@@ -16,6 +16,8 @@ here, so a fresh runtime (or a newer Firefox) is wired with one command:
      The copy keeps Mozilla's signature valid. Redo after replacing the runtime.
   3. runtime/vitre  = a junction to ../build (the chrome package). Sandboxed content processes can
      only read files inside the runtime directory, so the package has to appear there.
+  4. runtime/crashreporter.exe is renamed to crashreporter.exe.off: with Mozilla's identity it would
+     tidy the installed Firefox's crash folder (%APPDATA%\\Mozilla\\Firefox\\Crash Reports).
 
 --check only reports what is out of date and exits 1 if anything is.
 """
@@ -83,6 +85,19 @@ def main():
             r = subprocess.run(['cmd', '/c', 'mklink', '/J', link, BUILD], capture_output=True, text=True)
             if r.returncode:
                 sys.exit('mklink failed: ' + (r.stderr or r.stdout))
+
+    # 4. Mozilla's crash reporter, renamed out of the way (crashreporter.exe.off). This runtime keeps
+    # Mozilla's identity, so about a minute into every session the crash manager runs
+    # crashreporter.exe --ping-cleanup on the INSTALLED Firefox's "%APPDATA%\Mozilla\Firefox\Crash
+    # Reports" (release check, 2026-10-05). The release engine leaves the file out (setup-engine.py STRIP).
+    reporter = os.path.join(RUNTIME, 'crashreporter.exe')
+    if os.path.exists(reporter):
+        stale.append('runtime\\crashreporter.exe (renamed to crashreporter.exe.off)')
+        if not check:
+            parked = reporter + '.off'
+            if os.path.exists(parked):
+                os.remove(parked)
+            os.rename(reporter, parked)
 
     if not stale:
         print('runtime is wired for Vitre: nothing to do')
