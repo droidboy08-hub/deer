@@ -1,0 +1,8 @@
+{
+  "manifest_version": 2,
+  "name": "Spike MV2 webRequestBlocking (like uBlock Origin)",
+  "version": "1.0",
+  "background": { "scripts": ["bg.js"], "persistent": true },
+  "browser_action": { "default_title": "mv2" },
+  "permissions": ["webRequest", "webRequestBlocking", "<all_urls>"]
+}

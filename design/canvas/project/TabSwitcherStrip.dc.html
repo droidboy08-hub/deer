@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tab switcher, compact strip</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #f3eee4; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-switcher" x="0" y="0" width="1080" height="212" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/4811fc0d362319a1423b578704acf508" x="0" y="0" width="1080" height="212" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="18" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="22" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+
+<section aria-label="Recent tabs" style="position: absolute; left: 180px; top: 344px; width: 1080px; height: 212px; border-radius: 24px; box-shadow: 0 30px 80px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.3)">
+<div style="position: absolute; inset: 0; border-radius: 24px; backdrop-filter: url(#lens-switcher)"></div>
+<div style="position: absolute; inset: 0; border-radius: 24px; background: rgba(20,20,24,0.58)"></div>
+<div style="position: absolute; inset: 0; border-radius: 24px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.2)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 212px; box-sizing: border-box; padding: 24px 28px; display: flex; gap: 16px; align-items: center">
+
+<div style="width: 192px; display: flex; flex-direction: column; gap: 10px">
+<div style="position: relative; display: block; width: 192px; height: 120px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: #000000">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.1333); transform-origin: 0 0; pointer-events: none"><dc-import name="Article" scroll="{{0}}" hints="{{false}}" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Sand, heat and a bath of molten tin, current tab" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 10px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0">Sand, heat and a bath of molten tin</span></div>
+</div>
+
+<div style="width: 192px; display: flex; flex-direction: column; gap: 10px">
+<div style="position: relative; display: block; width: 192px; height: 120px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: #000000; box-shadow: 0 0 0 3px #4cc2ff, 0 0 0 7px rgba(76,194,255,0.22)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.1333); transform-origin: 0 0; pointer-events: none"><dc-import name="VideoPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Molten: a 4K study of glass in motion, selected" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 10px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #ffffff"><svg width="14" height="14" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0">Molten: a 4K study of glass in motion</span></div>
+</div>
+
+<div style="width: 192px; display: flex; flex-direction: column; gap: 10px">
+<div style="position: relative; display: block; width: 192px; height: 120px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: #000000">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.1333); transform-origin: 0 0; pointer-events: none"><dc-import name="RefPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Float glass" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 10px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg><span>Float glass</span></div>
+</div>
+
+<div style="width: 192px; display: flex; flex-direction: column; gap: 10px">
+<div style="position: relative; display: block; width: 192px; height: 120px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: #000000">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.1333); transform-origin: 0 0; pointer-events: none"><dc-import name="IssuesPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Issues · vitre-shell" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 10px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg><span>Issues · vitre-shell</span></div>
+</div>
+
+<div style="width: 192px; display: flex; flex-direction: column; gap: 10px">
+<div style="position: relative; display: block; width: 192px; height: 120px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: #000000">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.1333); transform-origin: 0 0; pointer-events: none"><dc-import name="GalleryPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Slow light" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 10px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg><span>Slow light</span></div>
+</div>
+
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

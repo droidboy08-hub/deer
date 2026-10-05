@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vitre downloads panel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}input::placeholder{color:rgba(255,255,255,0.55)}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #2b2a2e; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-float" x="0" y="0" width="960" height="688" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/907d800cda0d60b0784640e4a27452c3" x="0" y="0" width="960" height="688" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="22" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="Home" chrome="shown" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+
+<section aria-label="Downloads" style="position: absolute; left: 240px; top: 106px; width: 960px; height: 688px; border-radius: 22px; box-shadow: 0 40px 100px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-float)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: rgba(20,20,24,0.62)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.2)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+
+<div style="position: relative; height: 688px; display: flex; flex-direction: column">
+
+<div style="height: 48px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08)">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.4 9 10 12.6 13.6 9"></path><path d="M4 16.5h12"></path></svg>
+<span style="flex-grow: 1; font-size: 14px; font-weight: 600">Downloads</span>
+<button aria-label="Close downloads" style="width: 30px; height: 30px; border: 0; border-radius: 15px; padding: 0; background: rgba(255,255,255,0.08); color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; display: flex">
+
+<nav aria-label="Download filters" style="width: 216px; flex-shrink: 0; box-sizing: border-box; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px">
+<label style="height: 34px; margin-bottom: 12px; box-sizing: border-box; padding: 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.07); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.3); color: rgba(255,255,255,0.55); font-size: 13px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg><input type="search" placeholder="Search downloads" aria-label="Search downloads" style="flex-grow: 1; min-width: 0; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit"></label>
+<a href="#all" aria-current="page" style="position: relative; height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: #ffffff; text-decoration: none; background: rgba(255,255,255,0.1)"><span style="position: absolute; left: 0; top: 9px; width: 3px; height: 16px; border-radius: 2px; background: #4cc2ff"></span><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5 10 4l6.5 3.5L10 11z"></path><path d="M3.5 11 10 14.5 16.5 11"></path></svg><span style="flex-grow: 1">All</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">6</span></a>
+<a href="#active" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.4 9 10 12.6 13.6 9"></path><path d="M4 16.5h12"></path></svg><span style="flex-grow: 1">Downloading</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">2</span></a>
+<a href="#queued" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 6.5V10l2.4 1.5"></path></svg><span style="flex-grow: 1">Queued</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+<a href="#paused" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M8.3 7.5v5M11.7 7.5v5"></path></svg><span style="flex-grow: 1">Paused</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+<a href="#done" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="m7.3 10.2 1.9 1.9 3.6-3.8"></path></svg><span style="flex-grow: 1">Completed</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">2</span></a>
+<div style="margin: 16px 10px 6px; font-size: 12px; color: rgba(255,255,255,0.55)">Categories</div>
+<a href="#video" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="11" rx="2.2"></rect><path d="M8.5 8v4l3.5-2z" fill="currentColor"></path></svg><span style="flex-grow: 1">Video</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+<a href="#music" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5V5l8-1.5v9"></path><circle cx="6" cy="14.5" r="2"></circle><circle cx="14" cy="12.5" r="2"></circle></svg><span style="flex-grow: 1">Music</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+<a href="#documents" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3h6l3.5 3.5V16a1 1 0 0 1-1 1h-8.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M11.5 3v3.5H15M7.5 10.5h5M7.5 13.5h5"></path></svg><span style="flex-grow: 1">Documents</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+<a href="#compressed" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="13" height="12.5" rx="1.8"></rect><path d="M10 4v3M10 8.5v1.5M8.8 11.5h2.4v2.5H8.8z"></path></svg><span style="flex-grow: 1">Compressed</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">2</span></a>
+<a href="#programs" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"></rect><path d="M3 7.5h14"></path></svg><span style="flex-grow: 1">Programs</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1</span></a>
+</nav>
+
+<div style="width: 1px; flex-shrink: 0; margin: 16px 0; background: rgba(255,255,255,0.08)"></div>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 18px 20px 20px; display: flex; flex-direction: column">
+<div style="height: 32px; display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; font-size: 13px; color: rgba(255,255,255,0.7)">2 downloading at 26.1 MB/s · 1 queued · 1 paused</span>
+<button style="height: 32px; border: 0; padding: 0 14px 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; background: #4cc2ff; color: #04121a; font: inherit; font-size: 13px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg>Add link</button>
+<button style="height: 32px; border: 0; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">Pause all</button>
+<button style="height: 32px; border: 0; padding: 0 10px 0 12px; border-radius: 6px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">No speed limit<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 5 5-5"></path></svg></button>
+<button aria-label="Schedule downloads" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12" rx="2"></rect><path d="M3 8.5h14M7 3v3M13 3v3"></path></svg></button>
+</div>
+
+<div style="margin-top: 14px; height: 28px; padding: 0 12px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center; font-size: 12px; color: rgba(255,255,255,0.55); border-bottom: 1px solid rgba(255,255,255,0.08)">
+<span></span><span>Name</span><span>Progress</span><span>Speed</span><span>Time</span><span></span>
+</div>
+
+<div style="position: relative; margin-top: 4px; height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center; background: rgba(255,255,255,0.1)">
+<span style="position: absolute; left: 0; top: 17px; width: 3px; height: 16px; border-radius: 2px; background: #4cc2ff"></span>
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">MP4</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">float-line-tour-4k.mp4</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">1.2 GB · Video</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><div style="flex-grow: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.14)"><div style="width: 43%; height: 6px; border-radius: 3px; background: #4cc2ff"></div></div><span style="width: 30px; font-size: 12px; color: rgba(255,255,255,0.75)">43%</span></div>
+<span style="font-size: 13px">18.4 MB/s</span>
+<span style="font-size: 13px">38 s</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Pause" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"></rect><rect x="11.6" y="4" width="3.4" height="12" rx="1"></rect></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<div style="height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center">
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">ZIP</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">photos-archive-2026.zip</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">3.4 GB · Compressed</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><div style="flex-grow: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.14)"><div style="width: 12%; height: 6px; border-radius: 3px; background: #4cc2ff"></div></div><span style="width: 30px; font-size: 12px; color: rgba(255,255,255,0.75)">12%</span></div>
+<span style="font-size: 13px">7.7 MB/s</span>
+<span style="font-size: 13px">6 min</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Pause" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"></rect><rect x="11.6" y="4" width="3.4" height="12" rx="1"></rect></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<div style="height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center">
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">EXE</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">vitre-setup-0.3.0.exe</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">96 MB · Programs</span></div>
+<span style="font-size: 12.5px; color: rgba(255,255,255,0.75)">Queued</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.45)">—</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.75)">Next</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Start now" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"></path></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<div style="height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center">
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">GZ</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">dataset-2026-q3.csv.gz</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">740 MB · Compressed</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><div style="flex-grow: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.14)"><div style="width: 61%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.45)"></div></div><span style="width: 30px; font-size: 12px; color: rgba(255,255,255,0.75)">61%</span></div>
+<span style="font-size: 12.5px; color: rgba(255,255,255,0.75)">Paused</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.45)">—</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Resume" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"></path></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<div style="height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center">
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">PDF</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">field-notes-issue-14.pdf</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">24 MB · Documents</span></div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6ccb5f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 10.5 3.2 3L15 6.5"></path></svg>Completed</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.45)">—</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.75)">21:12</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Show in folder" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a1.5 1.5 0 0 1 1.5-1.5h3.3l1.7 1.8h6A1.5 1.5 0 0 1 17 7.8v6.7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z"></path></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<div style="height: 50px; padding: 0 12px; border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 150px 76px 60px 64px; column-gap: 12px; align-items: center">
+<span style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; background: rgba(255,255,255,0.12)">M4A</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">low-tide-sessions-part-3.m4a</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">58 MB · Music</span></div>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: rgba(255,255,255,0.75)"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6ccb5f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 10.5 3.2 3L15 6.5"></path></svg>Completed</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.45)">—</span>
+<span style="font-size: 13px; color: rgba(255,255,255,0.75)">20:40</span>
+<div style="display: flex; justify-content: flex-end; gap: 4px"><button aria-label="Show in folder" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a1.5 1.5 0 0 1 1.5-1.5h3.3l1.7 1.8h6A1.5 1.5 0 0 1 17 7.8v6.7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z"></path></svg></button><button aria-label="More actions" style="width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.3"></circle><circle cx="10" cy="10" r="1.3"></circle><circle cx="15" cy="10" r="1.3"></circle></svg></button></div>
+</div>
+
+<section aria-label="Details for float-line-tour-4k.mp4" style="margin-top: auto; box-sizing: border-box; padding: 14px 18px; border-radius: 10px; display: grid; grid-template-columns: 270px minmax(0, 1fr); column-gap: 28px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="display: flex; flex-direction: column">
+<span style="font-size: 13px; font-weight: 600">Connections</span>
+<span style="margin-top: 2px; font-size: 12px; color: rgba(255,255,255,0.6)">8 of 8 active · Resumable</span>
+<div style="margin-top: 12px; display: flex; gap: 2px; height: 16px">
+<sc-for list="{{segments}}" as="seg" hint-placeholder-count="8">
+<div style="flex-grow: 1; height: 16px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.12)"><div style="width: {{seg.fill}}%; height: 16px; background: #4cc2ff"></div></div>
+</sc-for>
+</div>
+<span style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.55)">Each block is one part of the file, fetched in parallel</span>
+<div style="margin-top: 12px; display: flex; gap: 22px; font-size: 12px"><div style="display: flex; flex-direction: column; gap: 2px"><span style="color: rgba(255,255,255,0.55)">Average</span><span style="font-size: 13px">18.4 MB/s</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="color: rgba(255,255,255,0.55)">Peak</span><span style="font-size: 13px">24.0 MB/s</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="color: rgba(255,255,255,0.55)">Received</span><span style="font-size: 13px">512 MB</span></div></div>
+</div>
+<div style="min-width: 0; display: flex; flex-direction: column">
+<div style="display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 8px; font-size: 13px">
+<span style="font-size: 12px; color: rgba(255,255,255,0.55); line-height: 18px">Address</span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">cdn.tideline.fm/v/float-line-tour-4k.mp4</span>
+<span style="font-size: 12px; color: rgba(255,255,255,0.55); line-height: 18px">Saved to</span><span>Downloads › Video</span>
+<span style="font-size: 12px; color: rgba(255,255,255,0.55); line-height: 18px">From page</span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">fieldnotes.press/glass/float</span>
+<span style="font-size: 12px; color: rgba(255,255,255,0.55); line-height: 18px">Started</span><span>Today, 21:31</span>
+</div>
+<div style="margin-top: 12px; display: flex; gap: 8px">
+<button style="height: 30px; border: 0; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #ffffff; font: inherit; font-size: 12.5px">Pause</button>
+<button style="height: 30px; border: 0; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #ffffff; font: inherit; font-size: 12.5px">Limit speed</button>
+<button style="height: 30px; border: 0; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #ffffff; font: inherit; font-size: 12.5px">Show in folder</button>
+<button style="height: 30px; border: 0; padding: 0 12px; border-radius: 6px; background: transparent; color: #ff99a4; font: inherit; font-size: 12.5px; box-shadow: inset 0 0 0 1px rgba(255,153,164,0.35)">Cancel</button>
+</div>
+</div>
+</section>
+
+</main>
+</div>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+segments: [72, 60, 55, 48, 40, 30, 25, 14].map((f) => ({ fill: f }))
+};
+}
+}
+</script>
+</body>
+</html>

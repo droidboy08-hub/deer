@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Closes itself</title></head>
+<body style="margin:0;font:15px 'Segoe UI',system-ui,sans-serif;background:#fff">
+<main style="padding:24px 40px">
+<h1>This page closes itself</h1>
+<button id="close">window.close()</button>
+<button id="focus">window.focus() after 300 ms</button>
+<p id="out"></p>
+</main>
+<script>
+  document.getElementById('close').addEventListener('click', () => {
+    window.close();
+    document.getElementById('out').textContent = 'close called, still here: ' + !window.closed;
+  });
+  document.getElementById('focus').addEventListener('click', () => setTimeout(() => window.focus(), 300));
+</script>
+</body>
+</html>

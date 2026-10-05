@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Hang - Field Notes</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; margin: 0; padding: 110px 60px; background: #fbfaf7; color: #1b1b1f; }
+  button { font: inherit; padding: 6px 14px; }
+</style></head>
+<body>
+<h1>A page that can be slow</h1>
+<p id="p1">A <a id="link" href="plain.html">plain link</a> and a sentence of text to select for the menu.</p>
+<p><button id="pop">Open a popup window</button></p>
+<p id="out">ready</p>
+<script>
+  // data-slow-menu (ms): the page's own contextmenu listener blocks that long (a slow page).
+  document.addEventListener('contextmenu', () => {
+    const ms = +(document.documentElement.dataset.slowMenu || 0);
+    const end = Date.now() + ms;
+    while (Date.now() < end);
+  }, true);
+  document.getElementById('pop').addEventListener('click', () => {
+    window.open('plain.html#popup', 'vitrepopup', 'popup,width=640,height=520');
+  });
+  window.addEventListener('keydown', (e) => { document.documentElement.dataset.lastKey = e.key; });
+</script>
+</body></html>

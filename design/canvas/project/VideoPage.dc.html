@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tideline video page (mock site)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}input::placeholder{color:#8b8e98}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #0e0f12; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<header style="height: 64px; box-sizing: border-box; padding: 0 40px; display: flex; align-items: center; gap: 24px">
+<div style="width: 240px; display: flex; align-items: center; gap: 8px">
+<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#19c3b0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9.5c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3"></path><path d="M2 14c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3" opacity="0.55"></path></svg>
+<span style="font-family: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.01em">tideline</span>
+</div>
+<div style="flex-grow: 1; display: flex; justify-content: center">
+<div style="width: 520px; height: 38px; box-sizing: border-box; padding: 0 16px; border-radius: 19px; display: flex; align-items: center; gap: 10px; background: #1b1c21; box-shadow: inset 0 0 0 1px #2a2c33; color: #8b8e98; font-size: 14px"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg><input type="search" placeholder="Search" aria-label="Search tideline" style="flex-grow: 1; min-width: 0; height: 36px; border: 0; padding: 0; background: transparent; color: #f2f2f4; font: inherit; font-size: 14px; outline: none"></div>
+</div>
+<div style="width: 240px; display: flex; align-items: center; justify-content: flex-end; gap: 16px">
+<a href="#upload" style="color: #f2f2f4; font-size: 14px; text-decoration: none">Upload</a>
+<button aria-label="Account" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: #3a3d46; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#c9ccd4" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="7.5" r="3"></circle><path d="M4.5 16.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"></path></svg></button>
+</div>
+</header>
+
+<div style="position: absolute; left: 40px; top: 84px; width: 960px; height: 540px; border-radius: 12px; overflow: hidden; background: #000000">
+<img src="/_blob/dd320ac987dd96d049df92293f327323" alt="Video frame: ribbons of colored glass twisting in the dark" style="display: block; width: 960px; height: 540px; object-fit: cover">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 140px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.72))"></div>
+<div style="position: absolute; left: 16px; right: 16px; bottom: 54px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22)">
+<div style="position: absolute; left: 0; top: 0; width: 50%; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.4)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 33%; height: 4px; border-radius: 2px; background: #19c3b0"></div>
+<div style="position: absolute; left: 33%; top: -4px; width: 12px; height: 12px; margin-left: -6px; border-radius: 6px; background: #ffffff"></div>
+</div>
+<div style="position: absolute; left: 10px; right: 10px; bottom: 10px; height: 36px; display: flex; align-items: center; gap: 4px; color: #ffffff; font-size: 13px">
+<button aria-label="Pause" style="width: 36px; height: 36px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.5" height="12" rx="1"></rect><rect x="11.5" y="4" width="3.5" height="12" rx="1"></rect></svg></button>
+<button aria-label="Next video" style="width: 36px; height: 36px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4.5 4.5v11l8-5.5z"></path><rect x="13.5" y="4.5" width="2.2" height="11" rx="1"></rect></svg></button>
+<button aria-label="Volume" style="width: 36px; height: 36px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8v4h3l4 3.5v-11l-4 3.5z"></path><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5"></path><path d="M15.5 5.5a6.5 6.5 0 0 1 0 9"></path></svg></button>
+<span style="margin-left: 6px; color: rgba(255,255,255,0.9)">6:12 / 18:42</span>
+<span style="flex-grow: 1"></span>
+<button aria-label="Captions" style="height: 22px; border: 1.5px solid rgba(255,255,255,0.9); border-radius: 4px; padding: 0 4px; margin-right: 8px; background: transparent; color: #ffffff; font: inherit; font-size: 10.5px; font-weight: 700">CC</button>
+<button aria-label="Settings" style="width: 36px; height: 36px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3.5 6h8.2M15.3 6h1.2M3.5 14h2.2M9.3 14h7.2"></path><circle cx="13.5" cy="6" r="1.8"></circle><circle cx="7.5" cy="14" r="1.8"></circle></svg></button>
+<button aria-label="Full screen" style="width: 36px; height: 36px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4"></path></svg></button>
+</div>
+</div>
+
+<div style="position: absolute; left: 40px; top: 644px; width: 960px">
+<h1 style="margin: 0; font-size: 22px; line-height: 28px; font-weight: 600">Molten: a 4K study of glass in motion</h1>
+<div style="margin-top: 14px; display: flex; align-items: center; gap: 12px">
+<span style="width: 38px; height: 38px; border-radius: 19px; background: #d9482b; display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-style: italic; font-size: 18px; color: #ffffff">F</span>
+<div style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 15px; font-weight: 600">Field Notes Films</span><span style="font-size: 12.5px; color: #8b8e98">Published 3 days ago</span></div>
+<button style="margin-left: 12px; height: 34px; border: 0; padding: 0 16px; border-radius: 17px; background: #f2f2f4; color: #0e0f12; font: inherit; font-size: 13.5px; font-weight: 600">Follow</button>
+<span style="flex-grow: 1"></span>
+<button style="height: 34px; border: 0; padding: 0 16px; border-radius: 17px; background: #1f2026; color: #f2f2f4; font: inherit; font-size: 13.5px">Like</button>
+<button style="height: 34px; border: 0; padding: 0 16px; border-radius: 17px; background: #1f2026; color: #f2f2f4; font: inherit; font-size: 13.5px">Share</button>
+<button style="height: 34px; border: 0; padding: 0 16px; border-radius: 17px; background: #1f2026; color: #f2f2f4; font: inherit; font-size: 13.5px">Save</button>
+</div>
+<div style="margin-top: 16px; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; background: #18191d; font-size: 14px; line-height: 1.5; color: #c9ccd4">Shot over one night shift on a float line: the furnace, the tin bath and the cut, filmed at 120 frames a second and slowed right down. No narration, just the sound of the line.</div>
+</div>
+
+<aside aria-label="Up next" style="position: absolute; left: 1032px; top: 84px; width: 368px; display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 15px; font-weight: 600; margin-bottom: 2px">Up next</div>
+<a href="#v1" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/c8af8d7b4207fa3bf2f5fd49ff4b738d" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">22:10</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">Northern lake, four seasons in one take</span><span style="font-size: 12.5px; color: #8b8e98">Slow Coast</span></span></a>
+<a href="#v2" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/3494d52af58947a9b195d2c609e47f8e" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">9:48</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">Ribbon studies, part 2</span><span style="font-size: 12.5px; color: #8b8e98">Field Notes Films</span></span></a>
+<a href="#v3" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/cebfadd7cb1d2dcfcd450abb2efbef84" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">31:05</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">Salt flats at first light</span><span style="font-size: 12.5px; color: #8b8e98">Long Exposure Club</span></span></a>
+<a href="#v4" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/2c894f902d92f2aa9aa1b0c8b84e1b0c" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">14:27</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">How we lit the orb shot</span><span style="font-size: 12.5px; color: #8b8e98">Field Notes Films</span></span></a>
+<a href="#v5" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/ba8da8a2dc14c97747c634d2780c8795" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">5:02</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">The tin bath, explained in five minutes</span><span style="font-size: 12.5px; color: #8b8e98">Refract</span></span></a>
+<a href="#v6" style="display: flex; gap: 12px; color: inherit; text-decoration: none"><span style="position: relative; flex-shrink: 0; width: 168px; height: 94px; border-radius: 8px; overflow: hidden"><img src="/_blob/39bffc633e1c71b2865a432d0fb09063" alt="" style="display: block; width: 168px; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; bottom: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.78); font-size: 11px; font-weight: 600">47:19</span></span><span style="display: flex; flex-direction: column; gap: 4px; padding-top: 2px"><span style="font-size: 14px; line-height: 19px; font-weight: 600">Dusk, from a canoe</span><span style="font-size: 12.5px; color: #8b8e98">Slow Coast</span></span></a>
+</aside>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

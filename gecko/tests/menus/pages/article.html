@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Float glass - Field Notes</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #1b1b1f; background: #fbfaf7; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 32px 400px; }
+  h1 { font-size: 40px; line-height: 1.15; margin: 0 0 8px; }
+  .meta { color: #6b6b72; font-size: 14px; margin-bottom: 20px; }
+  a { color: #005fb8; }
+  #mail, #tel, #file, #dl, #js, #link1 { white-space: nowrap; }
+  img { border-radius: 12px; display: block; }
+  textarea, input { font: inherit; padding: 8px 10px; border: 1px solid #c9c9cf; border-radius: 8px; box-sizing: border-box; }
+  .row { display: flex; gap: 12px; margin: 14px 0; align-items: flex-start; }
+  .tall { height: 900px; }
+  iframe { width: 100%; height: 70px; border: 1px solid #ddd; border-radius: 8px; }
+  #nomenu { flex: 1; background: #e8e2d4; border-radius: 10px; padding: 10px; font-size: 14px; height: 100px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Float glass</h1>
+  <div class="meta">Field Notes &middot; 6 min read</div>
+
+  <p id="p1">Most flat glass made today is float glass. Molten glass is poured onto a bath of molten tin, where
+  surface tension pulls it into a sheet of even thickness. <a id="link1" href="counter.html">The counter page</a>
+  explains how long the ribbon takes to cool. The reference lives at refract.wiki for now.</p>
+
+  <p id="p2">The process was developed by Pilkington in the 1950s. Read <a id="link2" href="counter.html?from=wrap">the long
+  history of the float process and of the people who made it work at scale</a>, or write to
+  <a id="mail" href="mailto:hello@example.com?subject=hi">the editors</a>, call <a id="tel" href="tel:+15551234567">the desk</a>,
+  get <a id="file" href="files/sample.zip">the data set</a> or <a id="dl" href="counter.html?from=download" download="notes.txt">the notes</a>.
+  A <a id="js" href="javascript:void 0">script link</a> does nothing.</p>
+
+  <div class="row">
+    <img id="img1" src="photo.svg" width="240" height="134" alt="A ribbon of glass">
+    <a id="imglink" href="counter.html?from=imglink"><img id="img2" src="photo.svg" width="180" height="100" alt="Linked image"></a>
+    <canvas id="cv" width="200" height="100" style="border-radius:10px"></canvas>
+  </div>
+
+  <div class="row"><textarea id="ta" rows="2" cols="44" spellcheck="true">The flaot process makes flat sheets.</textarea>
+  <input id="inp" type="text" value="editable field text" spellcheck="false" size="18"></div>
+  <div class="row"><input id="pw" type="password" value="hunter2hunter2" size="16">
+  <div id="ce" contenteditable="true" spellcheck="true" style="flex:1;padding:8px 10px;border:1px solid #c9c9cf;border-radius:8px">A rich field with a <span id="miss">flaot</span> typo in it.</div></div>
+
+  <div class="row">
+    <video id="vid" width="240" height="135" muted loop playsinline style="border-radius:10px;background:#000"></video>
+    <audio id="aud" controls style="width:260px"></audio>
+    <div id="nomenu" oncontextmenu="event.preventDefault(); this.dataset.hits = (+this.dataset.hits || 0) + 1">This box replaces the context menu (preventDefault).</div>
+  </div>
+
+  <iframe id="frame1" src="frame.html"></iframe>
+
+  <p class="tall" id="gap">A long gap so that the page scrolls.</p>
+  <p id="p4">Tempered glass, laminated glass and low-iron glass all start as float glass.</p>
+</main>
+<script>
+  window.addEventListener('keydown', (e) => { document.documentElement.dataset.lastKey = e.key; });
+  const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+  cx.fillStyle = '#1b2a55'; cx.fillRect(0, 0, 200, 100);
+  cx.fillStyle = '#7fd3ff'; cx.fillRect(70, 30, 60, 40);
+  cx.fillStyle = '#fff'; cx.font = '14px Segoe UI'; cx.fillText('canvas', 10, 20);
+</script>
+</body>
+</html>

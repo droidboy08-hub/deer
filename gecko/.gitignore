@@ -1,0 +1,45 @@
+# Rules for gecko/ (the browser). The generic rules (captures, logs, binaries, profiles, build output)
+# are in the root .gitignore.
+
+# Engines: the development runtime (an engine wired by tools/setup-runtime.py; a branded Firefox
+# there must never be published) and the downloaded unbranded engines (tools/setup-engine.py).
+# docs/BUILDING.md says where to get them.
+/runtime/
+/engines/
+
+# Firefox's own UI source, extracted for reading: python tools/extract-reference.py
+# (with its omni.partial-* / omni.old-* folders while it runs)
+/reference/omni*/
+
+# Build output (node tools/build.mjs [--out=build-<name>]) and the auto-discovered module indexes
+/build/
+/build-*/
+_generated.ts
+node_modules/
+
+# Test and spike output: captures, logs and throwaway profiles
+/out/
+/tests/**/out/
+/tests/**/out-*/
+/tests/**/out-*.txt
+/tests/*/build/
+/spikes/**/out/
+/spikes/**/dist/
+/spikes/packaging/variants/
+/spikes/packaging/verify/variants/
+/spikes/packaging/verify/removed-exes/
+
+# The compiled launcher (node tools/build-launcher.mjs)
+/launcher/*.exe
+
+# Release builds and installer test material (installer/build.py); work/dev-engine is a copy of the
+# branded runtime. installer/.gitignore says the same; repeated here so neither file alone decides.
+/installer/out/
+/installer/work/
+
+# Python's bytecode cache
+__pycache__/
+
+# The release key's private half never belongs in the repository (tools/release-key.mjs refuses to
+# write it here; only its public half, update-key.txt, is committed)
+*.pem

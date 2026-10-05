@@ -1,0 +1,299 @@
+/* Deer tab bar, window controls and tooltips (src/window/bar.ts, winctl.ts, reveal.ts, tips.ts).
+ *
+ * Ported from the Electron build (app/src/renderer/styles.css, "Tab bar" and "Window controls");
+ * sizes, radii, gaps, tints and motion are the design's. Differences from that sheet are marked
+ * "Gecko:" and are about mechanics, not looks.
+ * Loaded per window by VitreShell.beforeLayout, before the first layout.
+ */
+
+/* ---- Tab bar ---- */
+/* Two ids on purpose: `#vitre-root > .module-layer > *` gives every layer child pointer-events: auto,
+ * and the bar itself must stay click-through (the page shows between its items). */
+#vitre-root #vitre-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 68px;
+  pointer-events: none;
+  transition: transform 320ms var(--spring), opacity 220ms ease;
+}
+
+/* Hidden: F11 full screen, or the auto-hide setting. Gecko: the Electron sheet reveals with :hover on
+ * a 6 px strip; here reveal.ts sets the classes (a real pointer never reaches that strip in a normal
+ * window). opacity < 1 makes the bar a backdrop root, so the lenses see nothing while it fades: the
+ * fade is 220 ms and the Electron build has the same. */
+#vitre-root.bar-hiding:not(.bar-revealed) #vitre-bar { transform: translateY(-72px); opacity: 0; }
+#vitre-root.bar-hiding:not(.bar-revealed) #vitre-bar .item { pointer-events: none; }
+/* A native popup is about to hang from the bar: it comes back without the slide. */
+#vitre-root.bar-snap :is(#vitre-bar, #vitre-winctl, #vitre-private) { transition: none !important; }
+
+#vitre-bar .item {
+  top: 12px;
+  height: 44px;
+  pointer-events: auto;
+  -moz-window-dragging: no-drag;
+  transition: left 420ms var(--spring), width 420ms var(--spring), top 420ms var(--spring), height 420ms var(--spring), opacity 200ms ease, transform 320ms var(--spring), box-shadow 200ms ease;
+}
+#vitre-bar .item.entering { opacity: 0; transform: scale(0.6); transition: none; }
+#vitre-bar .item.leaving { opacity: 0; transform: scale(0.6); pointer-events: none; }
+/* Gecko: while the address field is open the items step aside (skin/omnibox.css). An item at
+ * opacity < 1 is a backdrop root and its lens would show the sharp page through a half-faded
+ * shape, so the tint, rim and faces fade instead and the lens stays until they are gone. */
+#vitre-bar .item > .tint, #vitre-bar .item > .rim, #vitre-bar .item .pill-face, #vitre-bar .item .circle-face, #vitre-bar .item .load-line { transition: opacity 200ms ease; }
+#vitre-bar .item > .lens { transition: visibility 0s linear 0s; }
+#vitre-bar .item.circle, #vitre-bar .item.tab { width: 44px; }
+
+/* Gecko: the circles' lens. At rest one element per row of circles does the bending (bar.ts
+ * settle()); it sits under the items and takes no events. While the layout moves each circle
+ * blurs for itself. */
+#vitre-bar .row-lens { position: absolute; pointer-events: none; }
+#vitre-bar.moving .item:not(.active, .morphing) > .lens { backdrop-filter: blur(1.4px) saturate(1.5); }
+
+#vitre-bar .item .circle-face, #vitre-bar .item.plus .face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-icon);
+}
+/* Board: the + and Home glyphs are drawn in the text colour (#16181d on light glass, white on a photo). */
+#vitre-bar .item.plus .face, #vitre-bar .item.home .fav { color: var(--g-text); }
+#vitre-bar .item .fav { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* Board: favicons are 18 px in the circles and the pill. */
+#vitre-bar .item .fav img {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  /* Firefox's own page icons (context-fill SVGs) take the glass's icon colour. */
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+#vitre-bar .item .fav svg { width: 18px; height: 18px; }
+#vitre-bar .item .circle-face:hover, #vitre-bar .item.plus .face:hover { background: var(--g-hover); }
+#vitre-bar .item .circle-face:active, #vitre-bar .item.plus .face:active { background: var(--g-press); }
+
+/* A favicon that is one flat light shape disappears on light glass (and a flat dark one on dark
+ * glass): it gets the plate the design's own icons are drawn on (18 px, radius 4.5). */
+#vitre-root.theme-light #vitre-bar .fav[data-tone="light"] img {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  border-radius: 4.5px;
+  background: #1d1f24;
+}
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-bar .fav[data-tone="dark"] img {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  border-radius: 4.5px;
+  background: #f4f2ec;
+}
+
+#vitre-bar .item .pill-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+#vitre-bar .item.active .pill-face { opacity: 1; pointer-events: auto; transition-delay: 120ms; }
+#vitre-bar .item.active .circle-face { opacity: 0; pointer-events: none; }
+#vitre-bar .item .circle-face { transition: opacity 160ms ease; }
+
+#vitre-bar .item .nav {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-icon);
+  flex-shrink: 0;
+}
+#vitre-bar .item .nav[hidden] { display: none; }
+#vitre-bar .item .nav:hover { background: var(--g-hover); }
+#vitre-bar .item .nav:active { background: var(--g-press); }
+#vitre-bar .item .nav[aria-disabled="true"] { color: var(--g-dim); background: transparent; }
+/* Board (HomeBrowse, 480 pill): Back 8..36, Forward 38..66, address 76..404, the download mark's
+ * slot 410..438 (kept free while the mark is hidden, so the find face's Aa lands there too),
+ * Reload 442..470. The address is centred at 240, the pill's middle. */
+#vitre-bar .item .back { margin-left: 8px; }
+#vitre-bar .item .forward { margin-left: 2px; }
+#vitre-bar .item .dl-mark { margin-right: 4px; }
+/* Gecko: xul.css forces [hidden] to display: none !important in browser.xhtml, so the empty slot is
+ * a class: the box stays, nothing is drawn, nothing takes clicks. */
+#vitre-bar .item .dl-mark.empty { visibility: hidden; pointer-events: none; }
+#vitre-bar .item .reload { margin-right: 10px; }
+#vitre-bar .item .address {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  margin: 0 6px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--g-text);
+  white-space: nowrap;
+}
+#vitre-bar .item .address .host { overflow: hidden; text-overflow: ellipsis; }
+/* Board (Home): nothing to go back to or reload; the placeholder spans the whole pill. */
+#vitre-bar .item.home .nav { display: none; }
+#vitre-bar .item.home .address { margin: 0; }
+#vitre-bar .item .address.placeholder { font-weight: 400; color: var(--g-placeholder); font-size: 14px; }
+#vitre-bar .item .address.placeholder .fav { color: var(--g-placeholder); }
+#vitre-bar .item .address.placeholder .fav svg { width: 16px; height: 16px; }
+/* Pinned extension buttons live here (the extensions module fills it). */
+#vitre-bar .item .accessories { display: flex; align-items: center; flex-shrink: 0; }
+/* With something in the accessories slot the address box ends before it, yet the favicon + host
+ * stay centred at the pill's middle while they fit (bar.ts measures the slot: has-acc and
+ * --vitre-acc on the item). An invisible spacer as wide as the slot balances the box (its -8 px
+ * margin cancels the flex gap it adds); it gives way first, and the host, capped to the box,
+ * ellipsizes only when the box is too narrow for it even without the spacer. */
+#vitre-bar .item.has-acc:not(.home) .address::before {
+  content: '';
+  flex: 0 1 var(--vitre-acc, 0px);
+  min-width: 0;
+  margin-right: -8px;
+}
+#vitre-bar .item.has-acc:not(.home) .address .host { flex-shrink: 0; max-width: calc(100% - 26px); }
+
+#vitre-bar .item .close-badge {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(28,28,32,0.88);
+  color: #fff;
+  /* Gecko: not rendered at all until it shows, so it takes no clicks and no focus; display joins
+   * the transition so the badge still fades out. */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.3);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 120ms ease, transform 160ms var(--spring), display 160ms allow-discrete;
+}
+#vitre-bar .item.tab:not(.active):hover .close-badge,
+#vitre-bar.close-always .item.tab:not(.active) .close-badge { display: flex; opacity: 1; transform: none; }
+@starting-style {
+  #vitre-bar .item.tab:not(.active):hover .close-badge { opacity: 0; transform: scale(0.7); }
+}
+
+#vitre-bar .item .load-line {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+#vitre-bar .item.active.loading .load-line { animation: vt-load 1.6s var(--expand) infinite; opacity: 1; }
+@keyframes vt-load { 0% { transform: scaleX(0); opacity: 1; } 70% { transform: scaleX(0.85); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+
+/* Keyboard focus on the pill's address button (Tab from the address field, src/window/barkeys.ts):
+ * the ring follows the pill instead of boxing the text. */
+#vitre-root #vitre-bar .item .address:focus-visible { outline: none; }
+#vitre-root #vitre-bar .item.active:has(.address:focus-visible) { outline: 2px solid var(--g-text); outline-offset: 2px; }
+
+/* A popup window (window.open with features): one read-only pill and the window controls. */
+#vitre-root.popup #vitre-bar :is(.plus, .nav, .close-badge, .accessories) { display: none; }
+#vitre-root.popup #vitre-bar .address { padding: 0 16px; }
+
+/* ---- Window controls ---- */
+#vitre-root #vitre-winctl {
+  right: 12px;
+  top: 18px;
+  width: 108px;
+  height: 32px;
+  border-radius: 16px;
+  z-index: 11;
+  -moz-window-dragging: no-drag;
+  transition: transform 320ms var(--spring);
+}
+#vitre-winctl .winctl-buttons { position: relative; display: flex; height: 32px; }
+#vitre-winctl .winctl-buttons button { width: 36px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--g-text); }
+#vitre-winctl .winctl-buttons button:first-child { border-radius: 16px 0 0 16px; }
+#vitre-winctl .winctl-buttons button:last-child { border-radius: 0 16px 16px 0; }
+#vitre-winctl .winctl-buttons button:hover { background: var(--g-hover); }
+#vitre-winctl .winctl-buttons #vitre-win-close:hover { background: #c42b1c; color: #fff; }
+/* Gecko: Windows hit-tests an element with these appearances as a real caption button (snap layouts
+ * on Maximize). appearance: none keeps Deer's own drawing. */
+#vitre-win-min { -moz-default-appearance: -moz-window-button-minimize; }
+#vitre-win-max { -moz-default-appearance: -moz-window-button-maximize; }
+:root:is([sizemode="maximized"], [sizemode="fullscreen"]) #vitre-win-max { -moz-default-appearance: -moz-window-button-restore; }
+#vitre-win-close { -moz-default-appearance: -moz-window-button-close; }
+
+/* Private window: a label in the capsule's material, left of it. (No board exists for this.) */
+#vitre-root #vitre-private {
+  right: 128px;
+  top: 18px;
+  height: 32px;
+  border-radius: 16px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--g-text);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: transform 320ms var(--spring);
+}
+#vitre-private .label { position: relative; }
+
+/* Full screen: the controls leave with the bar and come back with it. */
+#vitre-root.fullscreen:not(.bar-revealed) :is(#vitre-winctl, #vitre-private) { transform: translateY(-60px); }
+
+/* ---- Tooltips: plain text, the key as dim text ---- */
+#vitre-root #layer-tips .vitre-tip {
+  position: absolute;
+  max-width: min(640px, calc(100vw - 32px));
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  background: rgba(28,28,32,0.88);
+  color: #fff;
+  font: 12px var(--font);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+#vitre-root #layer-tips .vitre-tip[hidden] { display: none; }
+#vitre-root #layer-tips .vitre-tip.on { opacity: 1; }
+#layer-tips .vitre-tip .t { overflow: hidden; text-overflow: ellipsis; }
+#layer-tips .vitre-tip .k { flex: none; color: rgba(255,255,255,0.6); }
+#layer-tips .vitre-tip .k[hidden] { display: none; }
+
+/* Reduced motion (DESIGN-NOTES: 150 ms cross-fades; TabMotion board: no scaling or sliding). */
+@media (prefers-reduced-motion: reduce) {
+  #vitre-bar .item, #vitre-root #vitre-bar, #vitre-root #vitre-winctl, #vitre-root #vitre-private {
+    transition-property: opacity !important;
+    transition-duration: 150ms !important;
+  }
+  #vitre-bar .item.entering, #vitre-bar .item.leaving { transform: none; }
+  #vitre-bar .item .close-badge { transform: none; transition: opacity 150ms ease, display 150ms allow-discrete; }
+  #vitre-bar .item.active.loading .load-line { animation: none; opacity: 1; transform: scaleX(0.6); }
+}

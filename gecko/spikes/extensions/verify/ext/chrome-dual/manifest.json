@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome-style MV3 (service_worker + scripts)",
+  "version": "1.0",
+  "description": "Verifier test: an MV3 manifest that lists both background.service_worker (Chrome) and background.scripts (Firefox). No gecko id.",
+  "icons": { "64": "icon.png" },
+  "permissions": ["storage"],
+  "background": { "service_worker": "sw.js", "scripts": ["sw.js"] },
+  "action": { "default_title": "chrome dual", "default_icon": { "64": "icon.png" } }
+}

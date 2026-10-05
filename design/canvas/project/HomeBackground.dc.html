@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vitre home, background settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #2b2a2e; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-pop" x="0" y="0" width="340" height="472" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/4684eaeb00e525aad2e25f5c80334bdd" x="0" y="0" width="340" height="472" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="14" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.6"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="Home" chrome="shown" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; right: 20px; bottom: 20px; width: 44px; height: 44px; border-radius: 22px; background: rgba(255,255,255,0.2); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35)"></div>
+
+<div style="position: absolute; left: 1080px; top: 352px; width: 340px; height: 472px; border-radius: 20px; box-shadow: 0 24px 60px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)">
+<div style="position: absolute; inset: 0; border-radius: 20px; backdrop-filter: url(#lens-pop)"></div>
+<div style="position: absolute; inset: 0; border-radius: 20px; background: rgba(22,22,26,0.52)"></div>
+<div style="position: absolute; inset: 0; border-radius: 20px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.22)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 472px; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; font-size: 13px">
+
+<div style="height: 28px; display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 14px; font-weight: 600">Background</span>
+<button aria-label="Close" style="width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: rgba(255,255,255,0.1); color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</div>
+
+<div style="margin-top: 14px; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 10px; display: flex; gap: 2px; background: rgba(255,255,255,0.08)">
+<button aria-pressed="true" style="flex-grow: 1; border: 0; border-radius: 8px; background: rgba(255,255,255,0.2); color: #ffffff; font: inherit; font-size: 12.5px; font-weight: 600; box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.35)">Photo</button>
+<button aria-pressed="false" style="flex-grow: 1; border: 0; border-radius: 8px; background: transparent; color: rgba(255,255,255,0.72); font: inherit; font-size: 12.5px">Video</button>
+<button aria-pressed="false" style="flex-grow: 1; border: 0; border-radius: 8px; background: transparent; color: rgba(255,255,255,0.72); font: inherit; font-size: 12.5px">See-through</button>
+</div>
+
+<div style="margin-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<button aria-pressed="true" aria-label="Lake at sunset" style="position: relative; height: 94px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: transparent; box-shadow: 0 0 0 2px #ffffff"><img src="/_blob/e31b6a05051cebcce4d575ca3590b634" alt="" style="display: block; width: 100%; height: 94px; object-fit: cover"><span style="position: absolute; right: 6px; top: 6px; width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #ffffff; color: #16181d"><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 10.5 3.2 3L15 6.5"></path></svg></span></button>
+<button aria-pressed="false" aria-label="Ribbons" style="position: relative; height: 94px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: transparent"><img src="/_blob/9896632e380f9fa298ee6ec877af3f1e" alt="" style="display: block; width: 100%; height: 94px; object-fit: cover"></button>
+<button aria-pressed="false" aria-label="Mist" style="position: relative; height: 94px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: transparent"><img src="/_blob/f467f60764881bd058585a212f67dab8" alt="" style="display: block; width: 100%; height: 94px; object-fit: cover"></button>
+<button aria-pressed="false" aria-label="Orb" style="position: relative; height: 94px; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: transparent"><img src="/_blob/cf27d7061110604f6314bd40edc675b4" alt="" style="display: block; width: 100%; height: 94px; object-fit: cover"></button>
+</div>
+
+<button style="margin-top: 8px; height: 36px; border: 0; border-radius: 10px; background: rgba(255,255,255,0.1); color: #ffffff; font: inherit; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg>Add a photo or video</button>
+
+<div style="margin-top: 14px; height: 1px; background: rgba(255,255,255,0.12)"></div>
+
+<div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between"><label for="bg-dim">Dim</label><span style="color: rgba(255,255,255,0.55)">0%</span></div>
+<input id="bg-dim" type="range" min="0" max="60" value="0" style="width: 100%; margin: 0; accent-color: #4cc2ff">
+</div>
+
+<div style="margin-top: 12px; height: 28px; display: flex; align-items: center; justify-content: space-between">
+<span id="sw-home-tabs">Show tabs on the home page</span>
+<button role="switch" aria-checked="true" aria-labelledby="sw-home-tabs" style="position: relative; width: 40px; height: 20px; border: 0; border-radius: 10px; padding: 0; background: #4cc2ff"><span style="position: absolute; top: 3px; left: 23px; width: 14px; height: 14px; border-radius: 7px; background: #0b1a24"></span></button>
+</div>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

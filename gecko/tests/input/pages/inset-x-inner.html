@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset inner scroller</title>
+<!-- Verifier cases for pages that scroll an inner container (tests/input/inset-edge.js):
+     ?htmlhidden  html { overflow: hidden; height: 100% }, body 100%, #scroller { height: 100%; overflow: auto }
+     ?bodyscroll  html { overflow: hidden; height: 100% }, the body is the scroller
+     ?fixedapp    #scroller is position: fixed; inset: 0; overflow: auto (the document itself is empty)
+     ?plain100    html, body { height: 100% } (overflow visible) and #scroller { height: 100%; overflow: auto } -->
+<script>document.documentElement.className = location.search.slice(1) || "htmlhidden";</script>
+<style>
+body{margin:0;font:16px/1.5 Segoe UI;background:#f3efe6}
+p{margin:0 40px 12px} h1{margin:16px 40px}
+#scroller{background:#f3efe6}
+.htmlhidden{overflow:hidden;height:100%} .htmlhidden body{height:100%} .htmlhidden #scroller{height:100%;overflow:auto}
+.bodyscroll{overflow:hidden;height:100%} .bodyscroll body{height:100%;overflow:auto}
+.fixedapp #scroller{position:fixed;inset:0;overflow:auto}
+.plain100, .plain100 body{height:100%} .plain100 #scroller{height:100%;overflow:auto}
+</style>
+<div id="scroller"><h1 id="title">Inner scroller case</h1>
+<script>
+{ let s = ""; for (let i = 1; i <= 60; i++) s += "<p>" + i + ". Glass is an amorphous solid that is transparent and has widespread practical, technological and decorative use in window panes, tableware and optics.</p>"; document.write(s); }
+</script>
+<p id="last">The end.</p></div>

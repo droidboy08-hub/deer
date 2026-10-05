@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http: vitre:; media-src 'self' vitre:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'">
+<title>Vitre</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-clear">
+<svg id="glass-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs></defs></svg>
+
+<main id="stage">
+  <section id="home" aria-label="Home">
+    <img id="wallpaper" alt="">
+  </section>
+  <div id="views"></div>
+  <div id="error" hidden>
+    <div class="error-card">
+      <h1>Can’t reach this page</h1>
+      <p id="error-detail"></p>
+      <button id="error-retry" type="button">Try again</button>
+    </div>
+  </div>
+</main>
+
+<div id="drag-strip"></div>
+<div id="reveal-zone"></div>
+<nav id="bar" aria-label="Tabs"></nav>
+
+<div id="winctl" class="glass" role="group" aria-label="Window">
+  <div class="lens"></div><div class="tint"></div><div class="rim"></div>
+  <div class="winctl-buttons">
+    <button id="win-min" type="button" aria-label="Minimize"></button>
+    <button id="win-max" type="button" aria-label="Maximize"></button>
+    <button id="win-close" type="button" aria-label="Close window"></button>
+  </div>
+</div>
+
+<div id="omnibox" hidden>
+  <div id="omni-field" class="glass">
+    <div class="lens"></div><div class="tint"></div><div class="rim"></div>
+    <div class="omni-row">
+      <span class="omni-icon" aria-hidden="true"></span>
+      <input id="omni-input" type="text" spellcheck="false" autocomplete="off" aria-label="Search or enter address" placeholder="Search or enter address" role="combobox" aria-expanded="true" aria-controls="omni-list">
+    </div>
+  </div>
+  <div id="omni-panel" class="glass panel">
+    <div class="lens"></div><div class="tint"></div><div class="rim"></div>
+    <div id="omni-list" role="listbox" aria-label="Suggestions"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

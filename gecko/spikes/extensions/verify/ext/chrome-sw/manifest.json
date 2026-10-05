@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome-style MV3 (service worker only)",
+  "version": "1.0",
+  "description": "Verifier test: what a typical Chrome Web Store MV3 manifest looks like. No gecko id, service_worker background.",
+  "icons": { "64": "icon.png" },
+  "permissions": ["storage"],
+  "background": { "service_worker": "sw.js" },
+  "action": { "default_title": "chrome sw", "default_icon": { "64": "icon.png" } }
+}

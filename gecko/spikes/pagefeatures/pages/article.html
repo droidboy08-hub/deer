@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Float glass - Field Notes</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #1b1b1f; background: #fbfaf7; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 96px 32px 400px; }
+  h1 { font-size: 40px; line-height: 1.15; margin: 0 0 8px; }
+  .meta { color: #6b6b72; font-size: 14px; margin-bottom: 28px; }
+  a { color: #005fb8; }
+  img { border-radius: 12px; display: block; margin: 16px 0; }
+  textarea, input { font: inherit; padding: 8px 10px; border: 1px solid #c9c9cf; border-radius: 8px; width: 100%; box-sizing: border-box; }
+  .row { display: flex; gap: 12px; margin: 14px 0; }
+  .tall { height: 900px; }
+  iframe { width: 100%; height: 90px; border: 1px solid #ddd; border-radius: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Float glass</h1>
+  <div class="meta">Field Notes &middot; 6 min read</div>
+
+  <p id="p1">Most flat glass made today is float glass. Molten glass is poured onto a bath of molten tin, where
+  surface tension pulls it into a sheet of even thickness. <a id="link1" href="counter.html">The counter page</a>
+  explains how long the ribbon takes to cool.</p>
+
+  <p id="p2">The process was developed by Pilkington in the 1950s. Before that, plate Glass had to be ground and
+  polished on both sides. A <a id="link2" href="counter.html?from=blank" target="_blank">new-tab link</a> and a
+  <button id="opener" onclick="window.open('counter.html?from=open')">window.open button</button>
+  <button id="opener2" onclick="window.open('counter.html?from=popup','_blank','width=420,height=320')">popup</button> and a
+  <a id="link3" href="mailto:hello@example.com">mail link</a> live here too.</p>
+
+  <img id="img1" src="photo.svg" width="360" height="200" alt="A ribbon of glass">
+
+  <p id="p3">Because the tin is perfectly flat, the glass is too. The ribbon of glass leaves the bath at about
+  600 degrees and passes through an annealing lehr. Coated Glass is made on the same line.</p>
+
+  <a id="imglink" href="counter.html?from=imglink"><img id="img2" src="photo.svg" width="180" height="100" alt="Linked image"></a>
+
+  <div class="row"><textarea id="ta" rows="2" spellcheck="true">The flaot process makes flat sheets.</textarea></div>
+  <div class="row"><input id="inp" type="text" value="editable field text" spellcheck="false"></div>
+
+  <div id="ce" contenteditable="true" spellcheck="true" style="padding:8px 10px;border:1px solid #c9c9cf;border-radius:8px;margin:14px 0">A rich field with a <span id="miss">flaot</span> typo in it.</div>
+
+  <div class="row">
+    <canvas id="cv" width="240" height="120" style="border-radius:10px"></canvas>
+    <video id="vid" width="240" height="120" muted autoplay playsinline style="border-radius:10px;background:#000"></video>
+    <div id="nomenu" oncontextmenu="event.preventDefault(); this.dataset.hits = (+this.dataset.hits || 0) + 1" style="flex:1;background:#e8e2d4;border-radius:10px;padding:10px;font-size:14px">This box replaces the context menu (preventDefault).</div>
+  </div>
+
+  <iframe id="frame1" src="frame.html"></iframe>
+
+  <p class="tall">A long gap so that later matches are below the fold.</p>
+
+  <p id="p4">Tempered glass, laminated glass and low-iron glass all start as float glass. That is twelve.</p>
+</main>
+<script>
+  // Lets the spike verify things without reaching into the page from chrome.
+  window.addEventListener('keydown', (e) => { document.documentElement.dataset.lastKey = e.key; });
+  // A real playing video with no media file: the canvas animation captured as a stream.
+  const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+  let f = 0;
+  setInterval(() => {
+    f++;
+    cx.fillStyle = '#1b2a55'; cx.fillRect(0, 0, 240, 120);
+    cx.fillStyle = '#7fd3ff'; cx.fillRect((f * 4) % 240, 40, 40, 40);
+    cx.fillStyle = '#fff'; cx.font = '14px Segoe UI'; cx.fillText('frame ' + f, 10, 20);
+  }, 50);
+  const vid = document.getElementById('vid');
+  vid.srcObject = cv.captureStream(20);
+  vid.play().catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image link menu near the edge</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #101012; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-circle" x="0" y="0" width="44" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/fbb9d57b142a16bacfbe2c03ac04e7b6" x="0" y="0" width="44" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="16" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-tab" x="0" y="0" width="480" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/288d693bd243616b99e29672a748d2df" x="0" y="0" width="480" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="20" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="GalleryPage" hint-size="1440px,900px"></dc-import></div>
+
+<div style="position: absolute; left: 322px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Field Notes" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></button>
+</div>
+
+<div style="position: absolute; left: 374px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Tideline" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 426px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Refract" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 478px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Issues · vitre-shell" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 530px; top: 12px; width: 480px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-tab)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; width: 480px; height: 44px; color: #ffffff">
+<button aria-label="Back" style="position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.8 6.8 10l5.2 5.2"></path></svg></button>
+<button aria-label="Forward" aria-disabled="true" style="position: absolute; left: 38px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(255,255,255,0.32); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.8 13.2 10 8 15.2"></path></svg></button>
+<button aria-label="longexposure.club, edit address" style="position: absolute; left: 76px; top: 0; width: 328px; height: 44px; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit; font-size: 13.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg>longexposure.club</button>
+<button aria-label="Reload" style="position: absolute; right: 10px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.3 10a5.3 5.3 0 1 1-1.55-3.75"></path><path d="M15.4 4v3.4H12"></path></svg></button>
+</div>
+</div>
+
+<div style="position: absolute; left: 1018px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Home" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 1074px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="New tab" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg></button>
+</div>
+
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.2)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.3)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+
+<div style="position: absolute; left: 1054px; top: 452px; width: 264px; height: 345px"><dc-import name="CtxMenu" kind="imagelink" hover="{{1}}" hint-size="264px,345px"></dc-import></div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: 1198px; top: 507px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

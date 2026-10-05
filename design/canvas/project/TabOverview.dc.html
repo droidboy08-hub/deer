@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tab overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #0e0f12; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-tab" x="0" y="0" width="480" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/288d693bd243616b99e29672a748d2df" x="0" y="0" width="480" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="20" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="VideoPage" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; inset: 0; background: rgba(10,10,14,0.5); backdrop-filter: blur(36px) saturate(1.2)"></div>
+
+<div style="position: absolute; left: 480px; top: 12px; width: 480px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-tab)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 44px; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 10px; font-size: 14px">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}"><span style="color: rgba(255,255,255,0.6)">Search 6 tabs</span></sc-if>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="color: #ffffff">glass</span><span style="width: 1.5px; height: 18px; margin-left: -8px; background: #4cc2ff"></span><span style="margin-left: auto; font-size: 12.5px; color: rgba(255,255,255,0.55)">3 of 6</span></sc-if>
+</div>
+</div>
+
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.2)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.3)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+
+<div style="position: absolute; left: 96px; top: 248px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: {{ringF}}">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="Article" scroll="{{0}}" hints="{{false}}" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Sand, heat and a bath of molten tin, fieldnotes.press" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Sand, heat and a bath of molten tin</span>
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: rgba(255,255,255,0.55)">fieldnotes.press</span></sc-if>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: rgba(255,255,255,0.55)">fieldnotes.press/<span style="padding: 0 1px; border-radius: 3px; background: rgba(76,194,255,0.35); color: #ffffff">glass</span>/float</span></sc-if>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; left: 415px; top: 248px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: {{ringT}}">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="VideoPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Molten: a 4K study of glass in motion, tideline.fm, current tab" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Molten: a 4K study of glass in motion</span></sc-if>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Molten: a 4K study of <span style="padding: 0 1px; border-radius: 3px; background: rgba(76,194,255,0.35)">glass</span> in motion</span></sc-if>
+<span style="font-size: 12px; color: rgba(255,255,255,0.55)">tideline.fm</span>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; left: 734px; top: 248px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: 0 16px 40px rgba(0,0,0,0.45)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="RefPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Float glass, refract.wiki" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}"><button aria-label="Close Float glass" style="position: absolute; right: 8px; top: 8px; width: 24px; height: 24px; border: 0; padding: 0; border-radius: 12px; background: rgba(24,24,28,0.86); color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px rgba(255,255,255,0.35), 0 2px 6px rgba(0,0,0,0.3)"><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button></sc-if>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px">Float glass</span></sc-if>
+<sc-if value="{{filtered}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px">Float <span style="padding: 0 1px; border-radius: 3px; background: rgba(76,194,255,0.35)">glass</span></span></sc-if>
+<span style="font-size: 12px; color: rgba(255,255,255,0.55)">refract.wiki</span>
+</div>
+</div>
+</div>
+
+<sc-if value="{{showAll}}" hint-placeholder-val="{{true}}">
+
+<div style="position: absolute; left: 1053px; top: 248px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: 0 16px 40px rgba(0,0,0,0.45)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="IssuesPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Issues · vitre-shell, code.vitre.dev" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13px">Issues · vitre-shell</span><span style="font-size: 12px; color: rgba(255,255,255,0.55)">code.vitre.dev</span></div>
+</div>
+</div>
+
+<div style="position: absolute; left: 96px; top: 508px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: 0 16px 40px rgba(0,0,0,0.45)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="GalleryPage" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Slow light, longexposure.club" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13px">Slow light</span><span style="font-size: 12px; color: rgba(255,255,255,0.55)">longexposure.club</span></div>
+</div>
+</div>
+
+<div style="position: absolute; left: 415px; top: 508px; width: 291px">
+<div style="position: relative; display: block; width: 291px; height: 182px; border: 0; padding: 0; border-radius: 12px; overflow: hidden; background: #000000; box-shadow: 0 16px 40px rgba(0,0,0,0.45)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.2021); transform-origin: 0 0; pointer-events: none"><dc-import name="Home" chrome="hidden" hint-size="1440px,900px"></dc-import></span>
+<span style="position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16)"></span>
+<button aria-label="Home, start page" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 12px; background: transparent; cursor: pointer"></button>
+</div>
+<div style="margin-top: 12px; display: flex; align-items: flex-start; gap: 9px">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 13px">Home</span><span style="font-size: 12px; color: rgba(255,255,255,0.55)">Start page</span></div>
+</div>
+</div>
+
+<div style="position: absolute; left: 734px; top: 508px; width: 291px">
+<button aria-label="New tab" style="width: 291px; height: 182px; box-sizing: border-box; border: 1.5px dashed rgba(255,255,255,0.3); padding: 0; border-radius: 12px; background: rgba(255,255,255,0.04); color: #ffffff; display: flex; align-items: center; justify-content: center"><span style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12)"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg></span></button>
+<div style="margin-top: 12px; font-size: 13px; color: rgba(255,255,255,0.75)">New tab</div>
+</div>
+
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"query":{"editor":"enum","default":"","options":["","glass"],"section":"Search"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const filtered = (this.props.query ?? '') === 'glass';
+const ring = '0 0 0 3px #4cc2ff, 0 0 0 7px rgba(76,194,255,0.22), 0 16px 40px rgba(0,0,0,0.45)';
+const plain = '0 16px 40px rgba(0,0,0,0.45)';
+return {
+filtered: filtered,
+showAll: !filtered,
+ringF: filtered ? ring : plain,
+ringT: filtered ? plain : ring
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+/* Deer glass: tokens, the three themes and the .glass structure.
+ *
+ * Ported unchanged from the Electron build (app/src/renderer/styles.css); `body.theme-*` became
+ * `#vitre-root.theme-*` because Deer's layer is one element inside Firefox's window.
+ * Loaded per window by VitreShell.beforeLayout, before the first layout.
+ *
+ * A glass element is
+ *   <div class="glass"> <div class="lens"/> <div class="tint"/> <div class="rim"/> ...content </div>
+ * (src/window/glass.ts glass(el) builds it). The lens carries the backdrop-filter:
+ *   - a strip lens from lens(w, h) / rowLens(...) for bar-sized shapes,
+ *   - frost for panels, menus and popovers: class "frost" on the glass element,
+ *   - frost while the element changes size: class "morphing".
+ * The theme class on #vitre-root follows the page under the bar: theme-light | theme-dark |
+ * theme-clear (clear = over a photo or the wallpaper).
+ */
+
+#vitre-root {
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --expand: cubic-bezier(0.2, 0, 0, 1);
+  --accent: #4cc2ff;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Glass themes for the chrome: follow the page under the bar. */
+#vitre-root.theme-light {
+  --g-tint: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22));
+  --g-rim: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8));
+  --g-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18);
+  --g-text: #16181d;
+  --g-icon: rgba(22,24,29,0.78);
+  --g-dim: rgba(22,24,29,0.28);
+  --g-hover: rgba(22,24,29,0.06);
+  --g-press: rgba(22,24,29,0.1);
+  --g-placeholder: rgba(22,24,29,0.5);
+}
+#vitre-root.theme-dark {
+  --g-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.3);
+  --g-rim: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35));
+  --g-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3);
+  --g-text: #ffffff;
+  --g-icon: rgba(255,255,255,0.85);
+  --g-dim: rgba(255,255,255,0.3);
+  --g-hover: rgba(255,255,255,0.1);
+  --g-press: rgba(255,255,255,0.16);
+  --g-placeholder: rgba(255,255,255,0.6);
+}
+#vitre-root.theme-clear {
+  --g-tint: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
+  --g-rim: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35));
+  --g-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.22);
+  --g-text: #ffffff;
+  --g-icon: rgba(255,255,255,0.9);
+  --g-dim: rgba(255,255,255,0.32);
+  --g-hover: rgba(255,255,255,0.1);
+  --g-press: rgba(255,255,255,0.16);
+  --g-placeholder: rgba(255,255,255,0.62);
+}
+
+/* Board (HomeBrowse over a photo): the window capsule's rim is a touch quieter than the bar's. */
+#vitre-root.theme-clear #vitre-winctl > .rim {
+  background: linear-gradient(165deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.3));
+}
+
+/* ---- Glass ---- */
+#vitre-root .glass { position: absolute; border-radius: 22px; box-shadow: var(--g-shadow); }
+#vitre-root .glass > .lens,
+#vitre-root .glass > .tint,
+#vitre-root .glass > .rim { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+#vitre-root .glass > .tint { background: var(--g-tint); }
+#vitre-root .glass > .rim {
+  padding: 1px;
+  background: var(--g-rim);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+/* While the size animates, a lens sized for the end state would bend unevenly: use frost. */
+#vitre-root .glass.morphing > .lens { backdrop-filter: blur(10px) saturate(1.6) !important; }
+/* Panels, menus, popovers: frost, no lens map. Their tint and rim come from their own CSS. */
+#vitre-root .glass.frost > .lens { backdrop-filter: blur(24px) saturate(1.6); }

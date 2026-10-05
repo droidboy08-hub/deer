@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keeps Ctrl+F</title>
+<style>body{font:17px/1.6 "Segoe UI",sans-serif;margin:0;padding:24px 48px;background:#fbfaf7;color:#1b1b1f}dialog{font:inherit}</style></head>
+<body>
+<h1>A web app that keeps Ctrl+F</h1>
+<p id="p1">This page uses Ctrl+F for its own search box, like a web mail client. Its own glass search runs instead.</p>
+<p><input id="own" placeholder="The page's own search"></p>
+<p id="p2">Another glass line, and a <button id="open">dialog</button> that takes Esc.</p>
+<dialog id="dlg"><p>A page dialog with glass in it.</p><button id="close">Close</button></dialog>
+<script>
+  window.ownSearch = 0;
+  window.dialogEsc = 0;
+  addEventListener('keydown', (e) => {
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.keyCode === 70) { e.preventDefault(); window.ownSearch++; document.getElementById('own').focus(); }
+  });
+  document.getElementById('open').onclick = () => document.getElementById('dlg').showModal();
+  document.getElementById('close').onclick = () => document.getElementById('dlg').close();
+  document.getElementById('dlg').addEventListener('cancel', () => window.dialogEsc++);
+</script>
+</body></html>

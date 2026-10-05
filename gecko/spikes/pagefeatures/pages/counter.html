@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Counter - state probe</title>
+<style>
+  body { font: 16px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif; margin: 0; background: #10131a; color: #e9edf5; }
+  main { padding: 28px 36px; }
+  h1 { margin: 0 0 6px; font-size: 28px; }
+  #n { font: 600 72px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; color: #4cc2ff; }
+  code { background: #1d2330; padding: 2px 6px; border-radius: 6px; }
+  input { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #39435a; background: #171c27; color: inherit; width: 320px; }
+  a { color: #9fe3ff; }
+  canvas { display: block; margin-top: 14px; border-radius: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Counter page</h1>
+  <div>Loaded once, token <code id="token"></code>, query <code id="q"></code></div>
+  <div id="n">0</div>
+  <p><input id="typed" placeholder="type here; survives promotion">
+     <button id="alert" onclick="alert('Hello from the peek')">alert()</button></p>
+  <p><a id="next" href="second.html">Go to the second page</a> &middot;
+     <a id="nested" href="article.html">Back to the article (a link inside the peek)</a></p>
+  <canvas id="c" width="420" height="60"></canvas>
+</main>
+<script>
+  // Everything here is in-memory only: a reload would reset the token and the counter.
+  const token = Math.random().toString(36).slice(2, 8);
+  document.getElementById('token').textContent = token;
+  document.getElementById('q').textContent = location.search || '(none)';
+  document.documentElement.dataset.token = token;
+  let n = 0;
+  const el = document.getElementById('n');
+  const ctx = document.getElementById('c').getContext('2d');
+  setInterval(() => {
+    n++;
+    el.textContent = n;
+    document.documentElement.dataset.n = n;
+    ctx.fillStyle = '#171c27'; ctx.fillRect(0, 0, 420, 60);
+    ctx.fillStyle = '#4cc2ff'; ctx.fillRect((n * 6) % 420, 10, 40, 40);
+  }, 100);
+  // counter.html?trapesc uses Esc itself (like a page with its own dialogs).
+  if (location.search.includes('trapesc')) {
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); document.documentElement.dataset.esc = (+document.documentElement.dataset.esc || 0) + 1; }
+    });
+  }
+  window.__opener = !!window.opener;
+  document.documentElement.dataset.hasOpener = String(!!window.opener);
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre MV2 Blocker",
+  "version": "1.0",
+  "description": "Spike test extension: webRequest + webRequestBlocking, the API uBlock Origin uses on Firefox.",
+  "browser_specific_settings": { "gecko": { "id": "vitre-mv2@spike.test" } },
+  "icons": { "64": "icon.png" },
+  "permissions": ["webRequest", "webRequestBlocking", "storage", "tabs", "menus", "<all_urls>"],
+  "background": { "scripts": ["bg.js"] },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["cs.js"], "run_at": "document_end" }
+  ],
+  "browser_action": {
+    "default_icon": { "64": "icon.png" },
+    "default_title": "Vitre MV2 Blocker",
+    "default_popup": "popup.html",
+    "default_area": "navbar"
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": false },
+  "sidebar_action": {
+    "default_title": "Vitre MV2 sidebar",
+    "default_panel": "sidebar.html",
+    "default_icon": "icon.png",
+    "open_at_install": false
+  },
+  "devtools_page": "devtools.html",
+  "commands": {
+    "_execute_browser_action": { "suggested_key": { "default": "Ctrl+Shift+Y" } }
+  }
+}

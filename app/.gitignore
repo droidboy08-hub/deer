@@ -1,0 +1,8 @@
+# Rules for app/ (the Electron reference build). Captures (*.png) and other generic rules are in the
+# root .gitignore.
+node_modules/
+dist/
+dist-*/
+src/main/modules/_generated.ts
+src/renderer/modules/_generated.ts
+src/preload/page-modules/_generated.ts

@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset backgrounds</title>
+<!-- Verifier cases for the inset strip colour (tests/input/inset-edge.js):
+     ?bodydark   background on body only (dark)        ?htmldark  background on html only (dark)
+     ?none       no background anywhere                ?scheme    color-scheme: dark, no background
+     ?banner     body background colour plus a 120 px dark banner image at the top, with the site's
+                 white header text placed on it        ?fixedbg   a fixed (viewport) background image
+     ?gradient   a full-page gradient on body (white at the top, dark at the bottom; repeats by default) -->
+<script>document.documentElement.className = location.search.slice(1) || "none";</script>
+<style>
+body{margin:0;font:16px/1.5 Segoe UI}
+#hdr{height:120px;display:flex;align-items:center;padding:0 40px;font:600 28px Segoe UI}
+p{margin:0 40px 12px}
+.bodydark body{background:#1b1b1f;color:#eee}
+.htmldark{background:#2a1a1a;color:#eee}
+.scheme{color-scheme:dark}
+.banner body{background:linear-gradient(#1d3557,#1d3557) 0 0 / 100% 120px no-repeat, #f0e6d2;color:#222} .banner #hdr{color:#fff}
+.gradient body{background:linear-gradient(#ffffff,#ffffff 30%,#202020);color:#222}
+.fixedbg body{background:#0b132b linear-gradient(160deg,#3a506b,#0b132b 60%) fixed;color:#eee}
+</style>
+<div id="hdr">Site name on its banner</div>
+<script>
+{ let s = ""; for (let i = 1; i <= 40; i++) s += "<p>" + i + ". Glass is an amorphous solid that is transparent and has widespread practical, technological and decorative use in window panes, tableware and optics.</p>"; document.write(s); }
+</script>

@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Slow light - Long Exposure Club</title>
+<style>
+  html, body { margin: 0; background: #101012; color: #e9e9ee; font: 15px "Segoe UI", sans-serif; }
+  h1 { position: absolute; left: 48px; top: 100px; margin: 0; font-size: 28px; font-weight: 600; }
+  a.photo { position: absolute; width: 324px; height: 190px; border-radius: 10px; overflow: hidden; display: block; }
+  a.photo img { width: 324px; height: 190px; display: block; object-fit: cover; }
+</style></head>
+<body>
+<h1>Slow light</h1>
+<script>
+  const xs = [48, 388, 728, 1068];
+  const ys = [184, 390, 596];
+  let n = 0;
+  for (const y of ys) for (const x of xs) {
+    const a = document.createElement('a');
+    a.className = 'photo';
+    a.id = 'photo' + (++n);
+    a.href = 'counter.html?photo=' + n;
+    a.style.left = x + 'px';
+    a.style.top = y + 'px';
+    const img = document.createElement('img');
+    img.src = 'photo.svg';
+    img.alt = 'Photo ' + n;
+    a.append(img);
+    document.body.append(a);
+  }
+</script>
+</body></html>

@@ -1,0 +1,40 @@
+/* Deer Home: the background fills the window; the tab bar is the browser window's own glass.
+ * #2b2a2e is the board's base colour (design/canvas/project/Home.dc.html) and is what shows while a
+ * picture loads and for the "none" background. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #2b2a2e;
+  user-select: none;
+  cursor: default;
+}
+
+#bg {
+  position: fixed;
+  inset: 0;
+}
+
+#bg > .media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+}
+#bg > .media.shown {
+  opacity: 1;
+}
+/* One background replacing another cross-fades; the first one of a page load just appears. */
+#bg > .media.fade {
+  transition: opacity 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bg > .media.fade {
+    transition-duration: 150ms;
+  }
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Deer Home (about:vitre-home). A static page: the user's background and nothing else; the glass
+  tab bar over it is drawn by the browser window. It runs in the parent process with the system
+  principal, so it stays static: no page-derived HTML, no inline script or style, no network.
+  Logic: home.js (src/pages/home/home.ts). about: pages have no base URL, so every URL is absolute.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src chrome:; style-src chrome:; img-src chrome: file: blob:; media-src file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>Home</title>
+    <link rel="stylesheet" href="chrome://vitre/content/pages/home/home.css" />
+  </head>
+  <body>
+    <div id="bg" aria-hidden="true"></div>
+    <script src="chrome://vitre/content/pages/home/home.js"></script>
+  </body>
+</html>

@@ -1,0 +1,92 @@
+/* Firefox's own pages and prompts in Deer's colours (design: app/src/renderer/index.html #error
+ * card and styles.css; accent #005fb8 light / #4cc2ff dark; no illustration, no off-palette accent).
+ *
+ * Registered once per process by VitreStartup.registerPagesSheet as a USER sheet of
+ * nsIStyleSheetService, so it applies to every document, in content processes too; the
+ * @-moz-document blocks pick the documents. User-level !important outranks the pages' own author
+ * rules (the cascade: user !important beats author !important), which is why every declaration
+ * here carries it. Deer's own UI (#vitre-root in browser.xhtml) uses none of these tokens.
+ *
+ * 1. The accent of Firefox's design system (chrome://global/skin/design-system/tokens-shared.css:
+ *    --color-accent-primary and its hover / active / selected variants; buttons, links and focus
+ *    rings derive from them) in every about: page and chrome document: prompts (alert, confirm,
+ *    HTTP auth: chrome://global/content/commonDialog.xhtml), the print dialog, about:config...
+ * 2. The network error page (about:neterror, about:certerror; chrome://global/content/aboutNetError.html,
+ *    skin aboutNetError.css + error-pages.css + in-content/info-pages.css) laid out as the Electron
+ *    error card: a 480 px card centred on #f6f7f9, "Can't reach this page" 600 24/32 Segoe UI
+ *    Variable Display, one detail line in #5b6170, a 32 px #005fb8 button. The copy comes from
+ *    locales/en-US/toolkit/neterror/netError.ftl (Deer's L10n source overrides those ids).
+ *    security.certerrors.felt-privacy-v1 = false (defaults/pref/vitre-prefs.js) removes the
+ *    illustrated layout first. Certificate warnings keep their advanced panel; only colours change.
+ */
+
+/* ---- 1. accent ---- */
+@-moz-document url-prefix("about:"), url-prefix("chrome://") {
+  :root {
+    --color-accent-primary: light-dark(#005fb8, #4cc2ff) !important;
+    --color-accent-primary-hover: light-dark(#0a6cc9, #62c9ff) !important;
+    --color-accent-primary-active: light-dark(#1479d6, #7ad0ff) !important;
+    --color-accent-primary-selected: light-dark(#005fb8, #4cc2ff) !important;
+  }
+}
+
+/* ---- 2. the error card ---- */
+@-moz-document url-prefix("about:neterror"), url-prefix("about:certerror") {
+  :root, body {
+    background: light-dark(#f6f7f9, #1b1d21) !important;
+    color: light-dark(#1b1d21, #f4f2ec) !important;
+    background-image: none !important;
+  }
+  body {
+    margin: 0 !important;
+    padding: 0 24px !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  .container {
+    width: 480px !important;
+    min-width: 0 !important;
+    max-width: 480px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .title {
+    background-image: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .title-text {
+    font: 600 24px/32px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif !important;
+    margin: 0 0 8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+  p, li, #errorLongDesc, #trrOnlyContainer, .trr-message-container {
+    color: light-dark(#5b6170, #b6bac6) !important;
+    font: 14px/20px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif !important;
+    user-select: text !important;
+  }
+  p { margin: 0 0 20px !important; }
+  /* One detail line: the network errors' bullet list of things to try is not the card's. */
+  body.neterror:not(.certerror, .blocked, .captiveportal) #errorLongDesc { display: none !important; }
+  .button-container { justify-content: flex-start !important; gap: 8px !important; }
+  button {
+    height: 32px !important;
+    min-height: 32px !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    font: 600 14px/32px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif !important;
+    background: light-dark(#e3e5ea, #33363e) !important;
+    color: light-dark(#1b1d21, #f4f2ec) !important;
+  }
+  button.primary { background: #005fb8 !important; color: #fff !important; }
+  button.primary:hover { background: #0a6cc9 !important; }
+  button.primary:active { background: #1479d6 !important; }
+  #netErrorButtonContainer > button { margin-top: 0 !important; }
+  .advanced-panel { margin: 24px auto !important; min-width: 0 !important; max-width: 480px !important; }
+}

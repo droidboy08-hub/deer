@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre PageAction Test",
+  "version": "1.0",
+  "description": "Verifier test extension: a page_action with a popup, shown on the local test pages.",
+  "browser_specific_settings": { "gecko": { "id": "vitre-pa@spike.test" } },
+  "icons": { "64": "icon.png" },
+  "permissions": ["tabs", "menus"],
+  "background": { "scripts": ["bg.js"] },
+  "page_action": {
+    "default_icon": { "64": "icon.png" },
+    "default_title": "Vitre page action",
+    "default_popup": "popup.html",
+    "show_matches": ["http://127.0.0.1/*", "http://localhost/*"]
+  },
+  "commands": { "_execute_page_action": { "suggested_key": { "default": "Ctrl+Shift+U" } } }
+}

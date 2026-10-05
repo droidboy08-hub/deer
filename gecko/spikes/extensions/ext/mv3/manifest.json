@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Vitre MV3 DNR",
+  "version": "1.0",
+  "description": "Spike test extension: declarativeNetRequest static and dynamic rules.",
+  "browser_specific_settings": { "gecko": { "id": "vitre-mv3@spike.test" } },
+  "icons": { "64": "icon.png" },
+  "permissions": ["declarativeNetRequest", "declarativeNetRequestFeedback", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "scripts": ["bg.js"] },
+  "action": {
+    "default_icon": { "64": "icon.png" },
+    "default_title": "Vitre MV3 DNR",
+    "default_popup": "popup.html"
+  },
+  "declarative_net_request": {
+    "rule_resources": [{ "id": "static_rules", "enabled": true, "path": "rules.json" }]
+  }
+}

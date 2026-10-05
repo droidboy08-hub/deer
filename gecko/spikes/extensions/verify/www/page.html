@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>loading</title>
+    <style>
+      body { font: 15px "Segoe UI", sans-serif; padding: 24px 32px; }
+      table { border-collapse: collapse; margin-top: 12px; }
+      td, th { border: 1px solid #ccc; padding: 6px 12px; text-align: left; }
+      .ok { color: #0a7d32; font-weight: 600; }
+      .blocked { color: #c42b1c; font-weight: 600; }
+      p.sel { margin-top: 18px; }
+    </style>
+  </head>
+  <body>
+    <h1>Blocking test page</h1>
+    <p>Each row loads an image and a fetch() from the other loopback host (third party to this page).</p>
+    <table id="t"><tr><th>Request</th><th>img</th><th>fetch</th></tr></table>
+    <p class="sel">Some text to select, and <a id="link" href="http://localhost:47631/ok/pixel.png">a link</a>.</p>
+    <script>
+      const other = location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
+      const base = "http://" + other + ":" + location.port;
+      const cases = ["ok", "ads-mv2", "ads-dnr", "ads-dnr-dynamic"];
+      const out = {};
+      const img = (url) => new Promise((res) => { const i = new Image(); i.onload = () => res("loaded"); i.onerror = () => res("blocked"); i.src = url; });
+      const get = (url) => fetch(url, { mode: "no-cors", cache: "no-store" }).then(() => "loaded", () => "blocked");
+      (async () => {
+        for (const c of cases) {
+          const url = base + "/" + c + "/pixel.png?" + Date.now();
+          const r = [await img(url), await get(url + "f")];
+          out[c] = r;
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td>" + base + "/" + c + "/pixel.png</td>" + r.map((x) => '<td class="' + (x === "loaded" ? "ok" : "blocked") + '">' + x + "</td>").join("");
+          document.getElementById("t").appendChild(tr);
+        }
+        document.title = "RESULT " + JSON.stringify(out);
+      })();
+    </script>
+  </body>
+</html>

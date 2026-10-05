@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peek verify</title>
+<style>
+  body { margin: 0; background: #f6f7f9; color: #1b1d21; font: 15px "Segoe UI", system-ui, sans-serif; }
+  main { padding: 24px 40px; }
+  a { display: inline-block; margin: 6px 0; color: #1b1d21; }
+  .row { height: 48px; display: flex; align-items: center; border-bottom: 1px solid #e3e5ea; }
+  body.dark { background: #101216; color: #e8eaee; }
+  body.dark a { color: #9fc3ff; }
+  body.dark .row { border-color: #262a31; }
+</style>
+</head>
+<body>
+<main>
+<h1 id="h">Peek verify</h1>
+<div class="row" role="listitem"><a id="pdf" href="doc.pdf">A PDF document</a></div>
+<div class="row" role="listitem"><a id="slow" href="/slow?ms=3000&amp;page=issue.html%3Fn%3D41">A slow page (3 s)</a></div>
+<div class="row" role="listitem"><a id="hang" href="/hang">A page that never answers</a></div>
+<div class="row" role="listitem"><a id="dark" href="verify.html?dark">A dark page</a></div>
+<div class="row" role="listitem"><a id="closer" href="closer.html">A page that closes itself</a></div>
+<div class="row" role="listitem"><a id="still" href="still.html">A static page</a></div>
+<div class="row" role="listitem"><a id="kept" href="issue.html?n=24">Shift+click is the page's own here</a></div>
+<div class="row" role="listitem"><a id="i39" href="issue.html?n=39">Issue 39</a></div>
+<div class="row" role="listitem"><a id="i38" href="issue.html?n=38">Issue 38</a></div>
+<div class="row" role="listitem"><a id="xsite" href="#">Another site</a></div>
+<p><input id="field" placeholder="type here" value=""> <button id="pop">Open a popup</button> <button id="last">Last control</button></p>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.has('dark')) document.body.classList.add('dark');
+  // The page uses Shift+click on #kept itself (an app's multi-select): Peek must leave it alone.
+  document.getElementById('kept').addEventListener('click', (e) => {
+    if (!e.shiftKey) return;
+    e.preventDefault();
+    document.documentElement.dataset.kept = String(Number(document.documentElement.dataset.kept || 0) + 1);
+  });
+  document.getElementById('pop').addEventListener('click', () => window.open('issues.html', 'vpop', 'popup,width=760,height=560'));
+  const x = q.get('xsite');
+  if (x) document.getElementById('xsite').href = x + 'issue.html?n=27';
+</script>
+</body>
+</html>

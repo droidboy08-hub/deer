@@ -1,0 +1,4 @@
+html { height: 100%; background: linear-gradient(160deg, #1b2a4a, #54306b 60%, #b0563c); color: #fff; font: 16px "Segoe UI Variable Text", "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 18vh auto 0; padding: 28px 32px; border-radius: 24px; background: rgba(255,255,255,.14); backdrop-filter: blur(24px) saturate(1.6); border: 1px solid rgba(255,255,255,.28); }
+h1 { margin: 0 0 12px; font: 600 34px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+p { margin: 4px 0; opacity: .9; }

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Context menu (part)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@media (prefers-reduced-motion: reduce){.vt-plate{transition:opacity 150ms ease !important}}
+</style>
+</helmet>
+<div role="menu" aria-label="{{ariaLabel}}" style="position: relative; width: {{w}}px; height: {{h}}px; border-radius: 12px; box-shadow: {{t.shadow}}; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; color: {{t.text}}">
+<div style="position: absolute; inset: 0; border-radius: 12px; background: {{t.tint}}; backdrop-filter: {{t.frost}}; -webkit-backdrop-filter: {{t.frost}}; border: {{t.border}}"></div>
+<div style="position: absolute; inset: 0; border-radius: 12px; padding: 1px; background: {{t.rim}}; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+<div class="vt-plate" style="position: absolute; left: 6px; top: {{plate.top}}px; width: {{plate.w}}px; height: {{plate.h}}px; border-radius: 6px; background: {{plate.bg}}; box-shadow: {{plate.inset}}; opacity: {{plate.op}}; transition: {{plate.tr}}"></div>
+<div style="position: relative; padding: 6px; display: flex; flex-direction: column">
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="6">
+<sc-if value="{{row.isSep}}" hint-placeholder-val="{{false}}"><div role="separator" style="height: 9px; display: flex; align-items: center"><div style="flex-grow: 1; height: 1px; margin: 0 6px; background: {{t.sep}}"></div></div></sc-if>
+<sc-if value="{{row.isCap}}" hint-placeholder-val="{{false}}"><div aria-hidden="true" style="height: 28px; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; font-size: 12px; line-height: 16px; color: {{t.sec}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{row.label}}</div></sc-if>
+<sc-if value="{{row.isItem}}" hint-placeholder-val="{{true}}"><div role="{{row.role}}" aria-disabled="{{row.ariaDis}}" aria-checked="{{row.ariaChecked}}" aria-keyshortcuts="{{row.aks}}" style="position: relative; height: {{rowH}}px; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; gap: 12px; color: {{row.color}}; opacity: {{row.op}}">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="{{row.d}}"></path><path d="{{row.d2}}" stroke-opacity="0.45"></path></svg>
+<span style="flex-grow: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: {{row.fw}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{row.pre}}<span style="text-decoration: {{row.ud}}; text-decoration-thickness: 1px; text-underline-offset: 2px">{{row.k}}</span>{{row.post}}</span>
+<sc-if value="{{row.hasAccel}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; margin-left: 20px; font-size: 12px; line-height: 16px; color: {{row.accColor}}; white-space: nowrap">{{row.accel}}</span></sc-if>
+</div></sc-if>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"link","options":["page","link","filelink","mailto","image","canvas","imagelink","selection","selectionurl","editable","password","misspelled","video","videodrm","audio","pill","address","suggestion","circle","plus","ring","peekpage","peekheader","peeklink","home","findfield"],"section":"Menu"},"theme":{"editor":"enum","default":"dark","options":["dark","raised","light","solid","contrast"],"section":"Menu"},"hover":{"editor":"int","default":-1,"min":-1,"max":12,"section":"State"},"pressed":{"editor":"boolean","default":false,"section":"State"},"keys":{"editor":"boolean","default":false,"section":"State"},"touch":{"editor":"boolean","default":false,"section":"State"},"quote":{"editor":"text","default":"float glass","section":"Menu"},"caption":{"editor":"text","default":"Slow light · Long Exposure Club","section":"Menu"},"$preview":{"width":264,"height":234}}'>
+class Component extends DCLogic {
+componentDidMount() {
+this.prevHover = this.props.hover ?? -1;
+if (this.prevHover >= 0) this.lastLit = this.prevHover;
+}
+
+componentDidUpdate() {
+this.prevHover = this.props.hover ?? -1;
+if (this.prevHover >= 0) this.lastLit = this.prevHover;
+}
+
+renderVals() {
+const kind = this.props.kind ?? 'link';
+const theme = this.props.theme ?? 'dark';
+const hover = this.props.hover ?? -1;
+const pressed = !!(this.props.pressed ?? false);
+const keys = !!(this.props.keys ?? false);
+const touch = !!(this.props.touch ?? false);
+let quote = String(this.props.quote ?? 'float glass').split(/\r?\n/)[0].replace(/\s+/g, ' ').trim();
+if (quote.length > 24) quote = quote.slice(0, 24).trimEnd() + '…';
+const caption = this.props.caption ?? 'Slow light · Long Exposure Club';
+
+const P = {
+newtab: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM3 8h6V4.5', ''],
+peek: ['M7 6h6a1.5 1.5 0 0 1 1.5 1.5v5.5a1.5 1.5 0 0 1-1.5 1.5H7a1.5 1.5 0 0 1-1.5-1.5V7.5A1.5 1.5 0 0 1 7 6z', 'M4.5 3.5h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z'],
+newwindow: ['M4.5 5.5h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zM6 5.5V4a1.5 1.5 0 0 1 1.5-1.5H16A1.5 1.5 0 0 1 17.5 4v7.5A1.5 1.5 0 0 1 16 13h-1.5', ''],
+link: ['M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-.9.9M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l.9-.9', ''],
+download: ['M10 3.5v9M6.4 9 10 12.6 13.6 9M4 16.5h12', ''],
+inspect: ['M7 6 3 10l4 4M13 6l4 4-4 4', ''],
+back: ['M12 4.8 6.8 10l5.2 5.2', ''],
+forward: ['M8 4.8 13.2 10 8 15.2', ''],
+reload: ['M15.3 10a5.3 5.3 0 1 1-1.55-3.75M15.4 4v3.4H12', ''],
+find: ['M10.5 16.5H5.5A1.5 1.5 0 0 1 4 15V5a1.5 1.5 0 0 1 1.5-1.5h9A1.5 1.5 0 0 1 16 5v4M15.5 13a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0zM14.8 14.8l2.2 2.2', ''],
+search: ['M14.1 8.8a5.3 5.3 0 1 1-10.6 0 5.3 5.3 0 1 1 10.6 0zM12.8 12.8l3.6 3.6', ''],
+print: ['M6 7.5V3.5h8v4M6 14H4.5A1.5 1.5 0 0 1 3 12.5V9a1.5 1.5 0 0 1 1.5-1.5h11A1.5 1.5 0 0 1 17 9v3.5a1.5 1.5 0 0 1-1.5 1.5H14M6 11.5h8v5H6z', ''],
+copy: ['M8 7h7a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 15 17H8a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 8 7zM3.5 12.5V5A1.5 1.5 0 0 1 5 3.5h7.5', ''],
+cut: ['M8 14.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0zM16 14.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0zM7.3 13 13.5 3.5M12.7 13 6.5 3.5', ''],
+paste: ['M7 4.5H5.5A1.5 1.5 0 0 0 4 6v10a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 16 16V6a1.5 1.5 0 0 0-1.5-1.5H13M7.5 3h5v3h-5z', ''],
+undo: ['M7.5 5.5 4 9l3.5 3.5M4 9h7.5a4 4 0 0 1 0 8H9', ''],
+redo: ['M12.5 5.5 16 9l-3.5 3.5M16 9H8.5a4 4 0 0 0 0 8H11', ''],
+image: ['M5 4h10a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 15 16H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 4zM3.5 13.5l4-4 3.5 3.5 2-2 3.5 3.5M13.8 7.8a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 1 1 2.6 0z', ''],
+pause: ['M7.5 5v10M12.5 5v10', ''],
+mute: ['M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 8l4 4M17.5 8l-4 4', ''],
+close: ['M5.5 5.5l9 9M14.5 5.5l-9 9', ''],
+folder: ['M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 1.5h6A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z', ''],
+opentab: ['M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12M11 4.5h4.5V9M15.5 4.5 9.5 10.5', ''],
+check: ['M5 10.5 8.5 14 15 6.5', '']
+};
+
+const I = (label, icon, accel, ak, o) => Object.assign({ t: 'item', label: label, icon: icon || '', accel: accel || '', ak: ak || '' }, o || {});
+const S = { t: 'sep' };
+const C = (label) => ({ t: 'cap', label: label });
+const q = '“' + quote + '”';
+const inspect = I('Inspect', 'inspect', '', 'N');
+
+const M = {
+page: [I('Back', 'back', 'Alt+Left', 'B'), I('Forward', 'forward', 'Alt+Right', 'F', { dis: true }), I('Reload', 'reload', 'Ctrl+R', 'R'), S, I('Find on page…', 'find', 'Ctrl+F', 'I'), I('Print…', 'print', 'Ctrl+P', 'P'), I('Save page as…', 'download', 'Ctrl+S', 'A'), S, I('View page source', '', 'Ctrl+U', 'V'), inspect],
+link: [I('Open link in new tab', 'newtab', '', 'T'), I('Peek link', 'peek', 'Shift+click', 'P'), I('Open link in new window', 'newwindow', '', 'W'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, inspect],
+filelink: [I('Download linked file', 'download', '', 'D'), I('Copy link address', 'link', '', 'E'), S, inspect],
+mailto: [I('Copy email address', 'copy', '', 'E'), S, inspect],
+image: [I('Open image in new tab', 'image', '', 'I'), I('Peek image', 'peek', '', 'P'), S, I('Save image as…', 'download', '', 'V'), I('Copy image', 'copy', '', 'Y'), I('Copy image address', 'link', '', 'O'), S, inspect],
+canvas: [I('Save image as…', 'download', '', 'V'), I('Copy image', 'copy', '', 'Y'), S, inspect],
+imagelink: [I('Open link in new tab', 'newtab', '', 'T'), I('Peek link', 'peek', 'Shift+click', 'P'), I('Open link in new window', 'newwindow', '', 'W'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, I('Open image in new tab', 'image', '', 'I'), I('Save image as…', 'download', '', 'V'), I('Copy image', 'copy', '', 'Y'), S, inspect],
+selection: [I('Copy', 'copy', 'Ctrl+C', 'C'), S, I('Search for ' + q, 'search', '', 'S'), I('Find ' + q + ' on page', 'find', 'Ctrl+F', 'I'), S, inspect],
+selectionurl: [I('Copy', 'copy', 'Ctrl+C', 'C'), S, I('Go to refract.wiki', 'newtab', '', 'G'), I('Find “refract.wiki” on page', 'find', 'Ctrl+F', 'I'), S, inspect],
+editable: [I('Undo', 'undo', 'Ctrl+Z', 'U'), I('Redo', 'redo', 'Ctrl+Y', 'R', { dis: true }), S, I('Cut', 'cut', 'Ctrl+X', 'T', { dis: true }), I('Copy', 'copy', 'Ctrl+C', 'C', { dis: true }), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Paste as plain text', '', 'Ctrl+Shift+V', 'L'), I('Select all', '', 'Ctrl+A', 'A'), S, inspect],
+password: [I('Undo', 'undo', 'Ctrl+Z', 'U'), I('Redo', 'redo', 'Ctrl+Y', 'R', { dis: true }), S, I('Cut', 'cut', 'Ctrl+X', 'T', { dis: true }), I('Copy', 'copy', 'Ctrl+C', 'C', { dis: true }), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Select all', '', 'Ctrl+A', 'A'), S, inspect],
+misspelled: [I('float', '', '', '', { bold: true }), I('flat', '', '', '', { bold: true }), I('flout', '', '', '', { bold: true }), I('Add to dictionary', '', '', 'D'), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Select all', '', 'Ctrl+A', 'A'), S, inspect],
+video: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', '', 'L', { check: false }), I('Show controls', '', '', 'C', { check: false }), I('Picture in picture', '', '', 'I', { check: false }), S, I('Download video…', 'download', 'Ctrl+Shift+D', 'D'), I('Copy video address', 'link', '', 'O'), S, inspect],
+videodrm: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', '', 'L', { check: false }), I('Show controls', '', '', 'C', { check: false }), I('Picture in picture', '', '', 'I', { check: false }), S, I('Download video…', 'download', 'Protected', 'D', { dis: true }), S, inspect],
+audio: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', '', 'L', { check: true }), I('Show controls', '', '', 'C', { check: false }), S, I('Download audio', 'download', '', 'D'), I('Copy audio address', 'link', '', 'O'), S, inspect],
+pill: [I('Copy address', 'link', '', 'A'), I('Paste and go', 'paste', '', 'G'), S, I('Duplicate tab', '', '', 'D'), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', 'Ctrl+W', 'C')],
+address: [I('Undo', 'undo', 'Ctrl+Z', 'U'), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Paste and go', '', '', 'G'), I('Select all', '', 'Ctrl+A', 'A')],
+suggestion: [I('Remove from history', 'close', 'Shift+Delete', 'R')],
+circle: [C(caption), S, I('Reload tab', 'reload', '', 'R'), I('Duplicate tab', '', '', 'D'), I('Copy address', 'link', '', 'A'), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', '', 'C')],
+plus: [I('New window', 'newwindow', 'Ctrl+N', 'W'), I('Reopen closed tab', '', 'Ctrl+Shift+T', 'R'), S, I('Show downloads', 'download', 'Ctrl+J', 'S'), I('Full screen', '', 'F11', 'F', { check: false }), I('Settings', '', 'Ctrl+,', 'E')],
+ring: [I('Show downloads', 'download', 'Ctrl+J', 'S'), I('Open Downloads folder', 'folder', '', 'F'), S, I('Pause all', 'pause', '', 'P'), I('Download copied link', 'link', '', 'D'), I('Clear finished', '', '', 'C')],
+peekpage: [I('Open as tab', 'opentab', 'Alt+Enter', 'T'), I('Copy address', 'link', '', 'A'), S, I('Back', 'back', 'Alt+Left', 'B', { dis: true }), I('Forward', 'forward', 'Alt+Right', 'F', { dis: true }), I('Reload', 'reload', 'Ctrl+R', 'R'), S, I('Find on page…', 'find', 'Ctrl+F', 'I'), I('Print…', 'print', 'Ctrl+P', 'P'), S, inspect],
+peekheader: [I('Open as tab', 'opentab', 'Alt+Enter', 'T'), I('Copy address', 'link', '', 'A'), I('Open in new window', 'newwindow', '', 'W'), S, I('Close peek', 'close', 'Esc', 'C')],
+peeklink: [I('Open link in new tab', 'newtab', '', 'T'), I('Open link in new window', 'newwindow', '', 'W'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, inspect],
+home: [I('Paste and go', 'paste', '', 'G'), S, I('Change background…', 'image', '', 'B'), I('Show tab bar', '', '', 'T', { check: true }), S, I('Settings', '', 'Ctrl+,', 'E')],
+findfield: [I('Undo', 'undo', 'Ctrl+Z', 'U'), I('Redo', 'redo', 'Ctrl+Y', 'R', { dis: true }), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Select all', '', 'Ctrl+A', 'A'), S, I('Match case', '', 'Alt+C', 'M', { check: false })]
+};
+const list = M[kind] || M.link;
+
+const T = {
+dark: { tint: 'rgba(32,32,38,0.80)', frost: 'blur(24px) saturate(1.6)', rim: 'linear-gradient(165deg, rgba(255,255,255,0.45), rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.18))', shadow: '0 18px 44px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.3)', border: '0', text: '#ffffff', sec: 'rgba(255,255,255,0.70)', sep: 'rgba(255,255,255,0.10)', plate: 'rgba(255,255,255,0.12)', plateIn: 'inset 0 0.5px 0 rgba(255,255,255,0.22)', press: 'rgba(255,255,255,0.08)', disPlate: 'rgba(255,255,255,0.05)', dis: 0.36, hiText: '', hiBg: '' },
+raised: { tint: 'rgba(48,48,56,0.86)', frost: 'blur(24px) saturate(1.6)', rim: 'linear-gradient(165deg, rgba(255,255,255,0.55), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.2))', shadow: '0 18px 44px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.4)', border: '0', text: '#ffffff', sec: 'rgba(255,255,255,0.70)', sep: 'rgba(255,255,255,0.10)', plate: 'rgba(255,255,255,0.12)', plateIn: 'inset 0 0.5px 0 rgba(255,255,255,0.22)', press: 'rgba(255,255,255,0.08)', disPlate: 'rgba(255,255,255,0.05)', dis: 0.36, hiText: '', hiBg: '' },
+light: { tint: 'rgba(249,249,251,0.80)', frost: 'blur(24px) saturate(1.6)', rim: 'linear-gradient(165deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5) 40%, rgba(255,255,255,0.3))', shadow: '0 0 0 1px rgba(0,0,0,0.10), 0 16px 40px rgba(0,0,0,0.16), 0 1px 3px rgba(0,0,0,0.1)', border: '0', text: 'rgba(0,0,0,0.90)', sec: 'rgba(0,0,0,0.62)', sep: 'rgba(0,0,0,0.08)', plate: 'rgba(0,0,0,0.06)', plateIn: 'none', press: 'rgba(0,0,0,0.04)', disPlate: 'rgba(0,0,0,0.03)', dis: 0.36, hiText: '', hiBg: '' },
+solid: { tint: '#2c2c2c', frost: 'none', rim: 'linear-gradient(rgba(255,255,255,0.08), rgba(255,255,255,0.08))', shadow: '0 18px 44px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.3)', border: '0', text: '#ffffff', sec: 'rgba(255,255,255,0.70)', sep: 'rgba(255,255,255,0.10)', plate: 'rgba(255,255,255,0.10)', plateIn: 'none', press: 'rgba(255,255,255,0.07)', disPlate: 'rgba(255,255,255,0.05)', dis: 0.36, hiText: '', hiBg: '' },
+contrast: { tint: '#202020', frost: 'none', rim: 'linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0))', shadow: 'none', border: '1px solid #ffffff', text: '#ffffff', sec: '#ffffff', sep: '#ffffff', plate: '#8ee3f0', plateIn: 'none', press: '#8ee3f0', disPlate: 'rgba(0,0,0,0)', dis: 1, hiText: '#263b50', hiBg: '#8ee3f0' }
+};
+const t = T[theme] || T.dark;
+
+const rowH = touch ? 40 : 34;
+const charW = (s, px, bold) => s.length * px * (bold ? 0.54 : 0.51);
+let need = 0;
+let rowsH = 0;
+let ord = 0;
+let plateTop = 6;
+let hovRow = null;
+const tops = [];
+const ariaK = (a) => a.replace(/\bCtrl\b/g, 'Control').replace(/\bEsc\b/, 'Escape').replace(/\bDel\b/, 'Delete').replace(/\bLeft\b/, 'ArrowLeft').replace(/\bRight\b/, 'ArrowRight');
+const rows = list.map((r) => {
+if (r.t === 'sep') { rowsH += 9; return { isSep: true, isCap: false, isItem: false, label: '' }; }
+if (r.t === 'cap') { rowsH += 28; return { isSep: false, isCap: true, isItem: false, label: r.label }; }
+const myOrd = ord;
+ord += 1;
+const top = 6 + rowsH;
+tops[myOrd] = top;
+rowsH += rowH;
+const isHover = myOrd === hover;
+if (isHover) { plateTop = top; hovRow = r; }
+const w = 44 + charW(r.label, 14, r.bold) + (r.accel ? 32 + charW(r.accel, 12, false) : 0) + 16;
+if (w > need) need = w;
+let pre = r.label;
+let k = '';
+let post = '';
+let idx = -1;
+if (r.ak) {
+const low = r.label.toLowerCase();
+const key = r.ak.toLowerCase();
+for (let i = 0; i < low.length && idx < 0; i += 1) {
+if (low[i] === key && (i === 0 || /[\s“(]/.test(low[i - 1]))) idx = i;
+}
+if (idx < 0) idx = low.indexOf(key);
+}
+if (idx >= 0) { pre = r.label.slice(0, idx); k = r.label.slice(idx, idx + 1); post = r.label.slice(idx + 1); }
+const icon = r.check === true ? P.check : (r.check === false ? ['', ''] : (P[r.icon] || ['', '']));
+const isContrastHi = theme === 'contrast' && isHover && !r.dis;
+let color = t.text;
+if (isContrastHi) color = t.hiText;
+else if (theme === 'contrast' && r.dis) color = '#a6a6a6';
+let op = r.dis ? t.dis : 1;
+if (isHover && pressed && !r.dis) op = 0.8;
+return {
+isSep: false, isCap: false, isItem: true, label: r.label,
+role: r.check === undefined ? 'menuitem' : 'menuitemcheckbox',
+ariaDis: r.dis ? 'true' : 'false',
+ariaChecked: r.check === undefined ? undefined : (r.check ? 'true' : 'false'),
+aks: /^(Ctrl|Alt|Shift|Esc|F\d)/.test(r.accel) && r.accel !== 'Shift+click' ? ariaK(r.accel) : undefined,
+pre: pre, k: k, post: post,
+ud: keys && k ? 'underline' : 'none',
+fw: r.bold ? 600 : 400,
+d: icon[0], d2: icon[1],
+accel: r.accel, hasAccel: !!r.accel,
+accColor: isContrastHi ? t.hiText : t.sec,
+color: color, op: op
+};
+});
+if (!hovRow && this.lastLit !== undefined && tops[this.lastLit] !== undefined) plateTop = tops[this.lastLit];
+const w = Math.max(264, Math.min(360, Math.ceil(need / 8) * 8));
+const h = 12 + rowsH;
+
+let plateBg = t.plate;
+let plateIn = t.plateIn;
+if (hovRow && hovRow.dis) { plateBg = t.disPlate; plateIn = 'none'; }
+else if (pressed) { plateBg = t.press; plateIn = 'none'; }
+const prev = this.prevHover === undefined ? hover : this.prevHover;
+const glide = prev >= 0 && hover >= 0 && Math.abs(prev - hover) === 1;
+const S2 = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const plateTr = glide ? 'top 90ms ' + S2 + ', background 80ms ease, opacity 60ms ease' : (hover >= 0 ? 'opacity 60ms ease' : 'opacity 120ms ease');
+
+return {
+ariaLabel: kind === 'circle' ? caption : 'Context',
+w: w, h: h, t: t, rows: rows, rowH: rowH,
+plate: { top: plateTop, w: w - 12, h: rowH, bg: plateBg, inset: plateIn, op: hovRow ? 1 : 0, tr: plateTr }
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Full-screen tab switcher</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@keyframes vt-deck-in{from{opacity:0;transform:translateY(28px) scale(0.96)}to{opacity:1;transform:none}}
+@keyframes vt-current-shrink{from{transform:translateX(1060.5px) translateY(23.3px) scale(1.938)}to{transform:none}}
+@keyframes vt-from-clear{from{opacity:0}}
+@keyframes vt-wall-in{from{filter:blur(0px) brightness(1) saturate(1)}}
+@keyframes vt-dock-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.vt-anim{transition-property:opacity !important;transition-duration:150ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #0b0c10; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-dock" x="0" y="0" width="476" height="52" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/8bacb1a2cf3c6194f6ccee3c612a3b2a" x="0" y="0" width="476" height="52" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="16" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" class="vt-anim" style="position: absolute; left: -48px; top: -48px; width: 1536px; height: 996px; object-fit: cover; filter: blur(44px) brightness(0.5) saturate(1.25); animation: vt-wall-in 320ms ease-out backwards">
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c0.z}}; transform: {{c0.transform}}; opacity: {{c0.opacity}}; transition: {{c0.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-current-shrink 420ms cubic-bezier(0.22, 1, 0.36, 1) both">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c0.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg>
+<span style="font-size: 15px; font-weight: 600">Sand, heat and a bath of molten tin</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">fieldnotes.press</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c0.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="Article" scroll="{{0}}" hints="{{false}}" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c0.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c0.dim}}; transition: opacity 420ms ease; animation: vt-from-clear 480ms ease backwards"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c0.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Sand, heat and a bath of molten tin" onClick="{{c0.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c1.z}}; transform: {{c1.transform}}; opacity: {{c1.opacity}}; transition: {{c1.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-deck-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 120ms">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c1.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg>
+<span style="font-size: 15px; font-weight: 600">Molten: a 4K study of glass in motion</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">tideline.fm</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c1.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="VideoPage" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c1.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c1.dim}}; transition: opacity 420ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c1.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Molten: a 4K study of glass in motion" onClick="{{c1.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c2.z}}; transform: {{c2.transform}}; opacity: {{c2.opacity}}; transition: {{c2.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-deck-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 180ms">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c2.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<span style="font-size: 15px; font-weight: 600">Float glass</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">refract.wiki</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c2.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="RefPage" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c2.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c2.dim}}; transition: opacity 420ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c2.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Float glass" onClick="{{c2.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c3.z}}; transform: {{c3.transform}}; opacity: {{c3.opacity}}; transition: {{c3.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-deck-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 240ms">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c3.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size: 15px; font-weight: 600">Issues · vitre-shell</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">code.vitre.dev</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c3.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="IssuesPage" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c3.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c3.dim}}; transition: opacity 420ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c3.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Issues · vitre-shell" onClick="{{c3.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c4.z}}; transform: {{c4.transform}}; opacity: {{c4.opacity}}; transition: {{c4.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-deck-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 300ms">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c4.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg>
+<span style="font-size: 15px; font-weight: 600">Slow light</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">longexposure.club</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c4.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="GalleryPage" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c4.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c4.dim}}; transition: opacity 420ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c4.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Slow light" onClick="{{c4.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 288px; top: 160px; width: 864px; height: 540px; z-index: {{c5.z}}; transform: {{c5.transform}}; opacity: {{c5.opacity}}; transition: {{c5.tr}}">
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; animation: vt-deck-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 360ms">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: -48px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: {{c5.label}}; transition: opacity 260ms ease">
+<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg>
+<span style="font-size: 15px; font-weight: 600">Home</span><span style="font-size: 13px; color: rgba(255,255,255,0.55)">Start page</span>
+</div>
+<div class="vt-anim" style="position: relative; width: 864px; height: 540px; border-radius: {{c5.radius}}px; overflow: hidden; background: #000000; box-shadow: 0 30px 80px rgba(0,0,0,0.5); transition: border-radius 360ms cubic-bezier(0.2, 0, 0, 1)">
+<span aria-hidden="true" inert="inert" style="position: absolute; left: 0; top: 0; display: block; width: 1440px; height: 900px; transform: scale(0.6); transform-origin: 0 0; pointer-events: none"><dc-import name="Home" chrome="hidden" hint-size="1440px,900px"></dc-import></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 32%); opacity: {{c5.chrome}}; transition: opacity 200ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; background: #0b0c10; opacity: {{c5.dim}}; transition: opacity 420ms ease"></span>
+<span class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); opacity: {{c5.chrome}}; transition: opacity 200ms ease"></span>
+<button aria-label="Home" onClick="{{c5.pick}}" style="position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: inherit; background: transparent; cursor: pointer"></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 482px; top: 778px; width: 476px; height: 52px; z-index: 20; animation: vt-dock-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 160ms">
+<div class="vt-anim" style="position: relative; width: 476px; height: 52px; border-radius: 26px; box-shadow: 0 14px 34px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.3); opacity: {{dockOpacity}}; transform: {{dockTransform}}; transition: opacity 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)">
+<div style="position: absolute; inset: 0; border-radius: 26px; backdrop-filter: url(#lens-dock)"></div>
+<div style="position: absolute; inset: 0; border-radius: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 26px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 52px; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; gap: 8px">
+<button aria-label="Sand, heat and a bath of molten tin" aria-current="{{c0.current}}" onClick="{{c0.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c0.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c0.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c0.dockText}}; transition: opacity 240ms ease">Sand, heat and a bath of molten tin</span></button>
+<button aria-label="Molten: a 4K study of glass in motion" aria-current="{{c1.current}}" onClick="{{c1.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c1.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c1.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c1.dockText}}; transition: opacity 240ms ease">Molten: a 4K study of glass in motion</span></button>
+<button aria-label="Float glass" aria-current="{{c2.current}}" onClick="{{c2.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c2.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c2.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c2.dockText}}; transition: opacity 240ms ease">Float glass</span></button>
+<button aria-label="Issues · vitre-shell" aria-current="{{c3.current}}" onClick="{{c3.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c3.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c3.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c3.dockText}}; transition: opacity 240ms ease">Issues · vitre-shell</span></button>
+<button aria-label="Slow light" aria-current="{{c4.current}}" onClick="{{c4.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c4.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c4.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 18 18" style="flex-shrink: 0" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c4.dockText}}; transition: opacity 240ms ease">Slow light</span></button>
+<button aria-label="Home" aria-current="{{c5.current}}" onClick="{{c5.pick}}" class="vt-anim" style="flex-shrink: 0; width: {{c5.dockW}}px; height: 40px; box-sizing: border-box; border: 0; padding: 0 14px 0 12px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; gap: 9px; background: {{c5.dockBg}}; color: #ffffff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), background 300ms ease"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" style="flex-shrink: 0" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg><span class="vt-anim" style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: {{c5.dockText}}; transition: opacity 240ms ease">Home</span></button>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"autoplay":{"editor":"boolean","default":true,"section":"Motion"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+state = { sel: 1, dir: 1, opening: false, tick: 0 };
+
+componentDidMount() {
+this.startTimer();
+}
+
+componentWillUnmount() {
+clearInterval(this.timer);
+clearTimeout(this.openTimer);
+clearTimeout(this.stepTimer);
+}
+
+startTimer() {
+clearInterval(this.timer);
+this.timer = setInterval(() => this.step(), 2100);
+}
+
+reducedMotion() {
+return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+step() {
+if ((this.props.autoplay ?? true) === false || this.state.opening || this.reducedMotion()) return;
+const tick = this.state.tick + 1;
+if (tick % 4 === 0) {
+this.setState({ tick: tick });
+this.open();
+return;
+}
+let dir = this.state.dir;
+let next = this.state.sel + dir;
+if (next > 5 || next < 0) {
+dir = -dir;
+next = this.state.sel + dir;
+}
+this.setState({ tick: tick, sel: next, dir: dir });
+}
+
+open() {
+this.setState({ opening: true });
+clearTimeout(this.openTimer);
+this.openTimer = setTimeout(() => this.setState({ opening: false }), 1300);
+}
+
+pick(i) {
+if (this.state.opening) return;
+this.startTimer();
+clearTimeout(this.stepTimer);
+this.setState({ tick: 0 });
+if (i === this.state.sel) {
+this.open();
+return;
+}
+const go = () => {
+const s = this.state.sel;
+if (s === i) return;
+this.setState({ sel: s + Math.sign(i - s) });
+this.stepTimer = setTimeout(go, 140);
+};
+go();
+}
+
+renderVals() {
+const sel = this.state.sel;
+const opening = this.state.opening;
+const spring = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const card = (i) => {
+const d = i - sel;
+const isSel = d === 0;
+let transform = 'translateX(' + (d * 912) + 'px) scale(' + (isSel ? 1 : 0.86) + ')';
+if (opening && isSel) transform = 'translateY(20px) scale(1.6667)';
+let tr = 'transform 560ms ' + spring + ', opacity 320ms ease';
+if (opening) tr = isSel ? 'transform 360ms cubic-bezier(0.2, 0, 0, 1), opacity 220ms ease' : 'transform 560ms ' + spring + ', opacity 220ms ease';
+return {
+transform: transform,
+tr: tr,
+opacity: opening && !isSel ? 0 : (Math.abs(d) > 1 ? 0 : 1),
+z: isSel ? 10 : 5 - Math.abs(d),
+dim: isSel ? 0 : 0.5,
+radius: opening && isSel ? 0 : 22,
+chrome: opening && isSel ? 0 : 1,
+label: opening ? 0 : (isSel ? 1 : 0.5),
+dockW: isSel ? 216 : 40,
+dockBg: isSel ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0)',
+dockText: isSel ? 1 : 0,
+current: isSel ? 'true' : 'false',
+pick: () => this.pick(i)
+};
+};
+return {
+c0: card(0), c1: card(1), c2: card(2), c3: card(3), c4: card(4), c5: card(5),
+dockOpacity: opening ? 0 : 1,
+dockTransform: opening ? 'translateY(18px)' : 'translateY(0px)'
+};
+}
+}
+</script>
+</body>
+</html>

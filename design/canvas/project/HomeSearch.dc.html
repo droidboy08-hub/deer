@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vitre home, searching from the tab</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #2b2a2e; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-tab-open" x="0" y="0" width="640" height="48" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/fc5d2f4ff69b9666e7afa149aa3982aa" x="0" y="0" width="640" height="48" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="20" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-panel" x="0" y="0" width="640" height="292" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/a0883a42bddc12891027429d902bfb3f" x="0" y="0" width="640" height="292" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="14" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.6"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="Wallpaper: a still lake at sunset between snowy hills" style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; object-fit: cover">
+<div style="position: absolute; inset: 0; background: rgba(0,0,0,0.26)"></div>
+
+<div style="position: absolute; left: 400px; top: 12px; width: 640px; height: 48px; border-radius: 24px; box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24)">
+<div style="position: absolute; inset: 0; border-radius: 24px; backdrop-filter: url(#lens-tab-open)"></div>
+<div style="position: absolute; inset: 0; border-radius: 24px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))"></div>
+<div style="position: absolute; inset: 0; border-radius: 24px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 48px; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 12px">
+<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<span style="font-size: 15px; color: #ffffff">fie<span style="border-radius: 2px; background: rgba(76,194,255,0.42)">ldnotes.press</span></span>
+</div>
+</div>
+
+<div style="position: absolute; left: 400px; top: 68px; width: 640px; height: 292px; border-radius: 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.25)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-panel)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: rgba(22,22,26,0.52)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.22)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; padding: 8px 8px 16px; display: flex; flex-direction: column; font-size: 13.5px">
+
+<button style="width: 624px; height: 40px; box-sizing: border-box; border: 0; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.3); color: #ffffff; font: inherit; text-align: left">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg>
+<span>fieldnotes.press</span>
+<span style="margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.55)">Switch to tab</span>
+<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4.5v6a2 2 0 0 1-2 2H5"></path><path d="m8 9.5-3 3 3 3"></path></svg>
+</button>
+
+<div style="margin: 12px 12px 6px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.5)">History</div>
+<button style="width: 624px; height: 40px; box-sizing: border-box; border: 0; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; background: transparent; color: rgba(255,255,255,0.92); font: inherit; text-align: left">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg>
+<span>Archive</span>
+<span style="color: rgba(255,255,255,0.5)">fieldnotes.press/archive</span>
+</button>
+<button style="width: 624px; height: 40px; box-sizing: border-box; border: 0; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; background: transparent; color: rgba(255,255,255,0.92); font: inherit; text-align: left">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg>
+<span>The quiet science of ice</span>
+<span style="color: rgba(255,255,255,0.5)">fieldnotes.press/ice</span>
+</button>
+
+<div style="margin: 12px 12px 6px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.5)">Search</div>
+<button style="width: 624px; height: 40px; box-sizing: border-box; border: 0; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; background: transparent; color: rgba(255,255,255,0.92); font: inherit; text-align: left">
+<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<span>field notes</span>
+</button>
+<button style="width: 624px; height: 40px; box-sizing: border-box; border: 0; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; background: transparent; color: rgba(255,255,255,0.92); font: inherit; text-align: left">
+<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<span>fields medal</span>
+</button>
+
+</div>
+</div>
+
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.2)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.3)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

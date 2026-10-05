@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>scroll: 0</title>
+<style>
+  html, body { margin: 0; font: 14px "Segoe UI", sans-serif; background: #f4f1ea; color: #1b1d21; }
+  .row { height: 120px; border-bottom: 1px solid #c9c2b4; padding: 80px 32px 0; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<script>
+  for (let i = 0; i < 60; i++) document.write('<div class="row">row ' + i + '</div>');
+  addEventListener('scroll', () => { document.title = 'scroll: ' + Math.round(scrollY); });
+</script>
+</body>
+</html>

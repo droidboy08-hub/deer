@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Keyboard map</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 3730px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1344px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">Keyboard map</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">Every shortcut in Vitre. None of them is a key that Windows, an input method or a screen reader needs.</p>
+<div style="margin-top: 14px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">
+<span><span style="color: rgba(255,255,255,0.82)">Vitre first</span>: pages never get it</span>
+<span>·</span>
+<span><span style="color: rgba(255,255,255,0.82)">Page first</span>: the site can use it first</span>
+<span>·</span>
+<span><span style="color: rgba(255,255,255,0.82)">Inside Vitre</span>: only in Vitre’s own fields, menus and panels</span>
+<span>·</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></span><span><span style="color: rgba(255,255,255,0.82)">New</span>: new or changed by this map</span></span>
+</div>
+</div>
+
+<div style="position: absolute; left: 48px; top: 160px; width: 648px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Tabs and windows</div>
+<sc-for list="{{tabs}}" as="r" hint-placeholder-count="10">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Tab switcher</div>
+<sc-for list="{{switcher}}" as="r" hint-placeholder-count="12">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Address and search</div>
+<sc-for list="{{address}}" as="r" hint-placeholder-count="8">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Page</div>
+<sc-for list="{{page}}" as="r" hint-placeholder-count="15">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Downloads</div>
+<sc-for list="{{downloads}}" as="r" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+</div>
+
+<div style="position: absolute; left: 744px; top: 160px; width: 648px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Peek</div>
+<sc-for list="{{peek}}" as="r" hint-placeholder-count="11">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Find</div>
+<sc-for list="{{find}}" as="r" hint-placeholder-count="15">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Menus and focus</div>
+<sc-for list="{{menus}}" as="r" hint-placeholder-count="9">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Popovers and prompts</div>
+<sc-for list="{{popovers}}" as="r" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 20px; font-weight: 600; margin-bottom: 8px">Panels and app</div>
+<sc-for list="{{panels}}" as="r" hint-placeholder-count="9">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="box-sizing: border-box; padding: 20px 24px 10px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Editing</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">System standard, shown for completeness</span></div>
+<sc-for list="{{editing}}" as="r" hint-placeholder-count="8">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; column-gap: 16px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px">
+<div style="position: relative; min-width: 0"><sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -14px; top: 6.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if><div style="font-weight: 600; color: #ffffff">{{r.keys}}</div><sc-if value="{{r.alt}}" hint-placeholder-val="{{true}}"><div style="margin-top: 1px; font-size: 12px; line-height: 17px; color: #9a9ca6">{{r.alt}}</div></sc-if></div>
+<div style="min-width: 0; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+<div style="text-align: right; font-size: 12px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div>
+</div>
+</sc-for>
+</div>
+
+</div>
+
+<div style="position: absolute; left: 48px; top: 3190px; width: 1344px; box-sizing: border-box; padding: 20px 24px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.07)"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Never used</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Keys Vitre leaves to their owners.</span></div>
+<div style="margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 48px">
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 14px">
+<sc-for list="{{ownersA}}" as="o" hint-placeholder-count="4">
+<div style="font-size: 13px; line-height: 19px"><div style="font-weight: 600; color: #ffffff">{{o.owner}}</div><div style="margin-top: 2px; color: rgba(255,255,255,0.82)">{{o.keys}}</div><sc-if value="{{o.note}}" hint-placeholder-val="{{false}}"><div style="margin-top: 4px; font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{o.note}}</div></sc-if></div>
+</sc-for>
+</div>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 14px">
+<sc-for list="{{ownersB}}" as="o" hint-placeholder-count="5">
+<div style="font-size: 13px; line-height: 19px"><div style="font-weight: 600; color: #ffffff">{{o.owner}}</div><div style="margin-top: 2px; color: rgba(255,255,255,0.82)">{{o.keys}}</div><sc-if value="{{o.note}}" hint-placeholder-val="{{false}}"><div style="margin-top: 4px; font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{o.note}}</div></sc-if></div>
+</sc-for>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3730}}'>
+class Component extends DCLogic {
+renderVals() {
+const P = { v: 'Vitre first', p: 'Page first', l: 'Inside Vitre' };
+const rows = (list) => list.map((e) => ({ keys: e[0].replace(/Page (Up|Down)/g, 'Page $1'), alt: e[1], action: e[2], pri: P[e[3]], isNew: e[4] === 1 }));
+return {
+tabs: rows([
+['Ctrl+T', '', 'New tab on Home, placed as Settings › Tabs says, with the address field focused', 'v', 1],
+['Ctrl+W', 'Ctrl+F4', 'Close the active tab. An open panel or peek closes first; in the switcher, the card.', 'v', 1],
+['Ctrl+Shift+T', '', 'Reopen the last closed tab or window, or a peek still warm (60 s) on the active tab', 'v', 1],
+['Ctrl+N', '', 'New window, opening on Home', 'v', 0],
+['Ctrl+Shift+W', '', 'Close the window and all its tabs', 'v', 1],
+['Ctrl+Page Down / Ctrl+Page Up', '', 'Next / previous tab in tab-bar order, wrapping around, with no switcher', 'v', 1],
+['Ctrl+1 … Ctrl+8', '', 'Go to tab 1–8, counting from the left (Home counts as a tab)', 'p', 1],
+['Ctrl+9', '', 'Go to the last tab', 'p', 1],
+['Ctrl+Shift+Page Up / Ctrl+Shift+Page Down', '', 'Move the active tab one place left / right', 'p', 1],
+['F11', 'Full screen in the + menu', 'Window full screen: the tab bar hides until you point at the top edge. F11 again leaves, and a page can’t stop that.', 'p', 1]
+]),
+address: rows([
+['Ctrl+L', 'Alt+D', 'Edit the address: the pill opens with the address selected, dropping in if the bar is hidden', 'p', 1],
+['Enter', '', 'Go to the address or search. On a Switch to tab suggestion, switch to that tab.', 'l', 0],
+['Alt+Enter', '', 'Open the address or highlighted result in a new tab and switch to it', 'l', 1],
+['Shift+Enter', 'Ctrl+Q', 'Peek the highlighted result instead of going to it. On Home, it peeks over the wallpaper.', 'l', 1],
+['Ctrl+Enter', '', 'Add www. and .com to what you typed, then go', 'l', 1],
+['Shift+Delete', '', 'Remove the history suggestion you moved to with Up/Down or the pointer. Otherwise it cuts.', 'l', 0],
+['Esc', '', 'The first press puts the address back and closes suggestions; the second returns to the page', 'l', 1],
+['Ctrl+H', '', 'Recent history: the address field opens on the History group. Type to search it.', 'p', 1]
+]),
+page: rows([
+['Alt+Left', 'Mouse Back, Browser Back key', 'Back', 'p', 0],
+['Alt+Right', 'Mouse Forward, Browser Forward key', 'Forward', 'p', 0],
+['Ctrl+R', 'F5', 'Reload', 'p', 1],
+['Ctrl+Shift+R', 'Ctrl+F5, Shift+F5', 'Hard reload, skipping the cache. Shift+click the reload button does the same.', 'p', 1],
+['Esc', '', 'Stop loading, the last step of the Esc ladder. The reload slot shows × while a page loads.', 'p', 1],
+['Esc', '', 'In element full screen or pointer lock: leave it. Under keyboard lock, hold Esc.', 'v', 1],
+['Ctrl+Plus', 'Ctrl+=, numpad +, Ctrl+wheel up', 'Zoom in, per site. The pill shows the level, such as 110%, for 2 s.', 'p', 1],
+['Ctrl+Minus', 'numpad −, Ctrl+wheel down', 'Zoom out', 'p', 1],
+['Ctrl+0', 'Ctrl+numpad 0', 'Reset zoom to 100%', 'p', 1],
+['Ctrl+P', '', 'Print… (the Windows print dialog)', 'p', 0],
+['Ctrl+S', '', 'Save page as…', 'p', 0],
+['Ctrl+U', '', 'View page source', 'p', 0],
+['Ctrl+click a link', 'Middle-click; Ctrl+Enter on a link', 'Open the link in a new background tab', 'p', 1],
+['Ctrl+Shift+click a link', 'Ctrl+Shift+Enter on a focused link', 'Open the link in a new tab and switch to it', 'p', 1],
+['Browser Refresh, Stop, Search and Home keys', '', 'Reload, stop loading, edit the address, go to the Home tab', 'v', 1]
+]),
+peek: rows([
+['Shift+click a link', '', 'Peek the link in a sheet over the page', 'p', 0],
+['Shift+Enter', '', 'Peek the focused link', 'p', 0],
+['Ctrl+Q', '', 'Peek the focused link, or the link under the pointer', 'p', 1],
+['Shift+click a link', '', 'Hop to a link on the dimmed page', 'p', 0],
+['Alt+Enter', 'Open as tab; double-click the header', 'Open the peek as a tab: same page, no reload, right of its source tab', 'p', 1],
+['Esc', '', 'Close the peek; focus goes back to its link. A panel over the peek closes first.', 'p', 1],
+['Esc Esc', '', 'Within 400 ms: close even if the page uses Esc. After you type in the peek, it only bumps the sheet.', 'v', 1],
+['Ctrl+W', '', 'Close the peek, never the tab under it', 'v', 0],
+['Alt+Left', 'Mouse Back button', 'Back in the peek; on its first page, close it', 'p', 0],
+['Alt+Right', 'Mouse Forward button', 'Forward inside the peek', 'p', 0],
+['Ctrl+R, Ctrl+P, Ctrl+S, Ctrl+U, zoom keys, F12', '', 'Act on the peek, not the tab under it', 'p', 1]
+]),
+find: rows([
+['Ctrl+F', '', 'Open find in the active pill, pre-filled with the selection or the last query, and search at once', 'p', 0],
+['Ctrl+F', '', 'On Home: focus the search field', 'l', 0],
+['Ctrl+F', '', 'In a peek: find opens in its header', 'p', 0],
+['Ctrl+F', '', 'In the find field: select all, with no motion', 'l', 0],
+['Enter / Shift+Enter', 'F3 / Shift+F3, Ctrl+G / Ctrl+Shift+G', 'Next / previous match, wrapping around', 'l', 0],
+['F3 / Shift+F3', 'Ctrl+G / Ctrl+Shift+G', 'With find closed or parked: reopen it parked on the last query and step to the next / previous match', 'p', 0],
+['Alt+C', '', 'Match case on or off, per tab. Ignored while Ctrl or AltGr is down.', 'l', 0],
+['Ctrl+Enter', '', 'Close find and click the match', 'l', 0],
+['Ctrl+Q', '', 'Close find and peek the match’s link', 'l', 0],
+['Up / Down / Page Up / Page Down', '', 'Scroll the page without leaving the field', 'l', 0],
+['Tab / Shift+Tab', '', 'Cycle field → previous → next → Aa → ×', 'l', 0],
+['F6', '', 'Move to the page. Find stays open, parked, and F6 comes back to it.', 'l', 0],
+['Ctrl+L', '', 'Go to the address field; the query is kept for F3', 'l', 0],
+['Esc', '', 'Close find. The match stays selected: Enter follows its link, Shift+Enter or Ctrl+Q peeks it.', 'l', 0],
+['Shift+F10', 'Menu key', 'Open the field menu (editing rows plus Match case)', 'l', 0]
+]),
+switcher: rows([
+['Ctrl+Tab (quick tap)', '', 'Switch straight to the previous tab without the switcher (released within 150 ms)', 'v', 0],
+['Ctrl+Tab (hold Ctrl)', '', 'Open the switcher on the previous tab. Deck by default; Grid and Strip in Settings › Tabs.', 'v', 0],
+['Tab (Ctrl held)', 'Right; arrow keys in Grid', 'Next card (reading order in Grid and Strip)', 'l', 0],
+['Ctrl+Shift+Tab', 'Left (Ctrl held)', 'Previous card. From rest, it opens the switcher stepping back; a quick tap switches there.', 'v', 1],
+['Release Ctrl', '', 'Open the selected card. Releasing on the card you started on changes nothing.', 'l', 0],
+['Ctrl+Shift+Tab back to the start, then release Ctrl', 'Click the wallpaper; switch away', 'Cancel and stay on the tab you started on. Esc can’t, because Ctrl+Esc opens Start.', 'l', 1],
+['Ctrl+W', 'Delete; middle-click a card', 'Close the selected card. While a search is filtering, only the highlighted result.', 'l', 1],
+['Type any text', '', 'Search the tabs; Ctrl+letter types too, except W. The first character latches the switcher open.', 'l', 1],
+['Ctrl+Shift+A', '', 'Open the switcher latched, with search ready', 'p', 1],
+['Left / Right', 'Arrow keys in Grid', 'Latched: move the selection. With a query, Up/Down and Tab move it and Left/Right edit the text.', 'l', 1],
+['Enter', 'Click a card', 'Latched: open the selected tab', 'l', 1],
+['Esc', '', 'Latched: cancel and return to the tab you started on', 'l', 1]
+]),
+downloads: rows([
+['Ctrl+J', '', 'Show or hide the Downloads panel', 'p', 1],
+['Ctrl+Shift+D', '', 'Download this video: opens the quality picker for the page’s main video', 'p', 1],
+['Shift+click the Download pill', '', 'Download the suggested quality at once, skipping the picker', 'l', 0],
+['Alt+click a link', '', 'Download the linked file with Vitre’s downloader', 'p', 1],
+['Enter / Space / Delete', '', 'In the Downloads panel: open the file / pause or resume / remove the row (never the file)', 'l', 1]
+]),
+menus: rows([
+['Shift+F10', 'Menu key', 'Open the focused element’s menu 4 px below it, first item focused, access keys underlined', 'p', 0],
+['Shift+right-click', '', 'Vitre’s menu, even where a page replaces it', 'v', 0],
+['Up / Down', 'Tab / Shift+Tab', 'Move between menu items, wrapping. Separators and captions are skipped.', 'l', 0],
+['Home / End', '', 'First / last menu item', 'l', 0],
+['Enter', 'Space', 'Run the focused item. A check item toggles and the menu closes.', 'l', 0],
+['Access-key letter', '', 'Run that menu item at once', 'l', 0],
+['Esc', 'Alt, F10', 'Close the menu and return focus', 'l', 0],
+['F6', 'Shift+F6 the other way', 'Move focus between the page and the address pill (or find). With a peek: page → header → pill.', 'v', 1],
+['Tab from the address field', 'Shift+Tab back', 'Walk the tab bar: Left/Right cross the circles, + and the ring; Enter switches; Esc returns.', 'l', 1]
+]),
+popovers: rows([
+['Up / Down', '', 'Move between choices in a popover or prompt (quality picker, downloads, background, permission)', 'l', 1],
+['Enter', 'Space', 'Choose', 'l', 1],
+['Esc', '', 'Close and return focus to what opened it', 'l', 1]
+]),
+panels: rows([
+['Ctrl+,', 'Settings in the + and Home menus', 'Open or close Settings', 'p', 1],
+['F1', '', 'Open Settings › Keyboard shortcuts', 'p', 1],
+['Ctrl+Shift+Delete', '', 'Open Clear browsing data in Settings. Nothing is cleared until you confirm there.', 'p', 1],
+['Esc', 'The panel’s close button', 'Close the open Settings or Downloads panel', 'l', 1],
+['Ctrl+W', '', 'With a panel open: close it, not the tab under it', 'l', 1],
+['Ctrl+F', '', 'With a panel open: focus its own search field', 'l', 0],
+['F12', 'Ctrl+Shift+I', 'Developer tools on or off for the topmost surface (the peek, when one is open)', 'p', 1],
+['Ctrl+Shift+J', '', 'Open the developer tools console', 'p', 1],
+['Ctrl+Shift+C', '', 'Inspect element (the developer tools picker)', 'p', 1]
+]),
+editing: rows([
+['Ctrl+Z', '', 'Undo', 'p', 0],
+['Ctrl+Y', 'Ctrl+Shift+Z', 'Redo', 'p', 1],
+['Ctrl+X', 'Shift+Delete', 'Cut (greyed out in password fields)', 'p', 1],
+['Ctrl+C', 'Ctrl+Insert', 'Copy (greyed out in password fields)', 'p', 1],
+['Ctrl+V', 'Shift+Insert', 'Paste', 'p', 1],
+['Ctrl+Shift+V', '', 'Paste as plain text', 'p', 0],
+['Ctrl+A', '', 'Select all', 'p', 0],
+['Ctrl+Backspace / Ctrl+Delete', '', 'Delete the previous / next word', 'p', 1]
+]),
+ownersA: [
+{ owner: 'Windows shell and window management', keys: 'Win alone and Win+any key; Alt+Tab, Alt+Shift+Tab, Ctrl+Alt+Tab; Alt+Esc, Alt+Shift+Esc; Alt+Space (the system menu, and launchers such as PowerToys Run); Alt+F4; Ctrl+Esc, Ctrl+Shift+Esc, Ctrl+Alt+Delete; PrtScn with any modifier', note: '' },
+{ owner: 'Keyboard layouts and input languages', keys: 'Ctrl+Alt+anything and AltGr (Right Alt)+anything; Alt+Shift and Ctrl+Shift pressed alone; Ctrl+Left Shift and Ctrl+Right Shift (text direction); Ctrl+Shift+0–9 and Alt+Shift+0–9; Ctrl with the grave key, brackets, slash, backslash, semicolon, quote or period', note: '' },
+{ owner: 'IMEs (Chinese, Japanese, Korean)', keys: 'Ctrl+Space, Shift alone, Shift+Space; Ctrl+period, Ctrl+Shift+F, Ctrl+Shift+B (Microsoft Pinyin); Alt+grave, Kanji, Henkan, Muhenkan, Kana, Ctrl/Alt/Shift+Caps Lock, Ctrl+Shift+F10 (Japanese IME); Right Alt and Right Ctrl on Korean keyboards; every key while text is being composed', note: '' },
+{ owner: 'Accessibility and screen readers', keys: 'Shift pressed five times, Right Shift held, Num Lock held; Left Alt+Left Shift+PrtScn or Num Lock; Ctrl+Win+Enter; Caps Lock+anything and Insert+anything (Narrator, NVDA, JAWS); Ctrl+Alt+N (NVDA); single letters and digits on the page (browse mode); Alt+numpad digits (Alt codes)', note: '' }
+],
+ownersB: [
+{ owner: 'PowerToys and Windows mouse settings', keys: 'Ctrl tapped or double-tapped alone (Find My Mouse, pointer location); Win+Alt+Space and other PowerToys Win chords', note: '' },
+{ owner: 'GPU drivers and overlays', keys: 'NVIDIA overlay: Alt+Z, Alt+R, Alt+F1, Alt+F2, Alt+F3, Alt+F9, Alt+F10. AMD Radeon (configurable, varies by version): Ctrl+Shift+O, Ctrl+Shift+L, Ctrl+Shift+S, Ctrl+Shift+E, Ctrl+Shift+R, Ctrl+Shift+I. Intel: Ctrl+Alt+arrows, Ctrl+Alt+F12. Windows: Ctrl+Shift+Win+B', note: 'Vitre keeps Chrome’s Ctrl+Shift+R and Ctrl+Shift+I, which some Radeon installs take, and Settings warns about them. Each has another route: Shift+click reload, F12, Inspect.' },
+{ owner: 'Windows conventions Vitre keeps and never rebinds', keys: 'Alt or F10 pressed alone (they only close an open Vitre menu); Alt+letter on a page (HTML accesskey); Ctrl+Insert, Shift+Insert, Shift+Delete, Ctrl+Backspace, Ctrl+Delete in fields', note: '' },
+{ owner: 'Web pages (Vitre leaves these unbound)', keys: 'Ctrl+K, Ctrl+E, Ctrl+D, Alt+Home, F7, Ctrl+Shift+N (held for a private window, if one ships); any single printable key on the page or in the bar; any Alt+letter not in this map', note: '' },
+{ owner: 'Rejected Vitre ideas (never shipped)', keys: 'Tap Alt for key tips; a Ctrl+K command palette; Ctrl+Shift+O ghost mode; Ctrl+Shift+B to toggle the tab bar; any double-tap of a modifier', note: '' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

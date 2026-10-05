@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vitre-shell issue page (mock site)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: {{w}}px; height: {{h}}px; position: relative; overflow: hidden; background: #f6f7f9; color: #1b1d21; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<header style="height: 56px; box-sizing: border-box; padding: 0 40px; display: flex; align-items: center; gap: 14px; background: #16181d; color: #ffffff; font-size: 14px">
+<span style="width: 28px; height: 28px; border-radius: 7px; background: #1d1f24; box-shadow: inset 0 0 0 1px #34373f; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+<span style="font-weight: 600">code.vitre.dev</span><span style="color: #7b8190">/</span><span>vitre</span><span style="color: #7b8190">/</span><span style="font-weight: 600">vitre-shell</span><span style="color: #7b8190">/</span><span style="color: #c9ccd4">Issues</span>
+</header>
+
+<div style="padding: 28px 40px 0">
+<sc-if value="{{is39}}" hint-placeholder-val="{{true}}">
+<h1 style="margin: 0; font-size: 22px; line-height: 30px; font-weight: 600">Downloads: resume fails when the server drops the <span data-e="1" style="border-radius: 2px; background: {{fe.e1.bg}}; color: {{fe.e1.fg}}">ETag</span> <span style="font-weight: 400; color: #7b8190">#39</span></h1>
+<div style="margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: #5b6170"><span style="height: 26px; box-sizing: border-box; padding: 0 10px; border-radius: 13px; display: flex; align-items: center; gap: 6px; background: #2f9e5b; color: #ffffff; font-size: 12.5px; font-weight: 600"><span style="width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid #ffffff"></span>Open</span>tomas opened this issue 3 days ago · 1 comment</div>
+</sc-if>
+<sc-if value="{{is38}}" hint-placeholder-val="{{false}}">
+<h1 style="margin: 0; font-size: 22px; line-height: 30px; font-weight: 600">Search: Alt + Enter should open the result in a background tab <span style="font-weight: 400; color: #7b8190">#38</span></h1>
+<div style="margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: #5b6170"><span style="height: 26px; box-sizing: border-box; padding: 0 10px; border-radius: 13px; display: flex; align-items: center; gap: 6px; background: #2f9e5b; color: #ffffff; font-size: 12.5px; font-weight: 600"><span style="width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid #ffffff"></span>Open</span>rhea opened this issue 4 days ago · 1 comment</div>
+</sc-if>
+<div style="height: 1px; margin: 20px 0; background: #dfe2e8"></div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 220px; column-gap: 32px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 16px">
+
+<sc-if value="{{is39}}" hint-placeholder-val="{{true}}">
+<div style="border-radius: 8px; background: #ffffff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden">
+<div style="height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 8px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px"><span style="width: 22px; height: 22px; border-radius: 11px; background: #c9a37e"></span><span style="font-weight: 600">tomas</span><span style="color: #7b8190">commented 3 days ago</span></div>
+<div style="padding: 14px 16px 16px; font-size: 14px; line-height: 22px">
+<p style="margin: 0 0 10px">Resuming a paused download sends If-Range with the strong <span data-e="2" style="border-radius: 2px; background: {{fe.e2.bg}}; color: {{fe.e2.fg}}">ETag</span> from the first probe. After a redeploy, cdn.tideline.fm stops sending an <span data-e="3" style="border-radius: 2px; background: {{fe.e3.bg}}; color: {{fe.e3.fg}}">ETag</span>, so the piece comes back as a full 200 and the download starts again from zero.</p>
+<ol style="margin: 0 0 10px; padding-left: 22px">
+<li>Start float-line-tour-4k.mp4</li>
+<li>Pause at about 40%</li>
+<li>Run the "validator-dropped" scenario in tools/range-test</li>
+<li>Resume</li>
+</ol>
+<p style="margin: 0"><strong>Expected:</strong> fall back to Last-Modified when there is no <span data-e="4" style="border-radius: 2px; background: {{fe.e4.bg}}; color: {{fe.e4.fg}}">ETag</span> at all, and keep the 512 MB already on disk. <strong>Actual:</strong> restarts from 0 B.</p>
+</div>
+</div>
+<div style="border-radius: 8px; background: #ffffff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden">
+<div style="height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 8px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px"><span style="width: 22px; height: 22px; border-radius: 11px; background: #8fb3e8"></span><span style="font-weight: 600">rhea</span><span style="color: #7b8190">commented 2 days ago</span></div>
+<div style="padding: 14px 16px 16px; font-size: 14px; line-height: 22px">Refusing a weak validator is right and should stay. Falling back to Last-Modified only when the server sends no <span data-e="5" style="border-radius: 2px; background: {{fe.e5.bg}}; color: {{fe.e5.fg}}">ETag</span> keeps that safety and fixes this; If-Range accepts an HTTP date too.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{showDraft}}" hint-placeholder-val="{{false}}">
+<div style="border-radius: 8px; background: #ffffff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden">
+<div style="height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 18px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px"><span style="height: 40px; box-sizing: border-box; display: flex; align-items: center; border-bottom: 2px solid #1b1d21; font-weight: 600">Write</span><span style="color: #5b6170">Preview</span></div>
+<div style="padding: 12px 16px 0; font-size: 14px; line-height: 22px; height: 66px; box-sizing: border-box; box-shadow: inset 0 0 0 0 transparent">The <span data-w="1" style="background: {{draftSel.bg}}; color: {{draftSel.fg}}; text-decoration: underline wavy #e81123; text-decoration-thickness: 1px; text-underline-offset: 3px">flaot</span> line tour restarts from 0 B after each redeploy, same as tomas saw.<span style="display: inline-block; width: 1px; height: 17px; margin-left: 1px; vertical-align: -3px; background: {{draftCaret}}"></span></div>
+<div style="padding: 10px 14px 12px; display: flex; justify-content: flex-end; gap: 8px"><span style="height: 32px; box-sizing: border-box; padding: 0 14px; border-radius: 6px; display: flex; align-items: center; background: #2f9e5b; color: #ffffff; font-size: 13px; font-weight: 600">Comment</span></div>
+</div>
+</sc-if>
+<sc-if value="{{is38}}" hint-placeholder-val="{{false}}">
+<div style="border-radius: 8px; background: #ffffff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden">
+<div style="height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 8px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px"><span style="width: 22px; height: 22px; border-radius: 11px; background: #8fb3e8"></span><span style="font-weight: 600">rhea</span><span style="color: #7b8190">commented 4 days ago</span></div>
+<div style="padding: 14px 16px 16px; font-size: 14px; line-height: 22px">
+<p style="margin: 0 0 10px">Alt + Enter in the address pill opens the result in a new tab and switches to it. Now that Peek exists, I'd rather it stayed in the background so I can keep reading:</p>
+<ul style="margin: 0; padding-left: 22px">
+<li><strong>Enter</strong> opens the result here</li>
+<li><strong>Alt + Enter</strong> opens it in a background tab</li>
+<li><strong>Shift + Enter</strong> peeks at it</li>
+</ul>
+</div>
+</div>
+<div style="border-radius: 8px; background: #ffffff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden">
+<div style="height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 8px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px"><span style="width: 22px; height: 22px; border-radius: 11px; background: #b7a3e0"></span><span style="font-weight: 600">ana</span><span style="color: #7b8190">commented 3 days ago</span></div>
+<div style="padding: 14px 16px 16px; font-size: 14px; line-height: 22px">Agreed. That puts all three ways of opening a result one key apart.</div>
+</div>
+</sc-if>
+
+</div>
+
+<aside style="display: flex; flex-direction: column; gap: 18px; font-size: 13px">
+<div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #e3e6eb">
+<span style="font-weight: 600; color: #5b6170">Labels</span>
+<sc-if value="{{is39}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 6px"><span style="padding: 2px 8px; border-radius: 10px; background: #e5f5ec; color: #23784a; font-size: 12px">downloads</span></div></sc-if>
+<sc-if value="{{is38}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 6px"><span style="padding: 2px 8px; border-radius: 10px; background: #e6eefc; color: #2c55c9; font-size: 12px">tabs</span></div></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #e3e6eb">
+<span style="font-weight: 600; color: #5b6170">Assignee</span>
+<span>{{assignee}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-weight: 600; color: #5b6170">Milestone</span>
+<span>0.3</span>
+</div>
+</aside>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"issue":{"editor":"enum","default":"39","options":["39","38"]},"w":{"editor":"int","default":1040,"min":640,"max":1440},"h":{"editor":"int","default":760,"min":400,"max":900},"find":{"editor":"boolean","default":false,"section":"Find"},"active":{"editor":"int","default":2,"min":0,"max":5,"section":"Find"},"draft":{"editor":"boolean","default":false,"section":"Comment"},"draftSelected":{"editor":"boolean","default":false,"section":"Comment"},"$preview":{"width":1040,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+const issue = String(this.props.issue ?? '39');
+const find = !!(this.props.find ?? false);
+const active = this.props.active ?? 2;
+const fe = {};
+for (let i = 1; i <= 5; i += 1) {
+fe['e' + i] = find ? { bg: i === active ? 'rgb(255,150,50)' : 'rgb(255,255,0)', fg: '#000000' } : { bg: 'transparent', fg: 'inherit' };
+}
+const draft = !!(this.props.draft ?? false);
+const sel = !!(this.props.draftSelected ?? false);
+return {
+fe: fe,
+showDraft: draft && issue === '39',
+draftSel: sel ? { bg: 'rgb(51,144,255)', fg: '#ffffff' } : { bg: 'transparent', fg: 'inherit' },
+draftCaret: sel ? 'transparent' : '#1b1d21',
+is39: issue === '39',
+is38: issue === '38',
+assignee: issue === '38' ? 'ana' : 'tomas',
+w: this.props.w ?? 1040,
+h: this.props.h ?? 760
+};
+}
+}
+</script>
+</body>
+</html>

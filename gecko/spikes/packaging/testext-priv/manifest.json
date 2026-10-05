@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre built-in probe",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "builtin-probe@vitre.invalid" } },
+  "permissions": ["tabs"],
+  "browser_action": { "default_title": "builtin: not run" },
+  "background": { "scripts": ["background.js"] },
+  "experiment_apis": {
+    "vitreProbe": {
+      "schema": "schema.json",
+      "parent": { "scopes": ["addon_parent"], "script": "api.js", "paths": [["vitreProbe"]] }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Cross-site frame - Field Notes</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; margin: 0; padding: 110px 60px; background: #fbfaf7; color: #1b1b1f; }
+  iframe { width: 760px; height: 360px; border: 1px solid #c9c9cf; border-radius: 10px; margin-top: 30px; }
+</style></head>
+<body>
+<h1>A page with a frame from another site</h1>
+<p id="p1">The frame below comes from <code>localhost</code>, this page from <code>127.0.0.1</code>: two sites, two processes.</p>
+<iframe id="xf"></iframe>
+<script>
+  // Same server, other site: 127.0.0.1 <-> localhost.
+  const other = location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1';
+  document.getElementById('xf').src = location.protocol + '//' + other + ':' + location.port + '/v/framelink.html';
+</script>
+</body></html>

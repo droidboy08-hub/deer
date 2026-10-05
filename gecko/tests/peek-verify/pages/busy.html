@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>A busy page</title></head>
+<body style="margin:0;font:15px 'Segoe UI',system-ui,sans-serif;background:#fff;color:#1b1d21">
+<main style="padding:24px 40px">
+<h1>This page keeps its main thread busy</h1>
+<p>180 ms of script every 200 ms, as a heavy web app can.</p>
+<p><a id="busy" href="busy.html?2">Another busy page</a> · <a id="calm" href="still.html">A calm page</a></p>
+</main>
+<script>
+  setInterval(() => { const t = performance.now(); while (performance.now() - t < 180); }, 200);
+</script>
+</body>
+</html>

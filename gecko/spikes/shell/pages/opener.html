@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>opener</title>
+<body style="margin:0;font:14px 'Segoe UI',sans-serif;background:#f4f1ea;color:#1b1d21">
+<main style="padding:96px 32px">
+  <button id="pop" style="font:inherit;padding:6px 10px">window.open with features</button>
+  <button id="tab" style="font:inherit;padding:6px 10px">window.open without features</button>
+  <a id="blank" href="https://example.com/?blank" target="_blank" style="margin-left:12px">target=_blank link</a>
+  <pre id="log"></pre>
+</main>
+<script>
+  const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+  document.getElementById('pop').onclick = () => { const w = window.open('https://example.com/?popup', 'vitrepop', 'width=560,height=420,left=120,top=120'); log('popup: ' + (w ? 'opened' : 'blocked')); document.title = 'opener: popup ' + (w ? 'opened' : 'blocked'); };
+  document.getElementById('tab').onclick = () => { const w = window.open('https://example.com/?tab'); log('tab: ' + (w ? 'opened' : 'blocked')); };
+</script>
+</body>
+</html>

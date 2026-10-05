@@ -1,0 +1,16 @@
+/* The PDF viewer (pdf.js) under Deer's bar: src/actors/page/pdf.ts loads this into
+ * resource://pdf.js/web/viewer.html as an author sheet. The bar floats over the top 68 px of the
+ * window (12 + 44 + 12), so the viewer's own chrome (toolbar, views manager, viewer) starts there.
+ * Rules carry !important to outrank viewer.css (an additional author sheet sorts before the
+ * document's own). The band above shows the viewer's background through the glass. */
+#mainContainer { inset-block-start: 68px !important; }
+
+/* The viewer's controls (zoom select, toggles, primary buttons) take the design-system accent
+ * (viewer.css: var(--color-accent-primary, ...)); the viewer document is not an about: or chrome:
+ * URL, so skin/pages.css does not reach it: same tokens as there. */
+:root {
+  --color-accent-primary: light-dark(#005fb8, #4cc2ff) !important;
+  --color-accent-primary-hover: light-dark(#0a6cc9, #62c9ff) !important;
+  --color-accent-primary-active: light-dark(#1479d6, #7ad0ff) !important;
+  --color-accent-primary-selected: light-dark(#005fb8, #4cc2ff) !important;
+}

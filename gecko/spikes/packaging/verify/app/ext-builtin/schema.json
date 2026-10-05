@@ -1,0 +1,8 @@
+[
+  {
+    "namespace": "vitreProbe",
+    "functions": [
+      { "name": "whoami", "type": "function", "async": true, "parameters": [] }
+    ]
+  }
+]

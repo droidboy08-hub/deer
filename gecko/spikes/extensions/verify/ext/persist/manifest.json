@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre Persist Test",
+  "version": "1.0",
+  "description": "Verifier test extension: counts its own starts in storage.local.",
+  "browser_specific_settings": { "gecko": { "id": "vitre-persist@spike.test" } },
+  "icons": { "64": "icon.png" },
+  "permissions": ["storage", "webRequest", "webRequestBlocking", "<all_urls>"],
+  "background": { "scripts": ["bg.js"] },
+  "browser_action": {
+    "default_icon": { "64": "icon.png" },
+    "default_title": "Vitre Persist Test",
+    "default_area": "navbar"
+  }
+}

@@ -1,0 +1,400 @@
+/* Vitre shell for browser.xhtml (Firefox 157).
+ * Loaded per window as an author sheet by VitreShell.beforeLayout, before the first layout.
+ * Everything is scoped to :root[vitre] so the sheet is inert until the shell claims the window.
+ * No default @namespace on purpose: #id and .class selectors must match both XUL and HTML elements. */
+@namespace html url("http://www.w3.org/1999/xhtml");
+@namespace xul url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* ------------------------------------------------------------------ */
+/* 1. Hide Firefox's own interface                                     */
+/* ------------------------------------------------------------------ */
+
+/* The toolbox stays in the frame tree (so the code that measures or anchors to it keeps working
+ * and the per-tab notification bars keep a home), but it leaves the flow and takes no space.
+ * Its toolbars are not rendered; only #notifications-toolbar can show (section 5). */
+:root[vitre] #navigator-toolbox {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0 !important;
+  border: 0 !important;
+  min-height: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  z-index: 9;
+  -moz-window-dragging: no-drag;
+}
+:root[vitre] #navigator-toolbox::after { display: none !important; }
+:root[vitre] #navigator-toolbox > #toolbar-menubar,
+:root[vitre] #navigator-toolbox > #TabsToolbar,
+:root[vitre] #navigator-toolbox > #nav-bar,
+:root[vitre] #navigator-toolbox > #PersonalToolbar,
+:root[vitre] #navigator-toolbox > toolbar:not(#notifications-toolbar) {
+  display: none !important;
+}
+
+/* Sidebar launcher, sidebar panel, their splitters, the AI window box. */
+:root[vitre] #sidebar-container,
+:root[vitre] #sidebar-box,
+:root[vitre] #sidebar-main,
+:root[vitre] #sidebar-splitter,
+:root[vitre] #sidebar-launcher-splitter,
+:root[vitre] #ai-window-splitter,
+:root[vitre] #ai-window-box {
+  display: none !important;
+}
+
+/* The 1px strip Firefox uses to bring its toolbox back in full screen; Vitre has its own. */
+:root[vitre] #fullscr-toggler { display: none !important; }
+
+/* ------------------------------------------------------------------ */
+/* 2. Pages fill the whole window                                      */
+/* ------------------------------------------------------------------ */
+
+:root[vitre] {
+  --window-min-width: 480px;
+  min-height: 360px !important;
+  background-color: #1b1c20 !important;
+}
+:root[vitre] body {
+  background: #1b1c20 !important;
+}
+:root[vitre] #browser {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+:root[vitre] #tabbrowser-tabbox,
+:root[vitre] #tabbrowser-tabpanels,
+:root[vitre] .browserContainer,
+:root[vitre] .browserStack {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. Vitre layer                                                      */
+/* ------------------------------------------------------------------ */
+
+#vitre-root {
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --expand: cubic-bezier(0.2, 0, 0, 1);
+  --accent: #4cc2ff;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--g-text);
+  user-select: none;
+  -moz-user-focus: normal;
+}
+#vitre-root, #vitre-root * { box-sizing: border-box; }
+
+#vitre-root.theme-light {
+  /* Stand-in values: stronger than the design's 0.42/0.22 tint because the frost below is not the
+   * real lens; the glass spike owns the final recipe. */
+  --g-tint: linear-gradient(180deg, rgba(255,255,255,0.66), rgba(255,255,255,0.46));
+  --g-rim: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8));
+  --g-shadow: 0 10px 28px rgba(40,30,15,0.18), 0 1px 2px rgba(40,30,15,0.22), 0 0 0 0.5px rgba(22,24,29,0.16);
+  --g-text: #16181d;
+  --g-icon: rgba(22,24,29,0.78);
+  --g-dim: rgba(22,24,29,0.28);
+  --g-hover: rgba(22,24,29,0.06);
+  --g-press: rgba(22,24,29,0.1);
+  --g-placeholder: rgba(22,24,29,0.5);
+}
+#vitre-root.theme-dark {
+  --g-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.3);
+  --g-rim: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35));
+  --g-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3);
+  --g-text: #ffffff;
+  --g-icon: rgba(255,255,255,0.85);
+  --g-dim: rgba(255,255,255,0.3);
+  --g-hover: rgba(255,255,255,0.1);
+  --g-press: rgba(255,255,255,0.16);
+  --g-placeholder: rgba(255,255,255,0.6);
+}
+
+#vitre-root button {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  cursor: default;
+}
+#vitre-root button:focus-visible,
+#vitre-root input:not(.address-input):focus-visible {
+  outline: 2px solid var(--g-text);
+  outline-offset: 2px;
+}
+
+/* Drag strip: the only part of the window that moves it. Everything else under the bar is page.
+ * In a normal window Windows keeps the top 8px of the client area for resizing (WM_NCHITTEST says
+ * HTTOP there), so the strip is 8 + 10px tall; maximized there is no resize band. The drag region
+ * is geometric: elements painted over the strip must opt out with no-drag or they would drag too. */
+#vitre-drag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 18px;
+  pointer-events: auto;
+  -moz-window-dragging: drag;
+}
+:root[sizemode="maximized"] #vitre-drag { height: 8px; }
+:root[inFullscreen] #vitre-drag { display: none; }
+#vitre-bar .item,
+#vitre-winctl { -moz-window-dragging: no-drag; }
+
+/* Reveal zone: only in full screen or when the bar auto-hides. */
+#vitre-reveal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 6px;
+  pointer-events: auto;
+  display: none;
+}
+:root[inFullscreen] #vitre-reveal,
+#vitre-root.autohide #vitre-reveal { display: block; }
+
+/* Glass (frost stand-in for the lens: the lens itself is a separate spike). */
+#vitre-root .glass {
+  position: absolute;
+  border-radius: 22px;
+  box-shadow: var(--g-shadow);
+}
+#vitre-root .glass > .lens,
+#vitre-root .glass > .tint,
+#vitre-root .glass > .rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+#vitre-root .glass > .lens { backdrop-filter: blur(22px) saturate(1.6); }
+#vitre-root .glass > .tint { background: var(--g-tint); }
+#vitre-root .glass > .rim {
+  padding: 1px;
+  background: var(--g-rim);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* Tab bar */
+#vitre-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 68px;
+  pointer-events: none;
+  transition: transform 320ms var(--spring), opacity 220ms ease;
+}
+:root[inFullscreen] #vitre-bar,
+#vitre-root.autohide #vitre-bar { transform: translateY(-72px); opacity: 0; }
+:root[inFullscreen] #vitre-reveal:hover ~ #vitre-bar,
+:root[inFullscreen] #vitre-bar:hover,
+:root[inFullscreen] #vitre-root.revealed #vitre-bar,
+#vitre-root.autohide #vitre-reveal:hover ~ #vitre-bar,
+#vitre-root.autohide #vitre-bar:hover,
+#vitre-root.autohide.revealed #vitre-bar { transform: none; opacity: 1; }
+:root[inDOMFullscreen] #vitre-root { display: none; }
+
+#vitre-bar .item {
+  top: 12px;
+  height: 44px;
+  pointer-events: auto;
+  transition: left 420ms var(--spring), width 420ms var(--spring), opacity 200ms ease, transform 320ms var(--spring);
+}
+#vitre-bar.static .item { transition: none; }
+#vitre-bar .item.entering { opacity: 0; transform: scale(0.6); }
+#vitre-bar .item.leaving { opacity: 0; transform: scale(0.6); pointer-events: none; }
+
+#vitre-bar .item .circle-face,
+#vitre-bar .item.plus .face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-icon);
+}
+#vitre-bar .fav { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+#vitre-bar .fav img { width: 16px; height: 16px; border-radius: 3px; }
+#vitre-bar .item .circle-face:hover, #vitre-bar .item.plus .face:hover { background: var(--g-hover); }
+#vitre-bar .item .circle-face:active, #vitre-bar .item.plus .face:active { background: var(--g-press); }
+
+#vitre-bar .item .pill-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+#vitre-bar .item.active .pill-face { opacity: 1; pointer-events: auto; transition-delay: 120ms; }
+#vitre-bar.static .item .pill-face, #vitre-bar.static .item .circle-face { transition: none; }
+#vitre-bar .item.active .circle-face { opacity: 0; pointer-events: none; }
+#vitre-bar .item .circle-face { transition: opacity 160ms ease; }
+
+#vitre-bar .nav {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-icon);
+  flex-shrink: 0;
+}
+#vitre-bar .nav:hover { background: var(--g-hover); }
+#vitre-bar .nav:active { background: var(--g-press); }
+#vitre-bar .nav[aria-disabled="true"] { color: var(--g-dim); background: transparent; }
+#vitre-bar .back { margin-left: 8px; }
+#vitre-bar .forward { margin-left: 2px; }
+#vitre-bar .reload { margin-right: 8px; }
+#vitre-bar .address {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--g-text);
+  white-space: nowrap;
+}
+#vitre-bar .address .host { overflow: hidden; text-overflow: ellipsis; }
+#vitre-bar .address.placeholder { font-weight: 400; color: var(--g-placeholder); font-size: 14px; }
+#vitre-bar .address.placeholder .fav { color: var(--g-placeholder); }
+#vitre-bar .address-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0 4px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--g-text);
+  font: 14px var(--font);
+  caret-color: var(--accent);
+  user-select: text;
+  display: none;
+}
+#vitre-bar .item.editing .address { display: none; }
+#vitre-bar .item.editing .address-input { display: block; }
+
+#vitre-bar .close-badge {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(28,28,32,0.88);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.3);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 120ms ease, transform 160ms var(--spring);
+  pointer-events: none;
+}
+#vitre-bar .item.tab:not(.active):hover .close-badge,
+#vitre-bar .item.tab:not(.active).show-close .close-badge { opacity: 1; transform: none; pointer-events: auto; }
+
+#vitre-bar .load-line {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+#vitre-bar .item.active.loading .load-line { opacity: 1; transform: scaleX(var(--progress, 0.1)); }
+
+/* Window controls: a 108x32 capsule. appearance:none keeps Vitre's drawing; -moz-default-appearance
+ * tells the Windows widget which rectangle is which caption button (snap layouts on maximize). */
+#vitre-winctl {
+  right: 12px;
+  top: 18px;
+  width: 108px;
+  height: 32px;
+  border-radius: 16px;
+  pointer-events: auto;
+  transition: transform 320ms var(--spring);
+}
+:root[inFullscreen] #vitre-winctl { transform: translateY(-60px); }
+:root[inFullscreen] #vitre-reveal:hover ~ #vitre-winctl,
+:root[inFullscreen] #vitre-winctl:hover,
+:root[inFullscreen] #vitre-bar:hover ~ #vitre-winctl { transform: none; }
+#vitre-winctl .winctl-buttons { position: relative; display: flex; height: 32px; }
+#vitre-winctl button {
+  width: 36px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-text);
+  appearance: none;
+}
+#vitre-winctl button:first-child { border-radius: 16px 0 0 16px; }
+#vitre-winctl button:last-child { border-radius: 0 16px 16px 0; }
+#vitre-winctl button:hover { background: var(--g-hover); }
+#vitre-winctl #vitre-win-close:hover { background: #c42b1c; color: #fff; }
+#vitre-win-min { -moz-default-appearance: -moz-window-button-minimize; }
+#vitre-win-max { -moz-default-appearance: -moz-window-button-maximize; }
+:root:is([sizemode="maximized"], [sizemode="fullscreen"]) #vitre-win-max { -moz-default-appearance: -moz-window-button-restore; }
+#vitre-win-close { -moz-default-appearance: -moz-window-button-close; }
+
+/* Popup windows (window.open with features): one read-only pill, no tabs, no plus. */
+:root[vitre][popup-window] #vitre-bar .item.plus,
+:root[vitre][popup-window] #vitre-bar .nav,
+:root[vitre][popup-window] #vitre-bar .close-badge { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* 5. Firefox notification bars, floated under the bar as cards        */
+/* ------------------------------------------------------------------ */
+:root[vitre] #navigator-toolbox > #notifications-toolbar {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  translate: -50% 0;
+  width: min(640px, calc(100vw - 32px));
+  background: light-dark(#f9f9fb, #2b2a33) !important;
+  color: light-dark(#15141a, #fbfbfe) !important;
+  pointer-events: auto;
+  border-radius: 12px;
+  overflow: clip;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
+}
+:root[vitre][inDOMFullscreen] #navigator-toolbox > #notifications-toolbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #vitre-bar, #vitre-bar .item, #vitre-winctl { transition-property: opacity !important; transition-duration: 150ms !important; }
+}

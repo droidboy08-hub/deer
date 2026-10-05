@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Find in motion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@media (prefers-reduced-motion: reduce){.vt-anim{transition-property:opacity !important;transition-duration:150ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 980px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-circle" x="0" y="0" width="44" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/fbb9d57b142a16bacfbe2c03ac04e7b6" x="0" y="0" width="44" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="16" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; overflow: hidden; background: #f3eee4; color: #16181d">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="Article" scroll="{{v.scroll}}" hints="{{false}}" find="{{v.find}}" active="{{v.active}}" ring="{{v.ring}}" selected="{{v.selected}}" hint-size="1440px,900px"></dc-import></div>
+
+<div aria-hidden="true" style="position: absolute; left: 1425px; top: 0; width: 15px; height: 900px; background: rgba(0,0,0,0.03); box-shadow: inset 1px 0 0 rgba(0,0,0,0.06)">
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 15px; height: 900px; opacity: {{tickOp}}; transition: opacity 100ms ease">
+<sc-for list="{{ticks}}" as="tk" hint-placeholder-count="7">
+<div style="position: absolute; left: 0; top: {{tk.y}}px; width: 15px; height: 2px; background: {{tk.c}}"></div>
+</sc-for>
+</div>
+<div style="position: absolute; left: 5px; top: {{thumbTop}}px; width: 6px; height: 542px; border-radius: 3px; background: rgba(0,0,0,0.3)"></div>
+</div>
+
+<div style="position: absolute; left: 322px; top: 12px; width: 480px; height: 44px"><dc-import name="FindPill" variant="pill" face="{{v.face}}" theme="light" site="fieldnotes" query="{{v.query}}" status="{{v.status}}" ord="{{v.ord}}" prev-ord="{{v.prevOrd}}" total="7" roll="{{v.roll}}" roll-key="{{v.rollKey}}" echo="{{v.echo}}" focused="{{true}}" selected="{{v.qsel}}" snap="{{snap}}" hint-size="480px,44px"></dc-import></div>
+
+<div style="position: absolute; left: 810px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Tideline" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 862px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Refract" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 914px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Issues · vitre-shell" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 966px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Long Exposure Club" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></button>
+</div>
+
+<div style="position: absolute; left: 1018px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Home" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#16181d" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 1074px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="New tab" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg></button>
+</div>
+
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(40,30,15,0.12), 0 1px 2px rgba(40,30,15,0.16)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; left: 0; top: 900px; width: 1440px; height: 80px; box-sizing: border-box; padding: 0 48px; display: flex; align-items: center; gap: 28px; border-top: 1px solid rgba(255,255,255,0.08)">
+<div aria-live="polite" style="width: 220px; flex-shrink: 0; font-size: 15px; font-weight: 600; white-space: nowrap">{{v.key}}</div>
+<div style="flex-grow: 1; min-width: 0; font-size: 13px; line-height: 19px; color: #9a9ca6">{{v.line}}</div>
+<div style="flex-shrink: 0; font-size: 12.5px; color: #6f727c; font-variant-numeric: tabular-nums">{{clock}}</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"autoplay":{"editor":"boolean","default":true,"section":"Motion"},"still":{"editor":"enum","default":"open","options":["open","step","closed"],"section":"Motion"},"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+state = { phase: 'idle', snap: true, still: false };
+
+componentDidMount() {
+this.timers = [];
+const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+if ((this.props.autoplay ?? true) && !reduced) {
+this.run();
+} else {
+const map = { open: 'ring1', step: 'step6', closed: 'close' };
+this.setState({ phase: map[this.props.still ?? 'open'] || 'ring1', snap: true, still: true });
+}
+}
+
+componentWillUnmount() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+}
+
+componentDidUpdate(prev) {
+if (prev && (prev.autoplay !== this.props.autoplay || prev.still !== this.props.still)) {
+(this.timers || []).forEach((t) => clearTimeout(t));
+this.componentDidMount();
+}
+}
+
+plan() {
+return [
+['idle', 0, { face: 'address', query: '', status: 'blank', ord: '1', prevOrd: '', roll: 'none', rollKey: 'a', echo: 'none', qsel: false, find: false, active: 1, ring: 'none', selected: false, scroll: 76, key: 'Reading', line: 'Field Notes, with the tab bar showing. Everything below is done from the keyboard.' }],
+['open', 700, { face: 'find', key: 'Ctrl+F', line: 'The pill becomes the find field in place: Back and Forward fade, reload turns into ×, the favicon slides left. 240 ms. The field has focus from the first frame.' }],
+['t1', 1300, { query: 'f' }],
+['t2', 1360, { query: 'fl' }],
+['t3', 1420, { query: 'flo', status: 'count', ord: '1', find: true, active: 1, key: 'Typing', line: 'Matches highlight as you type, in Chromium’s own yellow; the active one is orange.' }],
+['t4', 1480, { query: 'floa' }],
+['typed', 1540, { query: 'float' }],
+['ring1', 1940, { ring: 'a', line: 'After a 400 ms pause the ring lands on the active match: 280 ms in, then it fades.' }],
+['s2', 2900, { ord: '2', prevOrd: '1', roll: 'up', rollKey: 'b', echo: 'next', active: 2, ring: 'b', key: 'Enter', line: 'Next match. The count rolls up and the ring lands. The page stays put because the match is already in view.' }],
+['e2', 3000, { echo: 'none' }],
+['s3', 3700, { ord: '3', prevOrd: '2', roll: 'up', rollKey: 'a', echo: 'next', active: 3, ring: 'a' }],
+['e3', 3800, { echo: 'none' }],
+['b2', 4500, { ord: '2', prevOrd: '3', roll: 'down', rollKey: 'b', echo: 'prev', active: 2, ring: 'b', key: 'Shift+Enter', line: 'Previous match. The count rolls down.' }],
+['eb2', 4600, { echo: 'none' }],
+['b1', 5300, { ord: '1', prevOrd: '2', roll: 'down', rollKey: 'a', echo: 'prev', active: 1, ring: 'a' }],
+['eb1', 5400, { echo: 'none' }],
+['wrap', 6100, { ord: '7', prevOrd: '1', roll: 'up', rollKey: 'b', echo: 'prev', active: 7, ring: 'b', key: 'Shift+Enter, wrapping', line: 'From the first match it wraps to the last. The count rolls the other way: that is the only wrap cue on screen.' }],
+['ew', 6200, { echo: 'none' }],
+['step6', 6900, { ord: '6', prevOrd: '7', roll: 'down', rollKey: 'a', echo: 'prev', active: 6, ring: 'a', scroll: 595, key: 'Shift+Enter', line: 'Match 6 is off-screen, so the page jumps to it at once. Vitre never smooths this jump.' }],
+['e6', 7000, { echo: 'none' }],
+['close', 8100, { face: 'address', find: false, selected: true, ring: 'none', roll: 'none', key: 'Esc', line: 'Find closes in 200 ms. The match stays selected and has focus, so Ctrl+C copies it, or Enter follows it if it is a link.' }],
+['reopen', 9500, { face: 'find', find: true, selected: false, qsel: true, prevOrd: '', key: 'Ctrl+F again', line: 'The query comes back selected, at the same match. Nothing moves: no new search from the top.' }],
+['close2', 10900, { face: 'address', find: false, selected: true, qsel: false, key: 'Esc', line: 'Closed again. The loop restarts.' }]
+];
+}
+
+run() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+if ((this.props.autoplay ?? true) === false) return;
+this.timers = [];
+this.setState({ phase: 'idle', snap: true, still: false });
+this.timers.push(setTimeout(() => this.setState({ snap: false }), 80));
+this.plan().forEach((p) => {
+if (p[1] > 0) this.timers.push(setTimeout(() => this.setState({ phase: p[0] }), p[1]));
+});
+this.timers.push(setTimeout(() => this.run(), 12300));
+}
+
+renderVals() {
+const plan = this.plan();
+const ph = this.state.phase;
+const v = {};
+let at = 0;
+for (let i = 0; i < plan.length; i += 1) {
+Object.assign(v, plan[i][2]);
+if (plan[i][0] === ph) { at = plan[i][1]; break; }
+}
+if (this.state.still && (v.ring === 'a' || v.ring === 'b')) v.ring = 'hold';
+const H = 900 / 1495;
+const centres = [387.3, 588.5, 756.5, 704, 833.6, 1317.8, 898.2];
+const ticks = centres.map((y, i) => ({ y: Math.round(y * H) - 1, c: v.find && v.active === i + 1 ? 'rgb(255,150,50)' : 'rgb(230,190,0)' }));
+const s = (at / 1000).toFixed(1);
+return {
+v: v,
+snap: this.state.snap,
+thumbTop: Math.round(v.scroll * H),
+ticks: ticks,
+tickOp: v.find ? 1 : 0,
+clock: this.state.still ? 'Still' : s + ' s'
+};
+}
+}
+</script>
+</body>
+</html>

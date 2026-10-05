@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>[]</title>
+<style>
+  body { font: 14px/1.5 "Segoe UI", sans-serif; margin: 24px; background: #f4f1ea; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  #log { white-space: pre-wrap; font: 12px/1.4 Consolas, monospace; background: #fff; border: 1px solid #ccc; padding: 8px; min-height: 60px; }
+  input, textarea { font: inherit; padding: 4px 6px; margin-right: 8px; }
+</style>
+</head>
+<body>
+<h1 id="h">keys test page</h1>
+<p id="mode"></p>
+<p>
+  <input id="field" placeholder="page input" value="hello world">
+  <textarea id="area" rows="1">area</textarea>
+  <button id="acc" accesskey="g">accesskey g</button>
+  <a id="link" href="https://example.com/">a link</a>
+</p>
+<div id="rich" contenteditable="true" style="border:1px solid #999;padding:4px 6px;background:#fff;width:300px">rich text</div>
+<div id="log"></div>
+<script>
+// ?prevent=ctrl-k,ctrl-l  -> preventDefault on those keydowns ("*" = all)
+// ?preventpress=ctrl-l    -> preventDefault on those keypress events only
+// ?acc=d                  -> the button's accesskey
+// ?focus=field            -> focus that element on load
+const q = new URLSearchParams(location.search);
+const prevent = (q.get("prevent") || "").split(",").filter(Boolean);
+const preventPress = (q.get("preventpress") || "").split(",").filter(Boolean);
+if (q.get("acc")) document.getElementById("acc").accessKey = q.get("acc");
+const seen = [];
+let accClicks = 0;
+document.getElementById("mode").textContent = "this page calls preventDefault on keydown: " + (prevent.join(", ") || "(nothing)") + (preventPress.length ? "; on keypress: " + preventPress.join(", ") : "");
+function name(e) {
+  return (e.ctrlKey ? "ctrl-" : "") + (e.altKey ? "alt-" : "") + (e.shiftKey ? "shift-" : "") + (e.metaKey ? "meta-" : "") + e.key.toLowerCase();
+}
+function publish() {
+  document.title = JSON.stringify(seen);
+  document.getElementById("log").textContent = seen.join("  ");
+}
+for (const type of ["keydown", "keypress", "keyup"]) {
+  addEventListener(type, (e) => {
+    const n = name(e);
+    let flags = "";
+    if (type === "keydown" && (prevent.includes(n) || prevent.includes("*"))) { e.preventDefault(); flags += "!"; }
+    if (type === "keypress" && preventPress.includes(n)) { e.preventDefault(); flags += "!"; }
+    if (e.repeat) flags += "R";
+    if (e.isComposing) flags += "C";
+    if (e.keyCode === 229) flags += "P";
+    if (e.getModifierState("AltGraph")) flags += "G";
+    seen.push({ keydown: "d", keypress: "p", keyup: "u" }[type] + ":" + n + flags);
+    publish();
+  }, true);
+}
+for (const type of ["compositionstart", "compositionend"]) {
+  addEventListener(type, () => { seen.push(type); publish(); }, true);
+}
+document.getElementById("acc").addEventListener("click", () => { accClicks++; seen.push("accesskey-click"); publish(); });
+addEventListener("focus", () => { document.getElementById("h").textContent = "keys test page (focused)"; });
+if (q.get("nocontext")) { // ?nocontext=1 -> the page replaces the context menu
+  addEventListener("contextmenu", (e) => { e.preventDefault(); seen.push("contextmenu!" + (e.shiftKey ? "(shift)" : "")); publish(); }, true);
+}
+if (q.get("iframe")) { // ?iframe=https://example.org/ embeds a cross-site (out-of-process) frame
+  const f = document.createElement("iframe");
+  f.id = "frame"; f.src = q.get("iframe"); f.style.cssText = "width:500px;height:160px;border:1px solid #999;display:block;margin-top:8px";
+  document.body.appendChild(f);
+}
+if (q.get("focus")) document.getElementById(q.get("focus")).focus();
+publish();
+</script>
+</body>
+</html>

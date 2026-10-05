@@ -1,0 +1,6 @@
+# Vitre chrome layer (spike). Registered at runtime by config.js / boot script through
+# nsIComponentRegistrar.autoRegister(<this file>).
+content  vitre                ./
+skin     vitre  classic/1.0   skin/
+resource vitre                ./
+override chrome://browser/content/aboutDialog.xhtml chrome://vitre/content/pages/about.xhtml

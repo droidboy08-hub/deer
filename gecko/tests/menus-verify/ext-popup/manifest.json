@@ -1,0 +1,9 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre menus popup probe",
+  "version": "1.0",
+  "description": "Local test extension for tests/menus-verify/extpopup.js: a browser action with a popup page.",
+  "browser_specific_settings": { "gecko": { "id": "menus-popup-probe@vitre.test" } },
+  "icons": { "16": "icon.svg", "32": "icon.svg" },
+  "browser_action": { "default_title": "Popup probe", "default_popup": "popup.html", "default_icon": "icon.svg" }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>[]</title>
+<style>
+  body { font: 14px/1.5 "Segoe UI", sans-serif; margin: 24px; background: #eef3f1; color: #222; }
+  #log { white-space: pre-wrap; font: 12px/1.4 Consolas, monospace; background: #fff; border: 1px solid #ccc; padding: 8px; min-height: 40px; }
+  #fs { background: #234; color: #fff; padding: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1 style="font-size:18px">edge cases page (verifier)</h1>
+<p>
+  <select id="sel"><option>one</option><option>two</option><option>three</option></select>
+  <input id="field" value="hello world">
+  <input id="search" type="search" value="query">
+  <a id="link" href="https://example.com/">a link</a>
+</p>
+<dialog id="dlg"><p>modal dialog</p><button id="dlgbtn">ok</button></dialog>
+<div id="fs" tabindex="0">full screen target</div>
+<div id="log"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const prevent = (q.get("prevent") || "").split(",").filter(Boolean);
+const seen = [];
+function name(e) { return (e.ctrlKey ? "ctrl-" : "") + (e.altKey ? "alt-" : "") + (e.shiftKey ? "shift-" : "") + e.key.toLowerCase(); }
+function publish() { document.title = JSON.stringify(seen); document.getElementById("log").textContent = seen.join("  "); }
+for (const type of ["keydown", "keyup"]) {
+  addEventListener(type, (e) => {
+    const n = name(e);
+    let flags = "";
+    if (type === "keydown" && (prevent.includes(n) || prevent.includes("*"))) { e.preventDefault(); flags += "!"; }
+    if (e.repeat) flags += "R";
+    seen.push((type === "keydown" ? "d:" : "u:") + n + flags);
+    publish();
+  }, true);
+}
+document.getElementById("dlg").addEventListener("close", () => { seen.push("dialog-closed"); publish(); });
+document.getElementById("dlg").addEventListener("cancel", () => { seen.push("dialog-cancel"); publish(); });
+document.addEventListener("fullscreenchange", () => { seen.push("fullscreenchange:" + (document.fullscreenElement ? "on" : "off")); publish(); });
+document.addEventListener("fullscreenerror", () => { seen.push("fullscreenerror"); publish(); });
+function openDialog() { document.getElementById("dlg").showModal(); return document.getElementById("dlg").open; }
+function goFull(lock) {
+  const el = document.getElementById("fs");
+  const p = lock ? el.requestFullscreen({ keyboardLock: "browser" }) : el.requestFullscreen();
+  p.catch((e) => { seen.push("fs-rejected:" + e.name); publish(); });
+  return "requested";
+}
+function busy(ms) { setTimeout(() => { const t = Date.now(); while (Date.now() - t < ms) {} seen.push("busy-done"); publish(); }, 0); return "scheduled"; }
+publish();
+</script>
+</body>
+</html>

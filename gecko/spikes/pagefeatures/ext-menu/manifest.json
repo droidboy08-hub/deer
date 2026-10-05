@@ -1,0 +1,9 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre spike menu probe",
+  "version": "1.0",
+  "description": "Local test extension: adds context menu items so the spike can list and click them.",
+  "browser_specific_settings": { "gecko": { "id": "menu-probe@vitre.spike" } },
+  "permissions": ["menus"],
+  "background": { "scripts": ["background.js"] }
+}

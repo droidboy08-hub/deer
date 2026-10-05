@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menus in motion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@keyframes vt-wash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.vt-anim{transition-property:opacity !important;transition-duration:150ms !important;transition-delay:0ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 980px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-circle" x="0" y="0" width="44" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/fbb9d57b142a16bacfbe2c03ac04e7b6" x="0" y="0" width="44" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="16" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; overflow: hidden; background: #f6f7f9; color: #16181d">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="IssuesPage" hint-size="1440px,900px"></dc-import></div>
+
+<div class="vt-anim" style="position: absolute; left: 40px; top: 303px; width: 1360px; height: 64px; background: rgba(58,109,240,0.05); opacity: {{hover39}}; transition: {{trHover}}"></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 335px; width: 382px; height: 1.5px; background: #3a6df0; opacity: {{hover39}}; transition: {{trHover}}"></div>
+<div class="vt-anim" style="position: absolute; left: 40px; top: 303px; width: 1360px; height: 64px; background: rgba(76,194,255,0.22); opacity: 0; animation: {{closeWash}}"></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 315px; width: 382px; height: 20px; border-radius: 4px; background: rgba(76,194,255,0.14); opacity: {{wash39}}; transition: {{trWash}}"></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 379px; width: 425px; height: 20px; border-radius: 4px; background: rgba(76,194,255,0.14); opacity: {{wash38}}; transition: {{trWash}}"></div>
+<div class="vt-anim" style="position: absolute; left: 82px; top: 375px; width: 433px; height: 28px; box-sizing: border-box; border-radius: 6px; border: 2px solid #101010; box-shadow: 0 0 0 1px #ffffff, inset 0 0 0 1px #ffffff; opacity: {{focus38}}; transition: {{trFocus}}"></div>
+
+<div class="vt-anim" style="position: absolute; inset: 0; background: rgba(8,8,12,0.22); opacity: {{scrim}}; transition: {{trScrim}}"></div>
+
+<section aria-label="Peek: code.vitre.dev" class="vt-anim" style="position: absolute; left: {{sheet.l}}px; top: {{sheet.t}}px; width: {{sheet.w}}px; height: {{sheet.h}}px; border-radius: {{sheet.r}}px; overflow: hidden; opacity: {{sheet.o}}; background: #f6f7f9; box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25); transition: {{trSheet}}">
+<div style="position: absolute; left: 0; right: 0; top: 44px; bottom: 0; overflow: hidden">
+<div style="position: absolute; left: 0; top: 0; width: 1040px; height: 760px"><dc-import name="PeekIssue" issue="39" w="{{1040}}" h="{{760}}" hint-size="1040px,760px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; inset: 0; background: #e9ecf1; opacity: {{cover}}; transition: {{trFade}}"></div>
+</div>
+<div style="position: absolute; left: 0; right: 0; top: 0; height: 44px; box-sizing: border-box; border-bottom: 1px solid rgba(16,18,24,0.08); background: rgba(250,251,253,0.78); backdrop-filter: blur(20px) saturate(1.6)">
+<div style="position: absolute; left: 14px; top: 0; height: 43px; display: flex; align-items: center; gap: 8px; font-size: 13px">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-weight: 600">code.vitre.dev</span>
+<span style="white-space: nowrap; color: rgba(22,24,29,0.55)">/vitre/vitre-shell/issues/39</span>
+</div>
+<div style="position: absolute; right: 8px; top: 6px; display: flex; gap: 6px">
+<button aria-label="Open as tab" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12"></path><path d="M11 4.5h4.5V9"></path><path d="M15.5 4.5 9.5 10.5"></path></svg></button>
+<button aria-label="Close peek" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"></path></svg></button>
+</div>
+<div class="vt-anim" style="position: absolute; left: 0; bottom: -1px; height: 2px; width: {{loadW}}; background: #4cc2ff; opacity: {{loadOp}}; transition: {{trLoad}}"></div>
+</div>
+<div style="position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+</section>
+
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1440px; height: 68px; opacity: {{barOp}}; transform: {{barTf}}; transition: {{trBar}}">
+<div style="position: absolute; left: 322px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Field Notes" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></button>
+</div>
+<div style="position: absolute; left: 374px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Tideline" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+</div>
+<div style="position: absolute; left: 426px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Refract" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></button>
+</div>
+<div style="position: absolute; left: 478px; top: 12px; width: 480px; height: 44px"><dc-import name="FindPill" variant="pill" face="address" theme="light" site="vitre" hint-size="480px,44px"></dc-import></div>
+<div style="position: absolute; left: 966px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Long Exposure Club" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></button>
+</div>
+<div style="position: absolute; left: 1018px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Home" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#16181d" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg></button>
+</div>
+<div style="position: absolute; left: 1074px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="New tab" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg></button>
+</div>
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(40,30,15,0.12), 0 1px 2px rgba(40,30,15,0.16)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 302px; top: 325px; width: 264px; height: 234px; transform-origin: 0 0; opacity: {{mA.op}}; transform: {{mA.tf}}; transition: {{mA.tr}}"><dc-import name="CtxMenu" kind="link" hover="{{mA.hover}}" pressed="{{mA.pressed}}" hint-size="264px,234px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 403px; width: 264px; height: 234px; transform-origin: 0 0; opacity: {{mB.op}}; transform: {{mB.tf}}; transition: {{mB.tr}}"><dc-import name="CtxMenu" kind="link" keys="{{true}}" hover="{{mB.hover}}" pressed="{{mB.pressed}}" hint-size="264px,234px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; left: 1136px; top: 558px; width: 264px; height: 302px; transform-origin: 100% 100%; opacity: {{mC.op}}; transform: {{mC.tf}}; transition: {{mC.tr}}"><dc-import name="CtxMenu" kind="page" hover="{{mC.hover}}" hint-size="264px,302px"></dc-import></div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" class="vt-anim" style="position: absolute; left: {{cur.x}}px; top: {{cur.y}}px; transform: scale({{cur.s}}); transform-origin: 2px 2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); transition: {{trCursor}}"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+
+<div style="position: absolute; left: 0; top: 900px; width: 1440px; height: 80px; box-sizing: border-box; padding: 0 48px; display: flex; align-items: center; gap: 28px; border-top: 1px solid rgba(255,255,255,0.08)">
+<div aria-live="polite" style="width: 240px; flex-shrink: 0; font-size: 15px; font-weight: 600; white-space: nowrap">{{v.key}}</div>
+<div style="flex-grow: 1; min-width: 0; font-size: 13px; line-height: 19px; color: #9a9ca6">{{v.line}}</div>
+<div style="flex-shrink: 0; font-size: 12.5px; color: #6f727c; font-variant-numeric: tabular-nums">{{clock}}</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"autoplay":{"editor":"boolean","default":true,"section":"Motion"},"still":{"editor":"enum","default":"pointer","options":["pointer","keyboard","flipped"],"section":"Motion"},"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+state = { phase: 'idle', snap: true, still: false };
+
+componentDidMount() {
+this.timers = [];
+const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+if ((this.props.autoplay ?? true) && !reduced) {
+this.run();
+} else {
+const map = { pointer: 'row1', keyboard: 'sf10', flipped: 'menuC' };
+this.setState({ phase: map[this.props.still ?? 'pointer'] || 'row1', snap: true, still: true });
+}
+}
+
+componentWillUnmount() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+}
+
+componentDidUpdate(prev) {
+if (prev && (prev.autoplay !== this.props.autoplay || prev.still !== this.props.still)) {
+(this.timers || []).forEach((t) => clearTimeout(t));
+this.componentDidMount();
+}
+}
+
+plan() {
+return [
+['idle', 0, { cur: [720, 640], press: false, hover39: false, wash39: false, wash38: false, focus38: false, A: 'hidden', aHover: -1, aPressed: false, B: 'hidden', bHover: -1, bPressed: false, C: 'hidden', cHover: -1, peek: 'hidden', key: 'Reading', line: 'The vitre-shell issue list, with the tab bar hidden while reading.' }],
+['move1', 500, { cur: [300, 323], hover39: true }],
+['rc1', 1100, { press: true, key: 'Right-click a link' }],
+['menuA', 1200, { press: false, wash39: true, A: 'open', line: 'On release the link gets a faint wash and the menu grows from the pointer: 200 ms on the spring, fading in over 90 ms.' }],
+['toRow0', 1450, { cur: [420, 346] }],
+['row0', 1600, { aHover: 0, key: 'Pointing', line: 'One plate marks the row under the pointer. It glides between neighbouring rows in 90 ms.' }],
+['toRow1', 1840, { cur: [420, 380] }],
+['row1', 2000, { aHover: 1 }],
+['press1', 2500, { press: true, aPressed: true, key: 'Peek link' }],
+['peek', 2620, { press: false, A: 'chosen', wash39: false, hover39: false, peek: 'open', line: 'The menu fades out in 100 ms with the row still lit, while the peek grows out of the link it came from.' }],
+['loaded', 3150, { peek: 'loaded' }],
+['esc1', 4700, { peek: 'closing', key: 'Esc', line: 'The peek shrinks back into its link, which glows for a moment.' }],
+['park', 5600, { cur: [1180, 760], peek: 'hidden' }],
+['tab38', 6200, { focus38: true, key: 'Tab', line: 'Keyboard focus moves to issue #38.' }],
+['sf10', 6900, { B: 'open', bHover: 0, wash38: true, key: 'Shift+F10', line: 'The same menu from the keyboard, 4 px below the link. The first item is focused and access keys are underlined.' }],
+['down', 7600, { bHover: 1, key: 'Down', line: 'The plate glides to the next item.' }],
+['keyE', 8300, { bHover: 3, bPressed: true, key: 'E', line: 'An access key runs its item at once: Copy link address. No toast; the link keeps focus.' }],
+['chosenB', 8420, { B: 'chosen', wash38: false }],
+['moveC', 9300, { cur: [1398, 858], key: 'Right-click near the corner', line: 'There is no room below or to the right, so the menu opens up and to the left. Its rows keep their order.' }],
+['rcC', 9900, { press: true, focus38: false }],
+['menuC', 10000, { press: false, C: 'open' }],
+['escC', 11100, { C: 'dismissed', key: 'Esc', line: 'Dismissed with a 120 ms fade. Focus goes back where it was.' }]
+];
+}
+
+run() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+if ((this.props.autoplay ?? true) === false) return;
+this.timers = [];
+this.setState({ phase: 'idle', snap: true, still: false });
+this.timers.push(setTimeout(() => this.setState({ snap: false }), 80));
+this.plan().forEach((p) => {
+if (p[1] > 0) this.timers.push(setTimeout(() => this.setState({ phase: p[0] }), p[1]));
+});
+this.timers.push(setTimeout(() => this.run(), 12300));
+}
+
+renderVals() {
+const plan = this.plan();
+const ph = this.state.phase;
+const snap = this.state.snap;
+const v = {};
+let at = 0;
+for (let i = 0; i < plan.length; i += 1) {
+Object.assign(v, plan[i][2]);
+if (plan[i][0] === ph) { at = plan[i][1]; break; }
+}
+const S = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const E = 'cubic-bezier(0.2, 0, 0, 1)';
+const tr = (s) => (snap ? 'none' : s);
+
+const menu = (st, down) => {
+const closedTf = down ? 'translateY(-4px) scale(0.96)' : 'translateY(4px) scale(0.96)';
+if (st === 'open') return { op: 1, tf: 'translateY(0px) scale(1)', tr: tr('opacity 90ms ' + E + ', transform 200ms ' + S) };
+if (st === 'chosen') return { op: 0, tf: 'translateY(0px) scale(1)', tr: tr('opacity 100ms ease') };
+if (st === 'dismissed') return { op: 0, tf: 'translateY(0px) scale(0.985)', tr: tr('opacity 120ms cubic-bezier(0.4, 0, 1, 1), transform 120ms cubic-bezier(0.4, 0, 1, 1)') };
+return { op: 0, tf: closedTf, tr: 'none' };
+};
+const mA = Object.assign(menu(v.A, true), { hover: v.aHover, pressed: v.aPressed });
+const mB = Object.assign(menu(v.B, true), { hover: v.bHover, pressed: v.bPressed });
+const mC = Object.assign(menu(v.C, false), { hover: v.cHover });
+
+const linkRect = { l: 86, t: 315, w: 382, h: 20, r: 6 };
+const openRect = { l: 200, t: 72, w: 1040, h: 804, r: 22 };
+const isOpen = v.peek === 'open' || v.peek === 'loaded';
+const sheet = Object.assign({ o: isOpen ? 1 : 0 }, isOpen ? openRect : linkRect);
+let trSheet = 'left 400ms ' + S + ', top 400ms ' + S + ', width 400ms ' + S + ', height 400ms ' + S + ', border-radius 400ms ' + S + ', opacity 80ms ease';
+if (v.peek === 'closing') trSheet = 'left 280ms ' + S + ', top 280ms ' + S + ', width 280ms ' + S + ', height 280ms ' + S + ', border-radius 280ms ' + S + ', opacity 120ms ease 180ms';
+if (v.peek === 'hidden') trSheet = 'none';
+
+return {
+v: v,
+hover39: v.hover39 ? 1 : 0,
+trHover: tr(ph === 'move1' ? 'opacity 160ms ease 320ms' : 'opacity 160ms ease'),
+wash39: v.wash39 ? 1 : 0,
+wash38: v.wash38 ? 1 : 0,
+trWash: tr('opacity 120ms ease'),
+focus38: v.focus38 ? 1 : 0,
+trFocus: tr('opacity 100ms ease'),
+closeWash: (ph === 'esc1' || ph === 'park') && !snap ? 'vt-wash 1120ms ease-out 260ms both' : 'none',
+scrim: isOpen ? 1 : 0,
+trScrim: tr('opacity 240ms ease'),
+sheet: sheet,
+trSheet: tr(trSheet),
+cover: (v.peek === 'open' || v.peek === 'hidden') ? 1 : 0,
+trFade: tr('opacity 200ms ease'),
+loadW: v.peek === 'open' ? '70%' : (v.peek === 'loaded' ? '100%' : '0%'),
+loadOp: v.peek === 'open' ? 1 : 0,
+trLoad: tr('width 450ms ease, opacity 250ms ease 300ms'),
+barOp: isOpen ? 1 : 0,
+barTf: isOpen ? 'translateY(0px)' : 'translateY(-10px)',
+trBar: tr(v.peek === 'closing' ? 'opacity 220ms ease 300ms, transform 320ms ' + S + ' 300ms' : 'opacity 220ms ease, transform 320ms ' + S),
+mA: mA,
+mB: mB,
+mC: mC,
+cur: { x: v.cur[0], y: v.cur[1], s: v.press ? 0.86 : 1 },
+trCursor: tr('left 480ms cubic-bezier(0.3, 0, 0.2, 1), top 480ms cubic-bezier(0.3, 0, 0.2, 1), transform 120ms ease'),
+clock: this.state.still ? 'Still' : (at / 1000).toFixed(1) + ' s'
+};
+}
+}
+</script>
+</body>
+</html>

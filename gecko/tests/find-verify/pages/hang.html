@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Hangs</title>
+<style>body{font:17px/1.6 "Segoe UI",sans-serif;margin:0;padding:24px 48px;background:#fbfaf7;color:#1b1b1f}</style></head>
+<body>
+<h1>A page that hangs</h1>
+<p>Its script blocks the content process for a while: glass one, glass two, glass three.</p>
+<script>
+  window.hang = (ms) => setTimeout(() => { const t = Date.now(); while (Date.now() - t < ms) {} }, 50);
+</script>
+</body></html>

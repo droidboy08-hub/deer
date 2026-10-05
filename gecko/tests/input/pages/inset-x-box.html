@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset box model</title>
+<!-- Verifier cases for the inset (tests/input/inset-edge.js): the site's own root / body box model.
+     ?rootpad   html { padding-top: 56px } makes room for a fixed 56 px header
+     ?wpbar     html { margin-top: 32px !important } and a fixed 32 px admin bar (WordPress style)
+     ?bodybox   body { margin: 40px; padding: 20px }, background on html only
+     ?bodyabs   body { position: absolute; top: 0 } (the body is anchored to the initial containing block) -->
+<script>document.documentElement.className = location.search.slice(1) || "rootpad";</script>
+<style>
+body{margin:0;font:16px/1.5 Segoe UI;background:#fff}
+h1{margin:0 40px 12px;padding-top:8px} p{margin:0 40px 12px}
+.rootpad{padding-top:56px}
+.rootpad #hdr{position:fixed;top:0;left:0;right:0;height:56px;background:#b3261e;color:#fff;display:flex;align-items:center;padding:0 24px;z-index:5}
+.wpbar{margin-top:32px !important}
+.wpbar #hdr{position:fixed;top:0;left:0;right:0;height:32px;background:#1d2327;color:#fff;display:flex;align-items:center;padding:0 16px;z-index:99999}
+.bodybox{background:#23395b} .bodybox body{margin:40px;padding:20px;background:transparent;color:#f1f1f1} .bodybox #hdr{display:none}
+.bodyabs body{position:absolute;top:0;left:0;right:0} .bodyabs #hdr{display:none}
+</style>
+<header id="hdr">Fixed site header</header>
+<h1 id="title">Box model case</h1>
+<script>
+{ let s = ""; for (let i = 1; i <= 40; i++) s += "<p>" + i + ". Glass is an amorphous solid that is transparent and has widespread practical, technological and decorative use in window panes, tableware and optics.</p>"; document.write(s); }
+</script>

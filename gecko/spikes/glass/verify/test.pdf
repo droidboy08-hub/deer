@@ -1,0 +1,46 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 578 >>
+stream
+0.90 0.10 0.30 rg 0 0 44 792 re f
+0.96 0.50 0.19 rg 44 0 44 792 re f
+1.00 0.88 0.10 rg 88 0 44 792 re f
+0.24 0.70 0.29 rg 132 0 44 792 re f
+0.26 0.83 0.96 rg 176 0 44 792 re f
+0.26 0.39 0.85 rg 220 0 44 792 re f
+0.57 0.12 0.70 rg 264 0 44 792 re f
+0.90 0.10 0.30 rg 308 0 44 792 re f
+0.96 0.50 0.19 rg 352 0 44 792 re f
+1.00 0.88 0.10 rg 396 0 44 792 re f
+0.24 0.70 0.29 rg 440 0 44 792 re f
+0.26 0.83 0.96 rg 484 0 44 792 re f
+0.26 0.39 0.85 rg 528 0 44 792 re f
+0.57 0.12 0.70 rg 572 0 44 792 re f
+BT /F1 28 Tf 0 0 0 rg 40 740 Td (PDF page under Vitre glass 0123456789) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000869 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+939
+%%EOF

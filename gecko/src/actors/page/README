@@ -1,0 +1,24 @@
+Page-side modules (code that runs next to web pages, in their content process).
+
+Add a file <name>.ts here (or <name>/index.ts). tools/build.mjs discovers it and bundles it into
+actors/VitrePageChild.sys.mjs; there is nothing to register.
+
+A module exports any of: events, onEvent(ctx, event), onMessage(ctx, name, data), onDestroy(ctx).
+The full contract and the rules are in the header of ../page-api.ts. core.ts is the built-in example
+(ping, and the scroll / pageshow / paint signals the window uses to re-sample the glass theme).
+Built in: core (theme sampling signals), keys (Esc layers), pdf (the PDF viewer under the bar),
+inset (pages start below the bar: the top strip, its skip rule and the header heuristic are in its header).
+
+Settings: a page module reads its own setting straight from the vitre.* pref, in the content process:
+  Services.prefs.getBoolPref(settingPref('pageInset'), true)      (settingPref: src/shared/settings.ts)
+The read is synchronous, so it works before the first layout. VitreSettings installs every default on
+the default branch before the first content process starts, and Gecko mirrors each pref change to the
+content processes, so Services.prefs.addObserver(name, fn) in the page module hears the Settings panel
+(or about:config) at once. Observe per document and remove the observer in onDestroy. Prefer boolean and
+integer settings here: Gecko withholds some string prefs from web content processes, and nothing a page
+process must not know belongs in a setting a page module reads.
+
+Window side: b.page(tab).send(name, data), await b.page(tab).query(name, data),
+b.on('page-message', (tab, name, data, from) => ...). See src/window/browser.ts.
+
+Files starting with "_" are ignored; _generated.ts is written by the build.

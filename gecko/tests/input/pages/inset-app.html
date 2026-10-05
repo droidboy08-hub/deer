@@ -1,0 +1,136 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset app</title>
+<script>document.documentElement.className = location.search.slice(1) || "locked";</script>
+<style>
+body{margin:0;font:14px/1.4 Segoe UI;display:grid;grid-template-rows:56px 1fr 40px;grid-template-columns:220px 1fr}
+.locked, .locked body{height:100%;overflow:hidden}
+.vh body{height:100vh}
+.bb *, .bb {box-sizing:border-box} .bb, .bb body{height:100%}
+#top{grid-column:1/3;background:#2b2d42;color:#fff;display:flex;align-items:center;padding:0 16px}
+#side{background:#edf2f4;padding:12px}
+#main{overflow:auto;padding:0 16px}
+#foot{grid-column:1/3;background:#d90429;color:#fff;display:flex;align-items:center;padding:0 16px}
+</style>
+<header id="top">App toolbar (search, filters)</header>
+<nav id="side">Inbox<br>Sent<br>Drafts</nav>
+<main id="main"><ul><li>Message 0 &mdash; subject line 0</li>
+<li>Message 1 &mdash; subject line 1</li>
+<li>Message 2 &mdash; subject line 2</li>
+<li>Message 3 &mdash; subject line 3</li>
+<li>Message 4 &mdash; subject line 4</li>
+<li>Message 5 &mdash; subject line 5</li>
+<li>Message 6 &mdash; subject line 6</li>
+<li>Message 7 &mdash; subject line 7</li>
+<li>Message 8 &mdash; subject line 8</li>
+<li>Message 9 &mdash; subject line 9</li>
+<li>Message 10 &mdash; subject line 10</li>
+<li>Message 11 &mdash; subject line 11</li>
+<li>Message 12 &mdash; subject line 12</li>
+<li>Message 13 &mdash; subject line 13</li>
+<li>Message 14 &mdash; subject line 14</li>
+<li>Message 15 &mdash; subject line 15</li>
+<li>Message 16 &mdash; subject line 16</li>
+<li>Message 17 &mdash; subject line 17</li>
+<li>Message 18 &mdash; subject line 18</li>
+<li>Message 19 &mdash; subject line 19</li>
+<li>Message 20 &mdash; subject line 20</li>
+<li>Message 21 &mdash; subject line 21</li>
+<li>Message 22 &mdash; subject line 22</li>
+<li>Message 23 &mdash; subject line 23</li>
+<li>Message 24 &mdash; subject line 24</li>
+<li>Message 25 &mdash; subject line 25</li>
+<li>Message 26 &mdash; subject line 26</li>
+<li>Message 27 &mdash; subject line 27</li>
+<li>Message 28 &mdash; subject line 28</li>
+<li>Message 29 &mdash; subject line 29</li>
+<li>Message 30 &mdash; subject line 30</li>
+<li>Message 31 &mdash; subject line 31</li>
+<li>Message 32 &mdash; subject line 32</li>
+<li>Message 33 &mdash; subject line 33</li>
+<li>Message 34 &mdash; subject line 34</li>
+<li>Message 35 &mdash; subject line 35</li>
+<li>Message 36 &mdash; subject line 36</li>
+<li>Message 37 &mdash; subject line 37</li>
+<li>Message 38 &mdash; subject line 38</li>
+<li>Message 39 &mdash; subject line 39</li>
+<li>Message 40 &mdash; subject line 40</li>
+<li>Message 41 &mdash; subject line 41</li>
+<li>Message 42 &mdash; subject line 42</li>
+<li>Message 43 &mdash; subject line 43</li>
+<li>Message 44 &mdash; subject line 44</li>
+<li>Message 45 &mdash; subject line 45</li>
+<li>Message 46 &mdash; subject line 46</li>
+<li>Message 47 &mdash; subject line 47</li>
+<li>Message 48 &mdash; subject line 48</li>
+<li>Message 49 &mdash; subject line 49</li>
+<li>Message 50 &mdash; subject line 50</li>
+<li>Message 51 &mdash; subject line 51</li>
+<li>Message 52 &mdash; subject line 52</li>
+<li>Message 53 &mdash; subject line 53</li>
+<li>Message 54 &mdash; subject line 54</li>
+<li>Message 55 &mdash; subject line 55</li>
+<li>Message 56 &mdash; subject line 56</li>
+<li>Message 57 &mdash; subject line 57</li>
+<li>Message 58 &mdash; subject line 58</li>
+<li>Message 59 &mdash; subject line 59</li>
+<li>Message 60 &mdash; subject line 60</li>
+<li>Message 61 &mdash; subject line 61</li>
+<li>Message 62 &mdash; subject line 62</li>
+<li>Message 63 &mdash; subject line 63</li>
+<li>Message 64 &mdash; subject line 64</li>
+<li>Message 65 &mdash; subject line 65</li>
+<li>Message 66 &mdash; subject line 66</li>
+<li>Message 67 &mdash; subject line 67</li>
+<li>Message 68 &mdash; subject line 68</li>
+<li>Message 69 &mdash; subject line 69</li>
+<li>Message 70 &mdash; subject line 70</li>
+<li>Message 71 &mdash; subject line 71</li>
+<li>Message 72 &mdash; subject line 72</li>
+<li>Message 73 &mdash; subject line 73</li>
+<li>Message 74 &mdash; subject line 74</li>
+<li>Message 75 &mdash; subject line 75</li>
+<li>Message 76 &mdash; subject line 76</li>
+<li>Message 77 &mdash; subject line 77</li>
+<li>Message 78 &mdash; subject line 78</li>
+<li>Message 79 &mdash; subject line 79</li>
+<li>Message 80 &mdash; subject line 80</li>
+<li>Message 81 &mdash; subject line 81</li>
+<li>Message 82 &mdash; subject line 82</li>
+<li>Message 83 &mdash; subject line 83</li>
+<li>Message 84 &mdash; subject line 84</li>
+<li>Message 85 &mdash; subject line 85</li>
+<li>Message 86 &mdash; subject line 86</li>
+<li>Message 87 &mdash; subject line 87</li>
+<li>Message 88 &mdash; subject line 88</li>
+<li>Message 89 &mdash; subject line 89</li>
+<li>Message 90 &mdash; subject line 90</li>
+<li>Message 91 &mdash; subject line 91</li>
+<li>Message 92 &mdash; subject line 92</li>
+<li>Message 93 &mdash; subject line 93</li>
+<li>Message 94 &mdash; subject line 94</li>
+<li>Message 95 &mdash; subject line 95</li>
+<li>Message 96 &mdash; subject line 96</li>
+<li>Message 97 &mdash; subject line 97</li>
+<li>Message 98 &mdash; subject line 98</li>
+<li>Message 99 &mdash; subject line 99</li>
+<li>Message 100 &mdash; subject line 100</li>
+<li>Message 101 &mdash; subject line 101</li>
+<li>Message 102 &mdash; subject line 102</li>
+<li>Message 103 &mdash; subject line 103</li>
+<li>Message 104 &mdash; subject line 104</li>
+<li>Message 105 &mdash; subject line 105</li>
+<li>Message 106 &mdash; subject line 106</li>
+<li>Message 107 &mdash; subject line 107</li>
+<li>Message 108 &mdash; subject line 108</li>
+<li>Message 109 &mdash; subject line 109</li>
+<li>Message 110 &mdash; subject line 110</li>
+<li>Message 111 &mdash; subject line 111</li>
+<li>Message 112 &mdash; subject line 112</li>
+<li>Message 113 &mdash; subject line 113</li>
+<li>Message 114 &mdash; subject line 114</li>
+<li>Message 115 &mdash; subject line 115</li>
+<li>Message 116 &mdash; subject line 116</li>
+<li>Message 117 &mdash; subject line 117</li>
+<li>Message 118 &mdash; subject line 118</li>
+<li>Message 119 &mdash; subject line 119</li></ul></main>
+<footer id="foot">Status bar: the bottom edge of the app</footer>

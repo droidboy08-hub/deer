@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tab switcher motion spec</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">Tab switcher motion</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">Timings and curves for building the full-screen switcher. Every move in the deck uses one spring, so it behaves like one object; only the final expand uses its own curve.</p>
+</div>
+
+<div style="position: absolute; left: 48px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px dashed rgba(255,255,255,0.35)"></div>
+<div style="position: absolute; left: 25px; top: 16px; width: 268px; height: 167px; border-radius: 8px; background: #ece6da; box-shadow: 0 10px 30px rgba(0,0,0,0.4)"><div style="margin: 14px 16px; width: 120px; height: 12px; border-radius: 3px; background: #1d1b18; opacity: 0.8"></div><div style="margin: 0 16px; width: 170px; height: 6px; border-radius: 3px; background: #1d1b18; opacity: 0.25"></div><div style="position: absolute; right: 14px; top: 34px; width: 90px; height: 70px; border-radius: 4px; background: #1f4fd1"></div></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M6 6 18 14M18 14h-6M18 14V8"></path><path d="M312 6 300 14M300 14h6M300 14V8"></path><path d="M6 193 18 185M18 185h-6M18 185v6"></path><path d="M312 193 300 185M300 185h6M300 185v6"></path></g></svg>
+</div>
+<div style="position: absolute; left: 48px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">1 · Press Ctrl+Tab</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The page you were on shrinks into its card at the left of the deck, 420 ms, spring.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Your wallpaper blurs in behind it, 0 → 44 px, 320 ms.</span>
+</div>
+
+<div style="position: absolute; left: 390px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; left: -132px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #ece6da; opacity: 0.5"></div>
+<div style="position: absolute; left: 286px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #f4f2ec; opacity: 0.5"></div>
+<div style="position: absolute; left: 64px; top: 36px; width: 190px; height: 119px; border-radius: 6px; background: #1b1d22; box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)"><div style="margin: 10px; height: 64px; border-radius: 4px; background: linear-gradient(120deg, #7b2fc9, #e0532f 55%, #f1b52e)"></div><div style="margin: 0 10px; width: 110px; height: 6px; border-radius: 3px; background: #ffffff; opacity: 0.6"></div></div>
+<div style="position: absolute; left: 107px; top: 170px; width: 104px; height: 18px; border-radius: 9px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 4px; padding: 0 3px; box-sizing: border-box"><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 40px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.6)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span></div>
+</div>
+<div style="position: absolute; left: 390px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">2 · The deck settles</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The previous tab rises into the centre already selected; the others follow 60 ms apart, 560 ms each.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The tab dock rises 18 px, 380 ms, starting at 140 ms.</span>
+</div>
+
+<div style="position: absolute; left: 732px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; left: -132px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #1b1d22; opacity: 0.5"></div>
+<div style="position: absolute; left: 286px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #f6f7f9; opacity: 0.5"></div>
+<div style="position: absolute; left: 64px; top: 36px; width: 190px; height: 119px; border-radius: 6px; background: #f4f2ec; box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)"><div style="margin: 12px 14px 6px; width: 70px; height: 12px; border-radius: 3px; background: #1b1d21; opacity: 0.8"></div><div style="margin: 0 14px 4px; width: 150px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.25"></div><div style="margin: 0 14px; width: 130px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.25"></div></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M196 22H120M120 22l8-6M120 22l8 6"></path></g></svg>
+<div style="position: absolute; left: 107px; top: 170px; width: 104px; height: 18px; border-radius: 9px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 4px; padding: 0 3px; box-sizing: border-box"><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 40px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.6)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span></div>
+</div>
+<div style="position: absolute; left: 732px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">3 · Tab again</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The deck slides one card, 560 ms, spring. The new card grows 0.86 → 1; the old one dims to 50%.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The dock pill moves and widens 40 → 216 px, 420 ms.</span>
+</div>
+
+<div style="position: absolute; left: 1074px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; left: 14px; top: 9px; width: 290px; height: 181px; border-radius: 4px; background: #f4f2ec; box-shadow: 0 10px 30px rgba(0,0,0,0.5)"><div style="margin: 16px 18px 8px; width: 110px; height: 16px; border-radius: 3px; background: #1b1d21; opacity: 0.8"></div><div style="margin: 0 18px 6px; width: 220px; height: 6px; border-radius: 3px; background: #1b1d21; opacity: 0.25"></div><div style="margin: 0 18px; width: 190px; height: 6px; border-radius: 3px; background: #1b1d21; opacity: 0.25"></div></div>
+<div style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px dashed rgba(255,255,255,0.35)"></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M140 110 120 124M120 124h6M120 124v-6"></path><path d="M178 110 198 124M198 124h-6M198 124v-6"></path><path d="M140 82 120 68M120 68h6M120 68v6"></path><path d="M178 82 198 68M198 68h-6M198 68v6"></path></g></svg>
+</div>
+<div style="position: absolute; left: 1074px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">4 · Release Ctrl</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The chosen card fills the window: scale 1 → 1.667, corners 22 → 0 px, 360 ms.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The other cards and the dock fade out, 220 ms.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 480px; width: 560px; height: 360px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; font-weight: 600">Curves</div>
+<svg width="300" height="220" viewBox="-20 -20 300 220" style="position: absolute; left: 24px; top: 70px" aria-label="Two easing curves: the spring rises fast and settles; the expand curve starts slowly, speeds through the middle and eases into place." role="img">
+<rect x="0" y="0" width="260" height="180" fill="none" stroke="rgba(255,255,255,0.12)"></rect>
+<path d="M0 90H260M130 0V180" stroke="rgba(255,255,255,0.06)"></path>
+<path d="M0 180 C 57.2 0, 93.6 0, 260 0" fill="none" stroke="#4cc2ff" stroke-width="2.5"></path>
+<path d="M0 180 C 52 180, 0 0, 260 0" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-dasharray="5 4"></path>
+<text x="0" y="198" fill="#9a9ca6" font-size="11">time</text>
+<text x="-6" y="-6" fill="#9a9ca6" font-size="11">progress</text>
+</svg>
+<div style="position: absolute; left: 330px; top: 84px; width: 206px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600"><span style="width: 18px; height: 3px; border-radius: 2px; background: #4cc2ff"></span>Spring</span><span style="font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11.5px; white-space: nowrap; color: #c9ccd4">cubic-bezier(0.22, 1, 0.36, 1)</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Shrinking, sliding, the dock and closing gaps. Fast start, soft landing.</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600"><span style="width: 18px; height: 0; border-top: 2px dashed rgba(255,255,255,0.55)"></span>Expand</span><span style="font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11.5px; white-space: nowrap; color: #c9ccd4">cubic-bezier(0.2, 0, 0, 1)</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Only for the chosen card filling the window on release.</span></div>
+</div>
+</div>
+
+<div style="position: absolute; left: 632px; top: 480px; width: 760px; height: 360px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column">
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 8px">Other moments</div>
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); column-gap: 20px; font-size: 13px; line-height: 19px">
+<span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Close a tab</span><span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Ctrl+W or Delete, or middle-click a card. The card lifts 12 px and fades, 220 ms; the neighbours close the gap with the spring.</span>
+<span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Cancel</span><span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Step back to the card you started on and let go, or click the wallpaper: the deck reverses, 360 ms. Esc can&#39;t cancel while Ctrl is held, because Ctrl+Esc opens Start.</span>
+<span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Quick tap</span><span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Ctrl+Tab released within 150 ms switches straight to the previous tab; the deck never appears.</span>
+<span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Reduced motion</span><span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Follows the Windows animation setting: cross-fades only, 150 ms, no scaling or sliding.</span>
+<span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Performance</span><span style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Cards move with transform and opacity only. Thumbnails are captured when you leave a tab, so the deck never renders live pages.</span>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

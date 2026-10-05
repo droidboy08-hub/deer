@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Vitre Spike",
+  "version": "1.0",
+  "background": { "service_worker": "bg.js" },
+  "action": { "default_title": "Vitre Spike", "default_popup": "popup.html", "default_icon": { "32": "icon.png" } },
+  "permissions": ["tabs", "storage"],
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["cs.js"], "run_at": "document_idle" }]
+}

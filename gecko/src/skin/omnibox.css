@@ -1,0 +1,126 @@
+/* Deer address field (src/window/omnibox.ts): the active pill opens into a 640x48 glass field with
+ * a frosted suggestion panel under it.
+ *
+ * Ported from the Electron build (app/src/renderer/styles.css, "Omnibox"). Taken from the board
+ * instead (design/canvas/project/HomeSearch.dc.html) where the two differ and are marked "Board:":
+ * the page dims at 0.26 while the field is open, the rest of the tab bar steps aside, suggestion
+ * rows show the site's icon, and over a photo (clear glass) the field and panel use the board's
+ * lighter tints. Loaded per window by VitreShell.beforeLayout with the other sheets.
+ */
+
+/* Board: the page dims while searching. Its own layer (z 9) sits under the tab bar, so the window
+ * controls stay as they are. A press on it closes the field. */
+#vitre-root #vitre-omni-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.26);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+#vitre-root #vitre-omni-scrim[hidden] { display: none; }
+#vitre-root #vitre-omni-scrim.on { opacity: 1; }
+
+/* Board: only the field shows while it is open. (Electron hides the active pill only.)
+ * Gecko: the items are not faded as a whole (an item at opacity < 1 is a backdrop root: its lens
+ * would show the sharp page through a half-faded shape, bar.css). Their tint, rim and faces fade
+ * over 200 ms while the lens keeps bending the page; then the lens (and the circles' shared row
+ * lens) goes at once. On close the lenses are back first and the rest fades in over them. */
+#vitre-root.omni-open #vitre-bar .item { pointer-events: none; box-shadow: none; }
+#vitre-root.omni-open #vitre-bar .item > .tint,
+#vitre-root.omni-open #vitre-bar .item > .rim,
+#vitre-root.omni-open #vitre-bar .item .pill-face,
+#vitre-root.omni-open #vitre-bar .item .circle-face,
+#vitre-root.omni-open #vitre-bar .item .load-line { opacity: 0; }
+#vitre-root.omni-open #vitre-bar .item > .lens,
+#vitre-root.omni-open #vitre-bar .row-lens { visibility: hidden; transition: visibility 0s linear 200ms; }
+
+/* ---- the field ---- */
+#vitre-root #vitre-omni-field {
+  border-radius: 24px;
+  -moz-window-dragging: no-drag;
+  transition: left 240ms var(--expand), top 240ms var(--expand), width 240ms var(--expand), height 240ms var(--expand);
+}
+/* Board (HomeSearch, over a photo): the open field's shadow. */
+#vitre-root.theme-clear #vitre-omni-field { box-shadow: 0 10px 28px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.24); }
+#vitre-root #vitre-omni-field[hidden],
+#vitre-root #vitre-omni-panel[hidden] { display: none; }
+#vitre-root.theme-light #vitre-omni-field > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.56)); }
+#vitre-root.theme-dark #vitre-omni-field > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.38); }
+/* Board: over a photo the dim does the darkening. */
+#vitre-root.theme-clear #vitre-omni-field > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); }
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-omni-field > .rim {
+  background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38));
+}
+
+#vitre-omni-field .omni-row { position: relative; height: 100%; display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+#vitre-omni-field .omni-icon { display: flex; flex-shrink: 0; color: var(--g-placeholder); }
+#vitre-omni-field .omni-icon svg { width: 17px; height: 17px; }
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-omni-field .omni-icon { color: rgba(255,255,255,0.7); }
+#vitre-root #vitre-omni {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--g-text);
+  font: 15px var(--font);
+  caret-color: var(--accent);
+  user-select: text;
+}
+#vitre-root #vitre-omni:focus-visible { outline: none; }
+#vitre-root.theme-light #vitre-omni { caret-color: #005fb8; }
+#vitre-omni::placeholder { color: var(--g-placeholder); opacity: 1; }
+#vitre-omni::selection { background: rgba(76,194,255,0.42); color: inherit; }
+
+/* ---- suggestions: frost, always dark ---- */
+#vitre-root #vitre-omni-panel {
+  top: 68px;
+  border-radius: 22px;
+  padding: 8px;
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.25);
+  -moz-window-dragging: no-drag;
+}
+#vitre-root #vitre-omni-panel > .tint { background: rgba(28,28,34,0.8); }
+/* Board: lighter over a photo, where the dim is under it. */
+#vitre-root.theme-clear #vitre-omni-panel > .tint { background: rgba(22,22,26,0.52); }
+#vitre-root #vitre-omni-panel > .rim {
+  background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.22));
+}
+#vitre-omni-list { position: relative; display: flex; flex-direction: column; }
+#vitre-omni-list .omni-group { margin: 10px 12px 6px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.55); }
+#vitre-omni-list .omni-item {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap;
+  overflow: hidden;
+}
+#vitre-omni-list .omni-item.selected { background: rgba(255,255,255,0.14); box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.3); color: #fff; }
+#vitre-omni-list .omni-glyph { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.6); flex-shrink: 0; }
+#vitre-omni-list .omni-glyph svg { width: 18px; height: 18px; }
+#vitre-omni-list .omni-glyph img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  /* Firefox's default page icon is a context-fill SVG. */
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+#vitre-omni-list .omni-title { overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+#vitre-omni-list .omni-detail { color: rgba(255,255,255,0.5); overflow: hidden; text-overflow: ellipsis; flex-shrink: 2; }
+#vitre-omni-list .omni-tail { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  #vitre-root #vitre-omni-field { transition: none !important; }
+  #vitre-root #vitre-omni-scrim { transition-duration: 150ms; }
+}

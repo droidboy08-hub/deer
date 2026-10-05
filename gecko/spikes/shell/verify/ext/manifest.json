@@ -1,0 +1,11 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre shell spike test",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "shell-test@vitre.dev" } },
+  "browser_action": {
+    "default_title": "Shell test",
+    "default_popup": "popup.html",
+    "default_area": "navbar"
+  }
+}

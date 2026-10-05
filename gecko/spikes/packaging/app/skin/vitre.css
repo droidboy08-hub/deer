@@ -1,0 +1,13 @@
+/* chrome://vitre/skin/vitre.css : a chrome stylesheet from the runtime-registered skin package. */
+#vitre-probe {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 10;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgb(10, 132, 255);
+  color: rgb(255, 255, 255);
+  font: 600 14px "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  pointer-events: none;
+}

@@ -1,0 +1,1116 @@
+{
+ "groups": [
+  {
+   "name": "Tabs and windows",
+   "entries": [
+    {
+     "keys": "Ctrl+T",
+     "alt": "",
+     "action": "New tab: opens Home as a new tab, placed where Settings › Tabs › 'New tabs open' says, with the address field focused for typing",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "The + circle's tooltip reads 'New tab  Ctrl+T'",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+W",
+     "alt": "Ctrl+F4",
+     "action": "Close the active tab",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "If a panel or peek is open, it closes that instead; in the switcher, it closes the selected card (see those groups). Ctrl+F4 is the Windows tab convention.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+T",
+     "alt": "",
+     "action": "Reopen the last closed tab or window. A closed peek comes back only while it is still warm (60 s) and its source tab is active; otherwise the next tab or window reopens.",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "The + menu row names what will reopen. Ignores key repeat.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+N",
+     "alt": "",
+     "action": "New window, opening on Home",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "Printed in the + menu",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Shift+N",
+     "alt": "",
+     "action": "New private window, opening on Home",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "Added 2026-10-04 (user asked for private windows). Printed in the + menu. Ctrl+N in a private window opens another private one. Ignores key repeat.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+W",
+     "alt": "",
+     "action": "Close the window and all its tabs",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "No prompt. Ctrl+Shift+T reopens the whole window. Alt+F4 still belongs to Windows and also closes it.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Page Down / Ctrl+Page Up",
+     "alt": "",
+     "action": "Next / previous tab in tab-bar order, wrapping around, with no switcher",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "Always positional, whatever 'Order of tabs' is set to",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+1 … Ctrl+8",
+     "alt": "",
+     "action": "Go to tab 1–8, counting the bar from the left (Home counts as a tab)",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Matched by the physical digit key, so AZERTY needs no Shift. Zoom wins only where a digit key is the layout’s only - or + (AZERTY 6).",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+9",
+     "alt": "",
+     "action": "Go to the last tab",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+Page Up / Ctrl+Shift+Page Down",
+     "alt": "",
+     "action": "Move the active tab one place left / right",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "The keyboard way to reorder the bar",
+     "isNew": true
+    },
+    {
+     "keys": "F11",
+     "alt": "Full screen in the + menu",
+     "action": "Window full screen: the tab bar hides, pointing at the top edge brings it back, and F11 again leaves",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "A page can stop F11 from entering full screen, never from leaving. Tab and window keys stay browser-first in this mode.",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Address and search",
+   "entries": [
+    {
+     "keys": "Ctrl+L",
+     "alt": "Alt+D",
+     "action": "Edit the address: the pill opens into the 640×48 field with the address selected. If the bar is hidden, the pill drops in at its slot.",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "F6 is the key a page can't take",
+     "isNew": true
+    },
+    {
+     "keys": "Enter",
+     "alt": "",
+     "action": "Go to the typed address or search. On a 'Switch to tab' suggestion, switch to that tab.",
+     "scope": "address field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+Enter",
+     "alt": "",
+     "action": "Open the address or the highlighted result in a new tab and switch to it",
+     "scope": "address field",
+     "priority": "local",
+     "note": "As in Chrome and Edge. In Vitre, Alt+Enter always means 'as a tab'.",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+Enter",
+     "alt": "Ctrl+Q",
+     "action": "Peek the highlighted result instead of going to it. On Home, the peek opens over the wallpaper.",
+     "scope": "address field",
+     "priority": "local",
+     "note": "In Chrome this opens a new window. Ctrl+Q is the peek key on every face of the pill.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Enter",
+     "alt": "",
+     "action": "Add www. and .com to what you typed, then go",
+     "scope": "address field",
+     "priority": "local",
+     "note": "As in Chrome and Edge",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+Delete",
+     "alt": "",
+     "action": "Remove the highlighted history suggestion",
+     "scope": "address field, suggestion highlighted",
+     "priority": "local",
+     "note": "With no suggestion highlighted, Shift+Delete stays the Windows cut",
+     "isNew": false
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "The first press puts the address back and closes the suggestions. The second returns focus to the page.",
+     "scope": "address field",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+H",
+     "alt": "",
+     "action": "Recent history: focuses the address field with an empty query and lists the History group. Type to search it.",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Docs and Word keep Ctrl+H for Replace. Needs an empty-query state on HomeSearch.",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Page",
+   "entries": [
+    {
+     "keys": "Alt+Left",
+     "alt": "Mouse Back button, keyboard Browser Back key",
+     "action": "Back",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+Right",
+     "alt": "Mouse Forward button, keyboard Browser Forward key",
+     "action": "Forward",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+R",
+     "alt": "F5",
+     "action": "Reload",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Reload in the page menu works even when a page takes the keys",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+R",
+     "alt": "Ctrl+F5, Shift+F5; Shift+click the pill’s reload button",
+     "action": "Hard reload, skipping the cache",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Chrome’s gesture on the reload button is the route a page can’t block",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "Stop loading. This is the last step of the Esc ladder; the reload slot shows × while a page loads.",
+     "scope": "page loading, nothing else open",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Esc (in video or element full screen)",
+     "alt": "",
+     "action": "Leave element full screen or release pointer lock. Under keyboard lock, hold Esc.",
+     "scope": "element full screen, pointer lock",
+     "priority": "browser-first",
+     "note": "Never counts toward a peek's Esc Esc",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Plus",
+     "alt": "Ctrl+=, numpad +, Ctrl+wheel up",
+     "action": "Zoom in, per site. The level shows in the pill as plain dim text such as '110%' for 2 s.",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Matched by the character the active layout types",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Minus",
+     "alt": "numpad −, Ctrl+wheel down",
+     "action": "Zoom out",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "On AZERTY this is the 6 key, so Ctrl+6 zooms out",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+0",
+     "alt": "Ctrl+numpad 0",
+     "action": "Reset zoom to 100%",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+P",
+     "alt": "",
+     "action": "Print… (the Windows print dialog)",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+S",
+     "alt": "",
+     "action": "Save page as…",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+U",
+     "alt": "",
+     "action": "View page source",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+click (link)",
+     "alt": "Middle-click; Ctrl+Enter on a focused link",
+     "action": "Open the link in a new background tab",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Not printed in the link menu",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+click (link)",
+     "alt": "Ctrl+Shift+Enter on a focused link",
+     "action": "Open the link in a new tab and switch to it",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "alt": "",
+     "note": "Hardware keys on media keyboards, routed through app-command",
+     "isNew": true,
+     "keys": "Browser Refresh, Stop, Search and Home keys",
+     "action": "Reload, stop loading, edit the address, go to the Home tab",
+     "scope": "anywhere in the window",
+     "priority": "browser-first"
+    }
+   ]
+  },
+  {
+   "name": "Peek",
+   "entries": [
+    {
+     "keys": "Shift+click (link)",
+     "alt": "",
+     "action": "Peek the link in a sheet over the page",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Comes only through setWindowOpenHandler, so pages that use Shift+click keep it. A switch in Settings › Keyboard shortcuts brings back Chrome's new window.",
+     "isNew": false
+    },
+    {
+     "keys": "Shift+Enter (focused link)",
+     "alt": "",
+     "action": "Peek the focused link",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Q",
+     "alt": "",
+     "action": "Peek the focused link, or the link under the pointer",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Real http/https links only, and never while you're typing in a field. Ctrl+Q never means Quit.",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+click (link on the dimmed page)",
+     "alt": "",
+     "action": "Hop: the peek's content cross-fades to that link",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+Enter",
+     "alt": "The Open as tab button; double-click the header",
+     "action": "Open the peek as a tab: same page, no reload, new pill to the right of its source tab",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "If the page in the peek uses Alt+Enter itself (Sheets, Jupyter), use the button instead",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "Close the peek. Focus goes back to the link it came from. A panel open over the peek closes first.",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "The page gets Esc first",
+     "isNew": true
+    },
+    {
+     "keys": "Esc Esc (within 400 ms)",
+     "alt": "",
+     "action": "Close the peek even if the page uses Esc",
+     "scope": "peek open",
+     "priority": "browser-first",
+     "note": "Ignores key repeat, and any Esc already used by the IME, a menu, find or leaving full screen. Once you've typed in the peek, it only bumps the sheet.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+W",
+     "alt": "",
+     "action": "Close the peek, never the tab under it (a Settings or Downloads panel open over the peek closes first)",
+     "scope": "peek open",
+     "priority": "browser-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+Left",
+     "alt": "Mouse Back button",
+     "action": "Back inside the peek. On its first page, this closes the peek.",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "Ignores key repeat",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+Right",
+     "alt": "Mouse Forward button",
+     "action": "Forward inside the peek",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+R, Ctrl+P, Ctrl+S, Ctrl+U, zoom keys, F12",
+     "alt": "",
+     "action": "Act on the peek, not the tab under it",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "Tab and window keys act on the window. Leaving the tab warm-closes its peek.",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Find",
+   "entries": [
+    {
+     "keys": "Ctrl+F",
+     "alt": "",
+     "action": "Open find in the active pill, in place. It pre-fills a selection made since find last closed, else this tab's last query, else the window's, and searches at once. Esc then Ctrl+F returns to the same match.",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "If a page keeps Ctrl+F: press F6, then Ctrl+F, or use Find on page… in the page menu",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+F",
+     "alt": "",
+     "action": "Focus the search field (Home has no page to search)",
+     "scope": "Home",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+F",
+     "alt": "",
+     "action": "Find in the peek: a 440×32 capsule replaces the header's domain and path",
+     "scope": "peek open",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+F",
+     "alt": "",
+     "action": "Select all in the field, with no motion",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Enter / Shift+Enter",
+     "alt": "F3 / Shift+F3, Ctrl+G / Ctrl+Shift+G",
+     "action": "Next / previous match, wrapping around",
+     "scope": "find field",
+     "priority": "local",
+     "note": "The tooltips print Enter and Shift+Enter",
+     "isNew": false
+    },
+    {
+     "keys": "F3 / Shift+F3",
+     "alt": "Ctrl+G / Ctrl+Shift+G",
+     "action": "Reopen find, parked, with the last query and step to the next / previous match",
+     "scope": "page, find closed or parked",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+C",
+     "alt": "",
+     "action": "Match case on or off, per tab",
+     "scope": "find field",
+     "priority": "local",
+     "note": "Ignored while Ctrl or AltGr is down, so AltGr+C still types ć",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Enter",
+     "alt": "",
+     "action": "Close find and click the match",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Q",
+     "alt": "",
+     "action": "Close find and peek the match's link",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Up / Down / Page Up / Page Down",
+     "alt": "",
+     "action": "Scroll the page without leaving the field",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Tab / Shift+Tab",
+     "alt": "",
+     "action": "Cycle field → previous → next → Aa → ×",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "F6",
+     "alt": "",
+     "action": "Move to the page. Find stays open, parked, and F6 from the page comes back to it.",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+L",
+     "alt": "",
+     "action": "Leave find for the address field. The query is kept for F3.",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "Close find. The match stays selected and focused: Enter follows its link, Shift+Enter or Ctrl+Q peeks it, Ctrl+C copies it.",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Shift+F10",
+     "alt": "Menu key",
+     "action": "Open the field menu (editing rows plus Match case)",
+     "scope": "find field",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    }
+   ]
+  },
+  {
+   "name": "Tab switcher",
+   "entries": [
+    {
+     "keys": "Ctrl+Tab (quick tap)",
+     "alt": "",
+     "action": "Switch straight to the previous tab without showing the switcher",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "Released within 150 ms",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Tab (hold Ctrl)",
+     "alt": "",
+     "action": "Open the switcher with the previous tab selected. The deck is the default; Grid and Strip are in Settings › Tabs.",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "With 'Order of tabs: Tab bar order' it starts at the tab on the right. Ignored while Alt or AltGr is down (AltGr+Tab is Windows' task switcher).",
+     "isNew": false
+    },
+    {
+     "keys": "Tab (Ctrl held)",
+     "alt": "Right; arrow keys in Grid",
+     "action": "Next card (reading order in Grid and Strip)",
+     "scope": "switcher, Ctrl held",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Shift+Tab",
+     "alt": "Left (Ctrl held)",
+     "action": "Previous card. From rest, it opens the switcher stepping backwards; a quick tap switches straight there.",
+     "scope": "anywhere in the window; switcher",
+     "priority": "browser-first",
+     "note": "Safe, because Tab is pressed in between and Windows' Ctrl+Shift layout switch never fires",
+     "isNew": true
+    },
+    {
+     "keys": "Release Ctrl",
+     "alt": "",
+     "action": "Open the selected card, which expands to fill the window. Releasing on the card you started on changes nothing.",
+     "scope": "switcher, Ctrl held",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Back to the starting card, then release Ctrl",
+     "alt": "Click the wallpaper; switch away from Vitre",
+     "action": "Cancel and stay on the tab you started on",
+     "scope": "switcher, Ctrl held",
+     "priority": "local",
+     "note": "Esc can't cancel while Ctrl is held, because Ctrl+Esc opens Windows' Start. One step back from where the deck opens.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+W",
+     "alt": "Delete while the query is empty; middle-click a card",
+     "action": "Close the selected card. While a search is filtering, it closes only the highlighted result.",
+     "scope": "switcher open",
+     "priority": "local",
+     "note": "Delete is the Alt+Tab convention. While a search is filtering, closes only the highlighted result.",
+     "isNew": true
+    },
+    {
+     "keys": "Type any text",
+     "alt": "",
+     "action": "Search the tabs. While the switcher is open, Ctrl+letter types that letter into search instead of running its command (except W, which closes the card). The first character latches the switcher open, so you can let go of Ctrl; then the field takes IME input, AltGr characters and dead keys.",
+     "scope": "switcher open",
+     "priority": "local",
+     "note": "A held search can’t start with W: use Ctrl+Shift+A. Can be turned off in Settings › Tabs.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+A",
+     "alt": "",
+     "action": "Open the switcher latched, with search ready",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Ctrl+Tab and then typing is the route a page can't block",
+     "isNew": true
+    },
+    {
+     "keys": "Left / Right",
+     "alt": "Arrow keys in Grid",
+     "action": "Move the selection. With a query typed, Up/Down, Tab/Shift+Tab and Ctrl+Tab/Ctrl+Shift+Tab move it and Left/Right edit the text; Grid uses all four arrows only while the query is empty.",
+     "scope": "switcher, latched",
+     "priority": "local",
+     "note": "Latched means opened with Ctrl+Shift+A, by typing, by mouse, or with Sticky Keys on (Sticky Keys skips the quick tap and opens latched).",
+     "isNew": true
+    },
+    {
+     "keys": "Enter",
+     "alt": "Click a card",
+     "action": "Open the selected tab",
+     "scope": "switcher, latched",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "Cancel and return to the tab you started on",
+     "scope": "switcher, latched",
+     "priority": "local",
+     "note": "Safe here because Ctrl is up",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Downloads",
+   "entries": [
+    {
+     "keys": "Ctrl+J",
+     "alt": "",
+     "action": "Show or hide the Downloads panel",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Also 'Show downloads' in the + menu and the ring menu",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+D",
+     "alt": "",
+     "action": "Download this video: opens the quality picker for the page's main video, like the pill's download mark",
+     "scope": "page with a video",
+     "priority": "page-first",
+     "note": "Printed beside Download video… in the video menu and in the download mark’s tooltip. Does nothing without a downloadable video.",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+click (Download pill)",
+     "alt": "",
+     "action": "Download the suggested quality at once, skipping the picker",
+     "scope": "Download this video pill",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Alt+click (link)",
+     "alt": "",
+     "action": "Download the linked file with Vitre's downloader",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Chrome's convention",
+     "isNew": true
+    },
+    {
+     "alt": "",
+     "note": "",
+     "isNew": true,
+     "keys": "Enter / Space / Delete",
+     "action": "In the Downloads panel: open the file / pause or resume / remove the row from the list (never the file)",
+     "scope": "Downloads panel, row focused",
+     "priority": "local"
+    }
+   ]
+  },
+  {
+   "name": "Menus and focus",
+   "entries": [
+    {
+     "keys": "Shift+F10",
+     "alt": "Menu key",
+     "action": "Open the menu for the focused element, 4 px below it, with the first item focused and access keys underlined. With nothing focused it opens at (24, 76).",
+     "scope": "page, tab bar, Vitre fields",
+     "priority": "page-first",
+     "note": "Pages that show their own menu get the key first; Shift+right-click bypasses them",
+     "isNew": false
+    },
+    {
+     "keys": "Shift+right-click",
+     "alt": "",
+     "action": "Vitre's menu, even on pages that replace the context menu",
+     "scope": "page",
+     "priority": "browser-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Up / Down",
+     "alt": "Tab / Shift+Tab",
+     "action": "Move between items, wrapping. Separators and captions are skipped; disabled rows still take focus.",
+     "scope": "menu open",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Home / End",
+     "alt": "",
+     "action": "First / last item",
+     "scope": "menu open",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Enter",
+     "alt": "Space",
+     "action": "Run the focused item. A check item toggles and the menu closes.",
+     "scope": "menu open",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Access-key letter",
+     "alt": "",
+     "action": "Run that item at once",
+     "scope": "menu open",
+     "priority": "local",
+     "note": "Global keys are swallowed while a menu is open",
+     "isNew": false
+    },
+    {
+     "keys": "Esc",
+     "alt": "Alt, F10",
+     "action": "Close the menu and return focus",
+     "scope": "menu open",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "F6",
+     "alt": "Shift+F6 (the other way)",
+     "action": "Move focus from the page to the address pill (or to the find field while find is open), and back. With a peek open, it cycles peek page → peek header → address pill.",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "The one key a page can never keep, so focus can’t be trapped. A later per-site list may hand F6 to web IDEs (off by default).",
+     "isNew": true
+    },
+    {
+     "keys": "Tab (from the address field)",
+     "alt": "Shift+Tab back",
+     "action": "Move into the rest of the tab bar. Left and Right then cross the circles, + and the downloads ring; Enter switches tab or presses the button; Shift+F10 opens that element's menu; Esc returns to the page.",
+     "scope": "address field, tab bar",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Popovers and prompts",
+   "entries": [
+    {
+     "keys": "Up / Down",
+     "alt": "",
+     "action": "Move between choices (quality picker, downloads popover, background popover, permission prompt)",
+     "scope": "popover open",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Enter",
+     "alt": "Space",
+     "action": "Choose",
+     "scope": "popover open",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "Close and return focus to what opened it",
+     "scope": "popover open",
+     "priority": "local",
+     "note": "A page dialog (alert, confirm, sign-in) takes Esc at the same step",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Panels and app",
+   "entries": [
+    {
+     "keys": "Ctrl+,",
+     "alt": "Settings in the + menu and the Home menu",
+     "action": "Open or close Settings",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "The Windows app convention (Terminal, VS Code, Teams). Printed beside Settings in both menus.",
+     "isNew": true
+    },
+    {
+     "keys": "F1",
+     "alt": "",
+     "action": "Open Settings › Keyboard shortcuts",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "F1 means Help in Windows",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+Delete",
+     "alt": "",
+     "action": "Open Settings › Privacy and security at Clear browsing data. Nothing is cleared until you confirm there.",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "The panel's close button",
+     "action": "Close the open Settings or Downloads panel",
+     "scope": "panel open",
+     "priority": "local",
+     "note": "Topmost first: a panel, then a peek, then the tab",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+W",
+     "alt": "",
+     "action": "Close the panel, not the tab under it",
+     "scope": "panel open",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+F",
+     "alt": "",
+     "action": "Focus the panel's own search field ('Find a setting', 'Search downloads')",
+     "scope": "panel open",
+     "priority": "local",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "F12",
+     "alt": "Ctrl+Shift+I",
+     "action": "Developer tools on or off for the topmost surface (the peek when one is open)",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "Inspect, in every page menu, is the route a page can't block",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+J",
+     "alt": "",
+     "action": "Open the developer tools console",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+C",
+     "alt": "",
+     "action": "Inspect element (the developer tools picker)",
+     "scope": "page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "Editing (system standard, shown for completeness)",
+   "entries": [
+    {
+     "keys": "Ctrl+Z",
+     "alt": "",
+     "action": "Undo",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "Never a Vitre accelerator: the focused page or field handles it, and the menus call the same command",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Y",
+     "alt": "Ctrl+Shift+Z",
+     "action": "Redo",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "Ctrl+Shift+Z also works in Vitre's own fields",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+X",
+     "alt": "Shift+Delete",
+     "action": "Cut (greyed out in password fields)",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+C",
+     "alt": "Ctrl+Insert",
+     "action": "Copy (greyed out in password fields)",
+     "scope": "any text field or selection",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+V",
+     "alt": "Shift+Insert",
+     "action": "Paste",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+V",
+     "alt": "",
+     "action": "Paste as plain text",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "The menu row appears only when the clipboard holds rich text",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+A",
+     "alt": "",
+     "action": "Select all",
+     "scope": "any text field or page",
+     "priority": "page-first",
+     "note": "",
+     "isNew": false
+    },
+    {
+     "keys": "Ctrl+Backspace / Ctrl+Delete",
+     "alt": "",
+     "action": "Delete the previous / next word",
+     "scope": "any text field",
+     "priority": "page-first",
+     "note": "Works in Vitre's fields too, as do Ctrl+Left Shift / Ctrl+Right Shift for text direction",
+     "isNew": true
+    }
+   ]
+  }
+ ],
+ "reserved": [
+  {
+   "owner": "Windows shell and window management",
+   "keys": "Win alone and Win+any key; Alt+Tab, Alt+Shift+Tab, Ctrl+Alt+Tab; Alt+Esc, Alt+Shift+Esc; Alt+Space (system menu, and launchers such as PowerToys Run); Alt+F4; Ctrl+Esc, Ctrl+Shift+Esc, Ctrl+Alt+Delete; PrtScn with any modifier"
+  },
+  {
+   "owner": "Keyboard layouts and input languages",
+   "keys": "Ctrl+Alt+anything and AltGr (Right Alt)+anything; Alt+Shift and Ctrl+Shift pressed alone; Ctrl+Left Shift and Ctrl+Right Shift (text direction); Ctrl+Shift+0–9 and Alt+Shift+0–9; Ctrl with the grave key, brackets, slash, backslash, semicolon, quote or period (dead keys, or keys that move between layouts)"
+  },
+  {
+   "owner": "IMEs (Chinese, Japanese, Korean)",
+   "keys": "Ctrl+Space, Shift alone, Shift+Space; Ctrl+period, Ctrl+Shift+F, Ctrl+Shift+B (Microsoft Pinyin); Alt+grave, Kanji, Henkan, Muhenkan, Kana, Ctrl/Alt/Shift+Caps Lock, Ctrl+Shift+F10 (Japanese IME); Right Alt and Right Ctrl on Korean keyboards; every key while text is being composed"
+  },
+  {
+   "owner": "Accessibility and screen readers",
+   "keys": "Shift pressed five times, Right Shift held, Num Lock held; Left Alt+Left Shift+PrtScn or Num Lock; Ctrl+Win+Enter; Caps Lock or Insert + anything (Narrator, NVDA, JAWS); Ctrl+Alt+N (NVDA); single letters and digits on the page (browse mode); Alt+numpad digits (Alt codes)"
+  },
+  {
+   "owner": "PowerToys and Windows mouse settings",
+   "keys": "Ctrl tapped or double-tapped alone (Find My Mouse, show pointer location); Win+Alt+Space and other PowerToys Win chords"
+  },
+  {
+   "owner": "GPU drivers and overlays. Vitre binds none of the NVIDIA or Intel keys; it keeps Chrome’s Ctrl+Shift+R and Ctrl+Shift+I, which some Radeon installs take, and Settings warns about them. Each has another route (Shift+click reload, F12, Inspect).",
+   "keys": "NVIDIA overlay: Alt+Z, Alt+R, Alt+F1, Alt+F2, Alt+F3, Alt+F9, Alt+F10. AMD Radeon (configurable, varies by version): Ctrl+Shift+O, Ctrl+Shift+L, Ctrl+Shift+S, Ctrl+Shift+E, Ctrl+Shift+R, Ctrl+Shift+I. Intel: Ctrl+Alt+arrows, Ctrl+Alt+F12. Windows: Ctrl+Shift+Win+B"
+  },
+  {
+   "owner": "Windows conventions Vitre keeps and never rebinds",
+   "keys": "Alt or F10 pressed alone (they only close an open Vitre menu); Alt+letter on a page (HTML accesskey); Ctrl+Insert, Shift+Insert, Shift+Delete, Ctrl+Backspace, Ctrl+Delete in fields"
+  },
+  {
+   "owner": "Web pages (Vitre leaves these unbound)",
+   "keys": "Ctrl+K, Ctrl+E, Ctrl+D, Alt+Home, F7; any single printable key on the page or in the bar; any Alt+letter not in this map"
+  },
+  {
+   "owner": "Rejected Vitre ideas (never shipped)",
+   "keys": "Tap Alt for key tips; a Ctrl+K command palette; Ctrl+Shift+O ghost mode; Ctrl+Shift+B to toggle the tab bar; any double-tap of a modifier"
+  }
+ ],
+ "rules": [
+  "Every shortcut is local to the Vitre window and works only while Vitre has focus. Never use Electron globalShortcut or RegisterHotKey, and never install a low-level keyboard hook.",
+  "Browser-first keys never reach the page. They are Chrome's reserved set: Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up and Ctrl+Page Down. Vitre adds three: F6 and Shift+F6; Esc Esc and Ctrl+W while a peek is open; and Esc or F11 to leave full screen or pointer lock. Shift+right-click is the mouse equivalent. Electron doesn't inherit Chrome's reserved list, so catch these keys in before-input-event on every WebContents (tab, peek, PDF guest, chrome view, menu layer) and call preventDefault.",
+  "Page-first keys go to the page first, and Vitre acts only if the page didn't call preventDefault. This covers every other key Vitre binds outside its own surfaces: Ctrl+F, F3, Shift+F3, Ctrl+G, Ctrl+Shift+G, Ctrl+L, Alt+D, Ctrl+H, Ctrl+J, Ctrl+Shift+D, Ctrl+Shift+A, Ctrl+Q, Alt+Enter in a peek, Alt+Left, Alt+Right, Ctrl+R, F5, the hard-reload keys, Ctrl+P, Ctrl+S, Ctrl+U, Ctrl+1 to Ctrl+9, Ctrl+Shift+Page Up/Down, the zoom keys, Ctrl+comma, F1, Ctrl+Shift+Delete, F11 to enter, F12, Ctrl+Shift+I/J/C, a single Esc, Shift+F10, the Menu key, and Shift+click and the other link clicks. They run on Chromium's unhandled-key path through hidden application-menu accelerators. The fallback is a preload that reads event.defaultPrevented after dispatch.",
+  "Local keys work only while focus is in a Vitre surface: the address field, find field, switcher, menus, panels, peek header, tab bar or Home. They never reach a page. While a menu or the latched switcher is open, global keys are swallowed.",
+  "Pages can never block these: F6, which always takes focus out of the page; the reserved tab and window keys (Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up/Down); Esc Esc and Ctrl+W on a peek; leaving full screen or pointer lock; and Shift+right-click. From the address pill (F6), every page-first key goes straight to Vitre, so F6 then the key is the general route; menus add Reload, Find on page…, Print…, Inspect, Show downloads, Full screen and Settings.",
+  "Only keyboard lock (navigator.keyboard.lock in element full screen) sends the browser-first keys to the page first. Plain element full screen and pointer lock keep them browser-first. Esc (held, under keyboard lock) and F11 always leave. F11 window full screen is not element full screen.",
+  "AltGr guard: a binding that uses Alt needs Ctrl up and AltGraph off, and a binding that uses Ctrl needs Alt up. Modifiers must match exactly: Ctrl+Alt+Left is not Alt+Left, and Ctrl+Alt+Tab is not Ctrl+Tab. Either the left or right Ctrl and Alt work, but nothing depends on the right-hand key.",
+  "IME guard: no shortcut fires while isComposing is true or keyCode is 229. Esc closes the IME first.",
+  "Layouts: match letters by virtual key, which follows the key's label, so QWERTZ, AZERTY and Dvorak behave like every Windows app and Cyrillic or Greek layouts still give Ctrl+C. Match digits by virtual key or physical code. Match Plus, Minus and Equals by the character the active layout types, with VK_OEM_PLUS/MINUS and the numpad as fallbacks; zoom wins when a digit key types - or +. Only letters, digits, F keys, navigation keys, Enter, Esc, Tab, Backspace, Delete, Plus, Minus, Equals and comma carry shortcuts. Comma is matched by VK_OEM_COMMA.",
+  "Held-Ctrl states: no chord that holds Ctrl may rely on Esc, because Ctrl+Esc opens Start. The switcher latches, staying open with Ctrl up, on the first typed character, on Ctrl+Shift+A, when opened by mouse, and when Sticky Keys is on. Losing window focus (Start, Alt+Tab, the Win key) cancels back to the starting tab.",
+  "Key repeat is ignored for anything that closes, opens, reopens or toggles: Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+N, F11, F12, F1, Ctrl+J, Ctrl+comma, Ctrl+Shift+A, Ctrl+Shift+D, Alt+Enter, Ctrl+Q, every Esc step, and Alt+Left or Browser Back when it closes a peek.",
+  "Esc unwinds one layer per fresh keydown (key repeat never steps the ladder), in this order: the IME; a Vitre menu; a Vitre popover, prompt or page dialog; the latched switcher; element full screen or pointer lock; the Settings or Downloads panel; the focused Vitre field (the address field first puts the address back, then returns to the page; the find field closes find); the page; parked find; the peek; and finally stop loading. An Esc used by any layer never counts toward a peek’s Esc Esc.",
+  "Topmost surface: Ctrl+W, Esc, Ctrl+F and the page keys (reload, print, save, source, zoom, developer tools) act on an open panel first, then a peek, then the tab — the same order as the Esc ladder and as they are drawn. Tab and window keys always act on the window, and leaving a tab warm-closes its peek.",
+  "Peek's Shift+click and Shift+Enter come only from setWindowOpenHandler, and only when all of these hold: the disposition is 'new-window'; details.features is empty, so sign-in, payment and call pop-ups stay real pop-ups; within about 500 ms the preload saw a trusted Shift+click or Shift+Enter on a link whose href equals the URL; the URL is http, https or file and isn't only a #fragment change; and the Shift+click setting is on. Otherwise Vitre behaves exactly like Chrome, and it never adds a Shift+click listener of its own.",
+  "Windows conventions keep working. Alt+F4 closes the window, and Alt+Space opens the system menu on the frameless window. Alt or F10 pressed alone only closes an open Vitre menu: there is no native menu bar, no & mnemonics, autoHideMenuBar stays off, and handled Alt chords don't beep. Shift+F10 and the Menu key open the context menu. CUA keys, Ctrl+Backspace and Ctrl+Left/Right Shift text direction work in every Vitre field.",
+  "No single printable key is ever a shortcut on the page or in the bar, so screen-reader browse mode and site keys (YouTube, Gmail) keep them. Single keys work only inside Vitre's own focused widgets: menu access keys and switcher search.",
+  "Every F-key action has a non-F route for laptops without Fn lock: F3 → Ctrl+G, F5 → Ctrl+R, F6 → Ctrl+L, F11 → Full screen in the + menu, F12 → Ctrl+Shift+I, F1 → Ctrl+comma, Shift+F10 → the Menu key or a right-click.",
+  "Display: keys appear only as plain dim text in menus, tooltips and Settings › Keyboard shortcuts, never as chips, badges or key tips. Windows spelling, no spaces (Ctrl+Shift+T, Shift+click, Page Up, Delete). Letters and digits print by their Latin key names; comma, Plus, Minus and Equals print the active layout’s label. Modifier names are localized with the UI.",
+  "Held switcher: while the switcher is open, held or latched, every Ctrl+letter except Ctrl+W is a search character and never its global command (so Ctrl+T, Ctrl+N, Ctrl+R, Ctrl+Shift+T and Ctrl+Shift+W do nothing there). The first key is translated with the active layout as if Ctrl were up; with an IME on, it only latches and the IME takes the next key.",
+  "Address field: Shift+Delete removes a history suggestion only when the user moved onto that row with Up/Down or the pointer is on it; the default top match never counts, and otherwise Shift+Delete cuts.",
+  "Hardware keys: Browser Back/Forward/Refresh/Stop/Search/Home and the mouse side buttons arrive through app-command and act like Alt+Left, Alt+Right, Ctrl+R, Esc (stop), Ctrl+L and the Home tab, on the peek first where that applies."
+ ],
+ "changes": [
+  "TabMotion 'Esc while switching': in the held deck, cancel is now 'Ctrl+Shift+Tab back to the card you started on, then release Ctrl', a click on the wallpaper, or switching away from Vitre (any loss of focus cancels). Esc cancels only once the switcher is latched. Why: with Ctrl held, Esc is Ctrl+Esc, which Windows takes to open Start.",
+  "Typing while switching (SettingsTabs, TabSearch): the first character typed latches the switcher open, so Ctrl can be let go and the field accepts IME input, AltGr characters and dead keys. Enter opens the tab and Esc cancels; while Ctrl is held, W still closes the card. Write this on TabSearch, which has no key notes yet. Why: IMEs can't compose with Ctrl down, AltGr letters arrive as Ctrl+Alt, and a Shift tapped under Ctrl switches the keyboard layout.",
+  "The switcher's latched mode is now specified for Deck, Grid and Strip. It is latched when opened with Ctrl+Shift+A, by typing, by mouse, or with Sticky Keys on. Latched keys: Left/Right, arrow keys in Grid, Enter, Esc. In Grid and Strip, Tab with Ctrl held moves in reading order. Ctrl+Tab is ignored while Alt or AltGr is down. With 'Order of tabs: Tab bar order', Ctrl+Tab and its quick tap go to the tab on the right. Why: releasing Ctrl can't confirm a choice when Ctrl isn't held, Sticky Keys lets go of Ctrl after one key, and AltGr+Tab is Windows' persistent task switcher.",
+  "Ctrl+W in the switcher while a search is filtering closes only the highlighted result. Why: the case in mock issue #29 was unspecified.",
+  "Ctrl+Shift+T now has one meaning: reopen from a single recently-closed list of tabs, peeks and windows, newest first. A peek reopens as a peek if its source tab is active, otherwise as a tab. The + menu row's label names what it will reopen ('Reopen closed tab', '…peek', '…window'), as Chrome's does. Why: the + menu and PeekSpec gave the same global key two different meanings.",
+  "Priorities are now stated for designed and printed keys that had none. Page-first: Alt+Enter on a peek, Ctrl+Q, Ctrl+Shift+A, Ctrl+L, Ctrl+J, Shift+F10 and the Menu key, and the printed page keys. Browser-first: Ctrl+W, Ctrl+N, Ctrl+Shift+T, Ctrl+Tab and F6. Why: Sheets, Excel, Jupyter and VS Code use Alt+Enter; Outlook uses Ctrl+Q; Slack and Teams use Ctrl+Shift+A; web terminals use Ctrl+L. Each of these keeps a route a page can't block (the header button, a header double-click, menus, Ctrl+Tab then typing, F6).",
+  "Ctrl+Q: it acts only on real http/https links and never while typing in a field. It now also peeks the highlighted suggestion in the address field, so Ctrl+Q is the peek key on every face of the pill. Why: one peek key everywhere, and javascript: links and buttons must never open a peek.",
+  "Esc Esc on a peek ignores key repeat and doesn't count an Esc already used by the IME, a menu, find or leaving full screen. Once you've typed in the peek, it only bumps the sheet, as a click on the dim already does; Ctrl+W and × still always close. Why: Vim, Jupyter, Figma and spreadsheet users press Esc twice on purpose. DESIGN-NOTES said Esc Esc 'always closes'.",
+  "Closing a peek, by any route, returns keyboard focus to the link that opened it. Why: PeekSpec didn't say where focus goes (mock issue #24).",
+  "Page keys with a peek open: Ctrl+S, Ctrl+U, zoom and F12 now act on the peek, as Ctrl+R, Ctrl+P and Ctrl+F already did. Tab and window keys act on the window, and leaving the tab warm-closes its peek. Why: the topmost-surface rule had been applied only in part.",
+  "Address field: Alt+Enter opens the address or result in a new foreground tab, and Ctrl+Enter adds www. and .com, as in Chrome and Edge. Mock issue #38's background-tab idea is not adopted. Why: 'Alt+Enter means as a tab, and go there' then holds for both the pill and the peek, and Peek already covers looking without leaving.",
+  "F6 becomes browser-first and gets a defined cycle: page ↔ address pill (or the find field while find is open). With a peek open it cycles peek page → peek header → address pill. Shift+F6 goes the other way, and Tab from the address field walks the tab bar. Why: a page could trap focus, FindSpec specified only half of F6, and no key reached the tab circles.",
+  "FindSpec's edge-case copy and DESIGN-NOTES Find › Keys: the guaranteed way to Vitre's find is 'F6, then Ctrl+F' (or Find on page… in the page menu), not 'Ctrl+L or F6'. Why: Ctrl+L is page-first, and web terminals and Word for the web take it.",
+  "Esc: the four partial orders (in Find, Peek, Menus and the switcher) are replaced by one ladder. Why: panels, address editing, element full screen and stop loading weren't covered by any of them.",
+  "Settings and Downloads panels: Esc and Ctrl+W close the panel, not the tab, and Ctrl+J and Ctrl+comma toggle their own panel. Why: only Ctrl+F was defined for panels.",
+  "The + circle menu gains a separator and 'Show downloads  Ctrl+J [S]', 'Full screen  F11 [F]' (a check item) and 'Settings  Ctrl+, [E]'. The + circle's tooltip reads 'New tab  Ctrl+T'. Why: Ctrl+J and Ctrl+comma are page-first and need a route a page can't block (the ring exists only during downloads, and Settings was reachable only from Home), and F11 needs a non-F route.",
+  "The Home wallpaper menu prints 'Settings  Ctrl+,'. 'Show tab bar' stays without a key. Why: the proposed Ctrl+Shift+B is Microsoft Pinyin's expressions panel.",
+  "Key spelling: 'Ctrl + Tab' and 'Ctrl + Shift + A' (SettingsTabs), 'Shift + click' (VideoStates), the spaced keys on the PeekSpec and TabMotion cards, 'Shift+Click' (CtxMenu link lists), 'Shift+Del' (CtxMenu suggestion row) and 'Shift-click to peek' (PeekDiscover) become 'Ctrl+Tab', 'Ctrl+Shift+A', 'Shift+click', 'Alt+Enter', 'Shift+Delete' and 'Shift+click to peek'. Why: two spellings on screen read as two systems, and Windows spelling is what the menus and FindSpec already use.",
+  "Guards widened: the AltGr guard, which covered only Alt+C, now covers every Alt and Ctrl chord. The composition guard, which covered only find's live search, now covers every shortcut. Why: Polish, Hungarian, Czech and German users type characters with AltGr, and the Japanese IME uses F6–F10 and Ctrl+U/I/O/P/T while composing.",
+  "Shift+Delete removes a history suggestion only while a suggestion row is highlighted; otherwise it stays the Windows cut. Why: CUA Shift+Delete means Cut in every Windows text field.",
+  "Ctrl+W, Ctrl+F4, Ctrl+Shift+W and Ctrl+Shift+T ignore key repeat, so holding Ctrl+W closes one tab, not a run of them. Why: an accidental hold shouldn't empty the window.",
+  "Shift+click gets a switch, 'Shift+click a link: Peek / Open in new window', on Settings › Keyboard shortcuts. This settles the open idea of a Peek group in Settings › Tabs. Why: Vitre changes Chrome's Shift+click, so Chrome's behaviour should be one switch away.",
+  "DESIGN-NOTES: the one-line 'Shortcuts' rule is replaced by this map's reserved list, and line 177's 'Keys these designs print' by the map itself. Why: the rule left out IME keys, Ctrl+Shift+digit, Ctrl+Esc inside held-Ctrl states, accessibility keys, Alt+numpad, dead keys and GPU overlays. The list left out Ctrl+J, Ctrl+W, Ctrl+F, Alt+Left, Alt+Right, Alt+Enter, Ctrl+Shift+T, Esc and Shift+click.",
+  "Concept placeholders in canvas.json go when the Concept page is cleared: 'Lens: Ctrl L, Ctrl T, Ctrl K' (no Ctrl+K palette; Ctrl+K and Ctrl+E stay with pages), 'Ghost mode: Ctrl Shift O' (an AMD overlay key, Chrome's bookmarks and VS Code's go to symbol; a private window would use Ctrl+Shift+N) and 'Key tips: tap Alt' (it clashes with Windows menu mode, Alt codes and the Alt+Shift layout switch, and it is the rejected chip pattern). The empty 'Keyboard map' frame (Keys.dc.html) becomes the KeyMap board.",
+  "Topmost order is panel, then peek, then tab, matching the Esc ladder (a Settings or Downloads panel can sit over a peek).",
+  "While the switcher is open, Ctrl+letter (except W) types into search; Delete also closes the selected card.",
+  "Plain element full screen and pointer lock no longer hand browser-first keys to the page; only keyboard lock does.",
+  "The Esc ladder gains a popover, prompt or page dialog layer, and every step needs a fresh keydown. New Popovers group and Downloads panel row keys.",
+  "Latched switcher with a query: Left/Right edit the text, Up/Down and Tab move the selection. Sticky Keys opens the switcher latched.",
+  "Ctrl+Shift+T reopens a peek only while it is warm and its source tab is active.",
+  "Hardware browser keys and mouse side buttons are mapped. Shift+click on the pill’s reload button is a hard reload.",
+  "Ctrl+Shift+D is printed beside Download video… and in the download mark’s tooltip."
+ ],
+ "customization": "Settings › Keyboard shortcuts sits in the Settings sidebar; F1 or Ctrl+, opens it. It lists every key in this map, grouped the same way, as plain dim text in Windows spelling, with labels taken from the active keyboard layout (navigator.keyboard.getLayoutMap) and localized modifier names. The panel's 'Find a setting' field searches the page by action or by key. Page-first keys carry a dim note, 'Sites can use this first'. A short 'Different from Chrome' section lists the deviations: Shift+click peeks; Shift+Enter in the address field peeks; Ctrl+Tab uses most-recent order; F6 always leaves the page; Ctrl+Q peeks. The page also has a switch, 'Shift+click a link: Peek / Open in new window', and a 'Caret browsing' switch, which has no key. Only Vitre's own verbs can be rebound, one key each: Peek (Ctrl+Q), Open as tab (Alt+Enter), Search tabs (Ctrl+Shift+A) and Download this video (Ctrl+Shift+D). Chrome-standard tab and window keys, find, navigation and editing keys are fixed. To rebind, click the key text and press the new keys; Esc cancels the capture. Each changed row gets a dim 'Reset', and the page has 'Reset all shortcuts'. The editor refuses some keys with a one-line reason: reserved keys ('Windows uses Ctrl+Shift+1 to switch input language', 'Ctrl+Alt types characters on many keyboards', 'Win keys belong to Windows', 'Microsoft Pinyin uses Ctrl+Shift+B', 'Ctrl+Esc opens Start'); single letters, bare modifiers and layout-dependent punctuation; and keys another Vitre command already uses ('Already used by Show downloads'). It warns but allows GPU-overlay defaults ('Radeon Software may use this on some PCs') and keys popular sites use ('Slack, GitHub and Notion use Ctrl+K; sites get it first'). Not in v1: a per-site 'Let this site use Ctrl+W, Ctrl+T and Ctrl+N' list for web IDEs and terminals. If it ships, it is off by default, set per site, and never covers Ctrl+Tab, F6 or Esc Esc. The refusals also cover Shift+printable keys (‘Types a character’) and Alt+letter (‘Pages use Alt+letter for access keys’), count every scope-local use as already used, and rebinding Peek or Open as tab changes every place it applies (page, peek, address field, find field). ‘Different from Chrome’ also lists Ctrl+H (recent history in the address field), F1 (keyboard shortcuts), Ctrl+Shift+D (download this video), Ctrl+Shift+T (also reopens a warm peek) and Ctrl+J (a panel, not a page). Keys some Radeon installs take (Ctrl+Shift+R, Ctrl+Shift+I) carry a dim warning.",
+ "boards": [
+  "KeyMap: the whole map as a reference sheet (fills the empty Keyboard map frame): every group as a table (keys, action, where it works), a quiet text marker for Vitre first / Page first / Inside Vitre, new keys marked, and the reserved list by owner.",
+  "KeyRouting: how one keydown travels (guards, browser-first, the page, page-first), the Esc ladder as a stack, the F6 focus cycle with and without a peek or find, and “What pages can never block”.",
+  "SwitcherKeys: the switcher held versus latched across Deck, Grid and Strip; replaces TabMotion’s Esc card.",
+  "SettingsKeys: Settings › Keyboard shortcuts in the floating panel: grouped list, page-first notes, Different from Chrome, the Shift+click switch, and a capture row refusing Ctrl+Shift+1 with its reason."
+ ],
+ "skepticResolved": "All 2 blockers and 9 should-fix items applied; nits applied except the F6 per-site idea (noted as later)."
+}

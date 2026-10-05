@@ -1,0 +1,227 @@
+/* Deer shell for browser.xhtml (Firefox 157).
+ *
+ * Loaded per window as an author sheet by VitreShell.beforeLayout (windowUtils.loadSheetUsingURIString,
+ * synchronous), before the first layout, so Firefox's own interface never paints.
+ * Everything that touches Firefox's elements is scoped to :root[vitre]: the sheet is inert until the
+ * shell claims the window. No default @namespace on purpose: #id and .class selectors must match
+ * both XUL and HTML elements.
+ *
+ * This sheet holds only what every window needs before its first paint: the hide rules, the page
+ * area, the tab-box filter that lets glass see the page, and the base of Deer's layer (module
+ * layers, drag strip). Glass tokens and themes are in glass.css, the bar in bar.css (loaded with
+ * this sheet); feature styles come from b.css(id, text).
+ * Element ids are Firefox 157's (reference/omni/browser/chrome/browser/content/browser/browser.xhtml).
+ */
+
+/* ------------------------------------------------------------------ */
+/* 1. Hide Firefox's own interface                                     */
+/* ------------------------------------------------------------------ */
+
+/* The toolbox stays in the frame tree (code that measures or anchors to it keeps working, and the
+ * per-tab notification bars keep a home), but it leaves the flow and takes no space. Its toolbars
+ * are not rendered; only #notifications-toolbar can show (section 5). */
+:root[vitre] #navigator-toolbox {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0 !important;
+  border: 0 !important;
+  min-height: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  z-index: 9;
+  -moz-window-dragging: no-drag;
+}
+:root[vitre] #navigator-toolbox::after { display: none !important; }
+:root[vitre] #navigator-toolbox > toolbar:not(#notifications-toolbar) { display: none !important; }
+
+/* Sidebar launcher, sidebar panel, their splitters, the AI window box. */
+:root[vitre] #sidebar-container,
+:root[vitre] #sidebar-box,
+:root[vitre] #sidebar-main,
+:root[vitre] #sidebar-splitter,
+:root[vitre] #sidebar-launcher-splitter,
+:root[vitre] #ai-window-splitter,
+:root[vitre] #ai-window-box {
+  display: none !important;
+}
+
+/* The strip Firefox uses to bring its toolbox back in full screen; Deer has its own reveal. */
+:root[vitre] #fullscr-toggler { display: none !important; }
+
+/* ------------------------------------------------------------------ */
+/* 2. Pages fill the whole window                                      */
+/* ------------------------------------------------------------------ */
+
+:root[vitre] {
+  --window-min-width: 480px;
+  min-height: 360px !important;
+  background-color: #1b1c20 !important;
+}
+:root[vitre] body {
+  background: #1b1c20 !important;
+}
+:root[vitre] #browser {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+:root[vitre] #tabbrowser-tabbox,
+:root[vitre] #tabbrowser-tabpanels,
+:root[vitre] .browserContainer,
+:root[vitre] .browserStack {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. Glass sees the page                                              */
+/* ------------------------------------------------------------------ */
+
+/* A neutral filter on the tab box puts the remote page and Deer's layer (mounted inside the tab
+ * box) on one surface, so backdrop-filter in the layer samples the live page
+ * (spikes/glass/RESULT.md, recipe correction 1). Costs: page text under it is greyscale-antialiased,
+ * and position: fixed inside the tab box is relative to the tab box.
+ * Removed in DOM full screen: the full-screen <browser> is position: fixed and must be relative to
+ * the window again. */
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabbox {
+  filter: saturate(1.0001);
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. Deer's layer                                                    */
+/* ------------------------------------------------------------------ */
+
+/* #vitre-root is mounted inside #tabbrowser-tabbox by the window bundle. The whole layer is
+ * click-through; children opt in with pointer-events: auto. */
+#vitre-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--g-text);
+  user-select: none;
+  -moz-user-focus: normal;
+}
+#vitre-root,
+#vitre-root * { box-sizing: border-box; }
+:root[inDOMFullscreen] #vitre-root { display: none; }
+
+/* Tokens (--spring, --expand, --accent, --font), the glass themes (theme-light | theme-dark |
+ * theme-clear, --g-*) and the .glass structure are in skin/glass.css; the tab bar, window controls
+ * and tooltips in skin/bar.css. VitreShell loads all three before the first layout. */
+
+#vitre-root button {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  cursor: default;
+}
+#vitre-root button:focus-visible,
+#vitre-root input:focus-visible {
+  outline: 2px solid var(--g-text);
+  outline-offset: 2px;
+}
+
+/* Feature-module overlay layers (b.layer(id, z)): full window, transparent to the pointer except
+ * their children. */
+#vitre-root > .module-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#vitre-root > .module-layer > * { pointer-events: auto; }
+
+/* Drag strip: the part of the window that moves it. In a normal window Windows keeps the top 8px of
+ * the client area for resizing (WM_NCHITTEST says HTTOP there), so the strip is 8 + 10px tall;
+ * maximized there is no resize band. The drag region is geometric: anything painted over the strip
+ * drags too unless it declares -moz-window-dragging: no-drag. The wheel is dead on the strip. */
+#vitre-drag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 18px;
+  pointer-events: auto;
+  -moz-window-dragging: drag;
+}
+:root[sizemode="maximized"] #vitre-drag { height: 8px; }
+:root[inFullscreen] #vitre-drag { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* 5. Firefox notification bars, floated under the bar as a card       */
+/* ------------------------------------------------------------------ */
+:root[vitre] #navigator-toolbox > #notifications-toolbar {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  translate: -50% 0;
+  width: min(640px, calc(100vw - 32px));
+  background: light-dark(#f9f9fb, #2b2a33) !important;
+  color: light-dark(#15141a, #fbfbfe) !important;
+  pointer-events: auto;
+  border-radius: 12px;
+  overflow: clip;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
+}
+:root[vitre][inDOMFullscreen] #navigator-toolbox > #notifications-toolbar { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* 6. Firefox's tab dialogs (print, sign-in) hang under the bar        */
+/* ------------------------------------------------------------------ */
+/* Firefox aligns them to the top of the page area, tucked 5px under its toolbar
+ * (skin/classic/browser/tabbrowser/content-area.css, ".dialogBox"). Deer's bar floats over the
+ * page, so they start 8px under it instead. alert / confirm / prompt (.content-prompt-dialog) are
+ * centred on the page and stay as they are. */
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels .dialogStack:not(.content-prompt-dialog) > .dialogOverlay > .dialogBox:not(.spotlightBox) {
+  margin-top: 64px;
+  max-height: calc(100% - 72px);
+}
+
+/* ------------------------------------------------------------------ */
+/* 7. The link status bubble (Firefox's #statuspanel, browser.xhtml)   */
+/* ------------------------------------------------------------------ */
+/* Board PeekDiscover (role=status): 12 px from the window's bottom-left corner (bottom-right when
+ * Firefox mirrors it away from the pointer: status-panel.js _mirror sets [mirror]), 30 px tall,
+ * radius 15, 12.5 px text at white 0.9 on rgba(28,28,34,0.82) frost with a 1 px white 0.14 ring.
+ * Peek's once-only discovery hint (.vp-hint, peek/style.ts) is the same bubble with
+ * "· Shift+click to peek" added, in the same place, so nothing jumps when it takes over. Firefox's
+ * own rules: browser/chrome/browser/skin/classic/browser/tabbrowser/content-area.css. */
+:root[vitre] #statuspanel:not([hidden]) {
+  left: 12px;
+  right: auto;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+}
+:root[vitre] #statuspanel:not([hidden])[mirror] {
+  left: auto;
+  right: 12px;
+}
+:root[vitre] #statuspanel[sizelimit] {
+  max-width: calc(50% - 12px);
+}
+:root[vitre] #statuspanel-label {
+  height: 30px;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 15px;
+  font: 12.5px/30px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.9) !important;
+  background-color: rgba(28, 28, 34, 0.82) !important;
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 18px rgba(0, 0, 0, 0.25);
+  text-shadow: none;
+}

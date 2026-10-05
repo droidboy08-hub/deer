@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How a key travels</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 1200px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">How a key travels</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">Every keydown passes the same guards, then reaches Vitre or the page first, depending on the key. Esc closes one layer per press, and F6 always gets you out of the page.</p>
+</div>
+
+<div style="position: absolute; left: 48px; top: 132px; width: 1344px; display: flex; align-items: baseline; gap: 12px; white-space: nowrap">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">One keydown</span>
+<span style="font-size: 13px; line-height: 19px; color: #9a9ca6">Its priority decides who sees it first: Vitre first, Page first or Inside Vitre.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 224px; width: 84px; height: 32px; box-sizing: border-box; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); font-size: 13px; line-height: 32px; font-weight: 600; text-align: center">Keydown</div>
+<svg width="36" height="10" viewBox="0 0 36 10" style="position: absolute; left: 132px; top: 235px" aria-hidden="true"><path d="M0 5H34.5M29.5 1.5L34.5 5L29.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 168px; top: 168px; width: 232px; height: 144px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">Guards</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">IME, AltGr, exact modifiers, key repeat</span>
+</div>
+<svg width="36" height="10" viewBox="0 0 36 10" style="position: absolute; left: 400px; top: 235px" aria-hidden="true"><path d="M0 5H34.5M29.5 1.5L34.5 5L29.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 436px; top: 168px; width: 380px; height: 144px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">Vitre first?</span>
+<span style="font-size: 12.5px; line-height: 18px">Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up/Down, F6, Shift+F6</span>
+<span style="font-size: 12.5px; line-height: 18px">Esc Esc and Ctrl+W on a peek; Esc or F11 to leave full screen</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Caught before the page, in before-input-event.</span>
+</div>
+<svg width="36" height="10" viewBox="0 0 36 10" style="position: absolute; left: 816px; top: 235px" aria-hidden="true"><path d="M0 5H34.5M29.5 1.5L34.5 5L29.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 816px; top: 217px; width: 36px; font-size: 12px; line-height: 16px; color: #9a9ca6; text-align: center">No</div>
+
+<div style="position: absolute; left: 852px; top: 168px; width: 220px; height: 144px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">The page</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The keydown reaches the site.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">It may call preventDefault and keep the key.</span>
+</div>
+<svg width="36" height="10" viewBox="0 0 36 10" style="position: absolute; left: 1072px; top: 235px" aria-hidden="true"><path d="M0 5H34.5M29.5 1.5L34.5 5L29.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 1108px; top: 168px; width: 284px; height: 144px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">Page first</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">If the page didn&#8217;t, Vitre&#8217;s accelerator runs.</span>
+<span style="font-size: 12.5px; line-height: 18px">Ctrl+F, Ctrl+L, Ctrl+R, Ctrl+J, Ctrl+1&#8211;9, zoom, a single Esc&#8230;</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">On Chromium&#8217;s unhandled-key path.</span>
+</div>
+
+<svg width="10" height="36" viewBox="0 0 10 36" style="position: absolute; left: 279px; top: 312px" aria-hidden="true"><path d="M5 0V34.5M1.5 29.5L5 34.5L8.5 29.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 294px; top: 322px; font-size: 12px; line-height: 16px; color: #9a9ca6; white-space: nowrap">Focus in Vitre</div>
+<svg width="10" height="36" viewBox="0 0 10 36" style="position: absolute; left: 621px; top: 312px" aria-hidden="true"><path d="M5 0V34.5M1.5 29.5L5 34.5L8.5 29.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 636px; top: 322px; font-size: 12px; line-height: 16px; color: #9a9ca6; white-space: nowrap">Yes</div>
+<svg width="10" height="36" viewBox="0 0 10 36" style="position: absolute; left: 957px; top: 312px" aria-hidden="true"><path d="M5 0V34.5M1.5 29.5L5 34.5L8.5 29.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 972px; top: 322px; font-size: 12px; line-height: 16px; color: #9a9ca6; white-space: nowrap">preventDefault</div>
+
+<div style="position: absolute; left: 48px; top: 348px; width: 352px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">Inside Vitre</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Fields, menus, the switcher, panels, the peek header, the tab bar and Home.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Local keys stop here and never reach a page.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Menus and the latched switcher swallow global keys.</span>
+</div>
+
+<div style="position: absolute; left: 436px; top: 348px; width: 380px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">Vitre runs it</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The page never sees the key.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Under keyboard lock, the page sees them first; hold Esc to leave.</span>
+</div>
+
+<div style="position: absolute; left: 852px; top: 348px; width: 220px; box-sizing: border-box; padding: 12px 16px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600; margin-bottom: 2px">The page keeps it</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Docs keeps Ctrl+H for Replace.</span>
+</div>
+
+<div style="position: absolute; left: 1108px; top: 360px; width: 284px; font-size: 12.5px; line-height: 18px; color: #9a9ca6">Kept by the page? Press F6, then the key. From the address pill it goes straight to Vitre.</div>
+
+<div style="position: absolute; left: 48px; top: 514px; width: 744px; display: flex; align-items: baseline; gap: 12px; white-space: nowrap">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">Esc, one layer at a time</span>
+<span style="font-size: 13px; line-height: 19px; color: #9a9ca6">Top closes first.</span>
+</div>
+
+<svg width="10" height="293" viewBox="0 0 10 293" style="position: absolute; left: 47px; top: 552px" aria-hidden="true"><path d="M5 2V291.5M1.5 286.5L5 291.5L8.5 286.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 68px; top: 552px; width: 480px; display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{ladder}}" as="step" hint-placeholder-count="11">
+<div style="height: 23px; box-sizing: border-box; padding: 0 12px; border-radius: 6px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; align-items: baseline; white-space: nowrap; font-size: 13px; line-height: 23px">
+<span style="width: 24px; flex-shrink: 0; font-size: 12px; color: #6f7280; font-variant-numeric: tabular-nums">{{step.n}}</span>
+<span style="flex-grow: 1">{{step.name}}</span>
+<span style="font-size: 12px; color: #9a9ca6">{{step.detail}}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="position: absolute; left: 576px; top: 552px; width: 200px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; line-height: 19px; color: #9a9ca6">
+<span style="padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07)">Every step needs a fresh press; holding Esc never runs down the ladder.</span>
+<span style="padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07)">An Esc used by any layer never counts toward a peek&#8217;s Esc Esc.</span>
+</div>
+
+<div style="position: absolute; left: 824px; top: 514px; width: 568px; display: flex; align-items: baseline; gap: 12px; white-space: nowrap">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">F6 moves focus</span>
+<span style="font-size: 13px; line-height: 19px; color: #9a9ca6">Each arrow is one press. A page can never keep F6.</span>
+</div>
+
+<div style="position: absolute; left: 824px; top: 562px; width: 104px; font-size: 13px; line-height: 19px; font-weight: 600">On a page</div>
+<div style="position: absolute; left: 936px; top: 556px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Page</div>
+<svg width="48" height="10" viewBox="0 0 48 10" style="position: absolute; left: 1056px; top: 567px" aria-hidden="true"><path d="M0 5H46.5M41.5 1.5L46.5 5L41.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 1104px; top: 556px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Address pill</div>
+<svg width="178" height="18" viewBox="0 0 178 18" style="position: absolute; left: 991px; top: 588px" aria-hidden="true"><path d="M173 0V8Q173 14 167 14H11Q5 14 5 8V1.5M1.5 6.5L5 1.5L8.5 6.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 824px; top: 648px; width: 104px; font-size: 13px; line-height: 19px; font-weight: 600">Find open</div>
+<div style="position: absolute; left: 936px; top: 642px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Page</div>
+<svg width="48" height="10" viewBox="0 0 48 10" style="position: absolute; left: 1056px; top: 653px" aria-hidden="true"><path d="M0 5H46.5M41.5 1.5L46.5 5L41.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 1104px; top: 642px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Find field</div>
+<svg width="178" height="18" viewBox="0 0 178 18" style="position: absolute; left: 991px; top: 674px" aria-hidden="true"><path d="M173 0V8Q173 14 167 14H11Q5 14 5 8V1.5M1.5 6.5L5 1.5L8.5 6.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 824px; top: 734px; width: 104px; font-size: 13px; line-height: 19px; font-weight: 600">Peek open</div>
+<div style="position: absolute; left: 936px; top: 728px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Peek page</div>
+<svg width="48" height="10" viewBox="0 0 48 10" style="position: absolute; left: 1056px; top: 739px" aria-hidden="true"><path d="M0 5H46.5M41.5 1.5L46.5 5L41.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 1104px; top: 728px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Peek header</div>
+<svg width="48" height="10" viewBox="0 0 48 10" style="position: absolute; left: 1224px; top: 739px" aria-hidden="true"><path d="M0 5H46.5M41.5 1.5L46.5 5L41.5 8.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="position: absolute; left: 1272px; top: 728px; width: 120px; height: 32px; border-radius: 16px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); font-size: 13px; line-height: 32px; text-align: center">Address pill</div>
+<svg width="346" height="18" viewBox="0 0 346 18" style="position: absolute; left: 991px; top: 760px" aria-hidden="true"><path d="M341 0V8Q341 14 335 14H11Q5 14 5 8V1.5M1.5 6.5L5 1.5L8.5 6.5" stroke="#4cc2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+
+<div style="position: absolute; left: 824px; top: 806px; width: 568px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 13px; line-height: 19px; color: #9a9ca6">Shift+F6 goes the other way. Tab from the address field walks the tab bar.</div>
+
+<div style="position: absolute; left: 48px; top: 880px; width: 600px; height: 276px; box-sizing: border-box; padding: 20px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 19px; font-weight: 600; margin-bottom: 8px">Pages can never block</div>
+<div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); column-gap: 20px; font-size: 13px; line-height: 19px">
+<sc-for list="{{neverBlock}}" as="row" hint-placeholder-count="5">
+<span style="padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">{{row.k}}</span><span style="padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">{{row.v}}</span>
+</sc-for>
+</div>
+</div>
+
+<div style="position: absolute; left: 672px; top: 880px; width: 340px; height: 276px; box-sizing: border-box; padding: 20px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column">
+<div style="font-size: 14px; line-height: 19px; font-weight: 600; margin-bottom: 14px">Topmost first</div>
+<div style="display: flex; gap: 18px; align-items: center">
+<div style="position: relative; width: 132px; height: 84px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #e9ecf1">
+<div style="position: absolute; left: 10px; top: 12px; width: 92px; height: 5px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 10px; top: 24px; width: 70px; height: 5px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 10px; top: 36px; width: 100px; height: 5px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 10px; top: 48px; width: 84px; height: 5px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 10px; top: 60px; width: 96px; height: 5px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+<div style="position: absolute; left: 16px; top: 8px; width: 84px; height: 72px; border-radius: 6px; overflow: hidden; background: #f6f7f9; box-shadow: 0 6px 14px rgba(0,0,0,0.3)"><div style="height: 7px; background: rgba(250,251,253,0.9); border-bottom: 1px solid rgba(16,18,24,0.08)"></div><div style="margin: 7px 8px 4px; width: 44px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.7"></div><div style="margin: 0 8px 3px; width: 60px; height: 3px; border-radius: 2px; background: #1b1d21; opacity: 0.2"></div><div style="margin: 0 8px; width: 52px; height: 3px; border-radius: 2px; background: #1b1d21; opacity: 0.2"></div></div>
+<div style="position: absolute; left: 60px; top: 24px; width: 62px; height: 48px; border-radius: 7px; background: rgba(24,25,30,0.94); box-shadow: 0 8px 18px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.12)"><div style="margin: 8px 8px 5px; width: 30px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.7)"></div><div style="margin: 0 8px 4px; width: 44px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25)"></div><div style="margin: 0 8px 4px; width: 38px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25)"></div><div style="margin: 0 8px; width: 40px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25)"></div></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 19px">
+<span><span style="display: inline-block; width: 18px; font-size: 12px; color: #6f7280">1</span>A panel</span>
+<span><span style="display: inline-block; width: 18px; font-size: 12px; color: #6f7280">2</span>A peek</span>
+<span><span style="display: inline-block; width: 18px; font-size: 12px; color: #6f7280">3</span>The tab</span>
+</div>
+</div>
+<div style="margin-top: 16px; font-size: 13px; line-height: 19px; color: #9a9ca6">Ctrl+W, Esc, Ctrl+F and the page keys (reload, print, save, source, zoom, developer tools) act on the topmost surface.</div>
+<div style="margin-top: 8px; font-size: 13px; line-height: 19px; color: #9a9ca6">Tab and window keys always act on the window.</div>
+</div>
+
+<div style="position: absolute; left: 1036px; top: 880px; width: 356px; height: 276px; box-sizing: border-box; padding: 20px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; line-height: 19px; font-weight: 600; margin-bottom: 8px">Guards</div>
+<div style="display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 16px; font-size: 13px; line-height: 19px">
+<sc-for list="{{guards}}" as="row" hint-placeholder-count="5">
+<span style="padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">{{row.k}}</span><span style="padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">{{row.v}}</span>
+</sc-for>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+ladder: [
+{ n: "1", name: "The IME", detail: "Composition ends" },
+{ n: "2", name: "A Vitre menu", detail: "Focus returns" },
+{ n: "3", name: "A popover, prompt or page dialog", detail: "Back to what opened it" },
+{ n: "4", name: "The latched switcher", detail: "Back to the starting tab" },
+{ n: "5", name: "Element full screen or pointer lock", detail: "Under keyboard lock, hold Esc" },
+{ n: "6", name: "The Settings or Downloads panel", detail: "Never the tab under it" },
+{ n: "7", name: "The focused Vitre field", detail: "Find closes; the address reverts" },
+{ n: "8", name: "The page", detail: "Sites get a single Esc" },
+{ n: "9", name: "Parked find", detail: "Find open, focus on the page" },
+{ n: "10", name: "The peek", detail: "Focus goes back to its link" },
+{ n: "11", name: "Stop loading", detail: "Only while the page loads" }
+],
+neverBlock: [
+{ k: "F6", v: "Always takes focus out of the page." },
+{ k: "Tab and window keys", v: "Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up/Down" },
+{ k: "Esc Esc, Ctrl+W", v: "Close a peek. Esc Esc only bumps it once you’ve typed." },
+{ k: "Esc, F11", v: "Leave full screen or pointer lock." },
+{ k: "Shift+right-click", v: "Vitre’s menu, even where a page replaces it." }
+],
+guards: [
+{ k: "AltGr", v: "Alt chords need AltGr off; modifiers match exactly." },
+{ k: "IME", v: "Nothing fires while composing." },
+{ k: "Layouts", v: "Letters by key label, zoom by the typed character." },
+{ k: "Key repeat", v: "Never closes, opens or toggles." },
+{ k: "Single keys", v: "Never a shortcut on the page." }
+]
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Vitre chrome layer (spike). Registered at runtime by config.js / boot script through
+# nsIComponentRegistrar.autoRegister(<this file>).
+content  vitre                ./
+skin     vitre  classic/1.0   skin/
+resource vitre                ./
+override chrome://browser/content/aboutDialog.xhtml chrome://vitre/content/pages/about.xhtml
+# --- verifier additions: legacy (non-Fluent) brand strings and in-product brand images ---
+override chrome://branding/locale/brand.properties chrome://vitre/content/locales/en-US/brand.properties
+override chrome://branding/content/icon32.png chrome://vitre/skin/icon64.png
+override chrome://branding/content/icon64.png chrome://vitre/skin/icon64.png

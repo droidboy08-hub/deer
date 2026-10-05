@@ -1,0 +1,21 @@
+{
+  "name": "deer",
+  "productName": "Deer",
+  "version": "0.1.0",
+  "description": "Deer: a liquid-glass browser for Windows, as a chrome layer on the Gecko runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "watch": "node tools/build.mjs --watch",
+    "typecheck": "tsc --noEmit -p .",
+    "start": "node tools/build.mjs && launcher\\Deer.cmd",
+    "launcher": "node tools/build-launcher.mjs",
+    "setup-runtime": "python tools/setup-runtime.py",
+    "test": "python tests/core/all.py"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

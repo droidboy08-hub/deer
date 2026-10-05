@@ -1,0 +1,539 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Article.dc.html": {
+      "h": 900,
+      "page": "parts",
+      "title": "Part · Field Notes page (mock site)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Downloads.dc.html": {
+      "h": 900,
+      "page": "panels",
+      "title": "Downloads · floating panel over the home page",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "DownloadsPopover.dc.html": {
+      "h": 900,
+      "page": "panels",
+      "title": "Downloads · quick view from the home page",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "GalleryPage.dc.html": {
+      "h": 900,
+      "page": "parts",
+      "title": "Part · Long Exposure Club gallery (mock site)",
+      "w": 1440,
+      "x": 0,
+      "y": 2040
+    },
+    "Home.dc.html": {
+      "h": 900,
+      "page": "home",
+      "title": "Home · idle",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "HomeBackground.dc.html": {
+      "h": 900,
+      "page": "home",
+      "title": "Home · background settings",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "HomeBrowse.dc.html": {
+      "h": 900,
+      "page": "home",
+      "title": "Browsing · glass tabs over a page",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "HomeSearch.dc.html": {
+      "h": 900,
+      "page": "home",
+      "title": "Home · searching from the tab",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "IssuesPage.dc.html": {
+      "h": 900,
+      "page": "parts",
+      "title": "Part · vitre-shell issues (mock site)",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "RefPage.dc.html": {
+      "h": 900,
+      "page": "parts",
+      "title": "Part · Refract reference page (mock site)",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "Settings.dc.html": {
+      "h": 900,
+      "page": "panels",
+      "title": "Settings · floating panel over a page",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "TabOverview.dc.html": {
+      "h": 900,
+      "page": "tabs",
+      "title": "Tab switcher · Grid (option in Settings)",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "TabSearch.dc.html": {
+      "h": 900,
+      "page": "tabs",
+      "title": "Grid · typing to search (works in every style)",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "TabSwitcher.dc.html": {
+      "h": 900,
+      "page": "tabs",
+      "title": "Tab switcher · Full-screen deck (default, plays by itself)",
+      "w": 1440,
+      "x": 0,
+      "y": 0,
+      "is_interactive": true
+    },
+    "VideoDownload.dc.html": {
+      "h": 900,
+      "page": "video",
+      "title": "Download this video · found while hovering",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "VideoPage.dc.html": {
+      "h": 900,
+      "page": "parts",
+      "title": "Part · Tideline video page (mock site)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "VideoPicker.dc.html": {
+      "h": 900,
+      "page": "video",
+      "title": "Download this video · choosing a quality",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "VideoStates.dc.html": {
+      "h": 900,
+      "page": "video",
+      "title": "Download this video · every state",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "TabMotion.dc.html": {
+      "h": 900,
+      "page": "tabs",
+      "title": "Full-screen deck · motion spec",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "TabSwitcherStrip.dc.html": {
+      "h": 900,
+      "page": "tabs",
+      "title": "Tab switcher · Strip (option in Settings)",
+      "w": 1440,
+      "x": 0,
+      "y": 2040
+    },
+    "SettingsTabs.dc.html": {
+      "h": 900,
+      "page": "panels",
+      "title": "Settings · Tabs, choosing the switcher style",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "PeekOpen.dc.html": {
+      "h": 900,
+      "page": "peek",
+      "title": "Peek · open over the page it came from",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "PeekMotion.dc.html": {
+      "h": 900,
+      "page": "peek",
+      "title": "Peek · in motion: open, hop, close, open as tab (plays by itself)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0,
+      "is_interactive": true
+    },
+    "PeekDiscover.dc.html": {
+      "h": 900,
+      "page": "peek",
+      "title": "Peek · how people find it: link menu and one-time hint",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "PeekSpec.dc.html": {
+      "h": 900,
+      "page": "peek",
+      "title": "Peek · motion, keys and edge cases",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "PeekIssue.dc.html": {
+      "h": 760,
+      "page": "parts",
+      "title": "Part · vitre-shell issue page (shown in the peek)",
+      "w": 1040,
+      "x": 1520,
+      "y": 2040
+    },
+    "FindOpen.dc.html": {
+      "h": 900,
+      "page": "find",
+      "title": "Find · the pill becomes the find field",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "FindMotion.dc.html": {
+      "h": 980,
+      "page": "find",
+      "title": "Find · in motion: open, type, step, wrap, close (plays by itself)",
+      "w": 1440,
+      "x": 1712,
+      "y": 0,
+      "is_interactive": true
+    },
+    "FindStates.dc.html": {
+      "h": 1500,
+      "page": "find",
+      "title": "Find · every state on light, dark and photo pages",
+      "w": 1632,
+      "x": 0,
+      "y": 1100
+    },
+    "FindContexts.dc.html": {
+      "h": 900,
+      "page": "find",
+      "title": "Find · in a peek, with the bar hidden, in a PDF, on Home",
+      "w": 1440,
+      "x": 1712,
+      "y": 1100
+    },
+    "FindSpec.dc.html": {
+      "h": 1000,
+      "page": "find",
+      "title": "Find · motion, keys and edge cases",
+      "w": 1440,
+      "x": 1712,
+      "y": 2120
+    },
+    "MenuSelection.dc.html": {
+      "h": 900,
+      "page": "menus",
+      "title": "Menus · selected text",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "MenuMotion.dc.html": {
+      "h": 980,
+      "page": "menus",
+      "title": "Menus · in motion: open, Peek link, keyboard, flip (plays by itself)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0,
+      "is_interactive": true
+    },
+    "MenuGallery.dc.html": {
+      "h": 900,
+      "page": "menus",
+      "title": "Menus · image link near the right edge (flips left)",
+      "w": 1440,
+      "x": 0,
+      "y": 1100
+    },
+    "MenuSpelling.dc.html": {
+      "h": 900,
+      "page": "menus",
+      "title": "Menus · misspelled word, opened with Shift+F10",
+      "w": 1440,
+      "x": 1520,
+      "y": 1100
+    },
+    "MenuChrome.dc.html": {
+      "h": 900,
+      "page": "menus",
+      "title": "Menus · tab pill, tab circle, downloads ring, Home",
+      "w": 1440,
+      "x": 0,
+      "y": 2120
+    },
+    "MenuSpec.dc.html": {
+      "h": 2330,
+      "page": "menus",
+      "title": "Menus · anatomy, materials, placement and keys",
+      "w": 1440,
+      "x": 1520,
+      "y": 2120
+    },
+    "MenuReference.dc.html": {
+      "h": 2920,
+      "page": "menus",
+      "title": "Menus · every menu",
+      "w": 1440,
+      "x": 0,
+      "y": 3140
+    },
+    "FindPill.dc.html": {
+      "h": 44,
+      "page": "parts",
+      "title": "Part · find pill (address and find faces)",
+      "w": 480,
+      "x": 0,
+      "y": 3060
+    },
+    "CtxMenu.dc.html": {
+      "h": 234,
+      "page": "parts",
+      "title": "Part · context menu (every list)",
+      "w": 264,
+      "x": 600,
+      "y": 3060
+    },
+    "KeyMap.dc.html": {
+      "h": 3730,
+      "page": "keys",
+      "title": "Keyboard map · every shortcut",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "SettingsKeys.dc.html": {
+      "h": 900,
+      "page": "keys",
+      "title": "Settings · Keyboard shortcuts",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "KeyRouting.dc.html": {
+      "h": 1200,
+      "page": "keys",
+      "title": "Keyboard map · how a key travels, Esc and F6",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "SwitcherKeys.dc.html": {
+      "h": 1100,
+      "page": "keys",
+      "title": "Keyboard map · the switcher, held and latched",
+      "w": 1440,
+      "x": 1520,
+      "y": 2340
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-29T19:40:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "page": "home",
+    "view": "canvas"
+  },
+  "notes": {
+    "t3": {
+      "kind": "title1",
+      "maxW": 3120,
+      "page": "parts",
+      "text": "Parts reused by the scenes",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t4": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "home",
+      "text": "Home and the glass tab bar",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t5": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "panels",
+      "text": "Settings and downloads",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t6": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "video",
+      "text": "Download this video",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t7": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "tabs",
+      "text": "Switching tabs: deck (default), grid, strip",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t8": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "peek",
+      "text": "Peek: open a link without leaving the page",
+      "x": 0,
+      "y": -300,
+      "w": 240
+    },
+    "t9": {
+      "kind": "title1",
+      "maxW": 3320,
+      "page": "find",
+      "text": "Find in page: the pill becomes the find field",
+      "x": 0,
+      "y": -300,
+      "w": 240
+    },
+    "t10": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "menus",
+      "text": "Right-click menus",
+      "x": 0,
+      "y": -300,
+      "w": 240
+    },
+    "t11": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "keys",
+      "text": "Keyboard: every shortcut, and none of Windows’ own",
+      "x": 0,
+      "y": -300,
+      "w": 240
+    }
+  },
+  "order": [
+    "Article.dc.html",
+    "VideoPage.dc.html",
+    "RefPage.dc.html",
+    "IssuesPage.dc.html",
+    "GalleryPage.dc.html",
+    "PeekIssue.dc.html",
+    "FindPill.dc.html",
+    "CtxMenu.dc.html",
+    "Home.dc.html",
+    "HomeSearch.dc.html",
+    "HomeBrowse.dc.html",
+    "HomeBackground.dc.html",
+    "Settings.dc.html",
+    "SettingsTabs.dc.html",
+    "Downloads.dc.html",
+    "DownloadsPopover.dc.html",
+    "VideoDownload.dc.html",
+    "VideoPicker.dc.html",
+    "VideoStates.dc.html",
+    "TabSwitcher.dc.html",
+    "TabMotion.dc.html",
+    "TabOverview.dc.html",
+    "TabSearch.dc.html",
+    "TabSwitcherStrip.dc.html",
+    "PeekOpen.dc.html",
+    "PeekMotion.dc.html",
+    "PeekDiscover.dc.html",
+    "PeekSpec.dc.html",
+    "FindOpen.dc.html",
+    "FindMotion.dc.html",
+    "FindStates.dc.html",
+    "FindContexts.dc.html",
+    "FindSpec.dc.html",
+    "MenuSelection.dc.html",
+    "MenuMotion.dc.html",
+    "MenuGallery.dc.html",
+    "MenuSpelling.dc.html",
+    "MenuChrome.dc.html",
+    "MenuSpec.dc.html",
+    "MenuReference.dc.html",
+    "KeyMap.dc.html",
+    "SettingsKeys.dc.html",
+    "KeyRouting.dc.html",
+    "SwitcherKeys.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home page"
+    },
+    {
+      "id": "panels",
+      "name": "Settings and downloads"
+    },
+    {
+      "id": "video",
+      "name": "Download this video"
+    },
+    {
+      "id": "tabs",
+      "name": "Switching tabs"
+    },
+    {
+      "id": "peek",
+      "name": "Peek"
+    },
+    {
+      "id": "find",
+      "name": "Find in page"
+    },
+    {
+      "id": "menus",
+      "name": "Right-click menus"
+    },
+    {
+      "id": "keys",
+      "name": "Keyboard"
+    },
+    {
+      "id": "parts",
+      "name": "Parts"
+    }
+  ],
+  "title": "Glass Browser Concept"
+}

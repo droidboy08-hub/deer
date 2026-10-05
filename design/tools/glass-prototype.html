@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vitre glass prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #111; }
+  body { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .stage { position: relative; width: 1440px; height: 900px; overflow: hidden; }
+  .photo { position: absolute; inset: 0; background: url(bg-lake.jpg) center / cover; }
+  .dim { position: absolute; inset: 0; background: rgba(0,0,0,0.28); }
+
+  .glass { position: absolute; border-radius: 999px; box-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.22); }
+  .glass > .lens, .glass > .tint, .glass > .rim { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+  .glass > .rim { padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  .glass > .content { position: relative; height: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .dark .tint { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)); }
+  .dark { color: #fff; }
+  .light .tint { background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22)); }
+  .light { color: #111; }
+  .light > .rim { background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); }
+
+  .circle { width: 44px; height: 44px; }
+  .circle .lens { backdrop-filter: url(#lens-circle); }
+  .tab { width: 480px; height: 44px; }
+  .tab .lens { backdrop-filter: url(#lens-tab); }
+  .tabopen { width: 640px; height: 48px; }
+  .tabopen .lens { backdrop-filter: url(#lens-tab-open); }
+  .panel { width: 640px; height: 336px; border-radius: 22px; }
+  .panel .lens { backdrop-filter: url(#lens-panel); }
+  .panel .tint { background: rgba(22,22,26,0.52); }
+
+  .caption { position: absolute; top: 0; right: 0; display: flex; color: rgba(255,255,255,0.92); }
+  .caption span { width: 46px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .caption.ink { color: #1d1b18; }
+
+  .ph { font-size: 14px; color: rgba(255,255,255,0.62); display: flex; align-items: center; gap: 8px; }
+  .x { position: absolute; right: -5px; top: -5px; width: 18px; height: 18px; border-radius: 9px; background: rgba(28,28,32,0.86); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px rgba(255,255,255,0.5), 0 2px 6px rgba(0,0,0,0.3); }
+
+  .row { height: 40px; margin: 0 8px; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: rgba(255,255,255,0.92); }
+  .row.sel { background: rgba(255,255,255,0.14); box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.3); }
+  .row .url { color: rgba(255,255,255,0.5); }
+  .row .end { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.5); }
+  .label { margin: 10px 20px 4px; font-size: 12px; color: rgba(255,255,255,0.5); }
+
+  /* page */
+  .page { position: absolute; inset: 0; background: #f3eee4; color: #1d1b18; font-family: 'Newsreader', Georgia, serif; }
+  .page header { height: 76px; padding: 0 56px; display: flex; align-items: center; gap: 44px; border-bottom: 1px solid #d9d0c0; }
+  .page .logo { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 34px; }
+  .page nav { display: flex; gap: 28px; font-size: 16px; color: #4a453d; flex-grow: 1; }
+  .page .sub { background: #d9482b; color: #fff; padding: 10px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; }
+  .page .hero { display: grid; grid-template-columns: 7fr 5fr; gap: 56px; padding: 56px; }
+  .page h1 { margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 96px; line-height: 0.95; letter-spacing: -0.02em; }
+  .page .dek { margin-top: 22px; font-size: 24px; font-style: italic; color: #4a453d; }
+  .page .art { height: 460px; border-radius: 6px; background: #1f4fd1; position: relative; overflow: hidden; }
+
+  [data-state] { display: none; }
+  body[data-show="idle"] [data-state~="idle"],
+  body[data-show="search"] [data-state~="search"],
+  body[data-show="page"] [data-state~="page"] { display: block; }
+</style>
+</head>
+<body data-show="idle">
+<svg width="0" height="0" style="position: absolute">
+  <filter id="lens-circle" x="0" y="0" width="44" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feImage href="map-circle.png" x="0" y="0" width="44" height="44" preserveAspectRatio="none" result="map"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"/>
+    <feDisplacementMap in="soft" in2="map" scale="22" xChannelSelector="R" yChannelSelector="G" result="bent"/>
+    <feColorMatrix in="bent" type="saturate" values="1.5"/>
+  </filter>
+  <filter id="lens-tab" x="0" y="0" width="480" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feImage href="map-tab.png" x="0" y="0" width="480" height="44" preserveAspectRatio="none" result="map"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"/>
+    <feDisplacementMap in="soft" in2="map" scale="28" xChannelSelector="R" yChannelSelector="G" result="bent"/>
+    <feColorMatrix in="bent" type="saturate" values="1.5"/>
+  </filter>
+  <filter id="lens-tab-open" x="0" y="0" width="640" height="48" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feImage href="map-tab-open.png" x="0" y="0" width="640" height="48" preserveAspectRatio="none" result="map"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"/>
+    <feDisplacementMap in="soft" in2="map" scale="28" xChannelSelector="R" yChannelSelector="G" result="bent"/>
+    <feColorMatrix in="bent" type="saturate" values="1.5"/>
+  </filter>
+  <filter id="lens-panel" x="0" y="0" width="640" height="336" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feImage href="map-panel.png" x="0" y="0" width="640" height="336" preserveAspectRatio="none" result="map"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="soft"/>
+    <feDisplacementMap in="soft" in2="map" scale="36" xChannelSelector="R" yChannelSelector="G" result="bent"/>
+    <feColorMatrix in="bent" type="saturate" values="1.6"/>
+  </filter>
+  <symbol id="fav-f" viewBox="0 0 18 18"><rect width="18" height="18" rx="4.5" fill="#d9482b"/><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#fff">F</text></symbol>
+  <symbol id="fav-t" viewBox="0 0 18 18"><circle cx="9" cy="9" r="9" fill="#0f8f8a"/><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="fav-r" viewBox="0 0 18 18"><rect width="18" height="18" rx="4.5" fill="#f4f2ec"/><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"/><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"/><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"/><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"/></symbol>
+  <symbol id="fav-v" viewBox="0 0 18 18"><rect width="18" height="18" rx="4.5" fill="#1d1f24"/><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.8" cy="8.8" r="5.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m12.8 12.8 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 20 20"><path d="M12 4.8 6.8 10l5.2 5.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 20 20"><path d="M8 4.8 13.2 10 8 15.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 20 20"><path d="M15.3 10a5.3 5.3 0 1 1-1.55-3.75" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.4 4v3.4H12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="5" y="9" width="10" height="7.5" rx="1.8" fill="currentColor"/><path d="M7.2 9V7a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-min" viewBox="0 0 20 20"><path d="M5 10h10" stroke="currentColor" stroke-width="1"/></symbol>
+  <symbol id="i-max" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 20 20"><path d="M10 5v8M6.8 10 10 13.2 13.2 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="stage">
+  <!-- backgrounds -->
+  <div class="photo" data-state="idle search"></div>
+  <div class="dim" data-state="search"></div>
+  <div class="page" data-state="page">
+    <header><div class="logo">Field Notes</div><nav><span>Science</span><span style="color:#1d1b18;font-weight:600">Craft</span><span>Places</span><span>Archive</span></nav><span class="sub">Subscribe</span></header>
+    <div class="hero">
+      <div><div style="font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b83a1e;margin-bottom:22px">Craft · Materials</div><h1>Sand, heat and a bath of molten tin</h1><div class="dek">How the float process turned glassmaking into a river that never stops.</div></div>
+      <div class="art"><div style="position:absolute;left:30px;top:40px;width:190px;height:190px;border-radius:50%;background:#e0532f"></div><div style="position:absolute;left:0;right:0;top:300px;height:34px;background:#f1b52e"></div><div style="position:absolute;left:0;right:0;top:334px;height:44px;background:#c9cdd6"></div></div>
+    </div>
+  </div>
+
+  <!-- window controls -->
+  <div class="caption" data-state="idle search"><span><svg width="16" height="16"><use href="#i-min"/></svg></span><span><svg width="16" height="16"><use href="#i-max"/></svg></span><span><svg width="16" height="16"><use href="#i-close"/></svg></span></div>
+  <div class="caption ink" data-state="page"><span><svg width="16" height="16"><use href="#i-min"/></svg></span><span><svg width="16" height="16"><use href="#i-max"/></svg></span><span><svg width="16" height="16"><use href="#i-close"/></svg></span></div>
+
+  <!-- IDLE: home, new tab active at the end -->
+  <div data-state="idle">
+    <div class="glass circle dark" style="left:348px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-f"/></svg></div></div>
+    <div class="glass circle dark" style="left:400px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-t"/></svg></div></div>
+    <div class="glass circle dark" style="left:452px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-r"/></svg></div></div>
+    <div class="glass circle dark" style="left:504px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-v"/></svg></div></div>
+    <div class="glass tab dark" style="left:556px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><span class="ph"><svg width="16" height="16"><use href="#i-search"/></svg>Search or enter address</span></div></div>
+    <div class="glass circle dark" style="left:1048px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#i-plus"/></svg></div></div>
+  </div>
+
+  <!-- SEARCH: tab expands, other tabs tuck away -->
+  <div data-state="search">
+    <div class="glass tabopen dark" style="left:400px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content" style="justify-content:flex-start;padding:0 18px;gap:12px"><svg width="17" height="17" style="opacity:.7"><use href="#i-search"/></svg><span style="font-size:15px">fie<span style="background:rgba(76,194,255,0.42);border-radius:2px">ldnotes.press</span></span></div></div>
+    <div class="glass panel dark" style="left:400px;top:66px"><div class="lens"></div><div class="tint"></div><div class="rim"></div>
+      <div style="position:relative;padding-top:8px">
+        <div class="row sel"><svg width="18" height="18"><use href="#fav-f"/></svg><span>fieldnotes.press</span><span class="url">— Switch to tab</span><span class="end">Enter</span></div>
+        <div class="label">History</div>
+        <div class="row"><svg width="18" height="18"><use href="#fav-f"/></svg><span>Archive</span><span class="url">fieldnotes.press/archive</span></div>
+        <div class="row"><svg width="18" height="18"><use href="#fav-f"/></svg><span>The quiet science of ice</span><span class="url">fieldnotes.press/ice</span></div>
+        <div class="label">Search</div>
+        <div class="row"><svg width="16" height="16" style="opacity:.6;margin:0 1px"><use href="#i-search"/></svg><span>field notes</span></div>
+        <div class="row"><svg width="16" height="16" style="opacity:.6;margin:0 1px"><use href="#i-search"/></svg><span>fields medal</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: browsing, active tab shows the address -->
+  <div data-state="page">
+    <div class="glass circle light" style="left:432px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-t"/></svg></div></div>
+    <div class="glass tab light" style="left:484px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div>
+      <div class="content" style="justify-content:space-between;padding:0 8px">
+        <span style="display:flex;gap:2px;opacity:.75"><svg width="28" height="28" style="padding:4px;box-sizing:border-box"><use href="#i-back"/></svg><svg width="28" height="28" style="padding:4px;box-sizing:border-box;opacity:.4"><use href="#i-fwd"/></svg></span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500"><svg width="16" height="16"><use href="#fav-f"/></svg>fieldnotes.press</span>
+        <span style="display:flex;opacity:.75"><svg width="28" height="28" style="padding:5px;box-sizing:border-box"><use href="#i-reload"/></svg><span style="width:30px"></span></span>
+      </div>
+    </div>
+    <div class="glass circle light" style="left:976px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-r"/></svg></div></div>
+    <div class="glass circle light" style="left:1028px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#fav-v"/></svg></div><span class="x"><svg width="10" height="10"><use href="#i-x"/></svg></span></div>
+    <div class="glass circle light" style="left:1092px;top:10px"><div class="lens"></div><div class="tint"></div><div class="rim"></div><div class="content"><svg width="18" height="18"><use href="#i-plus"/></svg></div></div>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.has('pan')) {
+    const [x, y, k] = q.get('pan').split(',').map(Number);
+    const st = document.querySelector('.stage');
+    st.style.transformOrigin = '0 0';
+    st.style.transform = `scale(${k || 1}) translate(${-x}px, ${-y}px)`;
+  }
+  const s = location.hash.slice(1); if (s) document.body.dataset.show = s;
+  addEventListener('hashchange', () => { document.body.dataset.show = location.hash.slice(1) || 'idle'; });
+</script>
+</body>
+</html>

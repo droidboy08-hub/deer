@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A long page</title>
+<style>
+  body { font: 16px/1.6 "Segoe UI", sans-serif; color: #1b1b1f; background: #eef3f8; margin: 0; }
+  #first { margin: 0; padding: 14px 32px; background: #1d4f7a; color: #fff; font-size: 22px; }
+  p { margin: 0 32px 18px; }
+</style>
+</head>
+<body>
+<h1 id="first">The first line of the page</h1>
+<script>
+  for (let i = 1; i <= 120; i++) {
+    const p = document.createElement('p');
+    p.id = 'p' + i;
+    p.textContent = 'Paragraph ' + i + ': glass panes, float lines and the slow work of the annealing lehr.';
+    document.body.append(p);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peek motion and keys</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">Peek motion and keys</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">A link opens in a glass sheet without leaving the page. Every move starts or ends at the link you clicked, and the tab bar is where a peek becomes a tab.</p>
+</div>
+
+<div style="position: absolute; left: 48px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #e9ecf1">
+<div style="position: absolute; left: 16px; top: 28px; width: 180px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 52px; width: 150px; height: 7px; border-radius: 3px; background: #3a6df0"></div>
+<div style="position: absolute; left: 16px; top: 76px; width: 200px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 100px; width: 170px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 124px; width: 190px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+<div style="position: absolute; left: 50px; top: 18px; width: 218px; height: 168px; border-radius: 9px; background: #f6f7f9; box-shadow: 0 10px 26px rgba(0,0,0,0.35)"><div style="height: 12px; border-radius: 9px 9px 0 0; background: rgba(250,251,253,0.9); border-bottom: 1px solid rgba(16,18,24,0.08)"></div><div style="margin: 12px 14px 6px; width: 120px; height: 8px; border-radius: 3px; background: #1b1d21; opacity: 0.75"></div><div style="margin: 0 14px 4px; width: 170px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.2"></div><div style="margin: 0 14px; width: 150px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.2"></div></div>
+<div style="position: absolute; left: 12px; top: 47px; width: 158px; height: 17px; border-radius: 4px; border: 1.5px dashed #4cc2ff"></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M170 64 L 258 176M258 176l-1 -8M258 176l-7.5 -3"></path></g></svg>
+</div>
+<div style="position: absolute; left: 48px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">1 · Shift+click a link</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The sheet grows out of the link, 400 ms, spring. The page dims to 22% and the tab bar stays visible.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">A frosted cover fills the sheet until the page paints, then fades, 200 ms.</span>
+</div>
+
+<div style="position: absolute; left: 390px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #e9ecf1">
+<div style="position: absolute; left: 16px; top: 52px; width: 150px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 76px; width: 200px; height: 7px; border-radius: 3px; background: #3a6df0"></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+<div style="position: absolute; left: 50px; top: 18px; width: 218px; height: 168px; border-radius: 9px; overflow: hidden; background: #f6f7f9; box-shadow: 0 10px 26px rgba(0,0,0,0.35)"><div style="height: 12px; background: rgba(250,251,253,0.9); border-bottom: 1px solid rgba(16,18,24,0.08)"></div><div style="position: absolute; left: 14px; top: 26px; width: 120px; height: 8px; border-radius: 3px; background: #1b1d21; opacity: 0.3"></div><div style="position: absolute; left: 14px; top: 40px; width: 150px; height: 8px; border-radius: 3px; background: #1b1d21; opacity: 0.75"></div><div style="position: absolute; left: 14px; top: 56px; width: 170px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.2"></div></div>
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" style="position: absolute; left: 24px; top: 72px"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+<div style="position: absolute; left: 390px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">2 · Hop to another link</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Shift+click a link still visible on the dimmed page. The sheet stays where it is and its content cross-fades, 200&#160;ms.</span>
+</div>
+
+<div style="position: absolute; left: 732px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #e9ecf1">
+<div style="position: absolute; left: 16px; top: 28px; width: 180px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 52px; width: 150px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 0; top: 66px; width: 318px; height: 26px; background: rgba(76,194,255,0.25)"></div>
+<div style="position: absolute; left: 16px; top: 76px; width: 200px; height: 7px; border-radius: 3px; background: #3a6df0"></div>
+<div style="position: absolute; left: 16px; top: 100px; width: 170px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 16px; top: 124px; width: 190px; height: 7px; border-radius: 3px; background: #c4c9d3"></div>
+<div style="position: absolute; left: 40px; top: 30px; width: 200px; height: 130px; border-radius: 8px; border: 1.5px dashed rgba(76,194,255,0.7)"></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M200 130 C 190 110 170 92 150 86M150 86l8 -1M150 86l5 6"></path></g></svg>
+</div>
+<div style="position: absolute; left: 732px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">3 · Close</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Esc, a click on the dimmed page or Ctrl+W. The sheet shrinks back into its link, 280 ms, and the link glows for 900 ms so you know where you were; keyboard focus returns to it.</span>
+</div>
+
+<div style="position: absolute; left: 1074px; top: 130px; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #f6f7f9">
+<div style="position: absolute; left: 14px; top: 34px; width: 150px; height: 9px; border-radius: 3px; background: #1b1d21; opacity: 0.75"></div>
+<div style="position: absolute; left: 14px; top: 52px; width: 240px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.2"></div>
+<div style="position: absolute; left: 14px; top: 64px; width: 210px; height: 5px; border-radius: 3px; background: #1b1d21; opacity: 0.2"></div>
+<div style="position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1.5px rgba(58,109,240,0.35)"></div>
+<div style="position: absolute; left: 64px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<div style="position: absolute; left: 77px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<div style="position: absolute; left: 90px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<div style="position: absolute; left: 103px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.45)"></div>
+<div style="position: absolute; left: 116px; top: 6px; width: 100px; height: 11px; border-radius: 6px; background: #ffffff; box-shadow: 0 0 0 1.5px #4cc2ff"></div>
+<div style="position: absolute; left: 220px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<div style="position: absolute; left: 233px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<div style="position: absolute; left: 246px; top: 7px; width: 9px; height: 9px; border-radius: 5px; background: rgba(22,24,29,0.3)"></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M120 90 C 150 70 160 40 166 22M166 22l-6 5M166 22l5 6"></path></g></svg>
+</div>
+<div style="position: absolute; left: 1074px; top: 341px; width: 318px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">4 · Open as tab</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Alt+Enter, the Open as tab button or a double-click on the header. The sheet fills the window, 380 ms. Its header rises into the tab bar as the new tab, right of its source, as the tabs re-flow, 420 ms.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 480px; width: 652px; height: 372px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 8px">Keys</div>
+<div style="display: grid; grid-template-columns: 210px minmax(0, 1fr); column-gap: 20px; font-size: 13px; line-height: 19px">
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Shift+click, Shift+Enter</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Peek a link. Shift+Enter in the address pill peeks a result.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Ctrl+Q</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Peek the link in focus, or the one under the pointer.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Alt+Enter</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Open the peek as a tab. Nothing reloads.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Esc</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Close. The page gets Esc first; press it twice within 400 ms to close anyway. After typing in the peek, that only nudges the sheet.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Ctrl+W</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Close the peek, never the tab under it.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Ctrl+Shift+T</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Reopen a peek closed in the last 60 s, while its tab is active.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Alt+Left</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Back inside the peek; on its first page, closes it.</span>
+</div>
+</div>
+
+<div style="position: absolute; left: 724px; top: 480px; width: 668px; height: 372px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 8px">Edge cases</div>
+<div style="display: grid; grid-template-columns: 136px minmax(0, 1fr); column-gap: 20px; font-size: 13px; line-height: 19px">
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Link is a download</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">The sheet folds into a file-type circle that flies to the downloads button.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Permission request</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">The prompt hangs from the peek's header, not the window.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Typed into the peek</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">A click on the dimmed page only nudges the sheet, so nothing typed is lost.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Small window</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Below 900 × 600 the sheet fills the window with an 8 px margin.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">On the home page</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Shift+Enter in the pill peeks over the wallpaper; Open as tab replaces Home.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Full-screen video</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Fills the window without becoming a tab, then settles back into the sheet.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Closed by accident</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">The page stays loaded for 60 s, so peeking it again is instant.</span>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

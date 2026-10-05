@@ -1,0 +1,13 @@
+{
+  "addons": {
+    "vitre-upd@spike.test": {
+      "updates": [
+        {
+          "version": "3.0",
+          "update_link": "http://127.0.0.1:47631/upd-3.0.xpi",
+          "update_hash": "sha256:cb8a8c7b999aa004394c9655c1723ec4fd1645b66f97e741f3db20c705a1a0d3"
+        }
+      ]
+    }
+  }
+}

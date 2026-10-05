@@ -1,0 +1,34 @@
+// Speed limits: a token bucket per limit (one for all downloads, one per download).
+// A transfer asks how long to wait after each chunk; while it waits it stops reading, so TCP
+// back-pressure slows the server down instead of Vitre buffering the excess.
+
+export class RateLimiter {
+  private tokens = 0;
+  private last = Date.now();
+
+  /** `kbps` is read on every call, so a changed setting applies at once. 0 means no limit. */
+  constructor(private kbps: () => number) {}
+
+  /** Milliseconds to wait before reading more, having just read `bytes`. */
+  take(bytes: number): number {
+    const rate = this.kbps() * 1024;
+    const now = Date.now();
+    if (rate <= 0) {
+      this.tokens = 0;
+      this.last = now;
+      return 0;
+    }
+    // Half a second of burst, so short pauses don't add up to a slower average.
+    this.tokens = Math.min(rate * 0.5, this.tokens + ((now - this.last) / 1000) * rate);
+    this.last = now;
+    this.tokens -= bytes;
+    return this.tokens >= 0 ? 0 : Math.ceil((-this.tokens / rate) * 1000);
+  }
+}
+
+/** The longest wait any of the limits asks for. */
+export function throttle(limiters: RateLimiter[], bytes: number): number {
+  let wait = 0;
+  for (const l of limiters) wait = Math.max(wait, l.take(bytes));
+  return wait;
+}

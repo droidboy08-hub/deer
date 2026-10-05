@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Full screen</title>
+<style>body{font:17px/1.6 "Segoe UI",sans-serif;margin:0;padding:24px 48px;background:#fbfaf7;color:#1b1b1f}
+#stage{background:#203040;color:#fff;height:200px;padding:20px}#stage:fullscreen{padding:80px}</style></head>
+<body>
+<h1>Element full screen</h1>
+<p>Some glass on the page, then a stage.</p>
+<div id="stage">The stage has glass on it as well. <button id="go">Full screen</button></div>
+<p>More glass after the stage.</p>
+<script>
+  window.pageCtrlF = 0;
+  addEventListener('keydown', (e) => { if (e.ctrlKey && e.keyCode === 70) window.pageCtrlF++; });
+  document.getElementById('go').onclick = () => document.getElementById('stage').requestFullscreen();
+</script>
+</body></html>

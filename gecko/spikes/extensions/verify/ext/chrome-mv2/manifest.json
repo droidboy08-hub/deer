@@ -1,0 +1,10 @@
+{
+  "manifest_version": 2,
+  "name": "Chrome-style MV2 (no gecko id)",
+  "version": "1.0",
+  "description": "Verifier test: a Chrome MV2 manifest with nothing Firefox-specific in it.",
+  "icons": { "64": "icon.png" },
+  "permissions": ["storage", "tabs"],
+  "background": { "scripts": ["bg.js"], "persistent": false },
+  "browser_action": { "default_title": "chrome mv2", "default_icon": { "64": "icon.png" } }
+}

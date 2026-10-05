@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Issue</title>
+<style>
+  body { margin: 0; background: #f6f7f9; color: #1b1d21; font: 14px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  header { height: 56px; box-sizing: border-box; padding: 0 40px; display: flex; align-items: center; gap: 14px; background: #16181d; color: #fff; font-size: 14px; }
+  header .logo { width: 28px; height: 28px; border-radius: 7px; background: #1d1f24; box-shadow: inset 0 0 0 1px #34373f; }
+  header .sep { color: #7b8190; }
+  main { padding: 28px 40px 40px; }
+  h1 { margin: 0; font-size: 22px; line-height: 30px; font-weight: 600; }
+  h1 .num { font-weight: 400; color: #7b8190; }
+  .state { margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: #5b6170; }
+  .open { height: 26px; box-sizing: border-box; padding: 0 10px; border-radius: 13px; display: flex; align-items: center; background: #2f9e5b; color: #fff; font-size: 12.5px; }
+  hr { height: 1px; margin: 20px 0; border: 0; background: #dfe2e8; }
+  .card { border-radius: 8px; background: #fff; box-shadow: 0 0 0 1px #dfe2e8; overflow: hidden; margin-bottom: 16px; }
+  .card .h { height: 40px; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 8px; background: #f6f7f9; border-bottom: 1px solid #e8eaef; font-size: 13px; }
+  .card .h .av { width: 22px; height: 22px; border-radius: 11px; background: #c9a37e; }
+  .card .b { padding: 14px 16px 16px; font-size: 14px; line-height: 22px; }
+  textarea { width: 100%; box-sizing: border-box; height: 66px; border: 0; padding: 12px 16px 0; font: 14px/22px inherit; resize: none; outline: none; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .tools button, .tools a { height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #dfe2e8; background: #fff; font: 13px inherit; color: #1b1d21; display: inline-flex; align-items: center; text-decoration: none; }
+  #counter { font-variant-numeric: tabular-nums; color: #5b6170; }
+  #stage { width: 320px; height: 180px; background: #16181d; color: #fff; display: flex; align-items: center; justify-content: center; border-radius: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<header><span class="logo"></span><b>code.vitre.dev</b><span class="sep">/</span><span>vitre</span><span class="sep">/</span><b>vitre-shell</b><span class="sep">/</span><span style="color:#c9ccd4">Issues</span></header>
+<main>
+  <h1><span id="title">Issue</span> <span class="num" id="num"></span></h1>
+  <div class="state"><span class="open">Open</span><span id="counter">0</span></div>
+  <hr>
+  <div class="card"><div class="h"><span class="av"></span><b>tomas</b> commented 3 days ago</div>
+    <div class="b"><p style="margin:0 0 10px">Resuming a paused download sends If-Range with the strong ETag from the first probe. After a redeploy, the CDN stops sending an ETag and the resume starts again from 0 B.</p>
+    <ol style="margin:0 0 10px;padding-left:22px"><li>Start float-line-tour-4k.mp4</li><li>Pause at about 40%</li><li>Run the "validator-dropped" scenario</li><li>Resume</li></ol>
+    <p style="margin:0"><b>Expected:</b> fall back to Last-Modified when there is no ETag at all, and keep what is already on disk.</p></div></div>
+  <div class="card"><div class="h"><b>Write</b><span style="color:#5b6170">Preview</span></div><textarea id="comment" placeholder="Leave a comment"></textarea></div>
+  <div class="tools">
+    <a id="next" href="issue.html?n=38">Next issue</a>
+    <a id="blank" href="issue.html?n=36" target="_blank">Open #36 (new tab link)</a>
+    <button id="open" type="button">window.open #33</button>
+    <button id="alert" type="button">alert()</button>
+    <button id="fs" type="button">Full screen</button>
+    <button id="geo" type="button">Where am I?</button>
+  </div>
+  <div id="stage">stage</div>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  const n = q.get('n') || '39';
+  const titles = {
+    41: 'Tab bar: reveal delay feels long on the top edge',
+    39: 'Downloads: resume fails when the server drops the ETag',
+    38: 'Search: Alt + Enter should open the result in a background tab',
+    36: "Video pill covers the player's own menu on narrow videos",
+    33: 'Glass: refraction looks too strong at 125% display scaling',
+    29: 'Tab switcher: Ctrl + W closes the wrong tab while searching',
+    27: "Settings: accent color doesn't follow Windows until restart",
+    24: 'Peek: Esc should return focus to the link that opened it',
+  };
+  document.title = (titles[n] || 'Issue') + ' · #' + n;
+  document.getElementById('title').textContent = titles[n] || 'Issue';
+  document.getElementById('num').textContent = '#' + n;
+  const root = document.documentElement;
+  root.dataset.token = Math.random().toString(36).slice(2, 8);
+  root.dataset.n = '0';
+  root.dataset.esc = '0';
+  root.dataset.loads = String((Number(sessionStorage.getItem('loads') || 0)) + 1);
+  sessionStorage.setItem('loads', root.dataset.loads);
+  const counter = document.getElementById('counter');
+  setInterval(() => { root.dataset.n = String(Number(root.dataset.n) + 1); counter.textContent = root.dataset.n; }, 100);
+  // Every Esc the page sees is counted; with ?trapesc it is an app that uses Esc itself (an editor)
+  // and keeps every one.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    root.dataset.esc = String(Number(root.dataset.esc) + 1);
+    if (q.has('trapesc')) e.preventDefault();
+  });
+  document.getElementById('open').addEventListener('click', () => { root.dataset.opened = String(!!window.open('issue.html?n=33')); });
+  document.getElementById('alert').addEventListener('click', () => alert('Hello from the peek'));
+  document.getElementById('fs').addEventListener('click', () => {
+    document.getElementById('stage').requestFullscreen().then(() => { root.dataset.fs = 'in'; }, (e) => { root.dataset.fs = 'error ' + e; });
+  });
+  document.addEventListener('fullscreenchange', () => { root.dataset.fschange = (root.dataset.fschange || '') + (document.fullscreenElement ? 'in ' : 'out '); });
+  document.getElementById('geo').addEventListener('click', () => {
+    root.dataset.geo = 'asked';
+    navigator.geolocation.getCurrentPosition(() => { root.dataset.geo = 'allowed'; }, (e) => { root.dataset.geo = 'error ' + e.code; });
+  });
+</script>
+</body>
+</html>

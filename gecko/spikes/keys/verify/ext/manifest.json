@@ -1,0 +1,12 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre keys verify (local test extension)",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "keys-verify@vitre.test" } },
+  "background": { "scripts": ["background.js"] },
+  "commands": {
+    "free": { "suggested_key": { "default": "Ctrl+Shift+Y" }, "description": "free chord" },
+    "pagefirst": { "suggested_key": { "default": "Ctrl+Shift+D" }, "description": "a Vitre page-first chord" },
+    "browserfirst": { "suggested_key": { "default": "Ctrl+Shift+T" }, "description": "a Vitre browser-first chord" }
+  }
+}

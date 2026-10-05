@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "/ads-dnr/",
+      "resourceTypes": ["main_frame", "sub_frame", "image", "script", "xmlhttprequest", "stylesheet", "other"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||example.net^",
+      "resourceTypes": ["main_frame", "sub_frame", "image", "script", "xmlhttprequest", "stylesheet", "other"]
+    }
+  }
+]

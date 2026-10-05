@@ -1,0 +1,4 @@
+content vitre chrome/
+category browser-window-before-initial-xul-layout chrome://vitre/content/VitreShell.sys.mjs VitreShell.beforeLayout
+category browser-window-domcontentloaded chrome://vitre/content/VitreShell.sys.mjs VitreShell.domContentLoaded
+category browser-window-delayed-startup chrome://vitre/content/VitreShell.sys.mjs VitreShell.delayedStartup

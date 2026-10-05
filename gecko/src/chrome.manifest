@@ -1,0 +1,19 @@
+# Deer chrome package. Registered at startup by runtime\config.js through
+# nsIComponentRegistrar.autoRegister(<app dir>\chrome.manifest); the app dir is this build output.
+#
+# chrome://vitre/content/ is the package root:
+#   modules/<Name>.sys.mjs   actors/<Name>.sys.mjs   window/window.js   pages/<name>/   skin/   locales/
+# Always import by chrome://vitre/content/ URL. Do not add a "resource" line for the same files: a
+# second URL for a module creates a second instance of it.
+content vitre ./
+
+# Per-window entry points. Firefox 157 calls these for every browser window (browser-init.js,
+# BrowserUtils.callModulesFromCategory). Entries of one category run sorted by module URL, so
+# chrome://vitre/ runs after Firefox's chrome://browser/ consumers and before its moz-src:/resource: ones.
+category browser-window-before-initial-xul-layout chrome://vitre/content/modules/VitreShell.sys.mjs VitreShell.beforeLayout
+category browser-window-domcontentloaded chrome://vitre/content/modules/VitreShell.sys.mjs VitreShell.domContentLoaded
+category browser-window-delayed-startup chrome://vitre/content/modules/VitreShell.sys.mjs VitreShell.delayedStartup
+
+# Brand strings for Firefox's legacy (non-Fluent) string bundles. Fluent strings come from
+# locales/en-US/branding/brand.ftl, registered as an L10n source by VitreStartup.
+override chrome://branding/locale/brand.properties chrome://vitre/content/locales/en-US/brand.properties

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The switcher, held and latched</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 1100px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<div style="position: absolute; left: 48px; top: 40px; width: 1344px; display: flex; flex-direction: column">
+
+<div style="width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">The switcher, held and latched</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">Deck, Grid and Strip share one set of keys. What changes is whether Ctrl is still down: held, letting go of Ctrl chooses; latched, Enter does and Esc cancels.</p>
+<div style="margin-top: 14px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">
+<span><span style="color: rgba(255,255,255,0.82)">Vitre first</span>: pages never get it</span>
+<span>·</span>
+<span><span style="color: rgba(255,255,255,0.82)">Inside Vitre</span>: only in Vitre’s own fields, menus and panels</span>
+<span>·</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></span><span><span style="color: rgba(255,255,255,0.82)">New</span>: added by the keyboard map</span></span>
+</div>
+</div>
+
+<section aria-label="Held: Ctrl is down" style="margin-top: 30px; display: flex; gap: 24px; align-items: flex-start">
+<div style="width: 1002px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<h2 style="margin: 0; flex-shrink: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 18px; line-height: 24px; font-weight: 600">Held: Ctrl is down</h2>
+<p style="margin: 0; font-size: 13px; line-height: 19px; color: #9a9ca6">Ctrl+Tab with Ctrl kept down. Letting go of Ctrl opens the card you stop on.</p>
+</div>
+<div style="display: flex; gap: 24px">
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Deck, held" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; left: -132px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #ece6da; opacity: 0.5"></div>
+<div style="position: absolute; left: 286px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #f4f2ec; opacity: 0.5"></div>
+<div style="position: absolute; left: 64px; top: 36px; width: 190px; height: 119px; border-radius: 6px; overflow: hidden; background: #1b1d22; box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; margin: 10px 10px 0; width: 170px; height: 64px; border-radius: 4px; object-fit: cover"><div style="margin: 10px 10px 0; width: 110px; height: 6px; border-radius: 3px; background: #ffffff; opacity: 0.6"></div><div style="margin: 6px 10px 0; width: 80px; height: 4px; border-radius: 2px; background: #ffffff; opacity: 0.25"></div></div>
+<div style="position: absolute; left: 96px; top: 170px; width: 126px; height: 18px; border-radius: 9px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 4px; padding: 0 3px; box-sizing: border-box"><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 40px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.6)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span><span style="width: 12px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.35)"></span></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M122 22H196M122 22l8-6M122 22l8 6M196 22l-8-6M196 22l-8 6"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Deck</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.deckHeld}}</span>
+</div>
+</div>
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Grid, held" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="position: absolute; left: -14px; top: -14px; width: 346px; height: 227px; object-fit: cover; filter: blur(8px) brightness(0.4)">
+<div style="position: absolute; left: 93px; top: 14px; width: 132px; height: 20px; box-sizing: border-box; padding: 0 8px; border-radius: 10px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 5px"><svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8"></circle><path d="m13 13 4 4"></path></svg><span style="font-size: 10px; line-height: 12px; color: rgba(255,255,255,0.6); white-space: nowrap">Search 6 tabs</span></div>
+<div style="position: absolute; left: 19px; top: 52px; width: 280px; display: grid; grid-template-columns: repeat(4, 64px); column-gap: 8px; row-gap: 26px">
+<div style="height: 40px; border-radius: 4px; background: #ece6da"><div style="margin: 6px 0 0 6px; width: 30px; height: 4px; border-radius: 2px; background: #1d1b18; opacity: 0.7"></div><div style="margin: 4px 0 0 6px; width: 44px; height: 3px; border-radius: 2px; background: #1d1b18; opacity: 0.22"></div></div>
+<div style="height: 40px; border-radius: 4px; overflow: hidden; background: #1b1d22; box-shadow: 0 0 0 1.5px #4cc2ff"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 64px; height: 26px; object-fit: cover"></div>
+<div style="height: 40px; border-radius: 4px; background: #f4f2ec"><div style="margin: 6px 0 0 6px; width: 24px; height: 4px; border-radius: 2px; background: #1b1d21; opacity: 0.7"></div><div style="margin: 4px 0 0 6px; width: 48px; height: 3px; border-radius: 2px; background: #1b1d21; opacity: 0.22"></div></div>
+<div style="height: 40px; border-radius: 4px; background: #f6f7f9"><div style="margin: 6px 0 0 6px; width: 34px; height: 4px; border-radius: 2px; background: #1b1d21; opacity: 0.7"></div><div style="margin: 4px 0 0 6px; width: 40px; height: 3px; border-radius: 2px; background: #1b1d21; opacity: 0.22"></div></div>
+<div style="height: 40px; border-radius: 4px; background: #2a2a30"><div style="margin: 6px 0 0 6px; width: 26px; height: 4px; border-radius: 2px; background: #ffffff; opacity: 0.6"></div></div>
+<div style="height: 40px; border-radius: 4px; background: #c9a37e"></div>
+<div style="height: 40px; box-sizing: border-box; border-radius: 4px; border: 1px dashed rgba(255,255,255,0.35)"></div>
+</div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M128 48Q159 37 190 48M190 48l-3.9-5.8M190 48l-6.8 1.7"></path><path d="M267 101C200 111 110 104 51 114M51 114l6.3 3M51 114l5-4.9"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Grid</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.gridHeld}}</span>
+</div>
+</div>
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Strip, held" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #ece6da">
+<div style="position: absolute; left: 16px; top: 18px; width: 110px; height: 10px; border-radius: 3px; background: #1d1b18; opacity: 0.7"></div>
+<div style="position: absolute; left: 16px; top: 36px; width: 170px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 46px; width: 150px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 228px; top: 18px; width: 74px; height: 50px; border-radius: 3px; background: #1f4fd1"></div>
+<div style="position: absolute; left: 16px; top: 156px; width: 200px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 166px; width: 230px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 176px; width: 180px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+<div style="position: absolute; left: 24px; top: 70px; width: 270px; height: 58px; box-sizing: border-box; padding: 9px 8px 0; border-radius: 10px; background: rgba(20,20,24,0.68); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 14px rgba(0,0,0,0.35); display: flex; gap: 6px">
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #ece6da"></div><div style="margin-top: 6px; width: 28px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; overflow: hidden; background: #1b1d22; box-shadow: 0 0 0 1.5px #4cc2ff"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 46px; height: 20px; object-fit: cover"></div><div style="margin-top: 6px; width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.75)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #f4f2ec"></div><div style="margin-top: 6px; width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #f6f7f9"></div><div style="margin-top: 6px; width: 30px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #2a2a30; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12)"></div><div style="margin-top: 6px; width: 24px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+</div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M112 65Q133 55 154 65M154 65l-3.4-6.1M154 65l-6.9 1.2"></path><path d="M102 133Q81 143 60 133M60 133l3.4 6.1M60 133l6.9-1.2"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Strip</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.stripHeld}}</span>
+</div>
+</div>
+
+</div>
+<p style="margin: 0; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.heldFoot}}</p>
+</div>
+
+<div style="width: 318px; box-sizing: border-box; padding: 8px 22px 4px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<sc-for list="{{held}}" as="r" hint-placeholder-count="7">
+<div style="position: relative; padding: 6px 0 7px; border-top: 1px solid {{r.rule}}">
+<sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -13px; top: 12.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if>
+<div style="display: flex; align-items: baseline; gap: 12px"><div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 19px; font-weight: 600; color: #ffffff">{{r.keys}}</div><div style="flex-shrink: 0; font-size: 12px; line-height: 19px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div></div>
+<div style="margin-top: 1px; font-size: 12.5px; line-height: 18px; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Latched: Ctrl is up" style="margin-top: 36px; display: flex; gap: 24px; align-items: flex-start">
+<div style="width: 1002px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<h2 style="margin: 0; flex-shrink: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 18px; line-height: 24px; font-weight: 600">Latched: Ctrl is up</h2>
+<p style="margin: 0; font-size: 13px; line-height: 19px; color: #9a9ca6">The switcher stays open until Enter or Esc. Its search field takes IME input, AltGr characters and dead keys.</p>
+</div>
+<div style="display: flex; gap: 24px">
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Deck, latched, searching for glass" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -16px; top: -16px; width: 350px; height: 231px; object-fit: cover; filter: blur(10px) brightness(0.5)">
+<div style="position: absolute; left: 286px; top: 44.5px; width: 164px; height: 102px; border-radius: 6px; background: #1b1d22; opacity: 0.5; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3)"></div>
+<div style="position: absolute; left: 64px; top: 36px; width: 190px; height: 119px; border-radius: 6px; overflow: hidden; background: #ece6da; box-shadow: 0 10px 30px rgba(0,0,0,0.5)"><div style="position: absolute; left: 12px; top: 12px; width: 84px; height: 9px; border-radius: 3px; background: #1d1b18; opacity: 0.8"></div><div style="position: absolute; left: 12px; top: 28px; width: 92px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.25"></div><div style="position: absolute; left: 12px; top: 38px; width: 80px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.25"></div><div style="position: absolute; left: 12px; top: 48px; width: 88px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.25"></div><div style="position: absolute; left: 114px; top: 28px; width: 64px; height: 50px; border-radius: 4px; background: #1f4fd1"></div></div>
+<div style="position: absolute; left: 84px; top: 167px; width: 150px; height: 22px; box-sizing: border-box; padding: 0 10px; border-radius: 11px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 5px"><svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8"></circle><path d="m13 13 4 4"></path></svg><span style="font-size: 11px; line-height: 13px; color: #ffffff">glass</span><span style="width: 1px; height: 12px; margin-left: -4px; background: #4cc2ff"></span><span style="margin-left: auto; font-size: 10px; line-height: 12px; color: rgba(255,255,255,0.6); white-space: nowrap">3 of 6</span></div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M196 22H122M122 22l8-6M122 22l8 6"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Deck</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.deckLatched}}</span>
+</div>
+</div>
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Grid, latched, searching for glass" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #1a1b20">
+<img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="position: absolute; left: -14px; top: -14px; width: 346px; height: 227px; object-fit: cover; filter: blur(8px) brightness(0.4)">
+<div style="position: absolute; left: 93px; top: 14px; width: 132px; height: 20px; box-sizing: border-box; padding: 0 8px; border-radius: 10px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); display: flex; align-items: center; gap: 5px"><svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8"></circle><path d="m13 13 4 4"></path></svg><span style="font-size: 11px; line-height: 13px; color: #ffffff">glass</span><span style="width: 1px; height: 12px; margin-left: -4px; background: #4cc2ff"></span><span style="margin-left: auto; font-size: 10px; line-height: 12px; color: rgba(255,255,255,0.6); white-space: nowrap">3 of 6</span></div>
+<div style="position: absolute; left: 19px; top: 52px; width: 280px; display: grid; grid-template-columns: repeat(4, 64px); column-gap: 8px">
+<div style="height: 40px; border-radius: 4px; background: #ece6da; box-shadow: 0 0 0 1.5px #4cc2ff"><div style="margin: 6px 0 0 6px; width: 30px; height: 4px; border-radius: 2px; background: #1d1b18; opacity: 0.7"></div><div style="margin: 4px 0 0 6px; width: 44px; height: 3px; border-radius: 2px; background: #1d1b18; opacity: 0.22"></div></div>
+<div style="height: 40px; border-radius: 4px; overflow: hidden; background: #1b1d22"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 64px; height: 26px; object-fit: cover"></div>
+<div style="height: 40px; border-radius: 4px; background: #f4f2ec"><div style="margin: 6px 0 0 6px; width: 24px; height: 4px; border-radius: 2px; background: #1b1d21; opacity: 0.7"></div><div style="margin: 4px 0 0 6px; width: 48px; height: 3px; border-radius: 2px; background: #1b1d21; opacity: 0.22"></div></div>
+</div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M56 104Q87 115 118 104M118 104l-6.8-1.7M118 104l-3.9 5.8"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Grid</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.gridLatched}}</span>
+</div>
+</div>
+
+<div style="width: 318px; display: flex; flex-direction: column; gap: 12px">
+<div aria-label="Strip, latched, searching for glass" style="position: relative; width: 318px; height: 199px; border-radius: 10px; overflow: hidden; background: #ece6da">
+<div style="position: absolute; left: 16px; top: 18px; width: 110px; height: 10px; border-radius: 3px; background: #1d1b18; opacity: 0.7"></div>
+<div style="position: absolute; left: 16px; top: 36px; width: 170px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 46px; width: 150px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 228px; top: 18px; width: 74px; height: 50px; border-radius: 3px; background: #1f4fd1"></div>
+<div style="position: absolute; left: 16px; top: 162px; width: 200px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 172px; width: 230px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; left: 16px; top: 182px; width: 180px; height: 5px; border-radius: 3px; background: #1d1b18; opacity: 0.2"></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.22)"></div>
+<div style="position: absolute; left: 93px; top: 54px; width: 132px; height: 22px; box-sizing: border-box; padding: 0 9px; border-radius: 11px; background: rgba(20,20,24,0.68); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 5px"><svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8"></circle><path d="m13 13 4 4"></path></svg><span style="font-size: 11px; line-height: 13px; color: #ffffff">glass</span><span style="width: 1px; height: 12px; margin-left: -4px; background: #4cc2ff"></span><span style="margin-left: auto; font-size: 10px; line-height: 12px; color: rgba(255,255,255,0.6); white-space: nowrap">3 of 6</span></div>
+<div style="position: absolute; left: 76px; top: 84px; width: 166px; height: 58px; box-sizing: border-box; padding: 9px 8px 0; border-radius: 10px; background: rgba(20,20,24,0.68); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 14px rgba(0,0,0,0.35); display: flex; gap: 6px">
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #ece6da; box-shadow: 0 0 0 1.5px #4cc2ff"></div><div style="margin-top: 6px; width: 28px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.75)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; overflow: hidden; background: #1b1d22"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 46px; height: 20px; object-fit: cover"></div><div style="margin-top: 6px; width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+<div style="width: 46px"><div style="height: 29px; border-radius: 3px; background: #f4f2ec"></div><div style="margin-top: 6px; width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.45)"></div></div>
+</div>
+<svg width="318" height="199" viewBox="0 0 318 199" style="position: absolute; left: 0; top: 0" aria-hidden="true"><g stroke="#4cc2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M112 147Q133 157 154 147M154 147l-6.9-1.2M154 147l-3.4 6.1"></path></g></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 600">Strip</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{cap.stripLatched}}</span>
+</div>
+</div>
+
+</div>
+</div>
+
+<div style="width: 318px; box-sizing: border-box; padding: 8px 22px 4px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<sc-for list="{{latched}}" as="r" hint-placeholder-count="5">
+<div style="position: relative; padding: 6px 0 7px; border-top: 1px solid {{r.rule}}">
+<sc-if value="{{r.isNew}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: -13px; top: 12.5px; width: 6px; height: 6px; border-radius: 3px; background: #4cc2ff"></div></sc-if>
+<div style="display: flex; align-items: baseline; gap: 12px"><div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 19px; font-weight: 600; color: #ffffff">{{r.keys}}</div><div style="flex-shrink: 0; font-size: 12px; line-height: 19px; color: #9a9ca6; white-space: nowrap">{{r.pri}}</div></div>
+<div style="margin-top: 1px; font-size: 12.5px; line-height: 18px; color: rgba(255,255,255,0.82)">{{r.action}}</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<div style="margin-top: 36px; display: flex; gap: 24px">
+<sc-for list="{{notes}}" as="n" hint-placeholder-count="4">
+<div style="width: 318px; box-sizing: border-box; padding: 15px 18px 17px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 13px; line-height: 19px; font-weight: 600">{{n.title}}</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">{{n.body}}</span>
+</div>
+</sc-for>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+const rule = (rows) => rows.map((r, i) => Object.assign({ rule: i === 0 ? 'transparent' : 'rgba(255,255,255,0.07)' }, r));
+return {
+cap: {
+deckHeld: 'Tab brings the next card to the centre and Ctrl+Shift+Tab the one before. The dock pill follows the selection.',
+gridHeld: 'Tab moves in reading order and wraps to the next row; Ctrl+Shift+Tab goes back. The arrow keys move in all four directions.',
+stripHeld: 'Tab moves right along the strip and Ctrl+Shift+Tab moves left.',
+heldFoot: 'Ctrl+Shift+Tab opens the switcher stepping backwards, and a quick tap switches straight there. Ctrl+Tab is ignored while Alt or AltGr is down, because AltGr+Tab is Windows’ task switcher. With Order of tabs set to Tab bar order, it starts at the tab on the right.',
+deckLatched: 'The query shows in the dock, and the deck keeps only the matches, the first one in the centre.',
+gridLatched: 'The query shows in the field at the top. The matches keep reading order, the first one highlighted.',
+stripLatched: 'The query shows in a field above the strip, which keeps only the matches.'
+},
+held: rule([
+{ keys: 'Ctrl+Tab, quick tap', pri: 'Vitre first', isNew: false, action: 'Switch straight back to the previous tab.' },
+{ keys: 'Ctrl+Tab, hold Ctrl', pri: 'Vitre first', isNew: false, action: 'Open the switcher on the previous tab.' },
+{ keys: 'Tab, Ctrl+Shift+Tab', pri: 'Inside Vitre', isNew: true, action: 'Next and previous card. Right and Left too.' },
+{ keys: 'Release Ctrl', pri: 'Inside Vitre', isNew: false, action: 'Open the selected card.' },
+{ keys: 'Back to the starting card, then release Ctrl', pri: 'Inside Vitre', isNew: true, action: 'Cancel. So does a click on the wallpaper.' },
+{ keys: 'Ctrl+W, Delete', pri: 'Inside Vitre', isNew: true, action: 'Close the selected card. Middle-click works too.' },
+{ keys: 'Type', pri: 'Inside Vitre', isNew: true, action: 'Search. Ctrl+letter types the letter, and the first character latches the switcher.' }
+]),
+latched: rule([
+{ keys: 'Up, Down, Tab, Shift+Tab', pri: 'Inside Vitre', isNew: true, action: 'Move the selection. So do Ctrl+Tab and Ctrl+Shift+Tab.' },
+{ keys: 'Left, Right', pri: 'Inside Vitre', isNew: true, action: 'Edit the query. While it’s empty they move the selection, and Grid uses all four arrows.' },
+{ keys: 'Enter', pri: 'Inside Vitre', isNew: true, action: 'Open the selected tab, or click a card.' },
+{ keys: 'Esc', pri: 'Inside Vitre', isNew: true, action: 'Cancel and return to the tab you started on.' },
+{ keys: 'Ctrl+W', pri: 'Inside Vitre', isNew: true, action: 'Close the highlighted result only. Delete does too while the query is empty.' }
+]),
+notes: [
+{ title: 'Why no Esc while held', body: 'Ctrl+Esc opens Start, so Esc cancels only once the switcher has latched.' },
+{ title: 'When it latches', body: 'When you type, when opened with Ctrl+Shift+A or by mouse, and with Sticky Keys on.' },
+{ title: 'Losing focus', body: 'Start, Alt+Tab or the Win key cancels back to the tab you started on.' },
+{ title: 'A search that starts with W', body: 'A held search can’t start with W, which closes the card: use Ctrl+Shift+A.' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

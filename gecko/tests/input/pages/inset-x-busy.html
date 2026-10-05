@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset busy pages</title>
+<!-- Verifier cases for cost and loops (tests/input/inset-edge.js):
+     ?raf      a fixed header whose inline style is reset on every animation frame
+     ?spy      a scroll spy: history.replaceState with a new fragment every 120 ms
+     ?heavy    60 000 elements (a long, deep page) with a fixed header, and a sticky section header
+               placed after the first 3 000 elements
+     ?narrow   a responsive header: in the flow when wide, position: fixed at top 0 below 700 px
+     ?fs       a stage element for element full screen
+     ?anim     a fixed header and a box moved by script on every frame (a main-thread repaint each frame) -->
+<script>document.documentElement.className = location.search.slice(1) || "raf";</script>
+<style>
+body{margin:0;font:16px/1.5 Segoe UI;background:#fff}
+h1{margin:16px 40px} p{margin:0 40px 12px}
+#hdr{left:0;right:0;height:56px;background:#00695c;color:#fff;display:flex;align-items:center;padding:0 24px;font-weight:600;z-index:5;box-sizing:border-box}
+.raf body, .heavy body, .anim body{padding-top:56px} .raf #hdr, .heavy #hdr, .anim #hdr{position:fixed;top:0}
+#mover{position:relative;width:80px;height:24px;background:#ff7043;margin:0 40px}
+.spy #hdr, .spy250 #hdr, .fs #hdr{position:sticky;top:0}
+@media (max-width:700px){ .narrow body{padding-top:56px} .narrow #hdr{position:fixed;top:0} }
+#sec{position:sticky;top:0;background:#ffe082;padding:6px 40px;font-weight:600}
+#stage{margin:16px 40px;height:240px;background:#263238;color:#fff;display:flex;align-items:center;justify-content:center}
+.d{margin-left:1px}
+</style>
+<header id="hdr">Header</header>
+<h1 id="title">Busy page</h1>
+<div id="stage">Stage (element full screen)</div>
+<div id="mover"></div>
+<script>
+const kind = document.documentElement.className;
+{ let s = ""; for (let i = 1; i <= 50; i++) s += "<p>" + i + ". Glass is an amorphous solid that is transparent and has widespread practical, technological and decorative use in window panes, tableware and optics.</p>"; document.write(s); }
+if (kind === "heavy") {
+  // 60 000 elements: 1 500 blocks of 40 nested / sibling elements; the sticky section header comes
+  // after the first ~3 000 elements in document order.
+  let s = "";
+  for (let i = 0; i < 1500; i++) {
+    if (i === 100) s += "<div id=sec>Sticky section header</div>";
+    s += "<div class=d><div class=d><div class=d><div class=d><span>" + i + "</span>";
+    for (let j = 0; j < 35; j++) s += "<i>" + (j % 10) + "</i>";
+    s += "</div></div></div></div>";
+  }
+  document.write(s);
+}
+window.resets = 0;
+if (kind === "raf") {
+  const h = document.getElementById("hdr");
+  const reset = () => { h.style.cssText = "position:fixed;top:0"; window.resets++; requestAnimationFrame(reset); };
+  requestAnimationFrame(reset);
+}
+if (kind === "anim") {
+  const m = document.getElementById("mover");
+  window.frames_ = 0;
+  const step = (t) => { m.style.left = Math.round(200 + 150 * Math.sin(t / 300)) + "px"; window.frames_++; requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+window.spies = 0;
+if (kind === "spy" || kind === "spy250") setInterval(() => { history.replaceState(null, "", "#s" + (++window.spies % 7)); }, kind === "spy" ? 120 : 250);
+</script>

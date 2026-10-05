@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A clip - Field Notes</title>
+<style>
+  body { font: 16px/1.6 "Segoe UI", sans-serif; color: #1b1b1f; background: #fff; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px; }
+  video { width: 480px; height: 270px; background: #000; border-radius: 10px; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A clip</h1>
+  <video id="vid" muted loop playsinline controls></video>
+  <p>The ribbon moves through the lehr.</p>
+</main>
+<script>
+  const src = new URLSearchParams(location.search).get('src');
+  if (src) { const v = document.getElementById('vid'); v.src = src; v.play().catch(() => {}); }
+</script>
+</body>
+</html>

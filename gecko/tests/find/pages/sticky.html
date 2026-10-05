@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pinned content</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #1b1b1f; background: #fbfaf7; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 32px 1600px; }
+  /* Taller than half the viewport, so the inset leaves it where it is: it sits under the bar. */
+  #rail { position: fixed; left: 50%; margin-left: -150px; top: 0; width: 300px; height: 100vh; background: #e9eef6; padding: 10px 14px; box-sizing: border-box; font-size: 15px; }
+  h2 { scroll-margin-top: 0; }
+</style>
+</head>
+<body>
+<div id="rail">pinned marker in a fixed rail</div>
+<main>
+  <h1>Pinned content</h1>
+  <p>The rail in the middle is fixed to the viewport and runs under the tab bar. A marker in it cannot
+  scroll away, so find gives the pill its parked tint instead.</p>
+  <p><a href="#second">Jump to the second section</a> · <a href="#third">Jump to the third section</a></p>
+  <div style="height: 900px"></div>
+  <h2 id="second">Second section</h2>
+  <p>Text of the second section.</p>
+  <div style="height: 900px"></div>
+  <h2 id="third">Third section</h2>
+  <p>Text of the third section.</p>
+</main>
+</body>
+</html>

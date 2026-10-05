@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8"><title>Inset late headers</title>
+<!-- Verifier cases for headers the module cannot see at load (tests/input/inset-edge.js):
+     ?late1500   a fixed header is added by script 1.5 s after load
+     ?late4000   the same 4 s after load (after the last settle re-check)
+     ?onscroll   the header is in the flow and becomes position: fixed once the page is scrolled past 150 px
+     ?hide       a fixed header with will-change: transform that hides (translateY(-100%)) while scrolling down
+     ?hidet      the same with a 250 ms transform transition (Headroom style); window.track records the
+                 header's top on every frame for 400 ms after each change
+     ?transform  a fixed header with transform: translateZ(0) (its own layer)
+     ?held       a fixed header inside an ancestor with will-change: transform (it scrolls with the page) -->
+<script>document.documentElement.className = location.search.slice(1) || "late1500";</script>
+<style>
+body{margin:0;padding-top:56px;font:16px/1.5 Segoe UI;background:#fff}
+.hdr{left:0;right:0;height:56px;background:#6a1b9a;color:#fff;display:flex;align-items:center;padding:0 24px;font-weight:600;z-index:5;box-sizing:border-box}
+.fixed{position:fixed;top:0}
+.onscroll body{padding-top:0} .onscroll .hdr{position:relative}
+.onscroll .hdr.fixed{position:fixed}
+.hide .hdr{will-change:transform;transition:none}
+.hide .hdr.away, .hidet .hdr.away{transform:translateY(-100%)}
+.hidet .hdr{will-change:transform;transition:transform .25s linear}
+.transform .hdr{transform:translateZ(0)}
+.held #holder{will-change:transform}
+h1{margin:16px 40px} p{margin:0 40px 12px}
+</style>
+<div id="holder"></div>
+<h1 id="title">Late header case</h1>
+<script>
+{ let s = ""; for (let i = 1; i <= 60; i++) s += "<p>" + i + ". Glass is an amorphous solid that is transparent and has widespread practical, technological and decorative use in window panes, tableware and optics.</p>"; document.write(s); }
+const kind = document.documentElement.className;
+function header() {
+  const h = document.createElement("header");
+  h.id = "hdr";
+  h.className = "hdr" + (kind === "onscroll" ? "" : " fixed");
+  h.textContent = "Header (" + kind + ")";
+  document.getElementById("holder").appendChild(h);
+  window.headerAt = performance.now();
+  return h;
+}
+if (kind === "late1500" || kind === "late4000") addEventListener("load", () => setTimeout(header, kind === "late1500" ? 1500 : 4000));
+else header();
+let lastY = 0;
+addEventListener("scroll", () => {
+  const h = document.getElementById("hdr");
+  if (!h) return;
+  if (kind === "onscroll") h.classList.toggle("fixed", scrollY > 150);
+  if (kind === "hide" || kind === "hidet") {
+    const away = scrollY > lastY && scrollY > 80;
+    if (away !== h.classList.contains("away")) {
+      h.classList.toggle("away", away);
+      window.track = [];
+      const t0 = performance.now();
+      const rec = () => { window.track.push(Math.round(h.getBoundingClientRect().top)); if (performance.now() - t0 < 400) requestAnimationFrame(rec); };
+      requestAnimationFrame(rec);
+    }
+  }
+  lastY = scrollY;
+});
+</script>

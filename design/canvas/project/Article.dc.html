@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Field Notes article page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+@keyframes vt-ring-a{0%{outline-offset:19px;outline-color:rgba(0,95,184,0)}36%{outline-offset:3px;outline-color:rgba(0,95,184,1)}69%{outline-offset:3px;outline-color:rgba(0,95,184,1)}100%{outline-offset:3px;outline-color:rgba(0,95,184,0)}}
+@keyframes vt-ring-b{0%{outline-offset:19px;outline-color:rgba(0,95,184,0)}36%{outline-offset:3px;outline-color:rgba(0,95,184,1)}69%{outline-offset:3px;outline-color:rgba(0,95,184,1)}100%{outline-offset:3px;outline-color:rgba(0,95,184,0)}}
+@media (prefers-reduced-motion: reduce){[data-m]{animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #f3eee4; color: #1d1b18; font-family: 'Newsreader', Georgia, serif">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; transform: translateY(-{{scroll}}px)">
+
+<header style="height: 76px; box-sizing: border-box; padding: 0 56px; display: flex; align-items: center; gap: 44px; border-bottom: 1px solid #d9d0c0">
+<div style="flex-shrink: 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 34px; letter-spacing: -0.01em">Field Notes</div>
+<nav style="flex-grow: 1; display: flex; gap: 28px; font-size: 16px">
+<a href="#science" style="color: #4a453d; text-decoration: none">Science</a>
+<a href="#craft" style="color: #1d1b18; text-decoration: none; font-weight: 600">Craft</a>
+<a href="#places" style="color: #4a453d; text-decoration: none">Places</a>
+<a href="#archive" style="color: #4a453d; text-decoration: none">Archive</a>
+</nav>
+<a href="#subscribe" style="flex-shrink: 0; background: #d9482b; color: #ffffff; padding: 10px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; text-decoration: none">Subscribe</a>
+</header>
+
+<section style="display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; padding: 56px 56px 48px">
+<div style="display: flex; flex-direction: column; gap: 22px; padding-top: 8px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #b83a1e">Craft · Materials</div>
+<h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 92px; line-height: 0.95; letter-spacing: -0.02em">Sand, heat and a bath of molten tin</h1>
+<p style="margin: 0; max-width: 560px; font-size: 23px; line-height: 1.4; font-style: italic; color: #4a453d">How the <span data-m="1" style="border-radius: 2px; background: {{fm.m1.bg}}; color: {{fm.m1.fg}}; outline: {{fm.m1.ol}}; outline-offset: {{fm.m1.oo}}px; animation: {{fm.m1.anim}}">float</span> process turned glassmaking into a river that never stops.</p>
+<div style="margin-top: 6px; display: flex; gap: 12px; align-items: center; font-size: 15px; color: #6b6458">
+<span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 18px; background: #d6cbb6"></span>
+<span>By Mara Ellison</span>
+<span>·</span>
+<span>9 min read</span>
+</div>
+</div>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px">
+<svg width="100%" height="440" viewBox="0 0 496 440" preserveAspectRatio="xMidYMid slice" style="display: block; border-radius: 6px" role="img" aria-label="Illustration of a float glass line: a glowing furnace, a ribbon of glass floating on a tin bath, and rollers">
+<rect x="0" y="0" width="496" height="440" fill="#1f4fd1"></rect>
+<rect x="0" y="318" width="496" height="122" fill="#1a3fae"></rect>
+<circle cx="120" cy="140" r="92" fill="#e0532f"></circle>
+<circle cx="120" cy="140" r="52" fill="#f28a3b"></circle>
+<path d="M92 74 q 9 -13 0 -26 q -9 -13 0 -26" fill="none" stroke="#ffd2a8" stroke-width="4" stroke-linecap="round"></path>
+<path d="M120 66 q 9 -13 0 -26 q -9 -13 0 -26" fill="none" stroke="#ffd2a8" stroke-width="4" stroke-linecap="round"></path>
+<path d="M148 74 q 9 -13 0 -26 q -9 -13 0 -26" fill="none" stroke="#ffd2a8" stroke-width="4" stroke-linecap="round"></path>
+<rect x="36" y="200" width="160" height="118" rx="10" fill="#10205a"></rect>
+<path d="M170 250 C 226 250 246 288 300 288 L 496 288 L 496 320 L 300 320 C 240 320 222 282 170 282 Z" fill="#f1b52e"></path>
+<rect x="206" y="320" width="290" height="40" fill="#c9cdd6"></rect>
+<path d="M206 333 H496 M206 347 H496" stroke="#a5acbb" stroke-width="2"></path>
+<g fill="#0e1a46">
+<circle cx="292" cy="392" r="15"></circle>
+<circle cx="340" cy="392" r="15"></circle>
+<circle cx="388" cy="392" r="15"></circle>
+<circle cx="436" cy="392" r="15"></circle>
+<circle cx="484" cy="392" r="15"></circle>
+</g>
+<circle cx="412" cy="96" r="36" fill="none" stroke="#f3eee4" stroke-width="3"></circle>
+<path d="M246 170 H472" stroke="#f3eee4" stroke-width="3" stroke-dasharray="2 12" stroke-linecap="round"></path>
+</svg>
+<figcaption style="font-size: 13px; color: #6b6458">The <span data-m="2" style="border-radius: 2px; background: {{fm.m2.bg}}; color: {{fm.m2.fg}}; outline: {{fm.m2.ol}}; outline-offset: {{fm.m2.oo}}px; animation: {{fm.m2.anim}}">float</span> line: furnace, tin bath, rollers.</figcaption>
+</figure>
+</section>
+
+<section style="display: grid; grid-template-columns: 188px minmax(0, 1fr) 300px; gap: 56px; padding: 44px 56px 96px; border-top: 1px solid #d9d0c0">
+<aside style="display: flex; flex-direction: column; gap: 14px; padding-top: 6px; font-size: 15px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #8a8171">In this story</div>
+<a href="#bath" style="position: relative; color: #1d1b18; text-decoration: none">The bath<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -34px; top: 1px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">as</span></sc-if></a>
+<a href="#before" style="position: relative; color: #4a453d; text-decoration: none">Before <span data-m="3" style="border-radius: 2px; background: {{fm.m3.bg}}; color: {{fm.m3.fg}}; outline: {{fm.m3.ol}}; outline-offset: {{fm.m3.oo}}px; animation: {{fm.m3.anim}}">float</span><sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -34px; top: 1px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">ad</span></sc-if></a>
+<a href="#cooling" style="position: relative; color: #4a453d; text-decoration: none">Cooling slowly<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -34px; top: 1px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">af</span></sc-if></a>
+<a href="#never" style="position: relative; color: #4a453d; text-decoration: none">A line that never stops<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -34px; top: 1px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">aj</span></sc-if></a>
+</aside>
+
+<article style="max-width: 640px; font-size: 20px; line-height: 1.62">
+<p style="margin: 0 0 22px"><span style="float: left; margin: 8px 12px 0 0; font-family: 'Instrument Serif', Georgia, serif; font-size: 84px; line-height: 0.8; color: #b83a1e">A</span>lmost every window you have looked through was made by <span data-m="4" style="border-radius: 2px; background: {{fm.m4.bg}}; color: {{fm.m4.fg}}; outline: {{fm.m4.ol}}; outline-offset: {{fm.m4.oo}}px; animation: {{fm.m4.anim}}">float</span>ing. Molten glass, mostly silica sand with soda ash and limestone, pours from the furnace onto a shallow bath of molten tin. Glass is lighter than tin, so it spreads across the metal and levels itself: flat, and parallel on both faces, with no grinding or polishing. The trick is called the <a href="#float" style="position: relative; color: #1f4fd1; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px"><span data-m="5" style="border-radius: 2px; background: {{fm.m5.bg}}; color: {{fm.m5.fg}}; outline: {{fm.m5.ol}}; outline-offset: {{fm.m5.oo}}px; animation: {{fm.m5.anim}}">float</span> process<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -6px; top: -16px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">fj</span></sc-if></a>.</p>
+<p style="margin: 0 0 22px">Before it, plate glass was cast or rolled, then ground and polished on both sides: slow, costly work that wore away part of every sheet. The method developed at <a href="#pilkington" style="position: relative; color: #1f4fd1; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px">Pilkington<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -6px; top: -16px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">fk</span></sc-if></a> in the 1950s replaced all of that with gravity and <span data-s="1" style="background: {{pick.bg}}; color: {{pick.fg}}">surface tension</span>, and it now makes the great majority of the world's flat glass.</p>
+<p style="margin: 0">The ribbon enters the bath at around 1,100 °C and leaves at about 600 °C, stiff enough to ride on rollers without marking. From there it passes through the <a href="#lehr" style="position: relative; color: #1f4fd1; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px">lehr<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -6px; top: -16px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">fl</span></sc-if></a>, a long annealing oven, where it cools slowly so no stress is locked inside.</p>
+<blockquote style="margin: 34px 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 46px; line-height: 1.05; color: #b83a1e">“Gravity does the polishing.”</blockquote>
+<p style="margin: 0">A <span data-m="6" style="border-radius: 2px; background: {{fm.m6.bg}}; color: {{fm.m6.fg}}; outline: {{fm.m6.ol}}; outline-offset: {{fm.m6.oo}}px; animation: {{fm.m6.anim}}">float</span> line runs day and night for years between rebuilds. Stopping it is harder than keeping it going, so the furnace never goes cold and the ribbon is simply cut to length as it arrives: a river of glass that never stops.</p>
+</article>
+
+<aside style="align-self: start; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 10px; background: #e9e1d2">
+<div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; line-height: 1.05">The line, stage by stage</div>
+<ol style="margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 10px; font-size: 15.5px; line-height: 1.45">
+<li><strong>Batch.</strong> Sand, soda ash, limestone and recycled cullet are weighed and mixed.</li>
+<li><strong>Furnace.</strong> The batch melts at about 1,500 °C.</li>
+<li><strong>Tin bath.</strong> The ribbon <span data-m="7" style="border-radius: 2px; background: {{fm.m7.bg}}; color: {{fm.m7.fg}}; outline: {{fm.m7.ol}}; outline-offset: {{fm.m7.oo}}px; animation: {{fm.m7.anim}}">float</span>s, spreads and flattens.</li>
+<li><strong>Lehr.</strong> Slow cooling relieves internal stress.</li>
+<li><strong>Cutting.</strong> The ribbon is scored and snapped to size.</li>
+</ol>
+<a href="#watch" style="position: relative; align-self: flex-start; color: #1f4fd1; font-size: 15.5px; font-weight: 600; text-decoration: none">Watch a line run →<sc-if value="{{hints}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: -6px; top: -16px; height: 18px; padding: 0 5px; border-radius: 5px; background: #16181d; color: #ffffff; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 11px; font-weight: 700; font-style: normal; line-height: 18px; letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.92), 0 6px 12px -4px rgba(0,0,0,0.4)">dj</span></sc-if></a>
+</aside>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scroll":{"editor":"int","default":0,"min":0,"max":640,"unit":"px"},"hints":{"editor":"boolean","default":false},"find":{"editor":"boolean","default":false,"section":"Find"},"active":{"editor":"int","default":5,"min":0,"max":7,"section":"Find"},"ring":{"editor":"enum","default":"none","options":["none","hold","a","b"],"section":"Find"},"selected":{"editor":"boolean","default":false,"section":"Find"},"pick":{"editor":"boolean","default":false,"section":"Selection"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const find = !!(this.props.find ?? false);
+const active = this.props.active ?? 5;
+const ring = this.props.ring ?? 'none';
+const selected = !!(this.props.selected ?? false);
+const fm = {};
+for (let i = 1; i <= 7; i += 1) {
+const on = i === active;
+let bg = 'transparent';
+let fg = 'inherit';
+if (find) { bg = on ? 'rgb(255,150,50)' : 'rgb(255,255,0)'; fg = '#000000'; }
+if (selected && on) { bg = 'rgb(51,144,255)'; fg = '#ffffff'; }
+const ringOn = find && on && ring !== 'none';
+fm['m' + i] = {
+bg: bg,
+fg: fg,
+ol: ringOn ? '2px solid #005fb8' : 'none',
+oo: 3,
+anim: ringOn && (ring === 'a' || ring === 'b') ? 'vt-ring-' + ring + ' 780ms cubic-bezier(0.22, 1, 0.36, 1) both' : 'none'
+};
+}
+const pick = !!(this.props.pick ?? false);
+return {
+pick: { bg: pick ? 'rgb(51,144,255)' : 'transparent', fg: pick ? '#ffffff' : 'inherit' },
+scroll: Math.min(this.props.scroll ?? 0, 640),
+hints: this.props.hints ?? false,
+fm: fm
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Peek in motion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@keyframes vt-cap{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes vt-wash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.vt-anim{transition-property:opacity !important;transition-duration:150ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #f6f7f9; color: #16181d; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-circle" x="0" y="0" width="44" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/fbb9d57b142a16bacfbe2c03ac04e7b6" x="0" y="0" width="44" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="16" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+<filter id="lens-win" x="0" y="0" width="108" height="32" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/6b64f841d59a2885d70cf9e62e1424d4" x="0" y="0" width="108" height="32" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="IssuesPage" hint-size="1440px,900px"></dc-import></div>
+
+<div class="vt-anim" style="position: absolute; left: 40px; top: 303px; width: 1360px; height: 64px; background: rgba(58,109,240,0.05); opacity: {{row2Hover}}; transition: {{trRow}}"></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 335px; width: 382px; height: 1.5px; background: #3a6df0; opacity: {{row2Hover}}; transition: {{trRow}}"></div>
+<div class="vt-anim" style="position: absolute; left: 40px; top: 367px; width: 1360px; height: 64px; background: rgba(58,109,240,0.05); opacity: {{row3Hover}}; transition: {{trRow}}"></div>
+<div class="vt-anim" style="position: absolute; left: 86px; top: 399px; width: 425px; height: 1.5px; background: #3a6df0; opacity: {{row3Hover}}; transition: {{trRow}}"></div>
+<div class="vt-anim" style="position: absolute; left: 40px; top: 367px; width: 1360px; height: 64px; background: rgba(76,194,255,0.22); opacity: 0; animation: {{washAnim}}"></div>
+
+<div class="vt-anim" style="position: absolute; inset: 0; background: rgba(8,8,12,0.22); opacity: {{scrim}}; transition: {{trScrim}}"></div>
+
+<section aria-label="Peek: code.vitre.dev" class="vt-anim" style="position: absolute; left: {{sheet.l}}px; top: {{sheet.t}}px; width: {{sheet.w}}px; height: {{sheet.h}}px; border-radius: {{sheet.r}}px; overflow: hidden; opacity: {{sheet.o}}; background: #f6f7f9; box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25); transition: {{trSheet}}">
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: {{contentTop}}px; bottom: 0; overflow: hidden; transition: {{trContentTop}}">
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1040px; height: 760px; opacity: {{op39}}; transition: {{trFade}}"><dc-import name="PeekIssue" issue="39" w="{{1040}}" h="{{760}}" hint-size="1040px,760px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1040px; height: 760px; opacity: {{op38}}; transition: {{trFade}}"><dc-import name="PeekIssue" issue="38" w="{{1040}}" h="{{760}}" hint-size="1040px,760px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; opacity: {{opWide}}; transition: {{trFade}}"><dc-import name="PeekIssue" issue="39" w="{{1440}}" h="{{900}}" hint-size="1440px,900px"></dc-import></div>
+<div class="vt-anim" style="position: absolute; inset: 0; background: #e9ecf1; opacity: {{cover}}; transition: {{trFade}}"></div>
+</div>
+<div class="vt-anim" style="position: absolute; left: 0; right: 0; top: 0; height: 44px; box-sizing: border-box; border-bottom: 1px solid rgba(16,18,24,0.08); background: rgba(250,251,253,0.78); backdrop-filter: blur(20px) saturate(1.6); opacity: {{headerOp}}; transition: {{trHeader}}">
+<div style="position: absolute; left: 14px; top: 0; height: 43px; display: flex; align-items: center; gap: 8px; font-size: 13px">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-weight: 600">code.vitre.dev</span>
+<span style="position: relative; display: block; width: 220px; height: 18px">
+<span class="vt-anim" style="position: absolute; left: 0; top: 0; white-space: nowrap; color: rgba(22,24,29,0.55); opacity: {{path39}}; transition: {{trFade}}">/vitre/vitre-shell/issues/39</span>
+<span class="vt-anim" style="position: absolute; left: 0; top: 0; white-space: nowrap; color: rgba(22,24,29,0.55); opacity: {{path38}}; transition: {{trFade}}">/vitre/vitre-shell/issues/38</span>
+</span>
+</div>
+<div style="position: absolute; right: 8px; top: 6px; display: flex; gap: 6px">
+<button aria-label="Open as tab" class="vt-anim" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: {{btnBg}}; color: #16181d; display: flex; align-items: center; justify-content: center; transition: {{trBtn}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12"></path><path d="M11 4.5h4.5V9"></path><path d="M15.5 4.5 9.5 10.5"></path></svg></button>
+<button aria-label="Close peek" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"></path></svg></button>
+</div>
+<div class="vt-anim" style="position: absolute; left: 0; bottom: -1px; height: 2px; width: {{loadW}}; background: #4cc2ff; opacity: {{loadOp}}; transition: {{trLoad}}"></div>
+</div>
+<div class="vt-anim" style="position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: {{rimOp}}; transition: {{trRim}}"></div>
+</section>
+
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1440px; height: 68px; opacity: {{barOp}}; transform: {{barTf}}; transition: {{trBar}}">
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.F}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Field Notes" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.T}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Tideline" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.R}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Refract" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.V}}px; top: 12px; width: {{tabs.Vw}}px; height: 44px; border-radius: 22px; overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22)); backdrop-filter: blur(10px) saturate(1.6); box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 480px; height: 44px; opacity: {{vPill}}; transition: {{trFade}}">
+<button aria-label="Back" style="position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.78); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.8 6.8 10l5.2 5.2"></path></svg></button>
+<button aria-label="Forward" aria-disabled="true" style="position: absolute; left: 38px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.28); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.8 13.2 10 8 15.2"></path></svg></button>
+<span style="position: absolute; left: 76px; top: 0; width: 328px; height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; font-weight: 500"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>code.vitre.dev</span>
+<button aria-label="Reload" style="position: absolute; left: 442px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.78); display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.3 10a5.3 5.3 0 1 1-1.55-3.75"></path><path d="M15.4 4v3.4H12"></path></svg></button>
+</div>
+<button aria-label="Issues · vitre-shell" class="vt-anim" style="position: absolute; left: 0; top: 0; width: 44px; height: 44px; border: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center; opacity: {{vCircle}}; transition: {{trFade}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.N}}px; top: 12px; width: {{tabs.Nw}}px; height: 44px; border-radius: 22px; overflow: hidden; opacity: {{newOp}}; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22)); backdrop-filter: blur(10px) saturate(1.6); box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trNew}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+<div class="vt-anim" style="position: absolute; left: 0; top: 0; width: 480px; height: 44px; opacity: {{newPill}}; transition: {{trFade}}">
+<button aria-label="Back" aria-disabled="true" style="position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.28); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.8 6.8 10l5.2 5.2"></path></svg></button>
+<button aria-label="Forward" aria-disabled="true" style="position: absolute; left: 38px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.28); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.8 13.2 10 8 15.2"></path></svg></button>
+<span style="position: absolute; left: 76px; top: 0; width: 328px; height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; font-weight: 500"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>code.vitre.dev</span>
+<button aria-label="Reload" style="position: absolute; left: 442px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: rgba(22,24,29,0.78); display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.3 10a5.3 5.3 0 1 1-1.55-3.75"></path><path d="M15.4 4v3.4H12"></path></svg></button>
+</div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.L}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Long Exposure Club" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.H}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="Home" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#16181d" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg></button>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: {{tabs.P}}px; top: 12px; width: 44px; height: 44px; border-radius: 22px; box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); transition: {{trTabs}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-circle)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<button aria-label="New tab" style="position: relative; width: 44px; height: 44px; border: 0; border-radius: 22px; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg></button>
+</div>
+
+<div style="position: absolute; right: 12px; top: 18px; width: 108px; height: 32px; border-radius: 16px; box-shadow: 0 8px 22px rgba(40,30,15,0.12), 0 1px 2px rgba(40,30,15,0.16)">
+<div style="position: absolute; inset: 0; border-radius: 16px; backdrop-filter: url(#lens-win)"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))"></div>
+<div style="position: absolute; inset: 0; border-radius: 16px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+<div style="position: relative; height: 32px; display: flex">
+<button aria-label="Minimize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"></path></svg></button>
+<button aria-label="Maximize" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"></rect></svg></button>
+<button aria-label="Close window" style="width: 36px; height: 32px; border: 0; padding: 0; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11"></path></svg></button>
+</div>
+</div>
+
+</div>
+
+<div aria-hidden="true" class="vt-anim" style="position: absolute; left: {{cap.l}}px; top: {{cap.t}}px; width: {{cap.w}}px; height: {{cap.h}}px; border-radius: 22px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; font-weight: 500; background: rgba(255,255,255,0.86); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.9), 0 14px 30px rgba(40,30,15,0.2); opacity: 0; animation: {{capAnim}}; transition: {{trCap}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>code.vitre.dev</div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" class="vt-anim" style="position: absolute; left: {{cur.x}}px; top: {{cur.y}}px; transform: scale({{cur.s}}); transform-origin: 2px 2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); transition: {{trCursor}}"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"autoplay":{"editor":"boolean","default":true,"section":"Motion"},"still":{"editor":"enum","default":"open","options":["open","hop","promoted"],"section":"Motion"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+state = { phase: 'idle', snap: true };
+
+componentDidMount() {
+this.timers = [];
+const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+if ((this.props.autoplay ?? true) && !reduced) {
+this.run();
+} else {
+const map = { open: 'loaded', hop: 'hop38', promoted: 'promoted' };
+this.setState({ phase: map[this.props.still ?? 'open'] || 'loaded', snap: true });
+}
+}
+
+componentWillUnmount() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+}
+
+componentDidUpdate(prev) {
+if (prev && (prev.autoplay !== this.props.autoplay || prev.still !== this.props.still)) {
+(this.timers || []).forEach((t) => clearTimeout(t));
+this.componentDidMount();
+}
+}
+
+run() {
+(this.timers || []).forEach((t) => clearTimeout(t));
+if ((this.props.autoplay ?? true) === false) return;
+this.timers = [];
+this.setState({ phase: 'idle', snap: true });
+this.timers.push(setTimeout(() => this.setState({ snap: false }), 80));
+const plan = [
+['hover2', 500], ['press2', 1100], ['open39', 1250], ['loaded', 1750],
+['hover3', 3100], ['press3', 3600], ['hop38', 3750],
+['scrimHover', 5500], ['pressScrim', 6000], ['close', 6150],
+['hover2b', 7800], ['press2b', 8300], ['open39b', 8450], ['loaded2', 8950],
+['toButton', 10100], ['pressBtn', 10600], ['promote', 10750], ['promoted', 11150]
+];
+plan.forEach((p) => this.timers.push(setTimeout(() => this.setState({ phase: p[0] }), p[1])));
+this.timers.push(setTimeout(() => this.run(), 13600));
+}
+
+renderVals() {
+const ph = this.state.phase;
+const snap = this.state.snap;
+const S = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const E = 'cubic-bezier(0.2, 0, 0, 1)';
+const tr = (s) => (snap ? 'none' : s);
+const inSet = (list) => list.indexOf(ph) !== -1;
+
+const openPh = ['open39', 'loaded', 'hover3', 'press3', 'hop38', 'scrimHover', 'pressScrim', 'open39b', 'loaded2', 'toButton', 'pressBtn'];
+const fullPh = ['promote', 'promoted'];
+const isOpen = inSet(openPh);
+const isFull = inSet(fullPh);
+
+const rects = {
+row2: { l: 86, t: 315, w: 382, h: 20, r: 6 },
+row3: { l: 86, t: 379, w: 425, h: 20, r: 6 },
+open: { l: 200, t: 72, w: 1040, h: 804, r: 22 },
+full: { l: 0, t: 0, w: 1440, h: 900, r: 0 }
+};
+let pos = 'row2';
+if (isFull) pos = 'full';
+else if (isOpen) pos = 'open';
+else if (ph === 'close') pos = 'row3';
+const sheet = Object.assign({ o: isOpen || isFull ? 1 : 0 }, rects[pos]);
+
+let trSheet = 'left 400ms ' + S + ', top 400ms ' + S + ', width 400ms ' + S + ', height 400ms ' + S + ', border-radius 400ms ' + S + ', opacity 80ms ease';
+if (ph === 'close') trSheet = 'left 280ms ' + S + ', top 280ms ' + S + ', width 280ms ' + S + ', height 280ms ' + S + ', border-radius 280ms ' + S + ', opacity 120ms ease 180ms';
+if (isFull) trSheet = 'left 380ms ' + E + ', top 380ms ' + E + ', width 380ms ' + E + ', height 380ms ' + E + ', border-radius 380ms ' + E + ', opacity 80ms ease';
+
+const before = { F: 322, T: 374, R: 426, V: 478, Vw: 480, N: 966, Nw: 0, L: 966, H: 1018, P: 1074 };
+const after = { F: 296, T: 348, R: 400, V: 452, Vw: 44, N: 504, Nw: 480, L: 992, H: 1044, P: 1100 };
+
+const cursor = {
+idle: [720, 640], hover2: [300, 323], press2: [300, 323], open39: [300, 323], loaded: [300, 323],
+hover3: [150, 387], press3: [150, 387], hop38: [150, 387],
+scrimHover: [100, 810], pressScrim: [100, 810], close: [100, 810],
+hover2b: [300, 323], press2b: [300, 323], open39b: [300, 323], loaded2: [300, 323],
+toButton: [1177, 93], pressBtn: [1177, 93], promote: [1177, 93], promoted: [1177, 93]
+}[ph] || [720, 640];
+const pressed = inSet(['press2', 'press3', 'pressScrim', 'press2b', 'pressBtn']);
+
+const capHeader = { l: 206, t: 80, w: 150, h: 28 };
+const capPill = { l: 504, t: 12, w: 480, h: 44 };
+
+return {
+sheet: sheet,
+trSheet: tr(trSheet),
+contentTop: isFull ? 0 : 44,
+trContentTop: tr('top 380ms ' + E),
+op39: inSet(['idle', 'hover2', 'press2', 'open39', 'loaded', 'hover3', 'press3', 'hover2b', 'press2b', 'open39b', 'loaded2', 'toButton', 'pressBtn']) ? 1 : 0,
+op38: inSet(['hop38', 'scrimHover', 'pressScrim', 'close']) ? 1 : 0,
+opWide: isFull ? 1 : 0,
+cover: inSet(['idle', 'hover2', 'press2', 'open39', 'hover2b', 'press2b', 'open39b']) ? 1 : 0,
+trFade: tr(isFull ? 'opacity 120ms ease' : 'opacity 200ms ease'),
+headerOp: isFull ? 0 : 1,
+trHeader: tr('opacity 140ms ease'),
+path39: inSet(['hop38', 'scrimHover', 'pressScrim', 'close']) ? 0 : 1,
+path38: inSet(['hop38', 'scrimHover', 'pressScrim', 'close']) ? 1 : 0,
+btnBg: ph === 'pressBtn' ? 'rgba(16,18,24,0.12)' : (ph === 'toButton' ? 'rgba(16,18,24,0.06)' : 'rgba(16,18,24,0)'),
+trBtn: tr(ph === 'toButton' ? 'background 120ms ease 340ms' : 'background 120ms ease'),
+loadW: inSet(['open39', 'open39b']) ? '70%' : (inSet(['loaded', 'loaded2', 'hop38']) ? '100%' : '0%'),
+loadOp: inSet(['open39', 'open39b']) ? 1 : 0,
+trLoad: tr('width 450ms ease, opacity 250ms ease 300ms'),
+rimOp: isFull ? 0 : 1,
+trRim: tr('opacity 140ms ease 240ms'),
+scrim: isOpen ? 1 : 0,
+trScrim: tr('opacity 240ms ease'),
+row2Hover: inSet(['hover2', 'press2', 'hover2b', 'press2b']) ? 1 : 0,
+row3Hover: inSet(['hover3', 'press3']) ? 1 : 0,
+trRow: tr(inSet(['hover2', 'hover3', 'hover2b']) ? 'opacity 160ms ease 320ms' : 'opacity 160ms ease'),
+washAnim: ph === 'close' && !snap ? 'vt-wash 1120ms ease-out 260ms both' : 'none',
+barOp: isOpen || isFull ? 1 : 0,
+barTf: isOpen || isFull ? 'translateY(0px)' : 'translateY(-10px)',
+trBar: tr(ph === 'close' ? 'opacity 220ms ease 300ms, transform 320ms ' + S + ' 300ms' : 'opacity 220ms ease, transform 320ms ' + S),
+tabs: isFull ? after : before,
+trTabs: tr('left 420ms ' + S + ', width 420ms ' + S),
+vPill: isFull ? 0 : 1,
+vCircle: isFull ? 1 : 0,
+newOp: isFull ? 1 : 0,
+trNew: tr('left 420ms ' + S + ', width 420ms ' + S + ', opacity 120ms ease'),
+newPill: ph === 'promoted' ? 1 : 0,
+cap: isFull ? capPill : capHeader,
+capAnim: isFull && !snap ? 'vt-cap 600ms ease both' : 'none',
+trCap: tr('left 420ms ' + S + ', top 420ms ' + S + ', width 420ms ' + S + ', height 420ms ' + S),
+cur: { x: cursor[0], y: cursor[1], s: pressed ? 0.86 : 1 },
+trCursor: tr('left 480ms cubic-bezier(0.3, 0, 0.2, 1), top 480ms cubic-bezier(0.3, 0, 0.2, 1), transform 120ms ease')
+};
+}
+}
+</script>
+</body>
+</html>

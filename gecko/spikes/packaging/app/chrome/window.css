@@ -1,0 +1,13 @@
+/* chrome://vitre/content/chrome/window.css : per-window stylesheet from the content package. */
+#vitre-probe2 {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgb(48, 209, 88);
+  color: rgb(0, 0, 0);
+  font: 600 14px "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  pointer-events: none;
+}

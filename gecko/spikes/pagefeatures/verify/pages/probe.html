@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe page</title>
+<style>
+  body { font: 16px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif; margin: 0; background: #14202b; color: #e9edf5; }
+  main { padding: 28px 36px; }
+  #n { font: 600 56px/1 "Segoe UI", sans-serif; color: #7fe0a8; }
+  button { font: inherit; padding: 6px 12px; margin-right: 8px; }
+  video, canvas { display: inline-block; margin-top: 14px; border-radius: 10px; background: #000; }
+  a { color: #9fe3ff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Probe page</h1>
+  <div>token <code id="token"></code></div>
+  <div id="n">0</div>
+  <p><button id="fs">fullscreen</button><button id="geo">geolocation</button><button id="notif">notification permission</button>
+     <a id="blank" href="counter.html?from=peekblank" target="_blank">target=_blank inside the peek</a></p>
+  <canvas id="cv" width="240" height="120"></canvas>
+  <video id="vid" width="240" height="120" muted autoplay playsinline></video>
+</main>
+<script>
+  const root = document.documentElement;
+  const token = Math.random().toString(36).slice(2, 8);
+  document.getElementById('token').textContent = token;
+  root.dataset.token = token;
+  let n = 0;
+  const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+  setInterval(() => {
+    n++;
+    document.getElementById('n').textContent = n;
+    root.dataset.n = n;
+    cx.fillStyle = '#1b2a55'; cx.fillRect(0, 0, 240, 120);
+    cx.fillStyle = '#7fd3ff'; cx.fillRect((n * 6) % 240, 40, 40, 40);
+  }, 100);
+  const vid = document.getElementById('vid');
+  vid.srcObject = cv.captureStream(20);
+  vid.play().catch(() => {});
+  document.getElementById('fs').onclick = () => {
+    root.dataset.fs = 'asked';
+    root.requestFullscreen().then(() => (root.dataset.fs = 'entered')).catch((e) => (root.dataset.fs = 'rejected: ' + e.message));
+  };
+  document.addEventListener('fullscreenchange', () => (root.dataset.fschange = (root.dataset.fschange || '') + (document.fullscreenElement ? 'in ' : 'out ')));
+  document.addEventListener('fullscreenerror', () => (root.dataset.fserror = '1'));
+  document.getElementById('geo').onclick = () => {
+    root.dataset.geo = 'asked';
+    navigator.geolocation.getCurrentPosition(() => (root.dataset.geo = 'granted'), (e) => (root.dataset.geo = 'error ' + e.code));
+  };
+  document.getElementById('notif').onclick = () => {
+    root.dataset.notif = 'asked';
+    Notification.requestPermission().then((r) => (root.dataset.notif = r));
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre packaging probe",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "pkg-probe@vitre.invalid" } },
+  "permissions": ["tabs"],
+  "browser_action": { "default_title": "probe: not run" },
+  "background": { "scripts": ["background.js"] }
+}

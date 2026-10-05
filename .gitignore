@@ -1,0 +1,112 @@
+# What stays out of the Deer repository.
+# Nested .gitignore files (gecko/, app/) hold the rules for their own folder; this file holds the
+# rules for the whole tree. Check what would be committed with:
+#   git add --dry-run . | more
+#   git status --ignored
+
+# --- Engines and Mozilla binaries: downloaded, never committed ------------------------------------
+# gecko/runtime (the development engine; a branded Firefox there must never be published),
+# gecko/engines (unbranded engines from Mozilla and the release engine), copies of either under
+# spikes/. Any folder named runtime/ is treated as an engine copy.
+runtime/
+/gecko/engines/
+*.exe
+*.dll
+*.msi
+*.msix
+*.ja
+*.7z
+*.tar.bz2
+*.tar.xz
+*.tar.gz
+*.zip
+!/gecko/tests/**/pages/files/*.zip
+
+# Firefox's own UI source extracted from omni.ja (116 MB); regenerate it with
+#   python gecko/tools/extract-reference.py
+# (omni*/ also covers the script's omni.partial-* and omni.old-* folders while it runs.)
+/gecko/reference/omni*/
+
+# --- Dependencies and build outputs ----------------------------------------------------------------
+node_modules/
+build/
+build-*/
+dist/
+/app/dist-*/
+_generated.ts
+__pycache__/
+*.pyc
+*.tsbuildinfo
+*.xpi
+*.crx
+
+# --- Test and spike output: captures, logs, throwaway profiles ------------------------------------
+out/
+out-*/
+*.log
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.bmp
+*.webm
+*.mp4
+# Firefox profile data that a run may leave behind (profiles normally live in %TEMP% and are deleted)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.jsonlz4
+*.mozlz4
+*.baklz4
+*.lz4
+*.db
+logins.json
+logins-backup.json
+sessionstore-backups/
+cache2/
+startupCache/
+**/storage/permanent/
+**/storage/default/
+datareporting/
+crashes/
+minidumps/
+parent.lock
+.parentlock
+times.json
+compatibility.ini
+xulstore.json
+sessionCheckpoints.json
+# the marker files the launchers and tools/run.py put in every profile they create
+vitre-profile
+vitre-harness
+
+# Images that are part of the source: documentation, the browser's own assets, test fixtures
+!/docs/images/**
+!/design/**/*.png
+!/design/**/*.jpg
+!/gecko/src/**/*.png
+!/gecko/src/**/*.jpg
+!/gecko/tools/runtime-overlay/**
+!/gecko/installer/**/*.png
+!/gecko/installer/**/*.bmp
+!**/icon*.png
+!**/pixel.png
+
+# --- Local tooling and personal working files ------------------------------------------------------
+# Orchestration scripts and prompts of the agent sessions that built the project
+/.workflows/
+.claude/
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+.env
+.env.*
+
+# A downloader engine kept for reading by its author ("All rights reserved", no licence granted):
+# not part of the public, MPL-licensed repository.
+/reference/

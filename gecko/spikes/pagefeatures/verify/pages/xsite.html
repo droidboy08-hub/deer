@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cross-site probe</title>
+<style>
+  body { font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #1b1b1f; background: #fbfaf7; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 60px 32px 300px; }
+  a { color: #005fb8; }
+  iframe { width: 100%; height: 90px; border: 1px solid #ddd; border-radius: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cross-site glass</h1>
+  <p id="p1">This page lives on 127.0.0.1. The frame below and two of the links live on <b>localhost</b>, which is a
+  different site, so with Fission they run in another content process. glass, glass and Glass.</p>
+  <p><a id="xlink" href="#">Cross-site link to the counter page</a></p>
+  <p><a id="xprobe" href="#">cross-site probe page</a></p>
+  <p><a id="pd" href="counter.html?pd" onclick="event.preventDefault(); this.dataset.hits = (+this.dataset.hits || 0) + 1">handled by the page</a></p>
+  <p><a id="same" href="counter.html?same">same-site counter</a></p>
+  <iframe id="xframe"></iframe>
+  <p id="p2">After the frame: one more glass in the top document.</p>
+</main>
+<script>
+  const other = location.origin.replace('127.0.0.1', 'localhost');
+  document.getElementById('xlink').href = other + '/counter.html?x';
+  document.getElementById('xprobe').href = other + '/probe.html';
+  document.getElementById('xframe').src = other + '/frame.html';
+  window.addEventListener('keydown', (e) => { document.documentElement.dataset.lastKey = e.key; });
+</script>
+</body>
+</html>

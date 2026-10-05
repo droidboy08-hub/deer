@@ -1,0 +1,5 @@
+# Build outputs and local test material (work/dev-engine is a copy of the branded runtime: never commit or ship it)
+out/
+work/
+tests/out/
+__pycache__/

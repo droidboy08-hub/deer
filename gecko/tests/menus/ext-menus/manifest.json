@@ -1,0 +1,10 @@
+{
+  "manifest_version": 2,
+  "name": "Vitre menus probe",
+  "version": "1.0",
+  "description": "Local test extension for tests/menus/ext.js: adds menu items to page, link and tab menus.",
+  "browser_specific_settings": { "gecko": { "id": "menus-probe@vitre.test" } },
+  "icons": { "16": "icon.svg", "32": "icon.svg" },
+  "permissions": ["menus", "tabs"],
+  "background": { "scripts": ["background.js"] }
+}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src chrome: resource:; img-src chrome: resource: data: moz-icon:; object-src 'none'" />
+    <title>Vitre Home (spike)</title>
+    <link rel="stylesheet" href="chrome://vitre/content/pages/home.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Vitre Home</h1>
+      <p id="status">script not run</p>
+      <p id="inline">inline script not run</p>
+    </main>
+    <script>
+      document.getElementById("inline").textContent = "inline script ran";
+    </script>
+    <script src="chrome://vitre/content/pages/home.js"></script>
+    <script type="module" src="chrome://vitre/content/pages/home.mjs"></script>
+  </body>
+</html>

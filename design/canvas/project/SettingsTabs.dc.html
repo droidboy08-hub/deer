@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vitre settings panel, tabs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}input::placeholder{color:rgba(255,255,255,0.55)}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #f3eee4; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-float" x="0" y="0" width="960" height="688" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/907d800cda0d60b0784640e4a27452c3" x="0" y="0" width="960" height="688" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="22" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+
+<section aria-label="Settings" style="position: absolute; left: 240px; top: 106px; width: 960px; height: 688px; border-radius: 22px; box-shadow: 0 40px 100px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3)">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-float)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: rgba(20,20,24,0.62)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.2)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude"></div>
+
+<div style="position: relative; height: 688px; display: flex; flex-direction: column">
+
+<div style="height: 48px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08)">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3.5 6h8.2M15.3 6h1.2M3.5 14h2.2M9.3 14h7.2"></path><circle cx="13.5" cy="6" r="1.8"></circle><circle cx="7.5" cy="14" r="1.8"></circle></svg>
+<span style="flex-grow: 1; font-size: 14px; font-weight: 600">Settings</span>
+<button aria-label="Close settings" style="width: 30px; height: 30px; border: 0; border-radius: 15px; padding: 0; background: rgba(255,255,255,0.08); color: #ffffff; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; display: flex">
+
+<nav aria-label="Settings sections" style="width: 216px; flex-shrink: 0; box-sizing: border-box; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px">
+<label style="height: 34px; margin-bottom: 12px; box-sizing: border-box; padding: 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.07); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.3); color: rgba(255,255,255,0.55); font-size: 13px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg><input type="search" placeholder="Find a setting" aria-label="Find a setting" style="flex-grow: 1; min-width: 0; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit"></label>
+<a href="#general" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 6h8.2M15.3 6h1.2M3.5 14h2.2M9.3 14h7.2"></path><circle cx="13.5" cy="6" r="1.8"></circle><circle cx="7.5" cy="14" r="1.8"></circle></svg>General</a>
+<a href="#appearance" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"></path></svg>Appearance</a>
+<a href="#home" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2.2"></rect><circle cx="7.5" cy="8.3" r="1.3"></circle><path d="m3.6 14.2 4-3.6 3 2.5 2.4-2 3.4 3"></path></svg>Home and background</a>
+<a href="#tabs" aria-current="page" style="position: relative; height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: #ffffff; text-decoration: none; background: rgba(255,255,255,0.1)"><span style="position: absolute; left: 0; top: 9px; width: 3px; height: 16px; border-radius: 2px; background: #4cc2ff"></span><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="4.8" cy="10" r="2.3"></circle><rect x="8.5" y="7.7" width="9" height="4.6" rx="2.3"></rect></svg>Tabs</a>
+<a href="#downloads" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.4 9 10 12.6 13.6 9"></path><path d="M4 16.5h12"></path></svg>Downloads</a>
+<a href="#privacy" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 4.5 5v4.5c0 3.4 2.3 6.3 5.5 7.5 3.2-1.2 5.5-4.1 5.5-7.5V5z"></path></svg>Privacy and security</a>
+<a href="#search" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>Search engine</a>
+<a href="#shortcuts" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="5.5" width="15" height="9" rx="2"></rect><path d="M5.5 8.5h1M9.5 8.5h1M13.5 8.5h1M6.5 11.5h7"></path></svg>Keyboard shortcuts</a>
+<a href="#about" style="height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.88); text-decoration: none"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 9.2v4M10 6.7v.1"></path></svg>About Vitre</a>
+</nav>
+
+<div style="width: 1px; flex-shrink: 0; margin: 16px 0; background: rgba(255,255,255,0.08)"></div>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 16px 28px 18px; display: flex; flex-direction: column">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 26px; line-height: 34px; font-weight: 600">Tabs</h1>
+
+<h2 style="margin: 12px 0 8px 2px; font-size: 13px; line-height: 20px; font-weight: 600; color: rgba(255,255,255,0.86)">Switching tabs</h2>
+<div style="border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="box-sizing: border-box; padding: 16px 16px 10px">
+<div role="radiogroup" aria-label="Tab switcher style" style="display: flex; gap: 20px">
+
+<button role="radio" aria-checked="true" aria-label="Full-screen deck" style="width: 205px; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 10px">
+<span style="position: relative; display: block; width: 205px; height: 120px; border-radius: 10px; overflow: hidden; background: #1a1b20; box-shadow: 0 0 0 2px #4cc2ff, 0 0 0 5px rgba(76,194,255,0.22)">
+<img src="/_blob/d76ec6f8c20771e9dd10b6d141ebfc22" alt="" style="position: absolute; left: -12px; top: -12px; width: 229px; height: 144px; object-fit: cover; filter: blur(6px) brightness(0.5)">
+<span style="position: absolute; left: -36px; top: 29px; display: block; width: 66px; height: 44px; border-radius: 4px; background: #ece6da; opacity: 0.55"></span>
+<span style="position: absolute; left: 175px; top: 29px; display: block; width: 66px; height: 44px; border-radius: 4px; background: #f4f2ec; opacity: 0.55"></span>
+<span style="position: absolute; left: 50px; top: 18px; display: block; width: 105px; height: 66px; border-radius: 5px; background: #0e0f12; box-shadow: 0 6px 16px rgba(0,0,0,0.45)"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 105px; height: 46px; object-fit: cover; border-radius: 5px 5px 0 0"><span style="display: block; margin: 7px 8px 0; width: 62px; height: 4px; border-radius: 2px; background: #ffffff; opacity: 0.7"></span></span>
+<span style="position: absolute; left: 61px; top: 96px; height: 12px; box-sizing: border-box; padding: 0 2px; border-radius: 6px; display: flex; align-items: center; gap: 3px; background: rgba(255,255,255,0.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3)"><span style="width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span><span style="width: 24px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.7)"></span><span style="width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span><span style="width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span><span style="width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span><span style="width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span></span>
+<span style="position: absolute; right: 7px; top: 7px; width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #4cc2ff; color: #0b1a24"><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 10.5 3.2 3L15 6.5"></path></svg></span>
+</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">Full-screen deck<span style="padding: 0 6px; border-radius: 4px; background: rgba(76,194,255,0.2); color: #9fe3ff; font-size: 11px; font-weight: 600; line-height: 18px">Default</span></span>
+</button>
+
+<button role="radio" aria-checked="false" aria-label="Grid" style="width: 205px; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 10px">
+<span style="position: relative; display: block; width: 205px; height: 120px; border-radius: 10px; overflow: hidden; background: #1a1b20; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12)">
+<img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="position: absolute; left: -12px; top: -12px; width: 229px; height: 144px; object-fit: cover; filter: blur(8px) brightness(0.4)">
+<span style="position: absolute; left: 62px; top: 9px; display: block; width: 81px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3)"></span>
+<span style="position: absolute; left: 18px; top: 32px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 169px">
+<span style="display: block; height: 24px; border-radius: 3px; background: #ece6da"></span>
+<span style="display: block; height: 24px; border-radius: 3px; background: #1b1d22; box-shadow: 0 0 0 1.5px #4cc2ff"></span>
+<span style="display: block; height: 24px; border-radius: 3px; background: #f4f2ec"></span>
+<span style="display: block; height: 24px; border-radius: 3px; background: #f6f7f9"></span>
+<span style="display: block; height: 24px; border-radius: 3px; background: #2a2a30"></span>
+<span style="display: block; height: 24px; border-radius: 3px; background: #c9a37e"></span>
+<span style="display: block; height: 24px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35)"></span>
+</span>
+</span>
+<span style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.88)">Grid</span>
+</button>
+
+<button role="radio" aria-checked="false" aria-label="Strip" style="width: 205px; border: 0; padding: 0; background: transparent; color: #ffffff; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 10px">
+<span style="position: relative; display: block; width: 205px; height: 120px; border-radius: 10px; overflow: hidden; background: #ece6da; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12)">
+<span style="position: absolute; left: 12px; top: 12px; display: block; width: 80px; height: 8px; border-radius: 2px; background: #1d1b18; opacity: 0.7"></span>
+<span style="position: absolute; left: 12px; top: 26px; display: block; width: 120px; height: 4px; border-radius: 2px; background: #1d1b18; opacity: 0.2"></span>
+<span style="position: absolute; left: 140px; top: 12px; display: block; width: 52px; height: 40px; border-radius: 2px; background: #1f4fd1"></span>
+<span style="position: absolute; inset: 0; display: block; background: rgba(8,8,12,0.2)"></span>
+<span style="position: absolute; left: 16px; top: 40px; width: 173px; height: 40px; box-sizing: border-box; padding: 0 7px; border-radius: 9px; display: flex; align-items: center; gap: 5px; background: rgba(20,20,24,0.68); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 14px rgba(0,0,0,0.35)">
+<span style="display: block; width: 27px; height: 18px; border-radius: 2px; background: #ece6da"></span>
+<span style="display: block; width: 27px; height: 18px; border-radius: 2px; background: #1b1d22; box-shadow: 0 0 0 1.5px #4cc2ff"></span>
+<span style="display: block; width: 27px; height: 18px; border-radius: 2px; background: #f4f2ec"></span>
+<span style="display: block; width: 27px; height: 18px; border-radius: 2px; background: #f6f7f9"></span>
+<span style="display: block; width: 27px; height: 18px; border-radius: 2px; background: #2a2a30"></span>
+</span>
+</span>
+<span style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.88)">Strip</span>
+</button>
+
+</div>
+<p style="margin: 10px 2px 0; font-size: 12.5px; line-height: 18px; color: rgba(255,255,255,0.62)">Hold Ctrl and tap Tab. Big cards slide past, and the one you stop on opens when you let go.</p>
+</div>
+<div style="height: 1px; margin-left: 52px; background: rgba(255,255,255,0.07)"></div>
+<div style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 16px">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 6.5V10l2.4 1.5"></path></svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span id="set-tab-order" style="font-size: 14px">Order of tabs</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">Ctrl+Tab starts at the tab you used before this one</span></div>
+<button id="set-tab-order-val" aria-labelledby="set-tab-order set-tab-order-val" aria-haspopup="listbox" style="height: 32px; border: 0; padding: 0 10px 0 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">Most recently used<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 5 5-5"></path></svg></button>
+</div>
+<div style="height: 1px; margin-left: 52px; background: rgba(255,255,255,0.07)"></div>
+<div style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 16px">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span id="set-switch-search" style="font-size: 14px">Type to search while switching</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">Works in every style; Ctrl+Shift+A opens it with search ready</span></div>
+<span style="font-size: 13px; color: rgba(255,255,255,0.8)">On</span>
+<button role="switch" aria-checked="true" aria-labelledby="set-switch-search" style="position: relative; width: 40px; height: 20px; border: 0; border-radius: 10px; padding: 0; background: #4cc2ff"><span style="position: absolute; top: 3px; left: 23px; width: 14px; height: 14px; border-radius: 7px; background: #0b1a24"></span></button>
+</div>
+</div>
+
+<h2 style="margin: 14px 0 8px 2px; font-size: 13px; line-height: 20px; font-weight: 600; color: rgba(255,255,255,0.86)">Opening and closing tabs</h2>
+<div style="border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 16px">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6.5"></circle><path d="M7.6 7.6l4.8 4.8M12.4 7.6l-4.8 4.8"></path></svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span id="set-close-btn" style="font-size: 14px">Close button on tabs</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">The × on a tab's circle</span></div>
+<button id="set-close-btn-val" aria-labelledby="set-close-btn set-close-btn-val" aria-haspopup="listbox" style="height: 32px; border: 0; padding: 0 10px 0 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">When I point at a tab<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 5 5-5"></path></svg></button>
+</div>
+<div style="height: 1px; margin-left: 52px; background: rgba(255,255,255,0.07)"></div>
+<div style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 16px">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"></path></svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span id="set-new-tab" style="font-size: 14px">New tabs open</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">Where a tab from a link or the + button appears</span></div>
+<button id="set-new-tab-val" aria-labelledby="set-new-tab set-new-tab-val" aria-haspopup="listbox" style="height: 32px; border: 0; padding: 0 10px 0 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">Next to the current tab<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 5 5-5"></path></svg></button>
+</div>
+<div style="height: 1px; margin-left: 52px; background: rgba(255,255,255,0.07)"></div>
+<div style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 16px">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke-opacity="0.45"></rect><rect x="5.5" y="6" width="9" height="8.5" rx="1.5"></rect></svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span id="set-sel-search" style="font-size: 14px">Searches from selected text</span><span style="font-size: 12px; color: rgba(255,255,255,0.6)">Search for “…” in the right-click menu</span></div>
+<button id="set-sel-search-val" aria-labelledby="set-sel-search set-sel-search-val" aria-haspopup="listbox" style="height: 32px; border: 0; padding: 0 10px 0 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #ffffff; font: inherit; font-size: 13px">Open in a peek<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 5 5-5"></path></svg></button>
+</div>
+</div>
+
+</main>
+</div>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

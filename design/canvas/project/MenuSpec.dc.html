@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menu anatomy, materials and placement</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 2330px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">Right-click menus</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">One menu system, drawn by Vitre in glass. It follows the Windows theme, never the page.</p>
+</div>
+
+<div style="position: absolute; left: 48px; top: 136px; width: 240px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">Anatomy</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The link menu at 200%.</span>
+</div>
+
+<div style="position: absolute; left: 300px; top: 208px; width: 640px; height: 556px; border-radius: 10px; background: #ffffff"></div>
+<div style="position: absolute; left: 356px; top: 252px; width: 528px; height: 468px">
+<div style="position: absolute; left: 0; top: 0; width: 264px; height: 234px; transform: scale(2); transform-origin: 0 0"><dc-import name="CtxMenu" kind="link" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+</div>
+
+<svg width="1440" height="780" viewBox="0 0 1440 780" style="position: absolute; left: 0; top: 0; pointer-events: none" aria-hidden="true" focusable="false">
+<g fill="none" stroke="#4cc2ff" stroke-width="1">
+<path d="M356.5 192V252M883.5 192V252M356.5 198.5H883.5"></path>
+<path d="M280 259.5H361"></path>
+<path d="M338.5 264V332M334 264.5H343M334 331.5H343M280 298.5H338"></path>
+<path d="M280 366.5H368M356.5 362V371M367.5 362V371"></path>
+<path d="M280 410.5H388M356.5 406V415M387.5 406V415"></path>
+<rect x="388.5" y="418.5" width="31" height="31" stroke-dasharray="3 2"></rect>
+<path d="M280 494.5H444M356.5 490V499M443.5 490V499"></path>
+<path d="M280 631.5H344M344.5 622V640M340 622.5H349M340 639.5H349M356 631.5H380M356.5 627V636M379.5 627V636"></path>
+<path d="M869 335.5H906M918 335.5H960"></path>
+<path d="M852 392.5H906M918 392.5H960M852.5 388V397M883.5 388V397"></path>
+<path d="M912.5 252V330M912.5 342V386M912.5 398V720M908 252.5H917M908 719.5H917M888 252.5H908M888 719.5H908M913 486.5H960"></path>
+</g>
+<g fill="none" stroke="#4cc2ff" stroke-width="2" stroke-linecap="round">
+<path d="M356 276A24 24 0 0 1 380 252"></path>
+<path d="M860 332A12 12 0 0 1 872 344"></path>
+</g>
+<g fill="#4cc2ff">
+<circle cx="363" cy="259.5" r="2.5"></circle>
+<circle cx="868.5" cy="335.5" r="2.5"></circle>
+</g>
+</svg>
+
+<div style="position: absolute; left: 356px; top: 174px; width: 528px; text-align: center; font-size: 12px; line-height: 16px; white-space: nowrap"><span style="color: #e4e6eb">Width 264</span><span style="color: #9a9ca6"> · fits the content in 8 px steps, 264 to 360</span></div>
+
+<div style="position: absolute; left: 48px; top: 251px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Radius 12</div>
+<div style="position: absolute; left: 48px; top: 290px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Row 34<br><span style="color: #9a9ca6">40 by touch or pen</span></div>
+<div style="position: absolute; left: 48px; top: 358px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Padding 6</div>
+<div style="position: absolute; left: 48px; top: 402px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Icon 16 px at x 16<br><span style="color: #9a9ca6">1.5 stroke; the column is always kept</span></div>
+<div style="position: absolute; left: 48px; top: 486px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Label at x 44<br><span style="color: #9a9ca6">14/20 Segoe UI Variable Text</span></div>
+<div style="position: absolute; left: 48px; top: 623px; width: 226px; text-align: right; font-size: 12px; line-height: 16px; color: #e4e6eb">Separator, 9 px block<br><span style="color: #9a9ca6">1 px line, inset 12</span></div>
+
+<div style="position: absolute; left: 966px; top: 328px; width: 300px; font-size: 12px; line-height: 16px; color: #e4e6eb">Plate radius 6<br><span style="color: #9a9ca6">One plate for hover and keyboard focus</span></div>
+<div style="position: absolute; left: 966px; top: 384px; width: 300px; font-size: 12px; line-height: 16px; color: #e4e6eb">Accelerator, 12 px secondary<br><span style="color: #9a9ca6">Right edge 16 from the menu edge</span></div>
+<div style="position: absolute; left: 966px; top: 478px; width: 300px; font-size: 12px; line-height: 16px; color: #e4e6eb">Height 234<br><span style="color: #9a9ca6">12 + 34 × rows + 9 × separators,<br>+ 28 for a caption row</span></div>
+<div style="position: absolute; left: 966px; top: 640px; width: 400px; font-size: 12px; line-height: 16px; color: #e4e6eb">Limits<br><span style="color: #9a9ca6">At most 10 actionable rows.<br>Taller than the window minus 16: scrolls inside,<br>with a 2 px overlay scrollbar.</span></div>
+
+<div style="position: absolute; left: 48px; top: 812px; width: 240px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">Row states</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Crops at 100%.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 872px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 24px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" hint-size="264px,234px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 48px; top: 1022px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Rest · opened by mouse, nothing focused</div>
+
+<div style="position: absolute; left: 392px; top: 872px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 24px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 392px; top: 1022px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Hover · one plate for mouse and keyboard</div>
+
+<div style="position: absolute; left: 736px; top: 872px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 24px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" hover="{{1}}" pressed="{{true}}" hint-size="264px,234px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 736px; top: 1022px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Pressed · dimmer plate, label at 80%</div>
+
+<div style="position: absolute; left: 1080px; top: 872px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 24px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" hover="{{0}}" keys="{{true}}" hint-size="264px,234px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 1080px; top: 1022px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Keyboard open · first item focused, access keys shown</div>
+
+<div style="position: absolute; left: 48px; top: 1062px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: -142px; width: 264px; height: 268px"><dc-import name="CtxMenu" kind="videodrm" hint-size="264px,268px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 48px; top: 1212px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Disabled · 36%, the reason in the accelerator column</div>
+
+<div style="position: absolute; left: 392px; top: 1062px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: -40px; width: 264px; height: 268px"><dc-import name="CtxMenu" kind="audio" hint-size="264px,268px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 392px; top: 1212px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Check items · a check in the icon column</div>
+
+<div style="position: absolute; left: 736px; top: 1062px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 24px; width: 264px; height: 262px"><dc-import name="CtxMenu" kind="circle" hint-size="264px,262px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 736px; top: 1212px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Caption row · 28 px, not focusable</div>
+
+<div style="position: absolute; left: 1080px; top: 1062px; width: 312px; height: 140px; border-radius: 10px; overflow: hidden; background: #f3f3f5">
+<div style="position: absolute; left: 24px; top: 30px; width: 264px; height: 336px"><dc-import name="CtxMenu" kind="misspelled" hint-size="264px,336px"></dc-import></div>
+</div>
+<div style="position: absolute; left: 1080px; top: 1212px; width: 312px; font-size: 12px; line-height: 16px; color: #9a9ca6">Spelling · up to 3 suggestions, Semibold</div>
+
+<div style="position: absolute; left: 48px; top: 1276px; width: 400px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">Materials</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Frost: blur 24, saturate 1.6. No lens map.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 1336px; width: 248px; height: 300px; border-radius: 10px; overflow: hidden; background: #f3eee4">
+<div style="position: absolute; left: -284px; top: -590px; width: 1440px; height: 900px"><dc-import name="Article" scroll="{{100}}" hint-size="1440px,900px"></dc-import></div>
+</div>
+
+<div style="position: absolute; left: 322px; top: 1336px; width: 248px; height: 300px; border-radius: 10px; overflow: hidden; background: #0d1117; box-sizing: border-box; padding-top: 8px; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 12px; line-height: 20px; color: #e6edf3">
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">1</span><span style="margin-left: 12px; white-space: pre"><span style="color: #ff7b72">import</span> { Layer } <span style="color: #ff7b72">from</span> <span style="color: #a5d6ff">'./ui'</span></span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">2</span><span style="margin-left: 12px; white-space: pre"><span style="color: #ff7b72">import</span> { tidy } <span style="color: #ff7b72">from</span> <span style="color: #a5d6ff">'./rows'</span></span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">3</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">4</span><span style="margin-left: 12px; white-space: pre"><span style="color: #ff7b72">function</span> <span style="color: #d2a8ff">itemsFor</span>(p) {</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">5</span><span style="margin-left: 12px; white-space: pre">  <span style="color: #ff7b72">const</span> rows = []</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">6</span><span style="margin-left: 12px; white-space: pre">  <span style="color: #ff7b72">if</span> (p.linkURL) {</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">7</span><span style="margin-left: 12px; white-space: pre">    rows.<span style="color: #d2a8ff">push</span>(newTab, peek)</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">8</span><span style="margin-left: 12px; white-space: pre">  }</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">9</span><span style="margin-left: 12px; white-space: pre">  <span style="color: #ff7b72">if</span> (p.hasImageContents) {</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">10</span><span style="margin-left: 12px; white-space: pre">    rows.<span style="color: #d2a8ff">push</span>(saveImage)</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">11</span><span style="margin-left: 12px; white-space: pre">  }</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">12</span><span style="margin-left: 12px; white-space: pre">  <span style="color: #ff7b72">return</span> <span style="color: #d2a8ff">tidy</span>(rows)</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">13</span><span style="margin-left: 12px; white-space: pre">}</span></div>
+<div style="height: 20px; display: flex"><span style="width: 22px; text-align: right; color: #6e7681">14</span></div>
+</div>
+
+<div style="position: absolute; left: 596px; top: 1336px; width: 248px; height: 300px; border-radius: 10px; overflow: hidden; background: #050508"><img src="/_blob/dd320ac987dd96d049df92293f327323" alt="" style="display: block; width: 248px; height: 300px; object-fit: cover; object-position: 6% 50%"></div>
+
+<div style="position: absolute; left: 870px; top: 1336px; width: 248px; height: 300px; border-radius: 10px; overflow: hidden; background: #101012">
+<div style="position: absolute; left: -300px; top: -330px; width: 1440px; height: 900px"><dc-import name="GalleryPage" hint-size="1440px,900px"></dc-import></div>
+</div>
+
+<div style="position: absolute; left: 1144px; top: 1336px; width: 248px; height: 300px; border-radius: 10px; background: #000000; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)"></div>
+
+<div style="position: absolute; left: 40px; top: 1388px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+<div style="position: absolute; left: 314px; top: 1388px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" theme="raised" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+<div style="position: absolute; left: 588px; top: 1388px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" theme="light" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+<div style="position: absolute; left: 862px; top: 1388px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" theme="solid" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+<div style="position: absolute; left: 1136px; top: 1388px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="link" theme="contrast" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+
+<div style="position: absolute; left: 48px; top: 1648px; width: 248px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Dark</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Text 8.4:1, secondary 5.1:1 over white</span></div>
+<div style="position: absolute; left: 322px; top: 1648px; width: 248px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Dark raised</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Over dark pages, luma under 48</span></div>
+<div style="position: absolute; left: 596px; top: 1648px; width: 248px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Light</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Follows Windows light mode</span></div>
+<div style="position: absolute; left: 870px; top: 1648px; width: 248px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Transparency off</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Solid #2C2C2C, flat rim</span></div>
+<div style="position: absolute; left: 1144px; top: 1648px; width: 248px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; line-height: 20px; font-weight: 600">Contrast themes</span><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">System colours, no frost or shadow</span></div>
+
+<div style="position: absolute; left: 48px; top: 1734px; width: 432px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; line-height: 22px; font-weight: 600">Placement</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The window at 30%. Dashed: the 8 px margin.</span>
+</div>
+
+<svg width="432" height="270" viewBox="0 0 432 270" style="position: absolute; left: 48px; top: 1794px" aria-hidden="true" focusable="false">
+<rect x="0" y="0" width="432" height="270" rx="4" fill="#e9ecf1"></rect>
+<g fill="#c4c9d3">
+<rect x="30" y="34" width="168" height="6" rx="3"></rect>
+<rect x="30" y="50" width="120" height="4" rx="2"></rect>
+<rect x="30" y="60" width="140" height="4" rx="2"></rect>
+<rect x="190" y="96" width="196" height="4" rx="2"></rect>
+<rect x="190" y="106" width="170" height="4" rx="2"></rect>
+<rect x="190" y="116" width="184" height="4" rx="2"></rect>
+<rect x="30" y="160" width="80" height="4" rx="2"></rect>
+<rect x="30" y="170" width="92" height="4" rx="2"></rect>
+<rect x="232" y="160" width="70" height="4" rx="2"></rect>
+<rect x="232" y="170" width="60" height="4" rx="2"></rect>
+</g>
+<g fill="#ffffff" fill-opacity="0.85" stroke="#16181d" stroke-opacity="0.14" stroke-width="0.6">
+<rect x="96.6" y="3.6" width="144" height="13.2" rx="6.6"></rect>
+<circle cx="249.6" cy="10.2" r="6.6"></circle>
+<circle cx="265.2" cy="10.2" r="6.6"></circle>
+<circle cx="280.8" cy="10.2" r="6.6"></circle>
+<circle cx="296.4" cy="10.2" r="6.6"></circle>
+<circle cx="312" cy="10.2" r="6.6"></circle>
+<circle cx="328.8" cy="10.2" r="6.6"></circle>
+<rect x="396" y="5.4" width="32.4" height="9.6" rx="4.8"></rect>
+</g>
+<rect x="2.4" y="2.4" width="427.2" height="265.2" rx="2" fill="none" stroke="#4cc2ff" stroke-width="1" stroke-dasharray="4 3"></rect>
+<g transform="translate(75 75)">
+<rect width="79.2" height="70.2" rx="3.6" fill="#3e3f45"></rect>
+<g fill="#ffffff" fill-opacity="0.5"><rect x="4.8" y="4.5" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="14.7" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="24.9" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="37.8" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="48" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="60.9" width="4.8" height="4.8" rx="1"></rect></g>
+<g fill="#ffffff" fill-opacity="0.8"><rect x="13.2" y="6.1" width="36" height="1.6" rx="0.8"></rect><rect x="13.2" y="16.3" width="18" height="1.6" rx="0.8"></rect><rect x="13.2" y="26.5" width="42" height="1.6" rx="0.8"></rect><rect x="13.2" y="39.4" width="31" height="1.6" rx="0.8"></rect><rect x="13.2" y="49.6" width="34" height="1.6" rx="0.8"></rect><rect x="13.2" y="62.5" width="14" height="1.6" rx="0.8"></rect></g>
+<rect x="57" y="16.5" width="17.4" height="1.2" rx="0.6" fill="#ffffff" fill-opacity="0.45"></rect>
+<path d="M3.6 33.8H75.6M3.6 56.9H75.6" stroke="#ffffff" stroke-opacity="0.2" stroke-width="0.6"></path>
+</g>
+<g transform="translate(307.8 69)">
+<rect width="79.2" height="70.2" rx="3.6" fill="#3e3f45"></rect>
+<g fill="#ffffff" fill-opacity="0.5"><rect x="4.8" y="4.5" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="14.7" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="24.9" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="37.8" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="48" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="60.9" width="4.8" height="4.8" rx="1"></rect></g>
+<g fill="#ffffff" fill-opacity="0.8"><rect x="13.2" y="6.1" width="36" height="1.6" rx="0.8"></rect><rect x="13.2" y="16.3" width="18" height="1.6" rx="0.8"></rect><rect x="13.2" y="26.5" width="42" height="1.6" rx="0.8"></rect><rect x="13.2" y="39.4" width="31" height="1.6" rx="0.8"></rect><rect x="13.2" y="49.6" width="34" height="1.6" rx="0.8"></rect><rect x="13.2" y="62.5" width="14" height="1.6" rx="0.8"></rect></g>
+<rect x="57" y="16.5" width="17.4" height="1.2" rx="0.6" fill="#ffffff" fill-opacity="0.45"></rect>
+<path d="M3.6 33.8H75.6M3.6 56.9H75.6" stroke="#ffffff" stroke-opacity="0.2" stroke-width="0.6"></path>
+</g>
+<g transform="translate(132 175.8)">
+<rect width="79.2" height="70.2" rx="3.6" fill="#3e3f45"></rect>
+<g fill="#ffffff" fill-opacity="0.5"><rect x="4.8" y="4.5" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="14.7" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="24.9" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="37.8" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="48" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="60.9" width="4.8" height="4.8" rx="1"></rect></g>
+<g fill="#ffffff" fill-opacity="0.8"><rect x="13.2" y="6.1" width="36" height="1.6" rx="0.8"></rect><rect x="13.2" y="16.3" width="18" height="1.6" rx="0.8"></rect><rect x="13.2" y="26.5" width="42" height="1.6" rx="0.8"></rect><rect x="13.2" y="39.4" width="31" height="1.6" rx="0.8"></rect><rect x="13.2" y="49.6" width="34" height="1.6" rx="0.8"></rect><rect x="13.2" y="62.5" width="14" height="1.6" rx="0.8"></rect></g>
+<rect x="57" y="16.5" width="17.4" height="1.2" rx="0.6" fill="#ffffff" fill-opacity="0.45"></rect>
+<path d="M3.6 33.8H75.6M3.6 56.9H75.6" stroke="#ffffff" stroke-opacity="0.2" stroke-width="0.6"></path>
+</g>
+<g transform="translate(319.8 178.8)">
+<rect width="79.2" height="70.2" rx="3.6" fill="#3e3f45"></rect>
+<g fill="#ffffff" fill-opacity="0.5"><rect x="4.8" y="4.5" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="14.7" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="24.9" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="37.8" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="48" width="4.8" height="4.8" rx="1"></rect><rect x="4.8" y="60.9" width="4.8" height="4.8" rx="1"></rect></g>
+<g fill="#ffffff" fill-opacity="0.8"><rect x="13.2" y="6.1" width="36" height="1.6" rx="0.8"></rect><rect x="13.2" y="16.3" width="18" height="1.6" rx="0.8"></rect><rect x="13.2" y="26.5" width="42" height="1.6" rx="0.8"></rect><rect x="13.2" y="39.4" width="31" height="1.6" rx="0.8"></rect><rect x="13.2" y="49.6" width="34" height="1.6" rx="0.8"></rect><rect x="13.2" y="62.5" width="14" height="1.6" rx="0.8"></rect></g>
+<rect x="57" y="16.5" width="17.4" height="1.2" rx="0.6" fill="#ffffff" fill-opacity="0.45"></rect>
+<path d="M3.6 33.8H75.6M3.6 56.9H75.6" stroke="#ffffff" stroke-opacity="0.2" stroke-width="0.6"></path>
+</g>
+<g fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round">
+<path transform="translate(73.6 73.6) scale(0.7)" d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z"></path>
+<path transform="translate(385.6 67.6) scale(0.7)" d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z"></path>
+<path transform="translate(130.6 244.6) scale(0.7)" d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z"></path>
+<path transform="translate(397.6 247.6) scale(0.7)" d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z"></path>
+</g>
+</svg>
+
+<div style="position: absolute; left: 48px; top: 2080px; width: 432px; display: grid; grid-template-columns: 116px minmax(0, 1fr); column-gap: 16px; font-size: 13px; line-height: 19px">
+<span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Mouse and pen</span><span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Opens at the pointer; flips left or up near the edge. Order never changes.</span>
+<span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Keyboard</span><span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">4 px below the focused element, first item focused.</span>
+<span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Tab bar</span><span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Hangs at y 64.</span>
+<span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Downloads ring</span><span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Opens up and to the left.</span>
+<span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Touch</span><span style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">40 px rows, above the finger.</span>
+</div>
+
+<div style="position: absolute; left: 504px; top: 1734px; width: 432px; height: 374px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 8px">Keys</div>
+<div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); column-gap: 16px; font-size: 13px; line-height: 19px">
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Shift+F10 or Menu key</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Open at the focused element.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Up, Down</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Move and wrap. Skip separators, stop on dimmed items.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Home, End</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">First or last item.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Enter or Space</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Activate.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">A letter</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Its access key, at once.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Esc, Alt or F10</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Close and return focus.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Shift+right-click</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Vitre's menu, even where a site replaces it.</span>
+</div>
+</div>
+
+<div style="position: absolute; left: 960px; top: 1734px; width: 432px; height: 374px; box-sizing: border-box; padding: 22px 24px; border-radius: 12px; background: #18191e; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 8px">Motion</div>
+<div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); column-gap: 16px; font-size: 13px; line-height: 19px">
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Open</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">200 ms on the spring, scale 0.96 to 1 from the pointer corner, with a 90 ms fade.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Plate</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Glides 90 ms between neighbouring rows; snaps on jumps and wraps.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Choose</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">The action runs at once; 100 ms fade.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Dismiss</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">120 ms fade.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Hand-offs</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">Peek grows from the link. Downloads fly to the ring, 480 ms.</span>
+<span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); font-weight: 600">Reduced motion</span><span style="padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.07); color: #9a9ca6">150 ms cross-fades, no scale or glide.</span>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2330}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
