@@ -240,13 +240,13 @@ const appearance: SectionDef = {
         },
         {
           title: 'Start pages below the tab bar',
-          desc: 'Leaves room at the top of each page; it scrolls away with the page',
+          desc: 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page',
           keywords: 'inset space gap top margin overlap cover header',
           build: (ctx) =>
             row({
               icon: ico.inset,
               title: 'Start pages below the tab bar',
-              desc: 'Leaves room at the top of each page; it scrolls away with the page',
+              desc: 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page',
               control: (ids) => toggle(ctx, { labelledBy: ids.title, describedBy: ids.desc, get: (s) => s.pageInset, set: (v) => ctx.set({ pageInset: v }) }),
             }),
         },

@@ -193,7 +193,8 @@ spike.main(async () => {
 
   // ---- 7. settings: get / set / broadcast across two windows ----
   const settings = b.sys("VitreSettings");
-  const defaults = settings.get();
+  // The harness turns auto-hide off (tools/run.py); reset() brings back Deer's own default.
+  const defaults = { ...settings.get(), barAutoHide: Services.prefs.getDefaultBranch("vitre.").getBoolPref("barAutoHide") };
   check("defaults match the Settings interface", defaults.theme === "system" && defaults.closeButton === "hover" && defaults.connections === 8 && defaults.homeBackground.kind === "windows" && defaults.rebind && Object.keys(defaults.rebind).length === 0 && defaults.searchEngine === "google" && defaults.downloadsFolder.length > 0, defaults);
 
   const win2 = await spike.openWindow();

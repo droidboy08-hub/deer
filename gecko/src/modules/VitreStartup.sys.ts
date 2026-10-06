@@ -293,10 +293,29 @@ export const VitreStartup = {
     about.set(what, url);
   },
 
-  /** New tabs open Home. In memory only, so it runs at every start. (browser/modules/AboutNewTab.sys.mjs) */
+  /**
+   * New tabs open Home. In memory only, so it runs at every start. (browser/modules/AboutNewTab.sys.mjs)
+   *
+   * And a new tab gets a Home page that is already drawn, as Firefox does for its own new-tab page
+   * (owner's report, 2026-10-05: a new tab showed a white, then a grey frame before its picture).
+   * Firefox's NewTabPagePreloading keeps one new-tab page loaded in a hidden browser per window
+   * (made when the window is idle and after each new tab) and Tabbrowser.addTab hands it to the next
+   * tab that opens BROWSER_NEW_TAB_URL. It switches itself off when the new-tab URL is overridden,
+   * which Deer's Home is; `enabled` is redefined to stay on for Home (the browser.newtab.preload
+   * pref still turns it off). moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs.
+   */
   useHomeAsNewTab(): void {
     const { AboutNewTab } = ChromeUtils.importESModule('resource:///modules/AboutNewTab.sys.mjs');
     AboutNewTab.newTabURL = HOME_URL;
+    try {
+      const { NewTabPagePreloading } = ChromeUtils.importESModule('moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs');
+      Object.defineProperty(NewTabPagePreloading, 'enabled', {
+        configurable: true,
+        get: () => !!NewTabPagePreloading.prefEnabled && AboutNewTab.newTabURL === HOME_URL,
+      });
+    } catch (e) {
+      console.error('VitreStartup: new-tab preloading stays off', e);
+    }
   },
 
   /**

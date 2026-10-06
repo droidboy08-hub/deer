@@ -19,6 +19,16 @@
 //                                    per new tab); luma is the mean brightness of its top tenth,
 //                                    where the tab bar sits. `win` is the calling page's window
 //                                    (image decoding and canvas live on window globals).
+//   VitreHome.background(win, bg, box)
+//                                    the picture of a Home background setting ('windows' or 'image':
+//                                    finds the wallpaper, then picture()), remembered in memory for
+//                                    the next Home tab.
+//   VitreHome.peek(bg, box)          synchronously, what background() last answered for this setting
+//                                    and screen, or null: a new Home tab starts loading it before any
+//                                    file access (each one otherwise waits for 4-5 file reads first).
+//   VitreHome.baseColor(bg)          the mean colour of that background's picture (remembered in the
+//                                    pref vitre.home.color across restarts), or null: what Home paints
+//                                    under the picture while it decodes, instead of the plain grey.
 //   VitreHome.themeFor(luma)         the rule: luma above 0.62 is light glass.
 //   VitreHome.fileURL(path)          file: URL for a Windows path (spaces, #, non-ASCII).
 // Everything here is local file access: nothing is fetched from the network.
@@ -32,11 +42,21 @@ export interface HomePicture {
   luma: number | null;
   /** True when the answer came from the cache (nothing was decoded). */
   cached: boolean;
+  /** Mean colour of the whole picture, '#rrggbb', or null when it could not be read. */
+  color: string | null;
+}
+
+/** The part of Settings' homeBackground these calls need. */
+export interface HomeBackground {
+  kind: string;
+  path: string;
 }
 
 interface CacheMeta {
   key: string;
   luma: number | null;
+  /** Absent in caches written before 2026-10-05: such a cache is rebuilt once. */
+  color?: string | null;
   /** The source is no larger than the screen: show the file itself. */
   direct: boolean;
 }
@@ -44,6 +64,7 @@ interface CacheMeta {
 /** Same rule as the Electron build: a bright top band gets light glass. */
 const LIGHT_LUMA = 0.62;
 const THEME_PREF = 'vitre.home.theme';
+const COLOR_PREF = 'vitre.home.color';
 const CACHE_DIR = 'vitre-home';
 /** Never keep a copy wider than this, whatever the screen. */
 const MAX_WIDTH = 3840;
@@ -52,6 +73,12 @@ let started = false;
 let theme: HomeTheme = 'clear';
 const listeners = new Set<(theme: HomeTheme) => void>();
 let pending: { key: string; promise: Promise<HomePicture | null> } | null = null;
+/** What background() answered last (one entry: Home shows one background at a time). */
+let remembered: { key: string; picture: HomePicture } | null = null;
+
+/** A background setting without the screen: 'windows' does not depend on the path field. */
+const settingKey = (bg: HomeBackground): string => `${bg.kind}|${bg.kind === 'windows' ? '' : bg.path}`;
+const memoryKey = (bg: HomeBackground, box: { width: number; height: number }): string => `${settingKey(bg)}|${Math.round(box.width)}x${Math.round(box.height)}`;
 
 function localFile(path: string): any {
   const f = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
@@ -63,21 +90,29 @@ function cachePath(name: string): string {
   return PathUtils.join(PathUtils.profileDir, CACHE_DIR, name);
 }
 
-/** Mean Rec. 709 luma of the top tenth of something drawable. */
-function topLuma(win: any, source: any, width: number, height: number): number | null {
+/** Mean Rec. 709 luma of the top tenth of something drawable, and the mean colour of all of it. */
+function sample(win: any, source: any, width: number, height: number): { luma: number | null; color: string | null } {
   try {
     const w = 160;
     const h = Math.max(1, Math.round((w * height) / width));
     const canvas = new win.OffscreenCanvas(w, h);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(source, 0, 0, w, h);
-    const rows = Math.max(1, Math.round(h * 0.1));
-    const d = ctx.getImageData(0, 0, w, rows).data;
-    let sum = 0;
-    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-    return sum / (d.length / 4) / 255;
+    const d = ctx.getImageData(0, 0, w, h).data;
+    const topEnd = Math.max(1, Math.round(h * 0.1)) * w * 4;
+    let luma = 0;
+    const rgb = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) {
+      if (i < topEnd) luma += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      rgb[0] += d[i];
+      rgb[1] += d[i + 1];
+      rgb[2] += d[i + 2];
+    }
+    const n = d.length / 4;
+    const hex = rgb.map((c) => Math.round(c / n).toString(16).padStart(2, '0')).join('');
+    return { luma: luma / (topEnd / 4) / 255, color: '#' + hex };
   } catch {
-    return null;
+    return { luma: null, color: null };
   }
 }
 
@@ -87,9 +122,10 @@ async function build(win: any, path: string, key: string, box: { width: number; 
   // 1. A copy made earlier for this file, at this size.
   try {
     const meta = (await IOUtils.readJSON(metaFile)) as CacheMeta;
-    if (meta.key === key) {
-      if (meta.direct) return { url: VitreHome.fileURL(path), luma: meta.luma, cached: true };
-      if (await IOUtils.exists(copy)) return { url: `${VitreHome.fileURL(copy)}?${encodeURIComponent(key.slice(-24))}`, luma: meta.luma, cached: true };
+    if (meta.key === key && meta.color !== undefined) {
+      const known = { luma: meta.luma, cached: true, color: meta.color };
+      if (meta.direct) return { url: VitreHome.fileURL(path), ...known };
+      if (await IOUtils.exists(copy)) return { url: `${VitreHome.fileURL(copy)}?${encodeURIComponent(key.slice(-24))}`, ...known };
     }
   } catch {
     /* no cache yet, or it is unreadable: build it */
@@ -98,14 +134,14 @@ async function build(win: any, path: string, key: string, box: { width: number; 
   const bytes = await IOUtils.read(path);
   const bitmap = await win.createImageBitmap(new win.Blob([bytes]));
   try {
-    const luma = topLuma(win, bitmap, bitmap.width, bitmap.height);
+    const { luma, color } = sample(win, bitmap, bitmap.width, bitmap.height);
     // Cover the screen, never upscale.
     const scale = Math.min(1, Math.max(box.width / bitmap.width, box.height / bitmap.height));
-    const meta: CacheMeta = { key, luma, direct: scale > 0.98 };
+    const meta: CacheMeta = { key, luma, color, direct: scale > 0.98 };
     await IOUtils.makeDirectory(PathUtils.join(PathUtils.profileDir, CACHE_DIR), { ignoreExisting: true });
     if (meta.direct) {
       await IOUtils.writeJSON(metaFile, meta);
-      return { url: VitreHome.fileURL(path), luma, cached: false };
+      return { url: VitreHome.fileURL(path), luma, cached: false, color };
     }
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
@@ -116,7 +152,7 @@ async function build(win: any, path: string, key: string, box: { width: number; 
     const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
     await IOUtils.write(copy, new Uint8Array(await blob.arrayBuffer()), { tmpPath: copy + '.tmp' });
     await IOUtils.writeJSON(metaFile, meta);
-    return { url: `${VitreHome.fileURL(copy)}?${encodeURIComponent(key.slice(-24))}`, luma, cached: false };
+    return { url: `${VitreHome.fileURL(copy)}?${encodeURIComponent(key.slice(-24))}`, luma, cached: false, color };
   } finally {
     bitmap.close();
   }
@@ -258,5 +294,36 @@ export const VitreHome = {
     };
     promise.then(clear, clear);
     return promise;
+  },
+
+  /**
+   * The picture of a 'windows' or 'image' background (null: no wallpaper, no path, or the file is
+   * gone), remembered for peek() and baseColor(). Rejects as picture() does.
+   */
+  async background(win: any, bg: HomeBackground, box: { width: number; height: number }): Promise<HomePicture | null> {
+    const path = bg.kind === 'windows' ? (await VitreHome.windowsWallpaper())?.path : bg.kind === 'image' ? bg.path : '';
+    const picture = path ? await VitreHome.picture(win, path, box) : null;
+    remembered = picture ? { key: memoryKey(bg, box), picture } : null;
+    const color = picture?.color ? JSON.stringify({ key: settingKey(bg), color: picture.color }) : '';
+    try {
+      if (Services.prefs.getStringPref(COLOR_PREF, '') !== color) Services.prefs.setStringPref(COLOR_PREF, color);
+    } catch {
+      /* not fatal: the first Home after a start paints the plain grey under its picture */
+    }
+    return picture;
+  },
+
+  peek(bg: HomeBackground, box: { width: number; height: number }): HomePicture | null {
+    return remembered?.key === memoryKey(bg, box) ? remembered.picture : null;
+  },
+
+  baseColor(bg: HomeBackground): string | null {
+    if (remembered?.key.startsWith(settingKey(bg) + '|')) return remembered.picture.color;
+    try {
+      const saved = JSON.parse(Services.prefs.getStringPref(COLOR_PREF, '') || 'null');
+      return saved?.key === settingKey(bg) && /^#[0-9a-f]{6}$/.test(saved.color) ? saved.color : null;
+    } catch {
+      return null;
+    }
   },
 };

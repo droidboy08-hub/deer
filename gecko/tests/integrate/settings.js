@@ -112,10 +112,12 @@ spike.main(async () => {
   const a2 = await win2.vitre.page(w2t.browser).query("inset:state", {});
   check("Show the tab bar › When I point at the top: both windows' bars hide and their pages start at the top", store.get().barAutoHide && b.bar.hidden && win2.vitre.bar.hiding && !a1.applied && Math.abs(a1.rect.top) < 1 && !a2.applied, { hidden: b.bar.hidden, w2: win2.vitre.bar.hiding, here: [a1.applied, a1.rect?.top], there: a2.applied });
   await capture("settings-3-autohide");
+  store.set({ pageInset: false }); // the link below turns it back on
   await openPage("appearance");
   await pickOption(ddFor("Show the tab bar"), "Always");
   await waitFor(async () => (await I.inset(t2.browser)).applied, { timeout: 4000, what: "strip back" }).catch(() => null);
   check("…Always: the bars stay and the strip is back", !store.get().barAutoHide && !b.bar.hiding && !win2.vitre.bar.hiding && (await I.inset(t2.browser)).applied);
+  check("…Always also turns on Start pages below the tab bar (it was off)", store.get().pageInset === true);
 
   // ---- Appearance › Start pages below the tab bar ----
   spike.click(switchFor("Start pages below the tab bar"));

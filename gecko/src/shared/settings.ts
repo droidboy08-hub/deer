@@ -37,7 +37,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   appIcon: 'gold',
-  barAutoHide: false,
+  // Owner's choice (2026-10-06): the bar (and the window controls) show when the pointer is at the top.
+  barAutoHide: true,
   pageInset: true,
   homeBackground: { kind: 'windows', path: '' },
   switcherStyle: 'deck',

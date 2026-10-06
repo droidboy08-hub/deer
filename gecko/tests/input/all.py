@@ -9,9 +9,15 @@
   omnibox    the address field: look (captures), suggestions, its keys, focus, private windows,
              history search in a 30 000-place history
   home       Home with each background kind (captures), glass theme, video pause, every window
+  homeflash  new Home tabs start from the remembered picture, decoded, with no blank frame first;
+             its mean colour under it
+  preload    new tabs take the Home page each window keeps drawn in a hidden browser: no white or
+             grey frame (every frame read back), the tab is called Home
   inset      the page top inset: the strip under the bar on plain, dark, fixed / sticky / absolute
              header, wrapper-coloured and app pages, the setting at runtime, bfcache, pushState,
              iframes, zoom, a page fighting the push, text and view-source, Wikipedia and DuckDuckGo
+  youtube    the strip on YouTube: its header and the guide (side menu) below Deer's bar, on the
+             home and watch pages and with the guide opened; the decision stays put (needs the network)
   edges      the inset's edge cases: the site's root padding / margin, background kinds and images,
              late / scroll-triggered / hiding headers, inner scrollers, element full screen, print
              preview, the PDF viewer and other excluded pages, zoom 50-300 % and site zoom, pages that
@@ -41,9 +47,12 @@ TESTS = {
     'actions': ('actions.js', 300),
     'omnibox': ('omnibox.js', 400),
     'home': ('home.js', 300),
+    'homeflash': ('home-flash.js', 240),
+    'preload': ('home-preload.js', 240),
     'inset': ('inset.js', 300),
     'private': ('private.js', 120),
     'edges': ('inset-edge.js', 400),
+    'youtube': ('inset-youtube.js', 240),
     'restart': ('restart.js', 200),
 }
 

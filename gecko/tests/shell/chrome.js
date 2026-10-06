@@ -100,11 +100,13 @@ spike.main(async () => {
   check("the native move is ready: user32 through js-ctypes knows this window", b.bar.canMoveWindow() === true);
 
   // ---- 4. auto-hide ----
+  check("Deer's default is auto-hide (the harness turns it off for tests)", Services.prefs.getDefaultBranch("vitre.").getBoolPref("barAutoHide") === true && b.sys("VitreSettings").get().barAutoHide === false);
   T.pointer(640, 400);
   settings.set({ barAutoHide: true });
   await waitFor(() => b.bar.hidden && b.root.classList.contains("bar-hiding"), { what: "auto-hide" });
   await sleep(500);
-  check("auto-hide: the bar slides out of the window and fades; it is inert; the window controls stay", barTop() <= -44 && css($("#vitre-bar"), "opacity") === "0" && $("#vitre-bar").hasAttribute("inert") && T.rect($("#vitre-winctl")).y === 18 && b.bar.state.hiding && !b.bar.state.revealed, { top: barTop(), opacity: css($("#vitre-bar"), "opacity") });
+  check("auto-hide: the bar slides out of the window and fades; it is inert", barTop() <= -44 && css($("#vitre-bar"), "opacity") === "0" && $("#vitre-bar").hasAttribute("inert") && b.bar.state.hiding && !b.bar.state.revealed, { top: barTop(), opacity: css($("#vitre-bar"), "opacity") });
+  check("auto-hide: the window controls leave with the bar (above the window, faded, inert)", Math.round($("#vitre-winctl").getBoundingClientRect().bottom) <= 0 && css($("#vitre-winctl"), "opacity") === "0" && $("#vitre-winctl").hasAttribute("inert"), { capsuleBottom: $("#vitre-winctl").getBoundingClientRect().bottom, opacity: css($("#vitre-winctl"), "opacity") });
   check("hidden bar: its slot is still reported, and clicks go to the page there", b.bar.layout.pillRect.top === 12 && document.elementFromPoint(pill.left + 100, 30)?.localName === "browser");
   await spike.capture("chrome-autohide-hidden");
   T.measure("chrome-autohide-hidden", window, "none");
@@ -115,6 +117,7 @@ spike.main(async () => {
   await waitFor(() => !b.bar.hidden, { what: "reveal" });
   await sleep(500);
   check("pointer within 28 px of the top: the bar comes back", barTop() === 12 && css($("#vitre-bar"), "opacity") === "1" && !$("#vitre-bar").hasAttribute("inert") && b.root.classList.contains("bar-revealed"));
+  check("…and the window controls with it", T.rect($("#vitre-winctl")).y === 18 && css($("#vitre-winctl"), "opacity") === "1" && !$("#vitre-winctl").hasAttribute("inert"));
   await T.shot("chrome-autohide-revealed");
   T.pointer(pill.left + 60, 34);
   await sleep(700);

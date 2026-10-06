@@ -418,6 +418,12 @@ auto-hidden bar on screen.
   privileged page (`src/pages/home`) with a strict CSP showing the wallpaper/image/video background.
   `VitreHome.sys.ts` finds the Windows wallpaper, keeps a screen-sized copy in `<profile>/vitre-home`
   and holds the glass theme the background calls for (light or clear), which every window follows.
+  New tabs never flash white or grey: Firefox's new-tab preloading (`NewTabPagePreloading`) is
+  switched back on for Home (`VitreStartup.useHomeAsNewTab`), so each window keeps one Home drawn in
+  a hidden browser for the next new tab; a Home page that does load from scratch starts from the
+  picture `VitreHome` remembers in memory, shows it only once decoded, and paints the picture's mean
+  colour under it until then (tests `input/home-preload.js`, `input/home-flash.js`). Decoded
+  pictures are not locked (`imgIRequest.lockImage` hung the browser when such a tab closed).
 - Address field history: Places SQL in `src/window/places.ts` (hosts first, then a frecency-ordered
   scan; a newer search interrupts the running one). Search engines: Deer's own list in
   `src/shared/settings.ts`.
@@ -575,8 +581,11 @@ the code as described; the user may want it otherwise.
 - **Page strip under a hidden bar** (integration): with auto-hide on or in F11 pages get no top strip,
   and a reveal of the bar (pointer at the top, a hold) does not bring it back: the bar floats over
   the page's top and nothing reflows. The alternative, the strip following every reveal, makes every
-  page jump 68 px each time the pointer touches the top. In auto-hide the window controls (only hidden
-  in F11) float over the page's top-right corner, over the PDF viewer's last toolbar buttons too.
+  page jump 68 px each time the pointer touches the top. Decided by the owner (2026-10-06): the window
+  controls (and a private window's label) hide and come back with the bar in auto-hide too, not only
+  in F11, and auto-hide is the default (`DEFAULT_SETTINGS.barAutoHide`; `tools/run.py` turns it off
+  for tests, `tests/shell/chrome.js` checks the default). Switching the bar to Always turns the strip
+  on as well (`VitreSettings.set`; it can be turned off again afterwards).
 - **Address with extension buttons** (integration): the favicon + host stay at the pill's middle while
   they fit beside the buttons; with many buttons (five fit) a short host sits as near the middle as the
   box allows, right against the buttons; a host too long for the box is cut at its end.

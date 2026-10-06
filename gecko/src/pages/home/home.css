@@ -1,12 +1,13 @@
 /* Deer Home: the background fills the window; the tab bar is the browser window's own glass.
- * #2b2a2e is the board's base colour (design/canvas/project/Home.dc.html) and is what shows while a
- * picture loads and for the "none" background. */
+ * #2b2a2e is the board's base colour (design/canvas/project/Home.dc.html) and is the "none"
+ * background. Under a picture, --home-base (home.ts) is the picture's mean colour, which is what
+ * shows if a frame is drawn before the picture is decoded. */
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #2b2a2e;
+  background: var(--home-base, #2b2a2e);
   user-select: none;
   cursor: default;
 }

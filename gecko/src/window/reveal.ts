@@ -15,7 +15,8 @@
 // "Auto-hide"). The rule here also fires when the pointer leaves the document upwards.
 //
 // State is mirrored on #vitre-root as classes: `bar-hiding` (the bar is in hiding mode) and
-// `bar-revealed` (it is showing anyway). The window controls only hide in full screen.
+// `bar-revealed` (it is showing anyway). The window controls (and a private window's label) hide and
+// come back with the bar.
 import type { Browser } from './browser';
 
 const REVEAL_BELOW = 28;
@@ -152,7 +153,10 @@ export class Reveal {
     root.classList.toggle('bar-hiding', this.hiding);
     root.classList.toggle('bar-revealed', this.hiding && this.revealed);
     // Hidden controls must not take focus or be read out.
-    if (this.hidden) this.bar.setAttribute('inert', '');
-    else this.bar.removeAttribute('inert');
+    for (const el of [this.bar, document.getElementById('vitre-winctl')]) {
+      if (!el) continue;
+      if (this.hidden) el.setAttribute('inert', '');
+      else el.removeAttribute('inert');
+    }
   }
 }

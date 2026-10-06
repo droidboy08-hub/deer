@@ -7,11 +7,26 @@
 // and tells every window which glass suits it (VitreHome.setTheme: light over a bright picture,
 // clear otherwise). A file that cannot be shown falls back to "none".
 //
+// A new tab must not flash grey before its picture (owner's bug report, 2026-10-05):
+//   - the picture the last Home tab showed is remembered in memory (VitreHome.peek), so loading
+//     starts at once instead of after the wallpaper lookup and cache-file reads;
+//   - a picture goes on screen only once it is decoded (img.decode()), never half-drawn;
+//   - the decoded picture is shared by every Home page through the process's image cache; it is
+//     not locked (imgIRequest.lockImage hung the browser when such a tab closed, 2026-10-05);
+//   - each window keeps one Home page drawn in a hidden browser, which the next new tab takes
+//     (Firefox's new-tab preloading, switched on for Home in VitreStartup.useHomeAsNewTab);
+//   - until then the page is painted in the picture's mean colour (VitreHome.baseColor), not grey.
+// The remembered picture is then checked against the files (VitreHome.background): a changed
+// wallpaper cross-fades in.
+//
 // The page runs in the parent process with the system principal. It builds DOM with createElement
 // only, takes no input from the web, and loads nothing from the network.
 //
 // State for tests and diagnostics, on <html>: data-kind, data-state (loading | ready | error),
-// data-theme, data-luma, data-cached, data-ms, data-playing (video).
+// data-theme, data-luma, data-cached (memory | true | false), data-ms, data-playing (video),
+// data-blank-frames (frames this page drew before its first background was on screen), and the
+// timings data-t-script, -picture, -decoded, -shown (ms since the tab started loading Home).
+// With the pref vitre.home.timing set to true they are also written to the browser console.
 import type { Settings } from '../../shared/settings';
 
 type Media = HTMLImageElement | HTMLVideoElement;
@@ -32,6 +47,30 @@ let serial = 0;
 
 const keyOf = (bg: Background): string => `${bg.kind}|${bg.path}`;
 
+// ---- timings ----
+let logTimings = false;
+try {
+  logTimings = Services.prefs.getBoolPref('vitre.home.timing', false);
+} catch {
+  /* no prefs: no console lines */
+}
+function mark(step: 'script' | 'picture' | 'decoded' | 'shown'): void {
+  const ms = Math.round(performance.now());
+  root.dataset['t' + step[0].toUpperCase() + step.slice(1)] = String(ms);
+  if (logTimings) console.log(`Deer Home: ${step} at ${ms} ms (cached: ${root.dataset.cached ?? '-'})`);
+}
+mark('script');
+
+// Frames drawn before the first background is on screen: each one showed the base colour only.
+let firstShown = false;
+let blankFrames = 0;
+const countFrame = (): void => {
+  if (firstShown) return;
+  blankFrames++;
+  requestAnimationFrame(countFrame);
+};
+requestAnimationFrame(countFrame);
+
 function setState(state: 'loading' | 'ready' | 'error', extra: Record<string, string> = {}): void {
   root.dataset.state = state;
   for (const [k, v] of Object.entries(extra)) root.dataset[k] = v;
@@ -42,6 +81,12 @@ function setTheme(luma: number | null): void {
   root.dataset.theme = theme;
   root.dataset.luma = luma === null ? '' : luma.toFixed(3);
   VitreHome.setTheme(theme);
+}
+
+/** The colour under the picture (home.css --home-base); null: the plain base colour. */
+function tint(color: string | null): void {
+  if (color) root.style.setProperty('--home-base', color);
+  else root.style.removeProperty('--home-base');
 }
 
 /** Brightness of the top tenth of what the element shows (where the tab bar sits). */
@@ -101,29 +146,44 @@ function present(el: Media): void {
   }
   el.classList.add('shown');
   if (old) window.setTimeout(() => retire(old, false), FADE_MS + 20);
+  if (!firstShown) {
+    firstShown = true;
+    root.dataset.blankFrames = String(blankFrames);
+    mark('shown');
+  }
   syncPlayback();
 }
 
 function showNone(state: 'ready' | 'error'): void {
   retire(current, true);
   current = null;
+  tint(null);
   setTheme(null);
   setState(state);
+  if (!firstShown) {
+    firstShown = true;
+    root.dataset.blankFrames = '0'; // the base colour is the background
+    mark('shown');
+  }
   syncPlayback();
 }
 
-function makeImage(url: string): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
-    const img = document.createElement('img');
-    img.className = 'media';
-    img.alt = '';
-    img.decoding = 'async';
-    img.draggable = false;
-    img.addEventListener('load', () => resolve(img), { once: true });
-    img.addEventListener('error', () => resolve(null), { once: true });
-    img.src = url;
-    host.append(img);
-  });
+/** A picture element, resolved once it is decoded (not merely loaded), or null if it cannot be shown. */
+async function makeImage(url: string): Promise<HTMLImageElement | null> {
+  const img = document.createElement('img');
+  img.className = 'media';
+  img.alt = '';
+  img.decoding = 'async';
+  img.draggable = false;
+  img.src = url;
+  host.append(img);
+  try {
+    await img.decode();
+  } catch {
+    img.remove();
+    return null;
+  }
+  return img;
 }
 
 function makeVideo(url: string): Promise<HTMLVideoElement | null> {
@@ -164,38 +224,82 @@ async function apply(bg: Background): Promise<void> {
     return;
   }
 
-  let el: Media | null = null;
-  let luma: number | null = null;
-  try {
-    if (bg.kind === 'video') {
-      if (bg.path) el = await makeVideo(VitreHome.fileURL(bg.path));
-      if (el) luma = topLuma(el);
-    } else {
-      const path = bg.kind === 'windows' ? (await VitreHome.windowsWallpaper())?.path : bg.path;
-      const picture = path ? await VitreHome.picture(window, path, box) : null;
-      if (picture) {
-        root.dataset.cached = String(picture.cached);
-        el = await makeImage(picture.url);
-        luma = picture.luma ?? (el ? topLuma(el) : null);
-      }
+  if (bg.kind === 'video') {
+    let video: HTMLVideoElement | null = null;
+    try {
+      if (bg.path) video = await makeVideo(VitreHome.fileURL(bg.path));
+    } catch (e) {
+      console.error('Deer Home: background failed', e);
+      video?.remove();
+      video = null;
     }
+    if (mine !== serial) {
+      video?.remove(); // a newer choice came first
+      return;
+    }
+    if (!video) {
+      showNone('error');
+      done('error');
+      return;
+    }
+    present(video);
+    setTheme(topLuma(video));
+    done('ready');
+    return;
+  }
+
+  // 'windows' or 'image'. 1. What the last Home tab showed, from memory: no file access first.
+  const known = VitreHome.peek(bg, box);
+  if (!current) tint(VitreHome.baseColor(bg));
+  if (known) {
+    root.dataset.cached = 'memory';
+    mark('picture');
+    const img = await makeImage(known.url);
+    if (mine !== serial) {
+      img?.remove();
+      return;
+    }
+    if (img) {
+      mark('decoded');
+      present(img);
+      setTheme(known.luma ?? topLuma(img));
+      done('ready');
+    }
+  }
+
+  // 2. The files as they are now: the first Home tab, or a wallpaper that changed since.
+  let picture: Awaited<ReturnType<typeof VitreHome.background>> = null;
+  let failed = false;
+  try {
+    picture = await VitreHome.background(window, bg, box);
   } catch (e) {
     console.error('Deer Home: background failed', e);
-    el?.remove();
-    el = null;
+    failed = true;
   }
-  if (mine !== serial) {
-    el?.remove(); // a newer choice came first
-    return;
+  if (mine !== serial) return;
+  if (known && current && picture?.url === known.url) return; // still the same picture
+  if (failed && current) return; // keep what is shown; the next tab tries again
+  let img: HTMLImageElement | null = null;
+  if (picture) {
+    if (!current) root.dataset.cached = String(picture.cached);
+    tint(picture.color);
+    if (!known) mark('picture');
+    img = await makeImage(picture.url);
+    if (mine !== serial) {
+      img?.remove(); // a newer choice came first
+      return;
+    }
   }
-  if (!el) {
+  if (!img) {
     // No wallpaper (a solid-colour desktop) is not an error; a chosen file that will not open is.
-    showNone(bg.kind === 'windows' ? 'ready' : 'error');
-    done(bg.kind === 'windows' ? 'ready' : 'error');
+    const state = bg.kind === 'windows' ? 'ready' : 'error';
+    showNone(state);
+    done(state);
     return;
   }
-  present(el);
-  setTheme(luma);
+  if (!firstShown) mark('decoded');
+  present(img);
+  setTheme(picture!.luma ?? topLuma(img));
   done('ready');
 }
 

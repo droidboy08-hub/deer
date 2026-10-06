@@ -79,6 +79,21 @@ export function addTab(url: string, opts: { background: boolean; tabIndex?: numb
   });
 }
 
+/**
+ * A tab that took Firefox's preloaded new-tab page (NewTabPagePreloading; on for Deer's Home, see
+ * VitreStartup.useHomeAsNewTab) keeps its initial label "New Tab": the page set its title before the
+ * tab existed, so no title change follows. setTabTitle(tab) reads browser.contentTitle
+ * (Tabbrowser.sys.mjs). Does nothing for a tab whose page has no title yet.
+ */
+export function titleFromLoadedPage(node: XULTab): void {
+  try {
+    const title = node.linkedBrowser?.contentTitle;
+    if (title && title !== node.label) gb().setTabTitle(node);
+  } catch {
+    /* the browser is not ready: its own title change will come */
+  }
+}
+
 /** removeTab(tab, { animate }). Closing the last tab closes the window (browser.tabs.closeWindowWithLastTab). */
 export function removeTab(node: XULTab, opts: { skipSessionStore?: boolean } = {}): void {
   // skipSessionStore: the tab never enters the closed-tab list (SessionStore onTabClose is skipped).

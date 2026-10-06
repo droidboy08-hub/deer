@@ -80,7 +80,10 @@
 //     in the strip band (probes: 2 rows x PROBE_COLUMNS) finds what paints there; the outermost position: fixed ancestor of each hit
 //     in the flat tree (not inside a transformed, filtered or contained ancestor, which would make it
 //     scroll with the page) whose box reaches into the band and is at most HEADER_MAX of the viewport
-//     high (taller ones, overlays and full-height sidebars, would lose their bottom edge) gets an
+//     high, or taller but stretched between a top and a bottom so the push shortens it instead of
+//     moving it and it starts below the window's top or still covers it after the push (a sidebar
+//     below the site's header, as YouTube's guide; an overlay reaching above the window; a box that
+//     fills the window from its top edge, or a tall box with a height of its own, is left), gets an
 //     inline `margin-top: calc(<its margin> + var(--vitre-inset, 0px)) !important`. A margin composes
 //     with the page's own top and transform, so headers that hide on scroll still move. The custom
 //     property lives in the screen-only sheet: in print (and print preview) the push resolves to 0
@@ -447,11 +450,33 @@ function decide(ctx: PageContext, px: number): boolean {
     if (!loadSheet(win, url)) return false;
     ({ S, H } = metrics(doc));
     removeSheet(win, url);
+  } else if (!locked) {
+    // The trial above had no pushes. A pushed absolute box sized to the viewport (YouTube's whole app,
+    // ytd-app) then makes the page overflow by the strip, and measured with it this check would take
+    // the strip away, the next trial would bring it back, and so on until the flips freeze it either
+    // way (owner's report, 2026-10-06). Measure as the trial did; the overflow can be scrolled to.
+    S = withoutAbsolutePushes(ctx, () => metrics(doc).S);
   }
   s.decision = verdict(S, H, px, locked);
   s.S = S;
   s.H = H;
   return !s.decision.startsWith('skip');
+}
+
+/** `measure()` with the absolute boxes' pushes out for a moment (style only: nothing paints). */
+function withoutAbsolutePushes<T>(ctx: PageContext, measure: () => T): T {
+  const out = (st(ctx).pushes ?? []).filter((p) => p.kind === 'absolute' && (p.el as HTMLElement).style?.getPropertyValue(p.prop) === p.value);
+  const set = (p: Push, value: string, priority: string): void => {
+    const style = (p.el as HTMLElement).style;
+    if (value) style.setProperty(p.prop, value, priority);
+    else style.removeProperty(p.prop);
+  };
+  for (const p of out) set(p, p.old, p.oldPriority);
+  try {
+    return measure();
+  } finally {
+    for (const p of out) set(p, p.value, 'important');
+  }
 }
 
 /** An author rule or the style attribute declares a top padding on the root. */
@@ -1005,7 +1030,7 @@ function bandProbe(ctx: PageContext, light: boolean): void {
           if (top === null) continue;
           base = top;
         } else {
-          if (found.kind === 'fixed' && (r.top >= px || r.bottom <= 0 || r.height > H * HEADER_MAX)) continue;
+          if (found.kind === 'fixed' && (r.top >= px || r.bottom <= 0)) continue;
           if (found.kind === 'absolute' && (r.top + win.scrollY >= px || r.bottom + win.scrollY <= 0)) continue;
           base = baseOf(win.getComputedStyle(found.el), found.kind);
         }
@@ -1016,7 +1041,21 @@ function bandProbe(ctx: PageContext, light: boolean): void {
           yieldBox(s, found.el);
           continue;
         }
+        // Taller than a header (a sidebar, an overlay): pushed only when it stretches between a top and
+        // a bottom (YouTube's guide: top 56px below its own header, bottom -120px), so the push makes
+        // it shorter and its bottom edge stays where it was. One with a height of its own would move
+        // down and lose its bottom edge: it is given back at once (nothing paints in between) and left.
+        // And only one that starts below the window's top (a sidebar under the site's header) or still
+        // covers it after the push (YouTube's overlay guide, top -120px): a box that fills the window
+        // from its top edge (a full-window app or overlay) keeps covering it, with no empty band.
+        const tall = found.kind === 'fixed' && r.height > H * HEADER_MAX;
+        if (tall && !(r.top > 0.5 || r.top + px <= 0.5)) continue;
         if (push(ctx, p, !known)) {
+          if (tall && Math.abs(found.el.getBoundingClientRect().bottom - r.bottom) > 1) {
+            restore(p);
+            yieldBox(s, found.el);
+            continue;
+          }
           s.pushes!.push(p);
           if (!known) cycle(s, found.el);
         }

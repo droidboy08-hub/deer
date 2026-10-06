@@ -449,6 +449,14 @@ def main():
     with open(os.path.join(profile, 'user.js'), 'w', encoding='utf-8') as f:
         for k, v in prefs.items():
             f.write('user_pref(%s, %s);\n' % (json.dumps(k), json.dumps(v)))
+    # First-start values go into prefs.js, which Gecko reads once and then owns (user.js would force
+    # them again after every restart, so a test could not change them for good). The bar stays on
+    # screen: Deer's default is auto-hide since 2026-10-06, but most tests click and capture the bar.
+    # Tests of auto-hide turn it on themselves; tests/shell/chrome.js checks the default.
+    first_start = os.path.join(profile, 'prefs.js')
+    if not os.path.exists(first_start):
+        with open(first_start, 'w', encoding='utf-8') as f:
+            f.write('user_pref("vitre.barAutoHide", false);\n')
     # config.js honours VITRE_BOOT / VITRE_LIB / VITRE_APP_DIR only in a profile that carries this marker.
     open(os.path.join(profile, 'vitre-harness'), 'w').close()
 

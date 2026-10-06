@@ -1,7 +1,7 @@
 {
   "name": "deer",
   "productName": "Deer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deer: a liquid-glass browser for Windows, as a chrome layer on the Gecko runtime",
   "private": true,
   "type": "module",

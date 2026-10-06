@@ -3,7 +3,8 @@
 //
 // Contract (same Settings interface as the Electron build, src/shared/settings.ts):
 //   VitreSettings.get()            the whole Settings object (validated; bad values fall back)
-//   VitreSettings.set(patch)       merge a patch (homeBackground may be partial), then savePrefFile
+//   VitreSettings.set(patch)       merge a patch (homeBackground may be partial), then savePrefFile;
+//                                  barAutoHide true -> false also sets pageInset true (see set())
 //   VitreSettings.onChange(fn)     fn(settings, changedKeys) once per set(), in every window and for
 //                                  direct pref writes (about:config); returns an unsubscribe to call on
 //                                  the window's unload
@@ -201,6 +202,10 @@ export const VitreSettings = {
   set(patch: SettingsPatch): void {
     VitreSettings.init();
     const p = prefs();
+    // Linked (owner, 2026-10-06): switching the bar from auto-hide to always shown also turns on
+    // "Start pages below the tab bar", which keeps pages from starting under a bar that never
+    // leaves. The person can turn the strip off again afterwards.
+    if (patch.barAutoHide === false && patch.pageInset === undefined && VitreSettings.get().barAutoHide) patch = { ...patch, pageInset: true };
     for (const [key, spec] of Object.entries(SCHEMA)) {
       const v = getPath(patch, key);
       if (v !== undefined) writeTo(p, key, spec.kind, v);

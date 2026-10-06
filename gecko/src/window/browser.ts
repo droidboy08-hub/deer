@@ -1005,6 +1005,7 @@ export class Browser {
       this.cleanups.push(() => container.removeEventListener(type, fn));
     };
     for (const type of fx.TAB_EVENTS.sync) listen(type, () => this.syncTabs());
+    listen('TabOpen', (e) => fx.titleFromLoadedPage(e.target));
     listen(fx.TAB_EVENTS.select, () => this.onSelect());
     for (const type of fx.TAB_EVENTS.changed) listen(type, (e) => this.onChanged(e.target));
 
