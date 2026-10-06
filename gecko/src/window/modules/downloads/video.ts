@@ -573,8 +573,10 @@ export class VideoUI {
       title: offer.title,
       pageUrl: tab?.url ?? '',
       browserId: t.browserId,
-      // The media a page's player fetched: the page is the loading principal, Origin is sent.
-      identity: { userContextId: tab?.node.userContextId ?? 0, withOrigin: true, firstParty: false },
+      // The media a page's player fetched: the page is the loading principal, Origin is sent. An
+      // embedded player's media its server only gives to that player goes out as the player's frame
+      // (offer.requestPage); pageUrl stays the tab's page (the download's source).
+      identity: { userContextId: tab?.node.userContextId ?? 0, withOrigin: true, firstParty: false, ...(offer.requestPage ? { requestPage: offer.requestPage } : {}) },
       origin,
       dir,
     };

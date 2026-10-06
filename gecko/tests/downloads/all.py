@@ -6,6 +6,8 @@
   ytdlp      YouTube and other sites through yt-dlp (a stand-in script): install prompt, picker, download, errors
   spa        a single-page site's next video (no reload): the old video's streams go, the new one is offered
   mark       the pill's download mark always answers: a picker for what the page loaded, or a note
+  embed      an embedded player from another site whose CDN refuses any Referer but the player's:
+             offered and downloaded as the player's frame; an ordinary embed goes out as before
   crosssite  a download another site's page starts is left to Firefox (no first-party cookies used)
   takeover   a real link click (Content-Disposition, cookie, Referer) taken over from Firefox's list;
              <a download>; Alt+click; Mark of the Web; Firefox's scratch folder stays empty
@@ -55,6 +57,7 @@ TESTS = {
     'takeover': (180, True),
     'crosssite': (120, True),
     'mark': (150, True),
+    'embed': (150, True),
     'spa': (150, True),
     'ytdlp': (240, True),
     'streams': (240, True),

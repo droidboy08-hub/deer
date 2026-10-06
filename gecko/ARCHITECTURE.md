@@ -360,7 +360,10 @@ local look-alike type, so a contract change fails `tsc`.
 - **Downloads** (`modules/downloads/`, engine `modules/VitreDownloads.sys.ts` + `modules/downloads/*`,
   page module `actors/page/downloads.ts`): IDM-style segmented engine (one network partition per
   connection), take-over of Firefox's downloads, HLS / DASH joined by ffmpeg (`-c copy`), yt-dlp with
-  Deno for sites that never play from a file address (YouTube), DRM never offered; the panel
+  Deno for sites that never play from a file address (YouTube), DRM never offered; an embedded
+  player's media that its server refuses as the tab's page (hotlink rules on Referer/Origin) is asked
+  for again, and downloaded, as the player's frame (`Identity.requestPage`, `media.ts` offer(); test
+  `tests/downloads/embed.js`), while the tab's page stays the download's source; the panel
   (Ctrl+J), the ring, the "Download this video" pill and picker (Ctrl+Shift+D), the pill's download
   mark, the quit and private-window prompts, Settings › Video downloads. ffmpeg, yt-dlp and Deno are
   not bundled: Deer downloads them only when the person asks there, from their GitHub releases, and

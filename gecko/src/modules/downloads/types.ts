@@ -10,6 +10,12 @@ export type Category = 'video' | 'music' | 'documents' | 'compressed' | 'program
 /** Whose request a download is: the page it came from and the cookie jar it lives in (VitreNet Identity). */
 export interface IdentityJSON {
   pageUrl: string;
+  /**
+   * The page the requests go out as, when it is not pageUrl: an embedded player's frame whose server
+   * only serves that player (media.ts offer()). Only Referer, Origin and the loading principal use it;
+   * pageUrl stays the download's source (the list, Safe Browsing, Mark of the Web). Absent otherwise.
+   */
+  requestPage?: string;
   userContextId: number;
   isPrivate: boolean;
   /** Send Origin on cross-origin requests (media a page's player fetched). */
@@ -184,6 +190,12 @@ export interface VideoOffer {
   reason?: string;
   /** 'none' because yt-dlp is needed for this site and is not installed. */
   needsTools?: boolean;
+  /**
+   * The page the media's requests go out as (Referer, Origin, loading principal) when it is not the
+   * tab's page: the embedded player's frame, because the server refused the tab's page. The download
+   * goes out the same way.
+   */
+  requestPage?: string;
 }
 
 /** A tab's media, as the download mark counts it. */

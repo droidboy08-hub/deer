@@ -22,6 +22,11 @@ Routes (GET):
                             filename*=UTF-8''N): the safety test's server-chosen names
   /links.html               links to /named (one rel=noreferrer) for the safety test's page-derived downloads,
                             and a button (#pop) that window.open()s a 560x460 popup window
+  /embed-top.html?hot=1     opened as http://localhost:<port>/: a page whose player is an iframe from another
+                            site (http://127.0.0.1:<port>/embed-player.html); with hot=1 the player's HLS comes
+                            from /hot/fx/, else from /fx/
+  /hot/fx/<path>            /fx/ with hotlink rules, as embed CDNs have: 403 unless the Referer is the player's
+                            site (127.0.0.1); segments are labelled image/jpeg, as such CDNs do
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
 
 Big-file addresses have no file extension: this machine runs Internet Download Manager, whose driver
@@ -181,6 +186,31 @@ class Handler(BaseHTTPRequestHandler):
             # An MSE player's <video> has a blob: source: pages that fetch a DASH or fMP4 stream get no src.
             src = '' if p in ('/video-dash.html', '/video-fmp4.html', '/video-bad.html', '/video-spa.html') else 'src="/media/clip"'
             return self.text(200, VIDEO.replace('%STYLE%', STYLE).replace('%SCRIPT%', SCRIPTS[p]).replace('%SRC%', src))
+        if p == '/embed-top.html':
+            self.record()
+            port = self.server.server_address[1]
+            hot = '1' if q.get('hot') == '1' else '0'
+            return self.text(200, '<!doctype html><meta charset=utf-8><title>Episode 1 · Field Notes TV</title>'
+                             '<style>%s</style><main><h1>Episode 1</h1><p>Watch below</p>'
+                             '<iframe id="player" src="http://127.0.0.1:%d/embed-player.html?hot=%s" width="960" height="540" '
+                             'style="border:0;border-radius:12px;background:#000" allowfullscreen></iframe></main>' % (STYLE, port, hot))
+        if p == '/embed-player.html':
+            self.record()
+            root = '/hot/fx' if q.get('hot') == '1' else '/fx'
+            script = "fetch('%s/hls/master.m3u8').then(r=>r.text()).then(()=>fetch('%s/hls/v360/index.m3u8'))" % (root, root)
+            return self.text(200, '<!doctype html><meta charset=utf-8><title>Player</title><style>body{margin:0;background:#000}</style>'
+                             '<video id="v" width="960" height="540" muted playsinline style="display:block"></video><script>%s</script>' % script)
+        if p.startswith('/hot/fx/'):
+            port = self.server.server_address[1]
+            if not self.headers.get('Referer', '').startswith('http://127.0.0.1:%d/' % port):
+                self.record(status=403)
+                return self.text(403, 'forbidden', 'text/plain; charset=utf-8')
+            path = os.path.normpath(os.path.join(FIX, p[len('/hot/fx/'):]))
+            if not path.startswith(FIX) or not os.path.isfile(path):
+                self.record(status=404)
+                return self.text(404, 'not found')
+            ext = os.path.splitext(path)[1]
+            return self.send_file(path, 0, ctype='image/jpeg' if ext == '.ts' else MIME.get(ext, 'application/octet-stream'))
         if p == '/bad/broken.m3u8':
             self.record()
             return self.text(200, 'this is not a playlist', 'application/vnd.apple.mpegurl')

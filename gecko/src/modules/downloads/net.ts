@@ -106,6 +106,7 @@ const system = (): any => Services.scriptSecurityManager.getSystemPrincipal();
  */
 export class Identity implements IdentityJSON {
   pageUrl: string;
+  requestPage: string;
   userContextId: number;
   isPrivate: boolean;
   withOrigin: boolean;
@@ -117,6 +118,7 @@ export class Identity implements IdentityJSON {
 
   constructor(o: Partial<IdentityJSON> = {}) {
     this.pageUrl = /^https?:/i.test(o.pageUrl ?? '') ? (o.pageUrl as string) : '';
+    this.requestPage = /^https?:/i.test(o.requestPage ?? '') ? (o.requestPage as string) : '';
     this.userContextId = Number(o.userContextId) || 0;
     this.isPrivate = !!o.isPrivate;
     this.withOrigin = !!o.withOrigin;
@@ -142,6 +144,7 @@ export class Identity implements IdentityJSON {
   toJSON(): IdentityJSON {
     return {
       pageUrl: this.pageUrl,
+      ...(this.requestPage ? { requestPage: this.requestPage } : {}),
       userContextId: this.userContextId,
       isPrivate: this.isPrivate,
       withOrigin: this.withOrigin,
@@ -202,7 +205,9 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
     throw new DownloadError('Deer can’t download this address.');
   }
   if (!uri.schemeIs('http') && !uri.schemeIs('https')) throw new DownloadError('Deer can’t download this kind of address.');
-  const page = identity.pageUrl ? Services.io.newURI(identity.pageUrl) : null;
+  // The page the request goes out as: an embedded player's frame when the identity names one.
+  const pageSpec = identity.requestPage || identity.pageUrl;
+  const page = pageSpec ? Services.io.newURI(pageSpec) : null;
   const ownPrincipal: any = identity.principal ? revive(() => E10SUtils.deserializePrincipal(identity.principal)) : null;
   const pageJar: any = ownPrincipal && identity.cookieJarSettings ? revive(() => E10SUtils.deserializeCookieJarSettings(identity.cookieJarSettings)) : null;
   let channel: any;

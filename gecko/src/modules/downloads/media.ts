@@ -20,7 +20,7 @@
 import { setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { dashAudio, dashContainer, dashLadder, parseMpd } from './dash';
 import { extOf, isOpaque } from './naming';
-import { Identity, fetchText, open, parseContentRange } from './net';
+import { HttpStatusError, Identity, fetchText, open, parseContentRange } from './net';
 import { audioFor, isMaster, isPlaylist, ladder, parseMaster, parseMedia } from './playlist';
 import type { MediaNotice, PageVideo, VideoOffer, VideoOption } from './types';
 import { probe, ytdlpFirst, ytdlpTools } from './ytdlp';
@@ -105,6 +105,8 @@ export class MediaWatch {
   private listeners = new Set<(n: MediaNotice) => void>();
   private streams = new Map<string, StreamInfo>();
   private sizes = new Map<string, number>();
+  /** Media address -> the embedded player's frame it had to be asked for as (see offer()). */
+  private framePages = new Map<string, string>();
   private installed = false;
   /** EncryptedMediaParent could be tapped (tests). */
   emeTap = false;
@@ -361,16 +363,47 @@ export class MediaWatch {
       const pick = videos.find((x) => x.height && x.height <= ctx.fit) ?? videos[videos.length - 1] ?? o.options[0];
       return { ...o, state: 'ok', suggested: pick?.id ?? '' };
     };
+    // An embedded player's media is asked for as the tab's page first, as always. Only when its server
+    // refuses that (4xx: hotlink rules that want the player's own site in Referer / Origin) is it asked
+    // again as the player's frame, the way the player itself asked; the download then goes out the same
+    // way (VideoOffer.requestPage). Media that works as the tab's page never takes this path.
+    const frameOf = (url: string): string => {
+      const frame = items.find((c) => c.url === url)?.frameUrl || (video.kind === 'frame' ? video.frameSrc : '');
+      return /^https?:/i.test(frame) && !sameOrigin(frame, ctx.pageUrl) ? frame : '';
+    };
+    const asFrame = (frame: string): Identity => new Identity({ pageUrl: ctx.pageUrl, requestPage: frame, userContextId: ctx.userContextId, isPrivate: ctx.isPrivate, withOrigin: true, firstParty: false });
+    const read = async <T>(url: string, fn: (id: Identity) => Promise<T>): Promise<{ value: T; page: string } | null> => {
+      const frame = frameOf(url);
+      const known = frame && this.framePages.get(url) === frame;
+      if (!known) {
+        try {
+          return { value: await fn(identity), page: '' };
+        } catch (e) {
+          if (!frame || !(e instanceof HttpStatusError && e.status >= 400 && e.status < 500)) return null;
+        }
+      }
+      try {
+        const value = await fn(asFrame(frame));
+        remember(this.framePages, url, frame);
+        return { value, page: frame };
+      } catch {
+        return null;
+      }
+    };
+    const via = (page: string): Partial<VideoOffer> => (page ? { requestPage: page } : {});
 
     // HLS: a player loads the master playlist and then one rendition: offer the master, which has every quality.
     const streams = src && /\.m3u8(\?|#|$)/i.test(src) ? [src] : rankStreams(items.filter((c) => c.kind === 'hls'));
     let hls = '';
+    let hlsPage = '';
     let info: StreamInfo | null = null;
     for (const url of streams.slice(0, 4)) {
-      const d = await this.describe(url, identity, muxer).catch(() => null);
-      if (!d) continue;
+      const got = await read(url, (id) => this.describe(url, id, muxer));
+      if (!got) continue;
+      const d = got.value;
       if (!info || (d.master && !info.master)) {
         hls = url;
+        hlsPage = got.page;
         info = d;
       }
       if (d.master) break;
@@ -382,7 +415,7 @@ export class MediaWatch {
         // A lone rendition without RESOLUTION plays at the element's size; a ladder keeps its bitrates apart.
         const lone = info.options.filter((o) => o.group === 'video').length === 1;
         const options = info.options.map((o) => (o.height || o.group === 'audio' || !lone ? o : { ...o, height: video.height, label: video.height ? `${video.height}p` : o.label }));
-        return finish({ ...base, duration: base.duration || info.duration, key: key(hls), options });
+        return finish({ ...base, duration: base.duration || info.duration, key: key(hls), options, ...via(hlsPage) });
       }
     }
 
@@ -391,14 +424,23 @@ export class MediaWatch {
     // DASH: the best video joined with the best audio.
     const dash = src && /\.mpd(\?|#|$)/i.test(src) ? src : file ? '' : (rankStreams(items.filter((c) => c.kind === 'dash'))[0] ?? '');
     if (dash) {
-      const d = await this.describeDash(dash, identity, muxer).catch(() => null);
+      const got = await read(dash, (id) => this.describeDash(dash, id, muxer));
+      const d = got?.value;
       if (d?.drm) return { ...base, state: 'protected', key: key(dash) };
       if (d?.live) return { ...base, state: 'live', key: key(dash) };
-      if (d?.options.length) return finish({ ...base, duration: base.duration || d.duration, key: key(dash), options: d.options });
+      if (d?.options.length) return finish({ ...base, duration: base.duration || d.duration, key: key(dash), options: d.options, ...via(got?.page ?? '') });
     }
     if (!file) file = items.filter((c) => c.kind === 'video').sort((a, b) => b.bytes - a.bytes)[0]?.url ?? '';
     if (file) {
-      const bytes = this.sizes.get(file) ?? (await this.sizeOf(file, identity));
+      let bytes = this.sizes.get(file) ?? 0;
+      let filePage = '';
+      if (frameOf(file)) {
+        // A frame's file: one small request tells whether its server takes the tab's page.
+        const target = file;
+        const got = await read(target, (id) => this.probeSize(target, id));
+        bytes ||= got?.value ?? 0;
+        filePage = got?.page ?? '';
+      } else if (!bytes) bytes = await this.sizeOf(file, identity);
       let ext = 'mp4';
       try {
         ext = extOf(new URL(file).pathname) || 'mp4';
@@ -406,7 +448,7 @@ export class MediaWatch {
         /* keep */
       }
       const opt = option({ id: 'file', group: 'video', label: video.height ? `${video.height}p` : ext.toUpperCase(), detail: video.height >= 2160 ? '4K' : '', container: ext.toUpperCase(), bytes, height: video.height, url: file, mode: 'file' });
-      return finish({ ...base, key: key(file), options: [opt] });
+      return finish({ ...base, key: key(file), options: [opt], ...via(filePage) });
     }
     // Nothing readable in the page's traffic: yt-dlp knows many sites, when it is there and asked for.
     if (ctx.allowTools && ytdlpTools() && /^https?:/i.test(ctx.pageUrl)) {
@@ -486,16 +528,18 @@ export class MediaWatch {
   }
 
   private async sizeOf(url: string, identity: Identity): Promise<number> {
-    try {
-      const res = await open(url, identity, { Range: 'bytes=0-0' }, timeout(8000));
-      res.destroy();
-      const total = parseContentRange(res.header('content-range'))?.total ?? -1;
-      const bytes = total > 0 ? total : res.status === 200 ? Math.max(0, res.contentLength) : 0;
-      if (bytes) remember(this.sizes, url, bytes);
-      return bytes;
-    } catch {
-      return 0;
-    }
+    return this.probeSize(url, identity).catch(() => 0);
+  }
+
+  /** The file's size from a one-byte request (0 when the server does not say); an HttpStatusError when it refuses. */
+  private async probeSize(url: string, identity: Identity): Promise<number> {
+    const res = await open(url, identity, { Range: 'bytes=0-0' }, timeout(8000));
+    res.destroy();
+    if (res.status >= 400) throw new HttpStatusError(res.status, null);
+    const total = parseContentRange(res.header('content-range'))?.total ?? -1;
+    const bytes = total > 0 ? total : res.status === 200 ? Math.max(0, res.contentLength) : 0;
+    if (bytes) remember(this.sizes, url, bytes);
+    return bytes;
   }
 
   /** For tests and diagnostics: the tab's record as it stands. */
