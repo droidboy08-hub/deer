@@ -255,7 +255,8 @@ Same shape as the Electron `Browser` so modules port directly (the full contract
   (priorities: menu 20, popover 30, latched switcher 40, element full screen 50, panel 60, Deer field
   70, parked find 90, peek 100), `escape()`, `interceptOpen(fn)` (modified clicks and, with source
   `'window-open'`, `window.open` / `target=_blank`; the latest interceptor is asked first; load a taken
-  request with `openLink(request, where)`), services (`provide`, `service`, `whenService`, below),
+  request with `openLink(request, where)`; a taken `window.open` opens no tab and no window and returns
+  null to the page), services (`provide`, `service`, `whenService`, below),
   `layer(id, z)` (z: home-bg 7, peek 8, omni-scrim 9 (core; a module layer at 9 made after boot paints
   over the dim: find-ring, downloads-video), bar 10, peek-rise and downloads-ring 11, find 12, omnibox
   20, panels and popovers 30, switcher 40, downloads-flight 45, menus 50, downloads-prompt 55 (the quit
