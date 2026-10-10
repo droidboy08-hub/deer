@@ -16,6 +16,8 @@
   inset      the page top inset: the strip under the bar on plain, dark, fixed / sticky / absolute
              header, wrapper-coloured and app pages, the setting at runtime, bfcache, pushState,
              iframes, zoom, a page fighting the push, text and view-source, Wikipedia and DuckDuckGo
+  fouc       no page is laid out before its style sheets are in (no flash of unstyled content) on
+             GitHub, Wikipedia, mozilla.org; the glass still follows the page (needs the network)
   youtube    the strip on YouTube: its header and the guide (side menu) below Deer's bar, on the
              home and watch pages and with the guide opened; the decision stays put (needs the network)
   private    private windows: Ctrl+Shift+N, the + menu and Ctrl+N inside one; they open on Deer's
@@ -56,6 +58,7 @@ TESTS = {
     'private': ('private.js', 120),
     'edges': ('inset-edge.js', 400),
     'youtube': ('inset-youtube.js', 240),
+    'fouc': ('fouc.js', 240),
     'restart': ('restart.js', 200),
 }
 

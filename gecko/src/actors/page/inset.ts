@@ -165,6 +165,7 @@
 import type { PageContext } from '../page-api';
 import { BAR_AREA, INSET_BAR_HIDDEN_KEY, INSET_OFF_KEY } from '../../shared/geometry';
 import { settingPref } from '../../shared/settings';
+import { sheetsPending } from '../../shared/sheets';
 
 const PREF = settingPref('pageInset');
 const SCHEMES = /^(?:https?|file|data|blob|moz-extension|view-source):/i;
@@ -1251,17 +1252,6 @@ function start(ctx: PageContext): void {
 }
 
 /** A <link rel=stylesheet> of the document has not finished loading (its sheet is not there yet). */
-function sheetsPending(doc: Document): boolean {
-  try {
-    for (const link of doc.querySelectorAll('link[rel~="stylesheet" i]')) {
-      if (!(link as HTMLLinkElement).sheet && !(link as HTMLLinkElement).disabled) return true;
-    }
-  } catch {
-    return true;
-  }
-  return false;
-}
-
 export const events = {
   // Chrome-only: the document's root element went in (before any layout).
   DOMDocElementInserted: {},

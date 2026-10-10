@@ -59,7 +59,8 @@
 //             b.setHomeTheme(theme); b.holdTheme(theme) -> release: the glass (window controls,
 //             bar, native popups) reads `theme` while a module's own full-window surface covers the
 //             page (the switcher's deck and grid hold 'clear'); b.luma(browser, rect) and
-//             b.snapshot(browser, rect, scale) for any part of any page; b.closePanels() hides
+//             b.snapshot(browser, rect, scale) for any part of any page (null while a new document
+//             has not painted yet: a snapshot would lay it out unstyled); b.closePanels() hides
 //             Firefox's open panels.
 //   Page      b.page(target).send(name, data), await .query(name, data), .sendAll(name, data),
 //             await .queryAll(name, data) (one answer per frame); target: a Tab, its id, a <browser>
@@ -264,6 +265,16 @@ export class Browser {
   private pendingFromPaint = false;
   /** Tabs whose theme came from a real sample (the others still carry the start-up guess). */
   private sampled = new WeakSet<Tab>();
+  /**
+   * Browsers showing a new document that has neither painted nor finished loading. Nothing takes a
+   * snapshot of them (theme sampling, b.snapshot, b.luma): drawSnapshot makes the page lay out, and
+   * before its style sheets are in that layout is unstyled and can reach the screen (owner's report,
+   * 2026-10-08: GitHub showed as a plain text page for a moment; Firefox warned "Layout was forced
+   * before the page was fully loaded" on every page, plain Firefox on none). Cleared by the page's
+   * first paint (core:paint), core:ready with its style sheets in, its load (core:pageshow) or the
+   * end of the network load.
+   */
+  private unpainted = new WeakSet<XULBrowser>();
   /** While > 0 the tab list is not mirrored (b.openHidden). */
   private syncHeld = 0;
   /**
@@ -673,11 +684,13 @@ export class Browser {
 
   /** Mean luma (0..1) of a rectangle of a page, in CSS px of the browser's box; null when it has no document. */
   luma(browser: XULBrowser, rect: { x: number; y: number; width: number; height: number }): Promise<number | null> {
+    if (this.unpainted.has(browser)) return Promise.resolve(null);
     return fx.luma(browser, rect);
   }
 
   /** A compositor snapshot of a rectangle of a page (null = the visible area) at `scale`. Close the bitmap when done. */
   snapshot(browser: XULBrowser, rect: { x: number; y: number; width: number; height: number } | null, scale: number): Promise<ImageBitmap | null> {
+    if (this.unpainted.has(browser)) return Promise.resolve(null);
     return fx.snapshot(browser, rect, scale);
   }
 
@@ -730,6 +743,7 @@ export class Browser {
   /** Called by the VitrePage parent actor for every ctx.send() from a page module. */
   receivePageMessage(browser: XULBrowser, name: string, data: unknown, from: { isTop: boolean; browsingContext: any }): void {
     const tab = this.tabFor(browser);
+    if (from.isTop && (name === 'core:paint' || name === 'core:pageshow' || (name === 'core:ready' && (data as { styled?: boolean } | null)?.styled))) this.unpainted.delete(browser);
     if (tab && tab.id === this.activeId && from.isTop) {
       if (name === 'core:scroll') this.sampleThrottled();
       else if (name === 'core:pageshow' || name === 'core:ready') this.sampleSoon(0);
@@ -1025,16 +1039,20 @@ export class Browser {
           if (t) {
             t.error = errorPage ? { code: 0, description: '', url } : null;
             this.onChanged(t.node, true);
+            // A new document is sampled once it has painted (receivePageMessage) or loaded (below);
+            // the same document moving on (pushState, a fragment) is styled already.
+            if (!(flags & SAME_DOCUMENT)) this.unpainted.add(browser);
             if (t.id === this.activeId) {
               if (!(flags & SAME_DOCUMENT)) this.resetPaintBackoff();
-              this.sampleSoon(60);
+              else this.sampleSoon(60);
             }
-          }
+          } else if (!(flags & SAME_DOCUMENT)) this.unpainted.add(browser);
           this.emit('tab-navigated', t, browser, { url, sameDocument: !!(flags & SAME_DOCUMENT), errorPage });
         },
         onStateChange: (browser: XULBrowser, webProgress: any, _request: unknown, state: number) => {
           if (!webProgress?.isTopLevel || !(state & NETWORK) || !(state & (START | STOP))) return;
           const t = this.tabFor(browser);
+          if (state & STOP) this.unpainted.delete(browser);
           if (t) {
             if (state & START) this.stoppedPending.delete(t.node);
             else this.stoppedPending.add(t.node);
@@ -1295,7 +1313,7 @@ export class Browser {
       }
       return;
     }
-    if (t.deferred || t.crashed) return;
+    if (t.deferred || t.crashed || this.unpainted.has(t.browser)) return;
     const seq = ++this.sampleSeq;
     const l = this.bar.layout;
     const strip = { left: Math.max(0, l.left - 16), right: (l.right || window.innerWidth) + 16, height: 64 };
