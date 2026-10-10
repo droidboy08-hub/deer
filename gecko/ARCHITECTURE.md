@@ -187,7 +187,10 @@ gecko/
   on load, scroll and main-thread repaints. Its own snapshot repaints the page, so the window ignores
   the paint reported within 400 ms of a sample; compositor animations (transforms, video) never
   report paints. `b.luma(browser, rect)` and `b.snapshot(browser, rect, scale)` expose the same
-  snapshot for modules (thumbnails, menus).
+  snapshot for modules (thumbnails, menus). No snapshot is taken of a new document until it has
+  painted, loaded, or reported its style sheets in (`core:ready` `styled`): `drawSnapshot` lays the
+  page out, and before its style sheets that layout is unstyled and can reach the screen (a flash of
+  unstyled content on every site until 2026-10-08; test `input/fouc.js`).
 - Window chrome: `-moz-window-dragging` strip, caption buttons with `-moz-default-appearance`
   (snap layouts work), `preventDefault()` on their `mouseup` (`winctl.ts`), script-started window move
   through js-ctypes for dragging the bar (`firefox.ts` `beginWindowMove`), JS reveal rule for auto-hide
@@ -510,8 +513,13 @@ Settings › About (`settings/pages.ts`, status lines in `src/shared/update.ts`)
 Firefox add-ons from addons.mozilla.org; the Chrome Web Store cannot work on Gecko. No blocker is
 bundled: the person installs one. The request-blocking API a blocker needs (MV2 `webRequest`
 blocking, MV3 `declarativeNetRequest`) was proven on this engine under Deer's interface
-(`spikes/extensions/RESULT.md`); uBlock Origin itself has not been tested in Deer. Pinned extension buttons are Firefox's real widgets inside the pill's `.accessories` area;
+(`spikes/extensions/RESULT.md`); installing uBlock Origin from addons.mozilla.org with a real click is
+tested (`tests/extensions/amo.js`, network). Pinned extension buttons are Firefox's real widgets inside the pill's `.accessories` area;
 the extensions button opens Firefox's panel. Install, permission and update prompts anchor to the bar.
+A saved toolbar layout that lists `#unified-extensions-button` in a toolbar (profiles carried over from
+an older setup) is repaired at start (`VitreStartup.repairToolbarState`, before CustomizableUI reads it):
+with it, Firefox's start-up step threw before `ExtensionsUI.init()` and no add-on prompt ever showed
+(2026-10-10; test `tests/extensions/layout.js`).
 Unsigned add-ons load only as temporary add-ons, re-installed at every start (the user's decision,
 DESIGN-NOTES "Ad blocking and extensions"); signing is never waived. Their cost: a restored tab
 loads before such a blocker is back, until it is reloaded.

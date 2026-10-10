@@ -191,6 +191,10 @@ export const VitreStartup = {
       }
     };
     step('settings', () => VitreSettings.init());
+    // Before anything imports CustomizableUI (it reads the layout once, by final-ui-startup it has);
+    // user prefs are loaded by now (measured 2026-10-10: at init, profile-do-change and
+    // profile-after-change the user value is there and CustomizableUI is not loaded yet).
+    step('toolbar layout', () => VitreStartup.repairToolbarState());
     step('brand', () => VitreStartup.registerBrand());
     step('pages sheet', () => VitreStartup.registerPagesSheet());
     step('actors', () => VitreStartup.registerActors());
@@ -291,6 +295,47 @@ export const VitreStartup = {
     const module = new AboutRedirector(what, url);
     Components.manager.QueryInterface(Ci.nsIComponentRegistrar).registerFactory(module.classID, module.classDescription, module.contractID, module);
     about.set(what, url);
+  },
+
+  /**
+   * Take Firefox's extensions button out of the saved toolbar layout (browser.uiCustomization.state)
+   * before CustomizableUI reads it: called from init(), which runs before anything imports
+   * CustomizableUI (it has read the layout by final-ui-startup).
+   *
+   * Owner's report, 2026-10-10: installing from addons.mozilla.org did nothing; the add-on
+   * downloaded, then no "Add" prompt came. The profile (copied from the old Vitre profile) listed
+   * #unified-extensions-button as a placed widget in the nav-bar; a fresh profile does not (in
+   * Firefox 157 it is a fixed part of the nav-bar, outside the layout). With that entry, and Deer
+   * moving the button into its own cluster, CustomizableUI leaves later areas unrestored, so
+   * BrowserGlue._onWindowsRestored throws in BrowserUsageTelemetry.init ("Area toolbar-menubar not
+   * yet restored", _buildWidgetPositions) before it reaches ExtensionsUI.init(): nothing observes
+   * "webextension-permission-prompt", every install waits for a prompt that never shows, and the
+   * rest of that start-up step (signing checks, webcompat reporter...) is skipped too. Removing only
+   * that entry fixed the copied profile (tests/extensions/amo.js). Returns whether it changed.
+   */
+  repairToolbarState(): boolean {
+    const PREF = 'browser.uiCustomization.state';
+    const BUTTON = 'unified-extensions-button';
+    if (!Services.prefs.prefHasUserValue(PREF)) return false;
+    let state: { placements?: Record<string, string[]> } | null = null;
+    try {
+      state = JSON.parse(Services.prefs.getStringPref(PREF, ''));
+    } catch {
+      return false; // unreadable: CustomizableUI starts from its defaults by itself
+    }
+    const placements = state?.placements;
+    if (!placements || typeof placements !== 'object') return false;
+    let changed = false;
+    for (const [area, ids] of Object.entries(placements)) {
+      if (!Array.isArray(ids) || !ids.includes(BUTTON)) continue;
+      placements[area] = ids.filter((id) => id !== BUTTON);
+      changed = true;
+    }
+    if (changed) {
+      Services.prefs.setStringPref(PREF, JSON.stringify(state));
+      console.warn('Deer: removed the extensions button from the saved toolbar layout (add-on prompts had no anchor)');
+    }
+    return changed;
   },
 
   /**
