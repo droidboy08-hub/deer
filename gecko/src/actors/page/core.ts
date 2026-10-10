@@ -2,7 +2,7 @@
 // a ping. The Browser re-samples the glass theme on these; the switcher refreshes thumbnails.
 //
 // Messages to the window (top document only):
-//   core:ready      { url }                 DOMContentLoaded
+//   core:ready      { url, styled }         DOMContentLoaded; styled: its style sheets are in
 //   core:pageshow   { url, persisted }      pageshow (persisted = restored from the back/forward cache)
 //   core:scroll     { x, y }                at most one per animation frame while scrolling
 //   core:paint      {}                      the page repainted (main thread): at most one per
@@ -23,6 +23,7 @@
 // leading+trailing throttle in the window; paint needs its own cap because animations repaint
 // every frame.
 import type { PageContext } from '../page-api';
+import { sheetsPending } from '../../shared/sheets';
 
 const PAINT_INTERVAL = 250;
 /** The band under the tab bar (68 px) plus a little, in CSS px of the page's viewport. */
@@ -67,7 +68,8 @@ export function onEvent(ctx: PageContext, event: Event): void {
       });
       break;
     case 'DOMContentLoaded':
-      if (event.target === ctx.document) ctx.send('core:ready', { url: ctx.document?.documentURI });
+      // styled: the style sheets are in, so the window may snapshot the page (src/shared/sheets.ts).
+      if (ctx.document && event.target === ctx.document) ctx.send('core:ready', { url: ctx.document.documentURI, styled: !sheetsPending(ctx.document) });
       break;
     case 'pageshow':
       if (event.target === ctx.document) {
