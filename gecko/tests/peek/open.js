@@ -76,17 +76,22 @@ spike.main(async () => {
   check("the header's back button goes back inside the sheet", !sheet().back && sheet().path === "/issue.html?n=39");
 
   // ---- 3. new tabs and windows the sheet's page asks for stay in the sheet -----------------------
+  // Only in the sheet: a taken request that still opened a window of its own (Gecko's fallback when
+  // nsIBrowserDOMWindow answers with no browser) also took keyboard focus away from the sheet.
+  const browserWindows = () => [...Services.wm.getEnumerator("navigator:browser")].length;
+  const windowsBefore = browserWindows();
   const blank = await P.rectOf(br, "#blank");
   P.mouse(blank.cx, blank.cy);
   await waitFor(() => br.currentURI.spec.includes("n=36") && !br.webProgress.isLoadingDocument, { what: "target=_blank in the sheet" });
   await sleep(300);
-  check("target=_blank inside the sheet loads in the sheet (no tab, no window)", b.tabs.length === 1 && P.tabsInfo().hidden === tabsBefore.hidden + 1 && peek().browser() === br, P.tabsInfo());
+  check("target=_blank inside the sheet loads in the sheet (no tab, no window)", b.tabs.length === 1 && P.tabsInfo().hidden === tabsBefore.hidden + 1 && peek().browser() === br && browserWindows() === windowsBefore, { tabs: P.tabsInfo(), windows: [windowsBefore, browserWindows()] });
   // A real click: window.open needs a user gesture (the popup blocker).
   const openBtn = await P.rectOf(br, "#open");
   P.mouse(openBtn.cx, openBtn.cy);
   await waitFor(() => br.currentURI.spec.includes("n=33") && !br.webProgress.isLoadingDocument, { what: "window.open in the sheet" });
   await sleep(300);
-  check("window.open() inside the sheet loads in the sheet", b.tabs.length === 1 && peek().browser() === br);
+  check("window.open() inside the sheet loads in the sheet (no tab, no window)", b.tabs.length === 1 && peek().browser() === br && browserWindows() === windowsBefore, { windows: [windowsBefore, browserWindows()] });
+  check("keyboard focus stays in the sheet's page", Services.focus.activeWindow === window && Services.focus.focusedContentBrowsingContext === br.browsingContext, { active: Services.focus.activeWindow === window, focused: Services.focus.focusedContentBrowsingContext?.currentWindowGlobal?.documentURI?.spec });
   const nx = await P.rectOf(br, "#next");
   P.move(nx.cx, nx.cy);
   P.mouse(nx.cx, nx.cy, { shiftKey: true });

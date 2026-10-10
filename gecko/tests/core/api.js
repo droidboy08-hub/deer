@@ -278,10 +278,15 @@ spike.main(async () => {
   const requests = [];
   const offOpen = b.interceptOpen((r) => { requests.push({ source: r.source, url: r.url, opener: r.opener === first }); return true; });
   const tabsNow = b.tabs.length;
-  await inPage(first.browser, (w) => { w.open("https://example.org/?popup", "_blank"); return true; });
+  const windows = () => [...Services.wm.getEnumerator("navigator:browser")];
+  const winsNow = windows().length;
+  // A taken request must be refused, not answered with "no tab here": that opened a whole window.
+  const openResult = await inPage(first.browser, (w) => { const r = w.open("https://example.org/?popup", "_blank"); return r === null ? "null" : "a window"; });
   await sleep(1000);
   offOpen();
-  check("window.open from a page reaches interceptOpen as source 'window-open' with its opener, and a taken request opens nothing", requests.length === 1 && requests[0].source === "window-open" && /example\.org/.test(requests[0].url) && requests[0].opener && b.tabs.length === tabsNow, { requests, tabs: [tabsNow, b.tabs.length] });
+  check("window.open from a page reaches interceptOpen as source 'window-open' with its opener, and a taken request opens nothing (no tab, no window; window.open returns null)", requests.length === 1 && requests[0].source === "window-open" && /example\.org/.test(requests[0].url) && requests[0].opener && b.tabs.length === tabsNow && windows().length === winsNow && openResult === "null", { requests, tabs: [tabsNow, b.tabs.length], windows: [winsNow, windows().length], openResult });
+  // A stray window (the failure) must not leak into the checks below.
+  if (winsNow === 1) for (const x of windows()) if (x !== window) x.close();
 
   // ---- 18. a new tab shows its address while the server has not answered ----
   const slow = b.newTab("https://10.255.255.1/never");

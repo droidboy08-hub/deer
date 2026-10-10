@@ -356,6 +356,12 @@ function policyContainerOf(value: unknown): unknown {
  * belongs to. `fn` sees every such request first; returning true cancels it (the content process
  * gets no window: window.open returns null). aURI is the page the new window will load, or null for
  * window.open('').
+ * Cancelling returns a failure code (Components.returnCode = NS_ERROR_ABORT: a quiet decline, no
+ * console error as a throw would log), never a bare null: ContentParent::CommonCreateWindow reads a
+ * null <browser> with success as "no window to open a tab in" and opens a whole new window instead
+ * (BrowserDOMWindow's own #openURIInNewTab returns null for exactly that), where the page's
+ * window.open then loads. NS_ERROR_ABORT is the window provider rejecting the open, which
+ * nsWindowWatcher turns into a null window.open result rather than an exception in the page.
  */
 export function interceptWindowOpen(fn: (request: { url: string; where: number; params: any; name: string }) => boolean): void {
   w.vitreWindowOpenHook = fn;
@@ -367,11 +373,16 @@ export function interceptWindowOpen(fn: (request: { url: string; where: number; 
     const original = proto[method];
     if (typeof original !== 'function') continue;
     proto[method] = function (this: any, aURI: any, aParams: any, aWhere: number, aFlags: number, aName: string) {
+      let taken = false;
       try {
         const hook = this.win?.vitreWindowOpenHook;
-        if (hook && aWhere !== Ci.nsIBrowserDOMWindow.OPEN_PRINT_BROWSER && hook({ url: aURI?.spec ?? '', where: aWhere, params: aParams, name: aName ?? '' })) return null;
+        taken = !!hook && aWhere !== Ci.nsIBrowserDOMWindow.OPEN_PRINT_BROWSER && !!hook({ url: aURI?.spec ?? '', where: aWhere, params: aParams, name: aName ?? '' });
       } catch (e) {
         console.error('Deer: window.open interception failed', e);
+      }
+      if (taken) {
+        Components.returnCode = Cr.NS_ERROR_ABORT;
+        return null;
       }
       return original.call(this, aURI, aParams, aWhere, aFlags, aName);
     };
