@@ -18,6 +18,9 @@
              iframes, zoom, a page fighting the push, text and view-source, Wikipedia and DuckDuckGo
   youtube    the strip on YouTube: its header and the guide (side menu) below Deer's bar, on the
              home and watch pages and with the guide opened; the decision stays put (needs the network)
+  private    private windows: Ctrl+Shift+N, the + menu and Ctrl+N inside one; they open on Deer's
+             Home (typing goes to Deer's address field) and search with their own engine
+             (DuckDuckGo by default)
   edges      the inset's edge cases: the site's root padding / margin, background kinds and images,
              late / scroll-triggered / hiding headers, inner scrollers, element full screen, print
              preview, the PDF viewer and other excluded pages, zoom 50-300 % and site zoom, pages that

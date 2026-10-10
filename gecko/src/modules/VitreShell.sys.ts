@@ -21,6 +21,7 @@
 //   - The window bundle is a classic script: it is loaded again for every window, while this module
 //     and every other .sys.mjs is loaded once per process.
 import { VitreStartup } from 'chrome://vitre/content/modules/VitreStartup.sys.mjs';
+import { HOME_URL } from '../shared/home';
 
 // Author sheets every window gets before its first layout: the shell (hide rules, layer base), the
 // glass tokens and structure, the tab bar and window controls, the address field.
@@ -37,6 +38,32 @@ function report(what: string, e: unknown): void {
   VitreShell.errors.push(text);
   VitreStartup.log(text);
   console.error(`Deer ${what}`, e);
+}
+
+/**
+ * A private window starts on Home, as Ctrl+T in it already does (design/keymap.json: "New private
+ * window, opening on Home"), not on Firefox's private browsing page: that page's search box takes
+ * no text itself, it hands every key to Firefox's address bar (gURLBar.handoff,
+ * browser/actors/AboutPrivateBrowsingParent.sys.mjs "SearchHandoff"), which Deer hides, so nothing
+ * could be typed there. Every way a private window opens passes "about:privatebrowsing" as its first
+ * window argument (modules/BrowserWindowTracker.sys.mjs openWindow, modules/BrowserContentHandler.sys.mjs
+ * -private-window and the temporary auto-start mode, parent/ext-windows.js), and
+ * gBrowserInit.uriToLoadPromise (content/browser/browser-init.js) reads it at DOMContentLoaded, after
+ * this hook. Home goes in as a one-URL list: a lone string equal to BrowserHandler.defaultArgs (Home
+ * is the home page) would wait for session restore's homepage override, which can leave a private
+ * window opened at startup on a blank tab; a list is loaded as it is (gBrowser.loadTabs).
+ */
+function privateStartOnHome(win: any): void {
+  const arg = win.arguments?.[0];
+  const url = typeof arg === 'string' ? arg : arg instanceof Ci.nsISupportsString ? arg.data : '';
+  if (url !== 'about:privatebrowsing') return;
+  const { PrivateBrowsingUtils } = ChromeUtils.importESModule('resource://gre/modules/PrivateBrowsingUtils.sys.mjs');
+  if (!PrivateBrowsingUtils.isWindowPrivate(win)) return;
+  const home = Cc['@mozilla.org/supports-string;1'].createInstance(Ci.nsISupportsString);
+  home.data = HOME_URL;
+  const list = Cc['@mozilla.org/array;1'].createInstance(Ci.nsIMutableArray);
+  list.appendElement(home);
+  win.arguments[0] = list;
 }
 
 /**
@@ -121,6 +148,11 @@ export const VitreShell = {
       lockCustomTitlebar(win);
     } catch (e) {
       report('beforeLayout failed', e);
+    }
+    try {
+      privateStartOnHome(win);
+    } catch (e) {
+      report('private window start page', e);
     }
     VitreShell.note(win, 'beforeLayout', { customtitlebar: root.hasAttribute('customtitlebar') });
   },

@@ -427,9 +427,16 @@ auto-hidden bar on screen.
   picture `VitreHome` remembers in memory, shows it only once decoded, and paints the picture's mean
   colour under it until then (tests `input/home-preload.js`, `input/home-flash.js`). Decoded
   pictures are not locked (`imgIRequest.lockImage` hung the browser when such a tab closed).
+  A private window opens on Home too: `VitreShell.beforeLayout` turns the window's
+  `about:privatebrowsing` start argument into Home before Firefox reads it, because that page's
+  search box hands every key to Firefox's hidden address bar (`gURLBar.handoff`), so nothing could
+  be typed there (test `input/private.js`).
 - Address field history: Places SQL in `src/window/places.ts` (hosts first, then a frecency-ordered
   scan; a newer search interrupts the running one). Search engines: Deer's own list in
-  `src/shared/settings.ts`.
+  `src/shared/settings.ts`; private windows search with their own engine (`privateSearchEngine`,
+  DuckDuckGo by default, the owner's choice of 2026-10-10; Settings › Search engine › Private
+  windows), picked by the window's `Browser.applySettings` for its address field, selected text and
+  peek searches.
 - Version: Settings › About shows the installed `deer-version.json`'s version, else `version` in
   `gecko/package.json`, which `tools/build.mjs` bakes into every bundle as `__DEER_VERSION__`.
 - Product defaults live in `runtime/defaults/pref/vitre-prefs.js` (Firefox messaging, telemetry

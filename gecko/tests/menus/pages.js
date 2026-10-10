@@ -33,12 +33,12 @@ spike.main(async () => {
   let at = await M.openOn("#link1");
   check("link: menu opened", at.ok);
   M.describe("LINK");
-  rowsAre("link", ["Open link in new tab", "Peek link", "Open link in new window", "Copy link address", "Download linked file", "Inspect"]);
+  rowsAre("link", ["Open link in new tab", "Peek link", "Open link in new window", "Open link in new private window", "Copy link address", "Download linked file", "Inspect"]);
   anatomy("link");
   let st = M.state();
   check("link: top-left at the pointer", Math.abs(st.rect.left - at.x) <= 1 && Math.abs(st.rect.top - at.y) <= 1, { rect: st.rect, at: [at.x, at.y] });
   check("link: Peek link prints Shift+click", st.rows[1].key === "Shift+click", st.rows[1]);
-  check("link: icons on the rows that have one", st.rows.map((r) => r.icon).join(",") === "newtab,peek,newwindow,link,download,inspect", st.rows.map((r) => r.icon));
+  check("link: icons on the rows that have one", st.rows.map((r) => r.icon).join(",") === "newtab,peek,newwindow,newwindow,link,download,inspect", st.rows.map((r) => r.icon));
   check("link: target wash over the link", st.wash === 1, st.wash);
   const wash = document.querySelector("#layer-menus .vt-wash");
   const wr = wash.getBoundingClientRect();
@@ -153,6 +153,21 @@ spike.main(async () => {
   await sleep(800);
   await spike.activate();
 
+  // Open link in new private window: the link in a private window (no referrer: Firefox strips it
+  // for a private window); inside a private window the row is left out, Open link in new window
+  // already opens a private one.
+  const { PrivateBrowsingUtils } = ChromeUtils.importESModule("resource://gre/modules/PrivateBrowsingUtils.sys.mjs");
+  await M.openOn("#link1");
+  await M.pick("Open link in new private window");
+  const pw = await spike.waitFor(() => [...Services.wm.getEnumerator("navigator:browser")].find((w) => w !== window && !w.closed && w.vitre?.ready), { what: "private window", timeout: 10000 }).catch(() => null);
+  const pwUrl = pw && (await spike.waitFor(() => pw.gBrowser.selectedBrowser.currentURI.spec.endsWith("counter.html") && pw.gBrowser.selectedBrowser.currentURI.spec, { what: "the link in it", timeout: 10000 }).catch(() => pw.gBrowser.selectedBrowser.currentURI.spec));
+  check("Open link in new private window opens the link in a private window", !!pw && PrivateBrowsingUtils.isWindowPrivate(pw) && /counter\.html$/.test(pwUrl ?? ""), { private: pw && PrivateBrowsingUtils.isWindowPrivate(pw), url: pwUrl });
+  const privateRows = pw?.vitreMenus?.rowsFor({ browser: pw.gBrowser.selectedBrowser, onLink: true, linkURL: "https://refract.wiki/tin", linkProtocol: "https", onSaveableLink: true }) ?? [];
+  check("…and inside a private window the link menu has no private-window row (new window is private there)", privateRows.some((r) => r.startsWith("Open link in new window")) && !privateRows.some((r) => r.startsWith("Open link in new private window")), privateRows);
+  for (const w of Services.wm.getEnumerator("navigator:browser")) if (w !== window) w.close();
+  await sleep(800);
+  await spike.activate();
+
   // releasing the right button on a row runs it, and its contextmenu opens nothing else
   await M.openOn("#link1");
   M.setClipboard("before");
@@ -225,7 +240,7 @@ spike.main(async () => {
   check("Copy image: an image on the clipboard", flavors.length > 0, flavors);
 
   at = await M.openOn("#img2");
-  rowsAre("image link", ["Open link in new tab", "Peek link", "Open link in new window", "Copy link address", "Download linked file", "Open image in new tab", "Save image as…", "Copy image", "Inspect"]);
+  rowsAre("image link", ["Open link in new tab", "Peek link", "Open link in new window", "Open link in new private window", "Copy link address", "Download linked file", "Open image in new tab", "Save image as…", "Copy image", "Inspect"]);
   anatomy("image link");
   check("image link: no wash (the image is the target)", M.state().wash === 0, M.state().wash);
   await capture("pages-imagelink");
@@ -566,7 +581,7 @@ spike.main(async () => {
   // ---- services that are not installed: their rows are left out ----
   for (const name of ["peek", "find", "downloads", "settings"]) b.provide(name, undefined);
   await M.openOn("#link1");
-  rowsAre("link without Peek / downloads", ["Open link in new tab", "Open link in new window", "Copy link address", "Inspect"]);
+  rowsAre("link without Peek / downloads", ["Open link in new tab", "Open link in new window", "Open link in new private window", "Copy link address", "Inspect"]);
   check("link without Peek: Shift+click printed on new window", M.state().rows[1].key === "Shift+click", M.state().rows[1]);
   await close();
   await M.openOn("#img1");
@@ -582,7 +597,7 @@ spike.main(async () => {
   let rows = rowsFor({ browser: tab0.browser }, { inPeek: true });
   check("peek page rows (CtxMenu peekpage)", JSON.stringify(rows) === JSON.stringify(["Open as tab [Alt+Enter]", "Copy address", "—", "Back [Alt+Left]", "Forward [Alt+Right]", "Reload [Ctrl+R]", "—", "Find on page… [Ctrl+F]", "Print… [Ctrl+P]", "—", "Inspect"]), rows);
   rows = rowsFor({ browser: tab0.browser, onLink: true, linkURL: "https://refract.wiki/tin", linkProtocol: "https", onSaveableLink: true }, { inPeek: true });
-  check("peek link rows: peeks do not nest (CtxMenu peeklink)", JSON.stringify(rows) === JSON.stringify(["Open link in new tab", "Open link in new window", "—", "Copy link address", "Download linked file", "—", "Inspect"]), rows);
+  check("peek link rows: peeks do not nest (CtxMenu peeklink)", JSON.stringify(rows) === JSON.stringify(["Open link in new tab", "Open link in new window", "Open link in new private window", "—", "Copy link address", "Download linked file", "—", "Inspect"]), rows);
   rows = rowsFor({ browser: tab0.browser, onImage: true, mediaURL: "https://refract.wiki/a.png" }, { inPeek: true });
   check("peek image rows: no Peek image", !rows.some((r) => r.startsWith("Peek")), rows);
   b.sys("VitreSettings").set({ rebind: { openAsTab: "Ctrl+Shift+O" } });

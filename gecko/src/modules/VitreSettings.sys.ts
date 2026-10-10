@@ -46,6 +46,7 @@ const SCHEMA: Record<string, Spec> = {
   shiftClick: { kind: 'string', def: DEFAULT_SETTINGS.shiftClick, allowed: ['peek', 'window'] },
   rebind: { kind: 'json', def: DEFAULT_SETTINGS.rebind },
   searchEngine: { kind: 'string', def: DEFAULT_SETTINGS.searchEngine, allowed: ['google', 'bing', 'duckduckgo', 'brave'] },
+  privateSearchEngine: { kind: 'string', def: DEFAULT_SETTINGS.privateSearchEngine, allowed: ['google', 'bing', 'duckduckgo', 'brave'] },
   downloadsFolder: { kind: 'string', def: DEFAULT_SETTINGS.downloadsFolder },
   askWhereToSave: { kind: 'bool', def: DEFAULT_SETTINGS.askWhereToSave },
   connections: { kind: 'int', def: DEFAULT_SETTINGS.connections, min: 1, max: 32 },

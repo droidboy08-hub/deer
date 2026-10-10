@@ -1,15 +1,16 @@
 // Address-bar text helpers. Ported from app/src/renderer/url.ts.
 //
 // State note: the search engine is module state. Every bundle that imports this file has its own
-// copy, so each must call setSearchEngine(settings.searchEngine) itself (the window's Browser does).
+// copy, so each must call setSearchEngine(settings.searchEngine) itself (the window's Browser does,
+// with settings.privateSearchEngine in a private window).
 // Code that only needs HOME_URL / isHomeUrl imports ./home, which carries no state.
-import { SEARCH_ENGINES, type Settings } from './settings';
+import { SEARCH_ENGINES, type SearchEngine } from './settings';
 
 export { HOME_URL, isHomeUrl } from './home';
 
 let SEARCH = SEARCH_ENGINES.google.url;
 
-export function setSearchEngine(engine: Settings['searchEngine']): void {
+export function setSearchEngine(engine: SearchEngine): void {
   SEARCH = (SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.google).url;
 }
 

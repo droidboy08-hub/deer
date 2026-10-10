@@ -24,7 +24,9 @@ export interface Settings {
   shiftClick: 'peek' | 'window';
   rebind: Record<string, string>;
   /** Search */
-  searchEngine: 'google' | 'bing' | 'duckduckgo' | 'brave';
+  searchEngine: SearchEngine;
+  /** The engine of private windows (their address field, selected text and peek searches). */
+  privateSearchEngine: SearchEngine;
   /** Downloads */
   downloadsFolder: string;
   askWhereToSave: boolean;
@@ -50,6 +52,8 @@ export const DEFAULT_SETTINGS: Settings = {
   shiftClick: 'peek',
   rebind: {},
   searchEngine: 'google',
+  // Owner's choice (2026-10-10): private windows search with a search engine that keeps no profile.
+  privateSearchEngine: 'duckduckgo',
   downloadsFolder: '',
   askWhereToSave: false,
   connections: 8,
@@ -83,7 +87,9 @@ export function cleanRebind(value: unknown): Record<string, string> {
   return out;
 }
 
-export const SEARCH_ENGINES: Record<Settings['searchEngine'], { name: string; url: string }> = {
+export type SearchEngine = 'google' | 'bing' | 'duckduckgo' | 'brave';
+
+export const SEARCH_ENGINES: Record<SearchEngine, { name: string; url: string }> = {
   google: { name: 'Google', url: 'https://www.google.com/search?q=' },
   bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
   duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' },

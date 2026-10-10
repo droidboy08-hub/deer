@@ -409,8 +409,9 @@ export const toggleFullScreen = (): void => w.BrowserCommands.fullScreen();
 export const closeWindow = (): void => w.BrowserCommands.tryToCloseWindow();
 /**
  * A new browser window. Without a URL: browser.js OpenBrowserWindow(options) -> BrowserWindowTracker.openWindow,
- * which opens the home page (about:privatebrowsing for a private window). With one: openLinkIn(url,
- * "window", params) (URILoadingHelper openInWindow), with the principals given or the system one.
+ * which opens the home page (about:privatebrowsing for a private window, which VitreShell turns into
+ * Home before it loads). With one: openLinkIn(url, "window", params) (URILoadingHelper openInWindow),
+ * with the principals given or the system one.
  */
 export function newWindow(opts: { private?: boolean; url?: string; principals?: LoadPrincipals } = {}): void {
   if (opts.url) {

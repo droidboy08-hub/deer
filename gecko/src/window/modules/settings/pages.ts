@@ -8,7 +8,7 @@
 // Sidebar order: general 10, appearance 20, home 30, tabs 40, downloads 50, privacy 60, search 70,
 // shortcuts 80, about 90; a module's page (registerPage) slots in by its own `order`.
 import type { UpdateState } from '../../../modules/VitreUpdater.sys';
-import { SEARCH_ENGINES, type Settings } from '../../../shared/settings';
+import { SEARCH_ENGINES, type SearchEngine, type Settings } from '../../../shared/settings';
 import { updateStatus } from '../../../shared/update';
 import { backgroundPicker } from './bg-picker';
 import { button, checkRow, dropdown, h, liveDesc, localDropdown, localToggle, radioRows, row, segmented, toggle, type Option, type RowDef, type SectionDef } from './controls';
@@ -43,7 +43,7 @@ const modeRow = (unlisted = false): RowDef => ({
     }),
 });
 
-const ENGINES = (Object.keys(SEARCH_ENGINES) as Settings['searchEngine'][]).map((id) => ({
+const ENGINES = (Object.keys(SEARCH_ENGINES) as SearchEngine[]).map((id) => ({
   value: id,
   label: SEARCH_ENGINES[id].name,
   desc: new URL(SEARCH_ENGINES[id].url).hostname.replace(/^www\./, ''),
@@ -659,6 +659,24 @@ const search: SectionDef = {
           desc: ENGINES.map((e) => e.label).join(', '),
           keywords: 'google bing duckduckgo brave default search provider',
           build: (ctx) => radioRows(ctx, { label: 'Search engine', options: ENGINES, get: (s) => s.searchEngine, set: (v) => ctx.set({ searchEngine: v }) }),
+        },
+      ],
+    },
+    {
+      title: 'Private windows',
+      anchor: 'private',
+      rows: [
+        {
+          title: 'Search engine in private windows',
+          desc: 'Private windows search with this engine instead',
+          keywords: 'private incognito window google bing duckduckgo brave search provider',
+          build: (ctx) =>
+            row({
+              icon: ico.searchRow,
+              title: 'Search engine in private windows',
+              desc: 'Private windows search with this engine instead',
+              control: (ids) => dropdown(ctx, { labelledBy: ids.title, options: ENGINES, get: (s) => s.privateSearchEngine, set: (v) => ctx.set({ privateSearchEngine: v }) }),
+            }),
         },
       ],
     },

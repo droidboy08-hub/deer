@@ -190,6 +190,17 @@ spike.main(async () => {
   check("the address field taking focus closed Settings", !panel.isOpen);
   store.reset("searchEngine");
 
+  // Private windows have their own engine, DuckDuckGo unless changed (owner's choice, 2026-10-10).
+  svc.open("search");
+  await settle();
+  const privateDd = ddFor("Search engine in private windows");
+  check("Search engine › Private windows shows DuckDuckGo by default", store.get().privateSearchEngine === "duckduckgo" && privateDd?.textContent.trim() === "DuckDuckGo", privateDd?.textContent);
+  await pickOption(privateDd, "Brave Search");
+  check("…and choosing Brave Search writes privateSearchEngine, not searchEngine", store.get().privateSearchEngine === "brave" && store.get().searchEngine === "google", { p: store.get().privateSearchEngine, n: store.get().searchEngine });
+  store.reset("privateSearchEngine");
+  svc.close();
+  await settle(200);
+
   // Another window hears the change at once (VitreSettings broadcasts).
   const win2 = await spike.openWindow();
   store.set({ closeButton: "always" });

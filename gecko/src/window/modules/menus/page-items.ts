@@ -159,7 +159,12 @@ function openTab(env: PageEnv, url: string, background = true): void {
   });
 }
 
-function openWindow(env: PageEnv, url: string): void {
+/**
+ * Load a page-derived URL in a new window, private when this one is. `asPrivate`: a private window
+ * from any window, as Firefox's nsContextMenu.openLinkInPrivateWindow (the page's principals, no
+ * container; openLinkIn strips the referrer for a private window, URILoadingHelper openInWindow).
+ */
+function openWindow(env: PageEnv, url: string, asPrivate = false): void {
   const p = gecko.linkParams(env.cm);
   env.b.openLink(url, 'window', {
     triggeringPrincipal: p.triggeringPrincipal,
@@ -167,8 +172,8 @@ function openWindow(env: PageEnv, url: string): void {
     originStoragePrincipal: p.originStoragePrincipal,
     referrerInfo: p.referrerInfo,
     policyContainer: p.policyContainer,
-    userContextId: env.cm.contentData?.userContextId,
-    private: env.b.isPrivate,
+    userContextId: asPrivate ? undefined : env.cm.contentData?.userContextId,
+    private: asPrivate || env.b.isPrivate,
   });
 }
 
@@ -286,6 +291,8 @@ function linkRows(env: PageEnv, withInspect: boolean): MenuItem[] {
         })
       : null,
     item('Open link in new window', 'newwindow', !shiftPeeks && !env.inPeek ? 'Shift+click' : '', 'W', () => openWindow(env, url)),
+    // In a private window the row above already opens a private one (Firefox shows neither twice).
+    env.b.isPrivate ? null : item('Open link in new private window', 'newwindow', '', 'R', () => openWindow(env, url, true)),
     SEP,
     copySelection,
     copyLink,

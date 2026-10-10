@@ -400,7 +400,8 @@ export class Browser {
   private applySettings(s: Settings): void {
     this.settings = s;
     applyRebind(s.rebind);
-    setSearchEngine(s.searchEngine);
+    // A private window searches with its own engine (Settings › Search engine › Private windows).
+    setSearchEngine(this.isPrivate ? s.privateSearchEngine : s.searchEngine);
   }
 
   /** The window title: "<title> – Deer" for a web page, "Deer" on Home; private windows say so. */
