@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reflow</title>
+<!-- A responsive article like Wikipedia's Vector 2022 skin: in a window as wide as the peek sheet the
+     side columns are folded away; in a wider window they are pinned beside the text, which gets
+     narrower and wraps into more lines. ?js: the page's script pins them after a resize (a class on
+     <html>, a moment later, as Wikipedia's does) instead of a media query. -->
+<style>
+  html { background: #fff; }
+  body { margin: 0; color: #202122; font: 16px/1.6 "Segoe UI", system-ui, sans-serif; }
+  header { height: 56px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; border-bottom: 1px solid #c8ccd1; }
+  .page { display: flex; gap: 24px; padding: 0 24px; }
+  .side { display: none; flex: none; }
+  .side.left { width: 220px; }
+  .side.right { width: 200px; }
+  .side .box { position: sticky; top: 24px; height: 300px; background: #f8f9fa; }
+  article { flex: 1; min-width: 0; max-width: 960px; margin: 0 auto; }
+  h1 { margin: 16px 0; font-size: 28px; font-weight: 400; }
+  p { margin: 0 0 12px; }
+  @media (min-width: 1200px) { html:not(.js) .side { display: block; } }
+  html.js.wide .side { display: block; }
+</style>
+</head>
+<body>
+<header>Reflow</header>
+<div class="page">
+  <nav class="side left"><div class="box"></div></nav>
+  <article>
+    <h1>Reflow</h1>
+    <p><a id="peek-link" href="reflow.html?n=2">The same article</a> in a peek.</p>
+  </article>
+  <aside class="side right"><div class="box"></div></aside>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const article = document.querySelector("article");
+  const words = "glass is an amorphous solid that is transparent and has many uses in windows tableware and optics it is made by fusing sand soda ash and lime at a high temperature".split(" ");
+  for (let i = 1; i <= 60; i++) {
+    const p = document.createElement("p");
+    p.id = "p" + i;
+    let text = "Paragraph " + i + ".";
+    for (let k = 0; k < 40 + ((i * 17) % 30); k++) text += " " + words[(i * 7 + k * 3) % words.length];
+    p.textContent = text + ".";
+    article.append(p);
+  }
+  if (params.has("js")) {
+    document.getElementById("peek-link").search = "?n=2&js";
+    const root = document.documentElement;
+    root.classList.add("js");
+    const pin = () => root.classList.toggle("wide", innerWidth >= 1200);
+    pin();
+    let timer = 0;
+    addEventListener("resize", () => {
+      clearTimeout(timer);
+      timer = setTimeout(pin, 50);
+    });
+  }
+</script>
+</body>
+</html>

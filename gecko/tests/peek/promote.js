@@ -109,4 +109,43 @@ spike.main(async () => {
   await spike.capture("promote-4-replaced-home");
   const info = P.tabsInfo();
   check("no hidden tabs left", info.hidden === 0, info);
+
+  // ---- 6. a scrolled page that reflows at the window's width -----------------------------------------
+  // The sheet (1040 px) is narrower than the window (1440 px). A responsive page (pages/reflow.html,
+  // laid out as Wikipedia's Vector 2022 skin) pins side columns once it is a tab, its text column gets
+  // narrower and the text above the reader wraps into more lines. The strip adds 68 px above, and
+  // scroll anchoring keeps the paragraph at the top of the view where it was: scrollY grows by the
+  // strip plus what the text above grew by, not by the strip alone (tests/peek/real.js on Wikipedia,
+  // 2026-10-08: 68 + 26). ?js pins the columns from the page's script a moment after the resize.
+  for (const variant of ["", "&js"]) {
+    const name = variant ? "script" : "media query";
+    await P.load(P.page("reflow.html?n=1" + variant));
+    await P.shiftClick("#peek-link");
+    const brR = await P.waitOpen("n=2");
+    const rr = brR.getBoundingClientRect();
+    spike.EU.synthesizeWheelAtPoint(rr.left + rr.width / 2, rr.top + 300, { deltaY: 600, deltaMode: 0 }, window);
+    await sleep(800);
+    const view = () =>
+      P.inContent(brR, (w) => {
+        const d = w.document;
+        // The paragraph at the top of the view in the sheet, followed through the promotion.
+        w.__peekTop ??= Array.from(d.querySelectorAll("article p[id]")).find((p) => p.getBoundingClientRect().bottom > 2);
+        return { y: w.scrollY, width: w.innerWidth, side: w.getComputedStyle(d.querySelector(".side")).display, top: w.__peekTop?.id, at: w.__peekTop?.getBoundingClientRect().top };
+      });
+    const v0 = await view();
+    const loadsR = P.countLoads(brR);
+    await P.focusPeek();
+    P.press("Alt+Enter");
+    await waitFor(() => gBrowser.selectedBrowser === brR && !peek().isOpen() && !sheet().shown, { timeout: 6000, what: "promotion" });
+    await sleep(1200);
+    loadsR.stop();
+    const v1 = await view();
+    log("reflow " + name, v0, v1, { dy: v1.y - v0.y, loads: loadsR.loads });
+    check(`(${name}) the page reflows at the window's width: its side columns are pinned in the tab, not in the sheet`, v0.width < v1.width && v0.side === "none" && v1.side === "block" && v0.y > 0, { v0, v1 });
+    check(
+      `(${name}) Open as tab on a page that reflows: no reload, the paragraph at the top of the view stays where it was, scrollY grows by the strip and the text above that rewrapped`,
+      loadsR.loads === 0 && v0.top === v1.top && Math.abs(v1.at - v0.at) <= 1 && v1.y - v0.y > 68 + 2,
+      { top: [v0.top, v0.at, v1.at], dy: v1.y - v0.y, loads: loadsR.loads }
+    );
+  }
 });

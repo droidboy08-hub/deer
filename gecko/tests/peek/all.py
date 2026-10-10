@@ -12,7 +12,8 @@ origin in VITRE_PEEK_XSITE). Build first:  node tools/build.mjs --out=build-peek
               history), close by a click on the dim (wash, focus back on the link)
   promote     Open as tab keeps the page (same browsing context and process, no load, counter and
               typed text kept), the new pill right of its source, the inset back, header double-click,
-              promote over Home, outside selection of the peek's tab
+              promote over Home, outside selection of the peek's tab, a scrolled page that reflows at
+              the window's width keeps the paragraph at the top of the view in place (pages/reflow.html)
   esc         Esc (page first), Esc Esc on a page that keeps Esc, the nudge after typing, key repeat,
               a lower Esc layer, Ctrl+W, a click on the dim
   real        a real site (Wikipedia) in a peek and promoted

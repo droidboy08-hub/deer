@@ -46,16 +46,48 @@ spike.main(async () => {
   const r = br.getBoundingClientRect();
   spike.EU.synthesizeWheelAtPoint(r.left + r.width / 2, r.top + 300, { deltaY: 600, deltaMode: 0 }, window);
   await sleep(800);
-  const y0 = (await P.state(br)).scrollY;
+  // The live page is laid out differently at the window's width than at the sheet's (Wikipedia pins
+  // its contents and Appearance columns beside the text at 1440 px, not at 1040 px; a fundraising
+  // banner above the article rewraps too) and differs from run to run (banners, late images), so
+  // scrollY grows by the strip plus whatever scroll anchoring makes of the reflow, and which text
+  // stays still depends on the element Gecko anchors (2026-10-08..10: +68, +94; the top text moved
+  // 0, -25 or -34 px). Here: no reload and the scroll position kept (on by at least the strip); that
+  // the content stays in place on a page that reflows is checked on a local page (promote.js 6).
+  // The text at the top of the view is logged for diagnosis.
+  const topOf = () =>
+    P.inContent(br, (w) => {
+      const d = w.document;
+      const box = (n) => {
+        const r = d.createRange();
+        r.selectNodeContents(n);
+        return r.getBoundingClientRect();
+      };
+      if (!w.__peekTop) {
+        const walker = d.createTreeWalker(d.getElementById("mw-content-text"), 4 /* NodeFilter.SHOW_TEXT */);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          if (!n.data.trim() || n.parentElement.closest("table, figure, .infobox, style, script")) continue;
+          const r = box(n);
+          if (r.height > 0 && r.bottom > 2) {
+            w.__peekTop = n;
+            break;
+          }
+        }
+      }
+      const n = w.__peekTop;
+      return { y: w.scrollY, text: n?.data.trim().slice(0, 30), at: n ? box(n).top : null };
+    });
+  const t0 = await topOf();
+  const y0 = t0.y;
   const loads = P.countLoads(br);
   await P.focusPeek();
   P.press("Alt+Enter");
   await waitFor(() => gBrowser.selectedBrowser === br && !peek().isOpen() && !sheet().shown, { timeout: 6000, what: "promotion" });
   await sleep(1200);
   loads.stop();
-  const y1 = (await P.state(br)).scrollY;
-  log("scroll", { before: y0, after: y1, loads: loads.loads });
-  check("Open as tab on a real site: no reload, the scroll position kept (the strip keeps the content in place)", loads.loads === 0 && y0 > 0 && Math.abs(y1 - y0 - 68) <= 2, { y0, y1, loads: loads.loads });
+  const t1 = await topOf();
+  const y1 = t1.y;
+  log("scroll", { before: t0, after: t1, loads: loads.loads });
+  check("Open as tab on a real site: no reload, the scroll position kept (on by at least the strip)", loads.loads === 0 && y0 > 0 && y1 - y0 >= 66, { y0, y1, top: [t0.text, t0.at, t1.at], loads: loads.loads });
   await spike.capture("real-2-promoted");
 
   // Ctrl+Q on the hovered link of the promoted article.
