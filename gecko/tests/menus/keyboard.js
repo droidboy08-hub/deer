@@ -41,7 +41,8 @@ spike.main(async () => {
   check("keyboard: access keys underlined", st.classes.includes("keys"), st.classes);
   check("keyboard: 4 px below the link, left-aligned to it", Math.abs(st.rect.left - link.x) <= 2 && Math.abs(st.rect.top - (link.bottom + 4)) <= 2, { menu: [st.rect.left, st.rect.top], link: [link.x, link.bottom] });
   const underlined = [...document.querySelectorAll("#layer-menus .vt-menu.keys .vt-ak")].map((e) => e.textContent).join("");
-  check("keyboard: the designed access letters", underlined.toUpperCase() === "TPWEDN", underlined);
+  // R: Open link in new private window (2026-10-10, under Open link in new window).
+  check("keyboard: the designed access letters", underlined.toUpperCase() === "TPWREDN", underlined);
   await capture("keyboard-link");
 
   // ---- moving ----
@@ -77,8 +78,9 @@ spike.main(async () => {
   M.key("KEY_ArrowDown");
   M.key("KEY_ArrowDown");
   M.key("KEY_ArrowDown");
+  M.key("KEY_ArrowDown");
   M.setClipboard("before");
-  check("Down x3 lands on Copy link address", M.labels()[M.state().active] === "Copy link address", M.state().active);
+  check("Down x4 lands on Copy link address (past the separator)", M.labels()[M.state().active] === "Copy link address", M.state().active);
   M.key("KEY_Enter");
   check("Enter runs it", (await M.clipboardIs(M.page("counter.html"))) === M.page("counter.html"));
   await M.waitClosed();

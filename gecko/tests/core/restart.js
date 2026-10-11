@@ -20,6 +20,7 @@ spike.main(async () => {
     shiftClick: "window",
     rebind: { peekLink: "Ctrl+K", switcherSearch: "Ctrl+Shift+E" },
     searchEngine: "duckduckgo",
+    privateSearchEngine: "bing",
     downloadsFolder: "D:\\Downloads\\Deer",
     askWhereToSave: true,
     connections: 16,
