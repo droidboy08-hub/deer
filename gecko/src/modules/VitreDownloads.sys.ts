@@ -13,6 +13,12 @@
 //   open(id) / showInFolder(id) / openFolder() / copyAddress(id) / clipboardUrl()
 //   keep(id)                       a download Safe Browsing blocked as uncommon or unwanted: the person
 //                                  keeps it anyway (its quarantined file takes its name)
+//   startOver(id, url?)            a File changed row (view.need 'choice') downloads the file the site
+//                                  has now; the old partial waits as "<name>.old.part" until it completes.
+//                                  With url: a paused file row starts over from that address instead
+//                                  ("Use it and start over")
+//   setAddress(id, url)            "Use another address…": a paused file row continues from a pasted
+//                                  address that proves to be the same file; AddressResult (types.ts)
 //   media                          MediaWatch: notice(browserId), subscribe(fn), offer(...), eme(...)
 //   ffmpeg()                       FfmpegInfo (settings path, bundled copy, the downloaded copy, PATH; or 'none')
 //   installFfmpeg(), ffmpegInstall(), onFfmpegInstall(fn), cancelFfmpegInstall()
@@ -50,6 +56,16 @@
 //     a tab that used EME offers nothing (media.ts), and start() refuses a stream, a picked video or
 //     a media address (MEDIA_URL) for a tab (opts.browserId) that uses DRM, whoever asks (throws
 //     DownloadError with the "protected" message).
+//   - Never lose or mix bytes (spikes/downloader/RESUME-DESIGN.md, Phase 1): a download whose address
+//     now refuses it or answers with a page pauses as Link expired (need 'address') with its bytes;
+//     one whose file changed on the site pauses as File changed (need 'choice') with its .part
+//     untouched, unless under 1 MiB was saved (it then starts again by itself, at most twice in ten
+//     minutes). The store keeps a .bak of its previous copy and is flushed on state changes.
+//   - Renewing an address (RESUME-DESIGN.md Phase 2, downloads/renew.ts): a file download whose address
+//     refuses or expires asks its original address and redirect hops again; one that proves to be the
+//     same file (downloads/proof.ts) is adopted and the download carries on from its segments. Found
+//     nowhere: Link expired, tried again by itself 2 min, 15 min, 1 h and 6 h after the failure
+//     (rec.wait, one timer for the earliest), or from an address the person pastes (setAddress).
 //   - Quit while downloads run: refused (quit-application-requested), the window shows its prompt;
 //     a quit that goes ahead pauses everything, resumable, and the list (with every segment) is
 //     written before the profile closes. Unfinished downloads come back paused.
@@ -72,7 +88,7 @@
 import { VitreSettings } from 'chrome://vitre/content/modules/VitreSettings.sys.mjs';
 import { AsyncShutdown } from 'resource://gre/modules/AsyncShutdown.sys.mjs';
 import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
-import { clearInterval, setInterval, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
+import { clearInterval, clearTimeout, setInterval, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { findFfmpeg, forgetFfmpeg } from './downloads/ffmpeg';
 import { cancelFfmpegInstall, ffmpegInstallDir, ffmpegInstallState, installFfmpeg, oldFolder, onFfmpegInstall, type FfmpegInstallState } from './downloads/ffmpeg-install';
 import { DRM_MESSAGE, StreamTransfer, streamEstimate, streamFills, trackPart, type StreamState } from './downloads/hls';
@@ -80,13 +96,15 @@ import { RateLimiter } from './downloads/limiter';
 import { MediaWatch } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
 import { categoryOf, chooseName, extOf, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
-import { AbortedError, DiskError, DownloadError, Identity, describeError } from './downloads/net';
-import { existsSync } from './downloads/partfile';
+import { AbortedError, ChangedError, DiskError, DownloadError, Identity, classify, describeError } from './downloads/net';
+import { existsSync, fileFor } from './downloads/partfile';
 import * as platform from './downloads/platform';
+import { ASK_ABOVE, UNSURE, proveAddress, readKind, sizeText, type Candidate, type Found } from './downloads/proof';
 import { asPolicy, readReferrerInfo } from './downloads/referrer';
 import { mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
-import { FileTransfer, fileFills, type FileState, type TransferEnv } from './downloads/ranged';
-import type { DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, StartOptions } from './downloads/types';
+import { FileTransfer, fileFills, hasRoom, type FileState, type TransferEnv } from './downloads/ranged';
+import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
+import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, StartOptions, WaitFor } from './downloads/types';
 import { YtdlpTransfer, cancelToolsInstall, installTools, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
 
 declare global {
@@ -98,7 +116,15 @@ declare global {
 const MAX_ACTIVE = 2;
 const TICK = 250;
 const SAVE_EVERY = 2000;
-const STORE_VERSION = 1;
+/** While downloads run, a save reaches the disk (flushed) at least this often (RESUME-DESIGN.md 5.6). */
+const FLUSH_EVERY = 30000;
+/**
+ * 2 (RESUME-DESIGN.md 5.6): {version, session, items}, written with a .bak of the previous copy and
+ * flushed on state changes. Version 1 files load (load() fills in what they lack).
+ */
+const STORE_VERSION = 2;
+/** Attempts of the schedule that fell due while Deer was closed wait this long after start (renewing, Phase 2). */
+const WAIT_GRACE = 5000;
 const ACTIVE: DownloadState[] = ['starting', 'queued', 'downloading'];
 const FINISHED: DownloadState[] = ['completed', 'cancelled', 'failed'];
 const ORDER: Record<DownloadState, number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
@@ -160,7 +186,32 @@ interface Rec {
   blocked?: Exclude<Verdict, 'safe'>;
   /** Where a blocked file waits ("<path>.blocked") until it is kept, retried or removed. */
   quarantine?: string;
+  /**
+   * The person must act; the row is paused and nothing is lost (RESUME-DESIGN.md 5.1, Phase 1 kinds):
+   * 'address' = Link expired (the address refused or answers with a page), 'choice' = File changed.
+   */
+  need?: { kind: NeedKind; since: number; status?: number; evidence?: string; candidate?: NeedCandidate };
+  /**
+   * Deer comes back to this paused row by itself (RESUME-DESIGN.md 5.1). Phase 2: 'address', the next
+   * attempt to renew a Link expired row's address (renew.ts schedule): `tries` attempts so far, the
+   * next at `nextAt` (0: none planned). Saved with the row, so the schedule survives restarts.
+   */
+  wait?: { for: WaitFor; since: number; nextAt: number; tries: number; status?: number };
+  /**
+   * An attempt of the schedule proved an address and attached it: the `tries` the next Link expired
+   * takes if the run it queued fails before it saves a byte, so a host that passes the proof but
+   * refuses the transfer still runs out of attempts (review of Phase 2). Cleared once a run saves bytes
+   * and by any manual action.
+   */
+  renewTries?: number;
+  /** The last history lines (at most 5): every automatic fix leaves one (RESUME-DESIGN.md 6). */
+  events?: { at: number; text: string }[];
+  /** Start over kept the old partial files here ("<name>.old.part") until the new file completes (owner's decision 2). */
+  oldParts?: string[];
 }
+
+/** The address that gives the other version of a File changed row's file, kept for Start over (RESUME-DESIGN.md 5.1). */
+type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string };
 
 /** Why a finished file was blocked, as the row says it. */
 const BLOCKED: Record<Exclude<Verdict, 'safe'>, string> = {
@@ -177,10 +228,16 @@ interface Run {
   firefox: any;
   samples: { t: number; bytes: number }[];
   speed: number;
-  phase: '' | 'probing' | 'merging';
+  phase: '' | 'probing' | 'merging' | 'renewing';
   last: number;
+  /** The in-run renewal hook's limits (renew.ts Gate), made on its first use. */
+  gate?: Gate;
+  /** The status that started this run's renewal (the Renewing link caption). */
+  status?: number;
   /** Resume was asked while the pause was still stopping the connections: queue again once stopped. */
   resumeAfter?: boolean;
+  /** Bytes saved when the run started: a run that ends with more made progress (renewTries). */
+  saved0?: number;
 }
 
 /**
@@ -274,7 +331,22 @@ class Manager {
   private ticker: any = null;
   private flushTimer: any = null;
   private lastSave = 0;
+  private lastFlushed = 0;
   private saving: Promise<void> = Promise.resolve();
+  /** This session as the store records it; clean only in the save at quit (crash detection is Phase 4). */
+  private session = { startedAt: Date.now(), clean: false };
+  /** Rows whose Start over is writing its decision (startOver()). */
+  private deciding = new Set<string>();
+  /** Rows whose address is being renewed outside a run (an attempt of the schedule, a pasted address), with its stop. */
+  private renewing = new Map<string, AbortController>();
+  /** When a row's last renewal found nothing: not asked again within FORGET_FAILURE (renew.ts). */
+  private renewFailed = new Map<string, number>();
+  /**
+   * The one timer for the earliest wait.nextAt (RESUME-DESIGN.md 3.0): the ticker stops when nothing
+   * runs, so waiting rows have their own. Re-armed at load and on every save.
+   */
+  private waitTimer: any = null;
+  private loadedAt = 0;
   private global = new RateLimiter(() => Number(settings().speedLimitKBps) || 0);
   private started = false;
   private quitting = false;
@@ -299,6 +371,8 @@ class Manager {
       this.scratch = PathUtils.join(PathUtils.profileDir, 'vitre-download-scratch');
       await this.load();
       this.installLifecycle();
+      this.loadedAt = Date.now();
+      this.armWaits();
       try {
         this.media.install();
       } catch (e) {
@@ -318,14 +392,41 @@ class Manager {
   }
 
   private async load(): Promise<void> {
+    // An unreadable or missing store falls back to the copy the last flushed save kept (.bak), instead
+    // of starting empty and writing the empty list over it (RESUME-DESIGN.md 5.6, G4 store safety).
+    // As JSONFile does (gre/modules/JSONFile.sys.mjs), a copy that can't be read is set aside as
+    // "<file>.corrupt" before anything is written: when both are unreadable, neither is ever
+    // overwritten by the empty list the next save writes (review of Phase 1).
     let saved: { version?: number; items?: Rec[] } | null = null;
-    try {
-      saved = await IOUtils.readJSON(this.storePath);
-    } catch {
-      saved = null;
+    for (const path of [this.storePath, this.storePath + '.bak']) {
+      try {
+        const read = await IOUtils.readJSON(path);
+        saved = read && Array.isArray(read.items) ? read : null;
+      } catch {
+        saved = null;
+      }
+      if (saved) {
+        if (path !== this.storePath) {
+          console.warn('Deer downloads: the download list could not be read; its backup copy was used');
+          await IOUtils.copy(path, this.storePath).catch(() => undefined);
+        }
+        break;
+      }
+      if (await IOUtils.exists(path).catch(() => false)) {
+        console.warn('Deer downloads: an unreadable copy of the download list was set aside', path);
+        await IOUtils.move(path, path + '.corrupt').catch(() => undefined);
+      }
     }
     for (const r of saved?.items ?? []) {
       if (!r?.id || !r.url || typeof r.url !== 'string') continue;
+      // Version 1 records (RESUME-DESIGN.md 5.8): the row's type stands in for what the first probe
+      // would have recorded, but only as a guess (it may be Firefox's, or empty for a named row): R1
+      // then takes only a page or JSON for "not the file" (ranged.ts notFile(); review of Phase 1).
+      if (r.file && r.file.contentType === undefined) {
+        r.file.contentType = typeof r.mime === 'string' ? r.mime : '';
+        r.file.typeGuessed = true;
+      }
+      if (r.file) settleSegments(r.file);
       if (ACTIVE.includes(r.state)) {
         // Firefox's own transfers don't survive a restart; Deer's carry on from their .part files.
         if (r.mode === 'browser' || r.state === 'starting') {
@@ -335,6 +436,8 @@ class Manager {
       }
       r.hold = false;
       r.note ??= '';
+      // Only a paused row waits (Link expired's schedule); anything else lost its wait.
+      if (r.wait && (r.state !== 'paused' || r.mode !== 'file' || !r.file)) r.wait = undefined;
       r.identity = new Identity(r.identity ?? {}).toJSON();
       this.recs.push(r);
     }
@@ -466,7 +569,7 @@ class Manager {
 
   private added(rec: Rec, origin: { x: number; y: number } | null): void {
     this.emit({ kind: 'added', view: this.view(rec, false), origin, browserId: rec.browserId });
-    this.save();
+    this.save(true);
   }
 
   // ---- Firefox's own downloads ----
@@ -572,7 +675,7 @@ class Manager {
     if (rec.state === 'queued') this.warm.set(rec.id, transfer);
     else transfer.dropPending();
     this.touch(rec);
-    this.save();
+    this.save(true);
     this.pump();
   }
 
@@ -630,7 +733,7 @@ class Manager {
         rec.state = 'failed';
         rec.error = download.error.becauseTargetFailed ? 'Couldn’t write to the downloads folder.' : 'The download was interrupted.';
         this.runs.delete(id);
-        this.save();
+        this.save(true);
       } else if (!download.stopped) {
         rec.state = 'downloading';
         rec.error = '';
@@ -682,7 +785,7 @@ class Manager {
       rec.state = 'failed';
       rec.error = describeError(err);
       this.touch(rec);
-      this.save();
+      this.save(true);
     }
   }
 
@@ -713,6 +816,7 @@ class Manager {
 
   private launch(rec: Rec): void {
     const run = this.makeRun();
+    run.saved0 = savedBytes(rec);
     this.runs.set(rec.id, run);
     rec.state = 'downloading';
     rec.error = '';
@@ -723,6 +827,7 @@ class Manager {
     job.then(
       async () => {
         this.runs.delete(rec.id);
+        rec.renewTries = undefined;
         await this.complete(rec);
         this.pump();
       },
@@ -736,15 +841,20 @@ class Manager {
     this.warm.delete(rec.id);
     rec.file = transfer.state;
     run.transfer = transfer;
+    // A File changed row is only checked again here, never started over (RESUME-DESIGN.md 3 G3).
+    transfer.silentRestarts = rec.need?.kind !== 'choice';
     if (!transfer.state.probed || transfer.received > 0) {
       run.phase = 'probing';
       this.touch(rec);
-      const info = await transfer.probe(run.ac.signal);
+      const info = await transfer.check(run.ac.signal, rec.path ? `${rec.path}.part` : '');
       if (!rec.path && !rec.named) {
         rec.filename = chooseName({ disposition: info.disposition, url: info.finalUrl, mime: info.contentType, title: rec.videoKey ? rec.title : '', suggested: rec.filename || nameFromUrl(rec.url) || undefined });
         rec.mime = info.contentType;
       }
     }
+    // The address gives the same file again: the row no longer needs the person or waits.
+    rec.need = undefined;
+    rec.wait = undefined;
     run.phase = '';
     rec.total = transfer.state.total;
     if (!rec.path) {
@@ -752,8 +862,11 @@ class Manager {
       await this.reserve(rec);
     }
     this.touch(rec);
-    this.save();
+    this.save(true);
     const part = `${rec.path}.part`;
+    // A new answer checked in "<part>.new" by a run that never ended (a crash) is left over: it goes
+    // before this run, which writes its own if it needs one (review of Phase 1).
+    await IOUtils.remove(`${part}.new`, { ignoreAbsent: true }).catch(() => undefined);
     await transfer.download(part, run.ac.signal);
     await this.placeFinished(rec, part);
   }
@@ -762,17 +875,19 @@ class Manager {
     const state = rec.stream ?? StreamTransfer.fresh(rec.url);
     rec.stream = state;
     const transfer = new StreamTransfer(state, { ...this.env(rec, run), ffmpeg: () => this.ffmpeg() });
+    transfer.silentRestarts = rec.need?.kind !== 'choice';
     run.transfer = transfer;
     run.phase = 'probing';
     this.touch(rec);
     await transfer.prepare(run.ac.signal);
+    rec.need = undefined;
     run.phase = '';
     if (!rec.path) {
       if (!rec.named) rec.filename = rec.filename.replace(/\.(mp4|m4a|ts|aac|webm|weba)$/i, '') + transfer.expectedExtension();
       if (!(await this.confirmPath(rec))) throw new SaveDeclined();
       await this.reserve(rec);
     }
-    this.save();
+    this.save(true);
     const base = stem(rec.path);
     await transfer.download(base, run.ac.signal);
     run.phase = 'merging';
@@ -793,7 +908,7 @@ class Manager {
       await this.reserve(rec);
     }
     this.touch(rec);
-    this.save();
+    this.save(true);
     const merging = setInterval(() => {
       if (transfer.phase === 'merging' && run.phase !== 'merging') {
         run.phase = 'merging';
@@ -836,7 +951,8 @@ class Manager {
 
   private taken(p: string, except: string): boolean {
     const key = p.toLowerCase();
-    return this.recs.some((r) => r.id !== except && r.path.toLowerCase() === key && !FINISHED.includes(r.state));
+    // A partial Start over keeps aside ("<name>.old.part") is reserved like a download's own .part.
+    return this.recs.some((r) => r.id !== except && ((r.path.toLowerCase() === key && !FINISHED.includes(r.state)) || (r.oldParts ?? []).some((o) => o.toLowerCase() === `${key}.part`)));
   }
 
   /** "Ask where to save each file": the Windows save dialog, once, before the first byte is written. */
@@ -853,6 +969,8 @@ class Manager {
   }
 
   private async complete(rec: Rec): Promise<void> {
+    // The new file is complete: the partial Start over kept goes now (owner's decision 2).
+    this.dropOldParts(rec);
     // Safe Browsing, for what the engine fetched itself (Firefox checked its own mirrored ones).
     if (rec.path && rec.mode !== 'browser' && /^https?:/i.test(rec.url)) {
       let size = rec.received;
@@ -871,6 +989,7 @@ class Manager {
     rec.state = 'completed';
     rec.finishedAt = Date.now();
     rec.error = '';
+    rec.need = undefined;
     try {
       rec.total = rec.received = (await IOUtils.stat(rec.path)).size;
     } catch {
@@ -881,7 +1000,13 @@ class Manager {
     if (rec.path) await platform.markOfTheWeb(rec.path, rec.url, rec.identity.pageUrl, rec.identity.isPrivate, asPolicy(rec.identity.referrerPolicy));
     this.touch(rec);
     this.settle(rec);
-    this.save();
+    this.save(true);
+  }
+
+  /** The partial files Start over kept aside go (the new file completed, or the row was cancelled or removed). */
+  private dropOldParts(rec: Rec): void {
+    for (const p of rec.oldParts ?? []) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    rec.oldParts = undefined;
   }
 
   /** A finished file Safe Browsing blocked (see the header): deleted, or kept aside as "<path>.blocked". */
@@ -906,7 +1031,7 @@ class Manager {
     rec.error = BLOCKED[verdict];
     this.touch(rec);
     this.settle(rec);
-    this.save();
+    this.save(true);
   }
 
   /** The person keeps a file Safe Browsing blocked as uncommon or unwanted: it takes its name. */
@@ -935,7 +1060,7 @@ class Manager {
     }
     await platform.markOfTheWeb(target, rec.url, rec.identity.pageUrl, rec.identity.isPrivate, asPolicy(rec.identity.referrerPolicy));
     this.touch(rec);
-    this.save();
+    this.save(true);
   }
 
   /** A blocked file waiting aside goes for good (Retry, Remove). */
@@ -953,20 +1078,45 @@ class Manager {
       return;
     }
     if (run.transfer) rec.received = run.transfer.received;
+    // A run that saved bytes ends what an attach left of the schedule (renewTries).
+    if (savedBytes(rec) > (run.saved0 ?? 0)) rec.renewTries = undefined;
+    const { kind, status } = classify(err);
     if (run.reason === 'pause' && run.resumeAfter && !this.quitting) {
       // Pause, then Resume before the connections had stopped: the last word wins.
       rec.state = 'queued';
       rec.queuedAt = queueStamp();
     } else if (run.reason === 'pause' || run.reason === 'quit') rec.state = 'paused';
     else if (run.reason === 'cancel' || (err instanceof AbortedError && !run.reason)) this.markCancelled(rec);
-    else {
+    else if ((kind === 'refused' || kind === 'not-file') && (rec.mode === 'file' || rec.mode === 'stream') && savedBytes(rec) > 0) {
+      // RESUME-DESIGN.md 3.0: the address no longer gives the file, and the run's renewal hook found
+      // no new one (the attempt at the failure). Nothing saved is lost: the row pauses as Link expired
+      // and Retry tries the address again. A file row is also tried again by itself 2 min, 15 min, 1 h
+      // and 6 h after the failure (renew.ts; a stream's renewal comes with Phase 6). With nothing
+      // saved it fails as before. A run an attempt of the schedule queued, that failed before it
+      // saved a byte, carries on that schedule instead of starting it again (renewTries; review of
+      // Phase 2: a host that passes the proof but refuses the transfer was asked every 2 minutes).
+      const now = Date.now();
+      const tries = rec.renewTries ?? 1;
+      rec.renewTries = undefined;
+      rec.state = 'paused';
+      rec.error = '';
+      rec.need = { kind: 'address', since: now, status };
+      rec.wait = rec.mode === 'file' ? { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status } : undefined;
+    } else if (kind === 'changed' && (rec.mode === 'file' || rec.mode === 'stream')) {
+      // The file on the site is another one (3 G3): stop with the .part untouched and ask. A renewal
+      // that found the other version keeps its address for Start over (need.candidate).
+      rec.state = 'paused';
+      rec.error = '';
+      rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: err instanceof ChangedError ? err.candidate : undefined };
+      rec.wait = undefined;
+    } else {
       rec.state = 'failed';
-      rec.error = describeError(err);
+      rec.error = kind === 'not-file' && rec.file?.guarded ? 'Start this download again from its page.' : describeError(err);
       if (!(err instanceof DownloadError) && !(err instanceof DiskError)) console.warn('Deer downloads: failed', rec.url, String(err));
     }
     this.touch(rec);
     this.settle(rec);
-    this.save();
+    this.save(true);
     this.pump();
   }
 
@@ -980,11 +1130,14 @@ class Manager {
   private markCancelled(rec: Rec): void {
     rec.state = 'cancelled';
     rec.finishedAt = Date.now();
+    rec.need = undefined;
+    rec.wait = undefined;
+    this.stopRenewing(rec.id);
     this.removeParts(rec);
     this.rewind(rec);
     this.touch(rec);
     this.settle(rec);
-    this.save();
+    this.save(true);
   }
 
   /** Back to the start: no partial file, no place on disk, no measurements (Retry after Cancel, Download again). */
@@ -1014,6 +1167,9 @@ class Manager {
     const parts =
       rec.mode === 'stream' && rec.stream ? [...rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)), `${stem(rec.path)}.merge.part`] : [`${rec.path}.part`];
     for (const p of parts) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    // What Phase 1 adds next to them: a new single-stream answer being checked, and Start over's old partial.
+    if (rec.mode === 'file') IOUtils.remove(`${rec.path}.part.new`, { ignoreAbsent: true }).catch(() => undefined);
+    this.dropOldParts(rec);
   }
 
   // ---- commands ----
@@ -1042,16 +1198,29 @@ class Manager {
         this.touch(rec);
         return;
       }
+    } else if (rec.state === 'paused' && (rec.wait || this.renewing.has(id))) {
+      // RESUME-DESIGN.md 6 and G4: Pause on a row Deer comes back to by itself cancels the attempt
+      // running (Renewing link) and the ones planned, and keeps the bytes; the row still says what it
+      // needs (Link expired) and Retry starts again (review of Phase 2).
+      this.stopRenewing(id);
+      rec.wait = undefined;
     } else return;
     this.touch(rec);
     this.settle(rec);
-    this.save();
+    this.save(true);
     this.pump();
   }
 
   resume(id: string, now = false): void {
     const rec = this.find(id);
-    if (!rec) return;
+    // While Start over writes its decision, the row is neither checked again nor started.
+    if (!rec || this.deciding.has(id)) return;
+    // A manual action: an attempt of the schedule gives way, and the count starts again (renew.ts),
+    // and the original address is asked again even right after a renewal failed (review of Phase 2).
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
+    rec.wait = undefined;
+    rec.renewTries = undefined;
     if (rec.state === 'completed') {
       // Download again: only when the finished file is gone.
       if (rec.path && existsSync(rec.path)) return;
@@ -1085,12 +1254,16 @@ class Manager {
         rec.state = 'failed';
         rec.error = 'Start this download again from its page.';
         this.touch(rec);
-        this.save();
+        this.save(true);
         return;
       }
-      // Firefox can't carry on: start over with Deer's engine.
+      // Firefox can't carry on: start over with Deer's engine. Its first answer must be the file
+      // Firefox was getting (RESUME-DESIGN.md G1, browser-mode rows; Phase 1 guard): a page where
+      // Firefox had a file (a form's answer, a one-time link) ends the row with "Start this download
+      // again from its page." instead of being saved as the download.
       rec.mode = 'file';
-      rec.file = null;
+      // Firefox's type is a guess about the server's: only a page or JSON answer counts against it.
+      rec.file = { ...FileTransfer.fresh(rec.url), contentType: rec.mime, typeGuessed: true, guarded: true };
       rec.path = '';
     }
     if (!['paused', 'failed', 'cancelled', 'queued'].includes(rec.state)) return;
@@ -1102,7 +1275,111 @@ class Manager {
     this.touch(rec);
     if (now && !this.runs.has(id)) this.launch(rec);
     this.pump();
-    this.save();
+    this.save(true);
+  }
+
+  /**
+   * File changed (need 'choice'): start over with the file the site has now (RESUME-DESIGN.md 3 G3,
+   * the owner's decision 2). The old partial file is kept as "<name>.old.part" until the new file
+   * completes, or deleted at once when the disk has no room for both. Same address, same name.
+   * Review of Phase 1:
+   *   - the decision reaches the disk first: the store names the old parts (flushed) before they are
+   *     moved, so a stop in between never leaves one nobody removes;
+   *   - "<name>.old.part" that is another file (another download's partial, the person's own) is never
+   *     touched: the next free "<name>.old (n).part" is used;
+   *   - a part that can't be set aside (another program has it open) stops the Start over: nothing is
+   *     moved or emptied, the row still asks, and its note says why.
+   */
+  async startOver(id: string, url = ''): Promise<void> {
+    const rec = this.find(id);
+    if (!rec) return;
+    // With `url` (Use another address…, "Use it and start over"): a paused file row, from that address.
+    const ready = (): boolean =>
+      this.recs.includes(rec) && rec.state === 'paused' && (url ? rec.mode === 'file' : rec.need?.kind === 'choice') && !this.runs.has(rec.id) && (rec.mode === 'file' || rec.mode === 'stream') && !!rec.path;
+    if (!ready() || this.deciding.has(id) || (url && !/^https?:\/\//i.test(url))) return;
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
+    rec.renewTries = undefined;
+    // Resume waits while the decision is written (resume()).
+    this.deciding.add(id);
+    try {
+      const parts = (rec.mode === 'stream' && rec.stream ? rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)) : [`${rec.path}.part`]).filter((p) => existsSync(p));
+      const before = rec.oldParts ?? [];
+      const moves: Array<[string, string]> = [];
+      for (const p of parts) moves.push([p, this.oldPartFor(rec, p, moves.map(([, old]) => old))]);
+      rec.oldParts = [...new Set([...before, ...moves.map(([, old]) => old)])];
+      await this.save(true);
+      if (!ready()) {
+        // Cancelled or removed meanwhile: only names of files that exist stay recorded.
+        if (rec.oldParts) rec.oldParts = rec.oldParts.filter((p) => existsSync(p));
+        return;
+      }
+      const moved: Array<[string, string]> = [];
+      try {
+        for (const [p, old] of moves) {
+          // Only a partial this row set aside before is replaced (oldPartFor never names another file).
+          if (existsSync(old)) fileFor(old).remove(false);
+          fileFor(p).moveTo(null, PathUtils.filename(old));
+          moved.push([p, old]);
+        }
+      } catch (e) {
+        console.warn('Deer downloads: the old partial file could not be set aside; nothing was started over', String(e));
+        for (const [p, old] of moved.reverse()) {
+          try {
+            fileFor(old).moveTo(null, PathUtils.filename(p));
+          } catch {
+            /* it stays recorded below and goes with the row */
+          }
+        }
+        const still = (rec.oldParts ?? []).filter((p) => existsSync(p));
+        rec.oldParts = still.length ? still : undefined;
+        if (rec.need) rec.need = { ...rec.need, evidence: 'another program has the saved part open; close it and try again' };
+        this.touch(rec);
+        await this.save(true);
+        return;
+      }
+      if (!hasRoom(rec.dir, rec.total > 0 ? rec.total : 0)) this.dropOldParts(rec);
+      // A fresh start at the stored address; the path (and so the name) stays this row's.
+      if (rec.mode === 'stream' && rec.stream) {
+        const s = rec.stream;
+        rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
+      } else rec.file = FileTransfer.fresh(url || rec.file?.url || rec.url);
+      if (url) {
+        rec.url = url;
+        rec.identity = pastedIdentity(rec.identity);
+      }
+      rec.need = undefined;
+      rec.wait = undefined;
+      rec.error = '';
+      rec.received = 0;
+      rec.netBytes = 0;
+      rec.activeMs = 0;
+      rec.peak = 0;
+      rec.state = 'queued';
+      rec.queuedAt = queueStamp();
+      this.touch(rec);
+      await this.save(true);
+    } finally {
+      this.deciding.delete(id);
+    }
+    this.pump();
+  }
+
+  /**
+   * Where Start over sets `part` aside: "<name>.old.part", or "<name>.old (n).part" when that name is
+   * another file or another download's (taken()). A name this row set aside before is its own and is
+   * reused; `planned` are names this Start over already picked.
+   */
+  private oldPartFor(rec: Rec, part: string, planned: string[]): string {
+    const base = part.replace(/\.part$/i, '');
+    const has = (list: string[], name: string): boolean => list.some((x) => x.toLowerCase() === name.toLowerCase());
+    for (let n = 0; n < 1000; n++) {
+      const name = `${base}.old${n ? ` (${n})` : ''}.part`;
+      if (has(planned, name)) continue;
+      if (has(rec.oldParts ?? [], name)) return name;
+      if (!existsSync(name) && !this.taken(name.slice(0, -'.part'.length), rec.id)) return name;
+    }
+    return `${base}.old (${Date.now()}).part`;
   }
 
   cancel(id: string): void {
@@ -1137,10 +1414,12 @@ class Manager {
   }
 
   private removeRec(id: string): void {
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
     this.recs = this.recs.filter((r) => r.id !== id);
     this.dirty.delete(id);
     this.emit({ kind: 'removed', ids: [id] });
-    this.save();
+    this.save(true);
   }
 
   clearFinished(isPrivate?: boolean): void {
@@ -1149,7 +1428,7 @@ class Manager {
     for (const r of this.recs) if (gone.includes(r.id)) this.dropQuarantine(r);
     this.recs = this.recs.filter((r) => !gone.includes(r.id));
     this.emit({ kind: 'removed', ids: gone });
-    this.save();
+    this.save(true);
   }
 
   pauseAll(isPrivate?: boolean): void {
@@ -1295,7 +1574,236 @@ class Manager {
       onBytes: (n) => {
         rec.netBytes += n;
       },
+      seed: rec.id,
+      // Looked up in the download's current run when called: a taken-over download's transfer was
+      // made by the run that probed it.
+      renew: (why, status) => this.renewInRun(rec, why, status),
     };
+  }
+
+  // ---- renewing an address (RESUME-DESIGN.md 3.0, G1; Phase 2) ----
+
+  /**
+   * The in-run renewal hook (TransferEnv.renew): the original address and its redirect hops, asked
+   * once for every connection that hit the dead address (renew.ts Gate), proven against the bytes
+   * certainly in the .part, and adopted into the transfer's state, which is rec.file. CHANGED or
+   * UNKNOWN (R7) there rejects with the ChangedError the row asks about (File changed, its address
+   * kept); nothing found is null, remembered for FORGET_FAILURE. The row reads Renewing link meanwhile.
+   */
+  private renewInRun(rec: Rec, _why: RenewWhy, status: number): Promise<Renewed | null> {
+    const run = this.runs.get(rec.id);
+    const t = run?.transfer;
+    if (!run || !(t instanceof FileTransfer) || rec.mode !== 'file' || !rec.path) return Promise.resolve(null);
+    run.gate ??= new Gate();
+    return run.gate.run(async () => {
+      if (Date.now() - (this.renewFailed.get(rec.id) ?? 0) < FORGET_FAILURE) return null;
+      const s = t.state;
+      const list = addresses(rec.url, s, s.finalUrl);
+      if (!list.length) return null;
+      const phase = run.phase;
+      run.phase = 'renewing';
+      run.status = status;
+      this.touch(rec);
+      try {
+        const out = await originalAddress({ ctx: t.proofCtx(), partPath: `${rec.path}.part`, segments: t.provable(), seed: rec.id }, list, run.ac.signal);
+        if (out.verdict === 'same') {
+          adopt(s, out.found, 'original');
+          this.renewFailed.delete(rec.id);
+          this.event(rec, 'New link found');
+          return { url: s.url, finalUrl: s.finalUrl, validators: { etag: s.etag, lastModified: s.lastModified } };
+        }
+        if (out.verdict !== 'failed') {
+          const err = new ChangedError(out.verdict === 'changed' ? out.evidence : UNSURE);
+          err.candidate = candidateOf(out.found);
+          throw err;
+        }
+        this.renewFailed.set(rec.id, Date.now());
+        return null;
+      } finally {
+        if (run.phase === 'renewing') run.phase = phase;
+        this.touch(rec);
+      }
+    });
+  }
+
+  /**
+   * One attempt of the schedule, outside any run (RESUME-DESIGN.md 3.0 "episode"): the original
+   * address and its hops are proven against the saved bytes while the row stays paused (Renewing
+   * link); it holds no download slot. SAME attaches and the row carries on; CHANGED makes it File
+   * changed (UNKNOWN too, unless at most ASK_ABOVE is saved: then it starts again from the address);
+   * nothing found counts the attempt and plans the next (wait.tries, renew.ts nextTry()).
+   */
+  private async episode(rec: Rec): Promise<void> {
+    const s = rec.file;
+    if (rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.quitting) return;
+    if (!s || rec.mode !== 'file' || !rec.path) {
+      // Nothing to renew: the wait goes, so it never fires again.
+      rec.wait = undefined;
+      return;
+    }
+    const ac = new AbortController();
+    this.renewing.set(rec.id, ac);
+    this.touch(rec);
+    let out: Outcome | null = null;
+    try {
+      const part = `${rec.path}.part`;
+      const list = addresses(rec.url, s, '');
+      const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, part), saved: savedBytes(rec) };
+      out = list.length ? await originalAddress({ ctx, partPath: part, segments: s.segments, seed: rec.id }, list, ac.signal) : { verdict: 'failed', status: 0 };
+    } catch (e) {
+      // Counted as an attempt that found nothing, so an overdue wait never fires again at once.
+      if (!ac.signal.aborted) {
+        console.warn('Deer downloads: renewing the address failed', String(e));
+        out = { verdict: 'failed', status: 0 };
+      }
+    } finally {
+      if (this.renewing.get(rec.id) === ac) this.renewing.delete(rec.id);
+    }
+    // Retry, Cancel, a pasted address or a quit came first: theirs is the last word.
+    if (!out || ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || !rec.wait) {
+      this.touch(rec);
+      this.armWaits();
+      return;
+    }
+    const now = Date.now();
+    if (out.verdict === 'same') {
+      // Counted like a failed attempt until the run it queues saves a byte (renewTries).
+      rec.renewTries = rec.wait.tries + 1;
+      this.attach(rec, out.found, 'original');
+      return;
+    }
+    if (out.verdict === 'unknown' && savedBytes(rec) <= ASK_ABOVE) {
+      // R7 with nothing at stake: a fresh start from the original address.
+      rec.file = FileTransfer.fresh(s.url);
+      rec.need = undefined;
+      rec.wait = undefined;
+      rec.state = 'queued';
+      rec.queuedAt = queueStamp();
+      this.touch(rec);
+      this.save(true);
+      this.pump();
+      return;
+    }
+    if (out.verdict === 'changed' || out.verdict === 'unknown') {
+      rec.need = { kind: 'choice', since: now, evidence: out.verdict === 'changed' ? out.evidence : UNSURE, candidate: candidateOf(out.found) };
+      rec.wait = undefined;
+    } else {
+      this.renewFailed.set(rec.id, now);
+      const tries = rec.wait.tries + 1;
+      rec.wait = { ...rec.wait, tries, nextAt: nextTry(tries, now), status: out.status || rec.wait.status };
+      if (out.status && rec.need) rec.need.status = out.status;
+    }
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /**
+   * A proven address becomes the row's (RESUME-DESIGN.md G1 attach): adopted into rec.file (the old one
+   * goes to address.history); a pasted one also becomes rec.url, with its identity. need and wait are
+   * cleared and the row queues. Segments, path and .part stay, so it carries on under the same name.
+   */
+  private attach(rec: Rec, found: Found, how: 'original' | 'pasted', identity?: IdentityJSON): void {
+    if (!rec.file) return;
+    adopt(rec.file, found, how);
+    if (how === 'pasted') {
+      rec.url = found.url;
+      if (identity) rec.identity = identity;
+    }
+    rec.need = undefined;
+    rec.wait = undefined;
+    rec.error = '';
+    this.renewFailed.delete(rec.id);
+    this.event(rec, how === 'pasted' ? 'Continued from another address' : 'New link found');
+    rec.state = 'queued';
+    rec.queuedAt = queueStamp();
+    this.touch(rec);
+    this.save(true);
+    this.pump();
+  }
+
+  /**
+   * "Use another address…" (RESUME-DESIGN.md G1, 6): an address the person pastes for a paused file
+   * download. It is asked once for window 0 and proven against the saved bytes like any new address
+   * (proof.ts proveAddress()), with the download's container and private state, as a pasted address
+   * (first-party, as Add link sends it). The same file attaches and the row carries on from its
+   * segments; otherwise nothing changes and the result's note says why (the wording of section 6).
+   */
+  async setAddress(id: string, url: string): Promise<AddressResult> {
+    const rec = this.find(id);
+    const no = (kind: AddressResult['kind'], note: string): AddressResult => ({ ok: false, kind, note });
+    if (!rec || rec.mode !== 'file' || !rec.file?.probed || !rec.path) return no('busy', 'Deer can’t use another address for this download.');
+    if (rec.state !== 'paused' || this.runs.has(id) || this.deciding.has(id)) return no('busy', 'Pause the download first.');
+    if (!/^https?:\/\/\S+$/i.test(url)) return no('unreachable', 'Enter a web address that starts with http or https.');
+    // A scheduled attempt gives way to the person's address; a manual action resets what the schedule remembers.
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
+    rec.renewTries = undefined;
+    const ac = new AbortController();
+    this.renewing.set(id, ac);
+    this.touch(rec);
+    const s = rec.file;
+    const part = `${rec.path}.part`;
+    const identity = pastedIdentity(rec.identity);
+    let c: Candidate;
+    try {
+      const ctx = { state: s, identity: new Identity(identity), kind: await readKind(s, part), saved: savedBytes(rec) };
+      c = await proveAddress(ctx, part, s.segments, rec.id, url, ac.signal);
+    } catch {
+      c = { verdict: 'unreachable', status: 0 };
+    } finally {
+      if (this.renewing.get(id) === ac) this.renewing.delete(id);
+      this.touch(rec);
+    }
+    if (ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || this.runs.has(id)) return no('busy', '');
+    if (c.verdict === 'same') {
+      this.attach(rec, c.found, 'pasted', identity);
+      return { ok: true, kind: '', note: '' };
+    }
+    if (c.verdict === 'unknown' && savedBytes(rec) <= ASK_ABOVE) {
+      // R7 with nothing at stake: taken as a fresh start from that address.
+      await this.startOver(id, url);
+      return { ok: true, kind: '', note: '' };
+    }
+    const ours = sizeText(rec.total > 0 ? rec.total : savedBytes(rec));
+    const theirs = c.verdict === 'changed' ? c.found.total : c.verdict === 'refused' && !c.page ? c.total : -1;
+    if (c.verdict === 'changed' || theirs >= 0) return no('different', `That address is a different file (${theirs >= 0 ? `${sizeText(theirs)}; ` : ''}this download is ${ours}).`);
+    if (c.verdict === 'unknown') return no('unknown', 'Deer can’t confirm that address is the same file.');
+    if (c.verdict === 'refused' && c.page) return no('page', 'That address answers with a web page, not the file.');
+    return no('unreachable', 'Deer couldn’t reach that address.');
+  }
+
+  /** An attempt of the schedule or a pasted address's proof for the row stops (Retry, Cancel, Remove, quit). */
+  private stopRenewing(id: string): void {
+    const ac = this.renewing.get(id);
+    if (!ac) return;
+    this.renewing.delete(id);
+    ac.abort();
+  }
+
+  /** One history line for the row (the last 5 are kept): every automatic fix leaves one (RESUME-DESIGN.md 6). */
+  private event(rec: Rec, text: string): void {
+    rec.events = [...(rec.events ?? []), { at: Date.now(), text }].slice(-5);
+  }
+
+  /**
+   * The one timer for the earliest wait.nextAt among paused rows (RESUME-DESIGN.md 3.0). Attempts that
+   * fell due while Deer was closed come WAIT_GRACE after it started.
+   */
+  private armWaits(): void {
+    if (this.waitTimer) clearTimeout(this.waitTimer);
+    this.waitTimer = null;
+    if (this.quitting || !this.loadedAt) return;
+    let next = Infinity;
+    for (const r of this.recs) if (r.wait?.nextAt && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) next = Math.min(next, r.wait.nextAt);
+    if (next === Infinity) return;
+    const now = Date.now();
+    const delay = Math.min(2 ** 31 - 1, Math.max(0, next - now, this.loadedAt + WAIT_GRACE - now));
+    this.waitTimer = setTimeout(() => {
+      this.waitTimer = null;
+      const due = Date.now() + 50;
+      for (const r of [...this.recs]) if (r.wait?.nextAt && r.wait.nextAt <= due && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) void this.episode(r);
+      this.armWaits();
+    }, delay);
   }
 
   private ensureTicker(): void {
@@ -1330,7 +1838,7 @@ class Manager {
       this.dirty.add(id);
     }
     this.flush();
-    if (now - this.lastSave > SAVE_EVERY && this.runs.size) this.save();
+    if (now - this.lastSave > SAVE_EVERY && this.runs.size) this.save(now - this.lastFlushed > FLUSH_EVERY);
     if (!this.runs.size && this.ticker) {
       clearInterval(this.ticker);
       this.ticker = null;
@@ -1374,6 +1882,8 @@ class Manager {
     const fills = r.mode === 'stream' && r.stream ? streamFills(r.stream) : r.file ? fileFills(r.file) : [];
     const multi = r.mode === 'stream' || (!!r.file?.ranges && r.file.total >= 8 * 1024 * 1024);
     const connections = Math.max(1, Math.min(32, Number(s.connections) || 8));
+    const renewing = !pausing && (this.renewing.has(r.id) || run?.phase === 'renewing');
+    const wait = r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
     return {
       id: r.id,
       url: r.url,
@@ -1383,7 +1893,7 @@ class Manager {
       path: r.path,
       category: categoryOf(r.filename, r.mime),
       state: pausing ? 'paused' : r.state,
-      phase: pausing ? '' : (run?.phase ?? ''),
+      phase: pausing ? '' : renewing ? 'renewing' : (run?.phase ?? ''),
       received,
       total,
       speed,
@@ -1408,14 +1918,20 @@ class Manager {
       isPrivate: r.identity.isPrivate,
       blocked: r.state === 'failed' ? (r.blocked ?? '') : '',
       keepable: r.state === 'failed' && !!r.quarantine,
+      need: r.state === 'paused' && !pausing && r.need ? { kind: r.need.kind, status: r.need.status ?? 0, evidence: r.need.evidence ?? '' } : null,
+      wait,
+      nextAt: wait?.nextAt ?? 0,
+      status: r.state === 'paused' ? (r.need?.status ?? 0) : (run?.status ?? 0),
+      history: (r.events ?? []).map((e) => ({ at: e.at, text: e.text })),
     };
   }
 
   // ---- persistence ----
 
-  private persisted(): { version: number; items: Rec[] } {
+  private persisted(): { version: number; session: { startedAt: number; clean: boolean }; items: Rec[] } {
     return {
       version: STORE_VERSION,
+      session: { ...this.session },
       items: this.recs
         .filter((r) => !r.identity.isPrivate)
         .map((r) => {
@@ -1434,12 +1950,27 @@ class Manager {
     };
   }
 
-  /** Atomic: written to a temp file, then moved over the store. */
-  save(): Promise<void> {
+  /**
+   * Atomic: written to a temp file, then moved over the store. `flush` (state changes, every
+   * FLUSH_EVERY while running, quit) makes the OS write it to the disk before the promise resolves,
+   * and the same list is then written, flushed, as the .bak that load() falls back to; progress saves
+   * stay unflushed and leave the .bak alone (RESUME-DESIGN.md 5.6). So the .bak is always the last
+   * flushed list, never one a power loss can catch half-written with the store (review of Phase 1:
+   * backupFile on every save rotated it every 2 s).
+   */
+  save(flush = false): Promise<void> {
     this.lastSave = Date.now();
+    if (flush) this.lastFlushed = this.lastSave;
     if (!this.storePath) return this.saving;
     const data = this.persisted();
-    this.saving = this.saving.then(() => IOUtils.writeJSON(this.storePath, data, { tmpPath: this.storePath + '.tmp' })).catch((e: unknown) => console.error('Deer downloads: store write failed', e));
+    const store = this.storePath;
+    this.saving = this.saving
+      .then(async () => {
+        await IOUtils.writeJSON(store, data, { tmpPath: store + '.tmp', flush });
+        if (flush) await IOUtils.writeJSON(store + '.bak', data, { tmpPath: store + '.bak.tmp', flush: true });
+      })
+      .catch((e: unknown) => console.error('Deer downloads: store write failed', e));
+    this.armWaits();
     return this.saving;
   }
 
@@ -1548,6 +2079,9 @@ class Manager {
     if (this.shuttingDown) return this.shuttingDown;
     this.shuttingDown = (async () => {
       this.quitting = true;
+      // Attempts of the schedule stop; their rows stay paused with the count and time saved.
+      for (const id of [...this.renewing.keys()]) this.stopRenewing(id);
+      this.armWaits();
       const waits: Promise<unknown>[] = [];
       for (const [id, run] of this.runs) {
         const rec = this.find(id);
@@ -1562,10 +2096,47 @@ class Manager {
         waits.push(this.whenSettled(id));
       }
       await Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, 5000))]);
-      await this.save();
+      this.session.clean = true;
+      await this.save(true);
     })();
     return this.shuttingDown;
   }
+}
+
+/**
+ * A stored file record put back to what can be true (review of Phase 1): a segment whose end was never
+ * known beside a known total is the single stream of unknown length it was (such a record cut the
+ * .part and looped fileFills() forever), and no segment claims more than its own length.
+ */
+function settleSegments(f: FileState): void {
+  if (!Array.isArray(f.segments)) return;
+  if (f.total >= 0 && f.segments.some((seg) => seg.end < 0)) {
+    f.total = -1;
+    f.ranges = false;
+  }
+  for (const seg of f.segments) if (seg.end >= 0) seg.received = Math.max(0, Math.min(seg.received, seg.end - seg.start));
+}
+
+/** What a found address answered, kept on a File changed row for Start over (need.candidate). */
+function candidateOf(f: Found): NeedCandidate {
+  return { url: f.url, finalUrl: f.finalUrl, total: f.total, etag: f.etag, lastModified: f.lastModified, contentType: f.contentType };
+}
+
+/**
+ * A pasted address (Use another address…) goes out as Add link's do: first-party, in the download's
+ * container and private state (RESUME-DESIGN.md 2.1), and with no source page (RESUME-DESIGN.md 8):
+ * no Referer and no Origin, so the old page is never sent to whatever host the person pastes (review
+ * of Phase 2). The page stays on the row (From page; the Phase 3 page step), never the old page's
+ * principal or cookie jar, which belonged to the old address's page.
+ */
+function pastedIdentity(id: IdentityJSON): IdentityJSON {
+  return new Identity({ pageUrl: id.pageUrl, userContextId: id.userContextId, isPrivate: id.isPrivate, withOrigin: false, referrerPolicy: 'no-referrer', firstParty: true }).toJSON();
+}
+
+/** Bytes certainly in the download's part files: the file's segments, or the stream's written tracks. */
+function savedBytes(rec: Rec): number {
+  if (rec.mode === 'stream') return (rec.stream?.tracks ?? []).reduce((n, t) => n + (t.bytes || 0), 0);
+  return (rec.file?.segments ?? []).reduce((n, s) => n + (s.received || 0), 0);
 }
 
 function streamPartsExist(p: string): boolean {

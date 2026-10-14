@@ -27,12 +27,67 @@ Routes (GET):
                             from /hot/fx/, else from /fx/
   /hot/fx/<path>            /fx/ with hotlink rules, as embed CDNs have: 403 unless the Referer is the player's
                             site (127.0.0.1); segments are labelled image/jpeg, as such CDNs do
+  /expire/<f>?how=403|410|html200|302html|403xml&after=N&k=KEY&rate=
+                            <f> (a fixture; "medium" means medium.bin) served normally until it expires: after N
+                            requests counted per KEY (default <f>), or once /flag?k=KEY was asked. Then it answers
+                            403, 410, a 200 web page, a 302 to a web page, or a 403 with S3's "Request has expired"
+                            XML. A playlist (.m3u8) is never counted or expired: its addresses carry the same query,
+                            so its segments expire instead (Phase 1 of spikes/downloader/RESUME-DESIGN.md)
+  /swap/<f>?val=etag|lm|weak|drop|none&k=KEY&rate=&ifrange=ignore&cut=N&same=1
+                            <f> with Range; once /flag?k=KEY was asked, other bytes of the same size (every byte
+                            XOR 0xA5) with other validators: a strong ETag; Last-Modified only; a weak ETag and
+                            Last-Modified; a strong ETag that is dropped while Last-Modified changes; none.
+                            With same=1 the bytes stay the same and only the validators change (a redeploy).
+                            If-Range is honoured (strong ETag or the exact date) unless ifrange=ignore; with cut,
+                            every 206 stops after N bytes and the connection closes (a dropped connection)
+  /morph/<f>?k=KEY&before=chunked|ranged&after=ranges|norange|star&short=N&xor=1&rate=
+                            <f> whose server answers differently once /flag?k=KEY was asked, ETag "M1" throughout.
+                            Before: chunked, a 200 without Content-Length that ignores Range; ranged, Range with
+                            the total. After: the first N bytes only (short; every byte XOR 0xA5 with xor=1), and
+                            ranges, Range with the total; norange, always a 200 with Content-Length; star, a 206
+                            whose Content-Range gives no total ("/*"), a 200 without Range. rate (KB/s) applies
+                            before the flag only
+  /md5/<f>?good=0|1&rate=   <f> without Range support (always 200), with Content-MD5: right (1) or wrong (0)
+  /sign/<f>?ttl=S&uses=N&k=KEY&ttl2=S2&uses2=N2&delay2=D&rate=
+                            a 302 to a fresh signed address /signed/<tok>/<f>?Expires=<epoch>&rate=, as a
+                            download?id= redirector or a presigning API answers (Phase 2 of RESUME-DESIGN.md).
+                            The first token for KEY (default <f>) works for S seconds (ttl) and/or N requests
+                            (uses; no Expires in the address then); later ones for S2 seconds (ttl2, default
+                            600), so a renewal outlives the test, and N2 requests (uses2: a host whose new
+                            address passes the proof's windows and then refuses the transfer), and are
+                            answered after D seconds (delay2)
+  /signed/<tok>/<f>?Expires=&rate=
+                            <f> with Range and If-Range (the ETag of /fx/, the same for every token) while the
+                            token works; then 403 "Request has expired". A transfer still running when its
+                            token expires is cut (the connection closes), so every connection asks again
+  /signed-once/<f>?ttl=S&k=KEY&hang=S2&rate=
+                            /sign/ whose own address works once per KEY: afterwards it answers 403 too, so a
+                            renewal from the original address finds nothing; once /flag?k=hang-KEY was asked,
+                            that 403 comes only after S2 seconds (hang, default 60: an attempt that hangs)
+  /mint/<f>?ttl=S&rate=     JSON {"url": "/signed/<tok>/<f>?..."}: a fresh signed address to paste (ttl default 600)
+  /edge/<f>?lm=0|1&rate=    <f> with Range, a new ETag on every answer over the same bytes (another CDN edge each
+                            time) and a stable Last-Modified (unless lm=0); If-Range is honoured only when it
+                            equals that answer's ETag (never) or the Last-Modified
+  /flap/<f>?rate=           <f> from a farm of two backends taking turns (A, B, A...), each with its own ETag
+                            AND Last-Modified over the same bytes (nginx or Apache behind a balancer, their file
+                            times differing); If-Range is honoured against the answering backend's validators
+  /tail/<f>?k=KEY&rate=     <f> with Range from a server that ignores If-Range; once /flag?k=KEY was asked, the
+                            bytes from 64 KiB on are other bytes (XOR 0xA5) under another ETag, same size, at
+                            full speed (rate applies before the flag only): a file that changed after its start
+  /whole/<f>?size=N&rate=   the first N bytes of <f> as a file of N bytes, whose server answers a Range over the
+                            whole file with the whole file (a 200) and any other Range with a 206; If-Range by
+                            its ETag
+  /flag?k=KEY[&f=F[&tail=1]] sets KEY's flag (/expire, /swap, /tail); with f, answers the sha256 of F's swapped
+                            bytes (with tail=1: swapped from 64 KiB on, as /tail sends them)
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
+                            (/reset leaves the flags and counts of /expire and /swap alone)
 
 Big-file addresses have no file extension: this machine runs Internet Download Manager, whose driver
 watches firefox.exe (Vitre runs as vitre.exe, which it leaves alone; the habit is kept).
 """
 import argparse
+import base64
+import hashlib
 import json
 import os
 import sys
@@ -44,6 +99,26 @@ from urllib.parse import parse_qs, urlparse
 
 LOCK = threading.Lock()
 STATE = {'active': 0, 'peak': 0, 'requests': [], 'ports': set(), 'hedged': set(), 'token': 1, 'rotated': False}
+# /expire and /swap: flags set by /flag?k=, request counts per key, cached md5 and swapped sha256 per file.
+FLAGS = set()
+COUNTS = {}
+DIGESTS = {}
+# /sign, /signed-once, /mint: tokens of /signed/ ({'expires': time or 0, 'uses': n or 0, 'used': n}), the
+# keys that have their first token, the /signed-once keys already used, and /edge's and /flap's answer counts.
+TOKENS = {}
+SIGNED_KEYS = set()
+ONCE = set()
+EDGE = {'n': 0}
+FLAP = {'n': 0}
+# /tail: its bytes from here on change once flagged.
+TAIL = 65536
+EXPIRED_PAGE = ('<!doctype html><meta charset=utf-8><title>Sign in</title><main style="padding:120px 80px;font:16px Segoe UI">'
+                '<h1>This link has expired</h1><p>Sign in to download the file again.</p></main>')
+EXPIRED_XML = ('<?xml version="1.0" encoding="UTF-8"?>\n<Error><Code>AccessDenied</Code><Message>Request has expired</Message>'
+               '<X-Amz-Expires>60</X-Amz-Expires><Expires>2026-10-13T09:00:00Z</Expires><RequestId>VITRETEST</RequestId></Error>')
+LM = {False: 'Mon, 12 Oct 2026 09:00:00 GMT', True: 'Tue, 13 Oct 2026 09:00:00 GMT'}
+# The swapped bytes: every byte XOR 0xA5 (bytes.translate, fast enough for 24 MiB).
+XOR = bytes(i ^ 0xA5 for i in range(256))
 ARGS = None
 FIX = None
 SID = 'sid=vitre-secret'
@@ -218,10 +293,55 @@ class Handler(BaseHTTPRequestHandler):
             self.record()
             return self.text(200, DRM.replace('%STYLE%', STYLE))
         rate = float(q.get('rate', '0')) * 1024
+        if p == '/flag':
+            key = q.get('k', '')
+            with LOCK:
+                FLAGS.add(key)
+            out = {'flag': key}
+            if q.get('f'):
+                out['sha256'] = self.digest(fixture(q['f']), 'tail' if q.get('tail') == '1' else 'swapped')
+            return self.text(200, json.dumps(out), 'application/json')
+        if p == '/expired-page.html':
+            self.record(status=200)
+            return self.text(200, EXPIRED_PAGE)
+        if p.startswith('/expire/'):
+            return self.expire(p[len('/expire/'):], q, rate)
+        if p.startswith('/swap/'):
+            return self.swap(p[len('/swap/'):], q, rate)
+        if p.startswith('/morph/'):
+            return self.morph(p[len('/morph/'):], q, rate)
+        if p.startswith('/sign/'):
+            return self.sign(p[len('/sign/'):], q, once=False)
+        if p.startswith('/signed-once/'):
+            return self.sign(p[len('/signed-once/'):], q, once=True)
+        if p.startswith('/signed/'):
+            return self.signed(p[len('/signed/'):], q, rate)
+        if p.startswith('/mint/'):
+            name = p[len('/mint/'):]
+            if not fixture(name):
+                return self.text(404, 'not found')
+            self.record(status=200, minted=True)
+            return self.text(200, json.dumps({'url': self.token(name, float(q.get('ttl', '600')), 0, q.get('rate', '0'))}), 'application/json')
+        if p.startswith('/edge/'):
+            return self.edge(p[len('/edge/'):], q, rate)
+        if p.startswith('/flap/'):
+            return self.flap(p[len('/flap/'):], q, rate)
+        if p.startswith('/tail/'):
+            return self.tail(p[len('/tail/'):], q, rate)
+        if p.startswith('/whole/'):
+            return self.whole(p[len('/whole/'):], q, rate)
+        if p.startswith('/md5/'):
+            path = fixture(p[len('/md5/'):])
+            if not path:
+                return self.text(404, 'not found')
+            md5 = self.digest(path, 'md5') if q.get('good', '1') == '1' else base64.b64encode(hashlib.md5(b'not this file').digest()).decode()
+            size = os.path.getsize(path)
+            return self.send_part(path, 200, 0, size - 1, rate, [('Content-Length', str(size)), ('Content-MD5', md5)])
         if p == '/blob/big':
             return self.send_file(os.path.join(FIX, 'big.bin'), rate)
         if p == '/blob/medium':
-            return self.send_file(os.path.join(FIX, 'medium.bin'), rate)
+            # ctype: another Content-Type for the same bytes (integrity: a text file sniffed as binary).
+            return self.send_file(os.path.join(FIX, 'medium.bin'), rate, ctype=q.get('ctype', 'application/octet-stream'))
         if p == '/dl/report':
             ok = SID in self.headers.get('Cookie', '') and '/page.html' in self.headers.get('Referer', '')
             if not ok:
@@ -275,7 +395,342 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(path, slow or rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
         self.text(404, 'not found')
 
-    def send_file(self, path, rate, extra=(), ctype='application/octet-stream'):
+    def digest(self, path, kind):
+        """md5 (base64, as Content-MD5 carries it) or the sha256 of the swapped bytes (hex; 'tail': swapped
+        from TAIL on, as /tail sends them), once per file."""
+        with LOCK:
+            hit = DIGESTS.get((path, kind))
+        if hit:
+            return hit
+        h = hashlib.md5() if kind == 'md5' else hashlib.sha256()
+        with open(path, 'rb') as f:
+            if kind == 'tail':
+                h.update(f.read(TAIL))
+            for b in iter(lambda: f.read(1 << 20), b''):
+                h.update(b if kind == 'md5' else b.translate(XOR))
+        out = base64.b64encode(h.digest()).decode() if kind == 'md5' else h.hexdigest()
+        with LOCK:
+            DIGESTS[(path, kind)] = out
+        return out
+
+    def expire(self, name, q, rate):
+        """/expire/<f>: the file until it expires (see the docstring), then what `how` says."""
+        from urllib.parse import urlencode
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        if path.endswith('.m3u8'):
+            # Its segment addresses carry the same query, so they are the ones that expire.
+            self.record(status=200)
+            query = urlencode(q)
+            with open(path, encoding='utf-8') as f:
+                lines = [l if (l.startswith('#') or not l.strip()) else l.strip() + '?' + query for l in f.read().splitlines()]
+            return self.text(200, chr(10).join(lines) + chr(10), MIME['.m3u8'])
+        key = q.get('k', name)
+        with LOCK:
+            COUNTS[key] = COUNTS.get(key, 0) + 1
+            expired = key in FLAGS or ('after' in q and COUNTS[key] > int(q['after']))
+        if not expired:
+            return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+        how = q.get('how', '403')
+        self.record(status={'html200': 200, '302html': 302, '410': 410}.get(how, 403), expired=how)
+        if how == 'html200':
+            return self.text(200, EXPIRED_PAGE)
+        if how == '302html':
+            self.send_response(302)
+            self.send_header('Location', '/expired-page.html')
+            self.send_header('Content-Length', '0')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return None
+        if how == '410':
+            return self.text(410, 'gone', 'text/plain; charset=utf-8')
+        if how == '403xml':
+            return self.text(403, EXPIRED_XML, 'application/xml')
+        return self.text(403, 'forbidden', 'text/plain; charset=utf-8')
+
+    def swap(self, name, q, rate):
+        """/swap/<f>: Range and If-Range over the file, or over other bytes of the same size once flagged."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            swapped = q.get('k', name) in FLAGS
+        size = os.path.getsize(path)
+        val = q.get('val', 'etag')
+        tag = ('B' if swapped else 'A') + '-%x' % size
+        etag = {'etag': '"%s"' % tag, 'weak': 'W/"%s"' % tag, 'drop': '' if swapped else '"%s"' % tag}.get(val, '')
+        lm = LM[swapped] if val in ('lm', 'weak', 'drop') else ''
+        headers = [('Accept-Ranges', 'bytes')]
+        if etag:
+            headers.append(('ETag', etag))
+        if lm:
+            headers.append(('Last-Modified', lm))
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            if_range = self.headers.get('If-Range')
+            ok = q.get('ifrange') == 'ignore' or if_range is None or (if_range == etag and not etag.startswith('W/')) or (if_range == lm and lm != '')
+            if ok:
+                a, _, b = rng[6:].partition('-')
+                start = int(a) if a else max(0, size - int(b))
+                end = min(size - 1, int(b)) if (a and b) else size - 1
+                status = 206
+                headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        cut = int(q.get('cut', '0')) if status == 206 else 0
+        return self.send_part(path, status, start, end, rate, headers, xor=0xA5 if swapped and q.get('same') != '1' else 0, cut=cut)
+
+    def morph(self, name, q, rate):
+        """/morph/<f>: answers that change once flagged (see the docstring): the review of Phase 1's
+        downloads of unknown length, and totals that a resume answer no longer gives."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            flagged = q.get('k', name) in FLAGS
+        etag = '"M1"'
+        if not flagged and q.get('before', 'chunked') == 'chunked':
+            return self.send_chunked(path, rate, [('ETag', etag)])
+        size = os.path.getsize(path)
+        total = min(size, int(q['short'])) if flagged and q.get('short') else size
+        after = q.get('after', 'ranges') if flagged else 'ranges'
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag)]
+        start, end, status = 0, total - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes=') and after != 'norange':
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, total - int(b))
+            end = min(total - 1, int(b)) if (a and b) else total - 1
+            status = 206
+            headers.append(('Content-Range', 'bytes %d-%d/%s' % (start, end, '*' if after == 'star' else total)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        xor = 0xA5 if flagged and q.get('xor') == '1' else 0
+        return self.send_part(path, status, start, end, 0 if flagged else rate, headers, xor=xor)
+
+    def token(self, name, ttl, uses, rate):
+        """A fresh /signed/ address for fixture `name`: valid for ttl seconds (0: no limit) and/or uses requests."""
+        tok = os.urandom(8).hex()
+        expires = time.time() + ttl if ttl else 0
+        with LOCK:
+            TOKENS[tok] = {'expires': expires, 'uses': uses, 'used': 0}
+        query = ('Expires=%d&' % int(expires + 0.999) if expires else '') + 'rate=' + rate
+        return '/signed/%s/%s?%s' % (tok, name, query)
+
+    def sign(self, name, q, once):
+        """/sign/<f> and /signed-once/<f>: a 302 to a fresh signed address (see the docstring)."""
+        if not fixture(name):
+            self.record(status=404)
+            return self.text(404, 'not found')
+        key = q.get('k', name)
+        with LOCK:
+            used = once and key in ONCE
+            if once:
+                ONCE.add(key)
+            first = key not in SIGNED_KEYS
+            SIGNED_KEYS.add(key)
+        if used:
+            with LOCK:
+                hang = ('hang-' + key) in FLAGS
+            self.record(status=403, expired='once', hang=hang)
+            if hang:
+                time.sleep(float(q.get('hang', '60')))
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        ttl = float(q.get('ttl', '0')) if first else float(q.get('ttl2', '600'))
+        if not first and q.get('delay2'):
+            time.sleep(float(q['delay2']))
+        uses = int(q.get('uses', '0')) if first else int(q.get('uses2', '0'))
+        where = self.token(name, ttl, uses, q.get('rate', '0'))
+        self.record(status=302, location=where)
+        self.send_response(302)
+        self.send_header('Location', where)
+        self.send_header('Content-Length', '0')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        return None
+
+    def signed(self, rest, q, rate):
+        """/signed/<tok>/<f>: the file while its token works, then 403; a running transfer is cut at expiry."""
+        tok, _, name = rest.partition('/')
+        path = fixture(name)
+        with LOCK:
+            t = TOKENS.get(tok)
+            ok = bool(t) and bool(path) and (not t['expires'] or time.time() < t['expires']) and (not t['uses'] or t['used'] < t['uses'])
+            if ok:
+                t['used'] += 1
+        if not ok:
+            self.record(status=403, expired='token')
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'), until=t['expires'])
+
+    def edge(self, name, q, rate):
+        """/edge/<f>: the same bytes under a new ETag on every answer, If-Range by that ETag (never) or Last-Modified."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            EDGE['n'] += 1
+            etag = '"E%d"' % EDGE['n']
+        lm = LM[False] if q.get('lm', '1') != '0' else ''
+        size = os.path.getsize(path)
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag)] + ([('Last-Modified', lm)] if lm else [])
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            if_range = self.headers.get('If-Range')
+            if if_range is None or if_range == etag or (lm and if_range == lm):
+                a, _, b = rng[6:].partition('-')
+                start = int(a) if a else max(0, size - int(b))
+                end = min(size - 1, int(b)) if (a and b) else size - 1
+                status = 206
+                headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, rate, headers, etag=etag)
+
+    def flap(self, name, q, rate):
+        """/flap/<f>: two backends taking turns, each with its own ETag and Last-Modified over the same bytes."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            FLAP['n'] += 1
+            backend = 'A' if FLAP['n'] % 2 else 'B'
+        size = os.path.getsize(path)
+        etag = '"%s-%x"' % (backend, size)
+        lm = LM[backend == 'B']
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag), ('Last-Modified', lm)]
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            if_range = self.headers.get('If-Range')
+            if if_range is None or if_range == etag or if_range == lm:
+                a, _, b = rng[6:].partition('-')
+                start = int(a) if a else max(0, size - int(b))
+                end = min(size - 1, int(b)) if (a and b) else size - 1
+                status = 206
+                headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, rate, headers, backend=backend)
+
+    def tail(self, name, q, rate):
+        """/tail/<f>: Range, If-Range ignored; once flagged, other bytes from TAIL on under another ETag."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            swapped = q.get('k', name) in FLAGS
+        size = os.path.getsize(path)
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', '"T2"' if swapped else '"T1"')]
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            status = 206
+            headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, 0 if swapped else rate, headers, xor=0xA5 if swapped else 0, xor_from=TAIL, swapped=swapped)
+
+    def whole(self, name, q, rate):
+        """/whole/<f>?size=N: N bytes of <f>; a Range over all of them is answered with the whole file (a 200)."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        size = min(os.path.getsize(path), int(q.get('size', '40960')))
+        etag = '"W1-%x"' % size
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag)]
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes=') and self.headers.get('If-Range') in (None, etag):
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            if start == 0 and end == size - 1:
+                status = 200
+            else:
+                status = 206
+                headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, rate, headers)
+
+    def send_chunked(self, path, rate, headers):
+        """All of `path` as a chunked 200 (no Content-Length) whatever Range asked; logged like send_file."""
+        entry = self.record(status=200, chunked=True)
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/octet-stream')
+        self.send_header('Transfer-Encoding', 'chunked')
+        self.send_header('Cache-Control', 'no-store')
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+        sent = 0
+        t0 = time.time()
+        try:
+            with open(path, 'rb') as f:
+                while True:
+                    b = f.read(16384)
+                    if not b:
+                        break
+                    self.wfile.write(b'%x\r\n' % len(b) + b + b'\r\n')
+                    sent += len(b)
+                    if rate:
+                        ahead = sent / rate - (time.time() - t0)
+                        if ahead > 0:
+                            time.sleep(ahead)
+            self.wfile.write(b'0\r\n\r\n')
+        finally:
+            entry['sent'] = sent
+            entry['secs'] = round(time.time() - t0, 3)
+
+    def send_part(self, path, status, start, end, rate, headers, xor=0, cut=0, xor_from=0, **extra):
+        """Bytes start..end of `path` (swapped when `xor`, from file offset `xor_from` on), with the headers
+        given; logged like send_file (with `extra` in the log entry). With `cut`, only that many bytes are
+        sent and the connection closes."""
+        length = end - start + 1
+        entry = self.record(status=status, start=start, end=end, **extra)
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/octet-stream')
+        self.send_header('Cache-Control', 'no-store')
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+        sent = 0
+        t0 = time.time()
+        try:
+            with open(path, 'rb') as f:
+                f.seek(start)
+                chunk = 16384 if rate else 262144
+                while sent < length:
+                    if cut and sent >= cut:
+                        self.close_connection = True
+                        break
+                    b = f.read(min(chunk, length - sent, cut - sent if cut else length))
+                    if not b:
+                        break
+                    if xor:
+                        keep = max(0, min(len(b), xor_from - (start + sent)))
+                        b = b[:keep] + b[keep:].translate(XOR)
+                    self.wfile.write(b)
+                    sent += len(b)
+                    if rate:
+                        ahead = sent / rate - (time.time() - t0)
+                        if ahead > 0:
+                            time.sleep(ahead)
+        finally:
+            entry['sent'] = sent
+            entry['secs'] = round(time.time() - t0, 3)
+
+    def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0):
+        """`path` with Range and If-Range (ETag size-mtime); with `until` (a time), a transfer still running
+        then is cut: the connection closes, as a signed address that expired mid-transfer."""
         size = os.path.getsize(path)
         etag = '"%x-%x"' % (size, int(os.path.getmtime(path)))
         start, end, status = 0, size - 1, 200
@@ -316,6 +771,10 @@ class Handler(BaseHTTPRequestHandler):
                 f.seek(start)
                 chunk = 16384 if rate else 262144
                 while sent < length:
+                    if until and time.time() >= until:
+                        entry['cut'] = True
+                        self.close_connection = True
+                        break
                     b = f.read(min(chunk, length - sent))
                     if not b:
                         break
@@ -331,6 +790,16 @@ class Handler(BaseHTTPRequestHandler):
             if not probe:
                 with LOCK:
                     STATE['active'] -= 1
+
+
+def fixture(name):
+    """A fixture by its address name ("medium" is medium.bin), or None outside the fixtures or when missing."""
+    path = os.path.normpath(os.path.join(FIX, name))
+    if not path.startswith(FIX):
+        return None
+    if not os.path.isfile(path) and os.path.isfile(path + '.bin'):
+        path += '.bin'
+    return path if os.path.isfile(path) else None
 
 
 class Server(ThreadingHTTPServer):

@@ -26,6 +26,28 @@
              and Ctrl+J from a popup window
   folders    where ffmpeg, yt-dlp and Deno are downloaded to (%LOCALAPPDATA%/Deer) and copies from
              before the rename (%LOCALAPPDATA%/Vitre) used where they are, on fake roots in %TEMP%
+  integrity  never lose or mix bytes (spikes/downloader/RESUME-DESIGN.md, Phase 1): a file swapped during a
+             pause is File changed with its .part untouched; the same bytes under a new ETag are
+             proven by 64 KiB windows and complete; a download of unknown length whose server
+             then ranges completes, one that then gives fewer bytes is File changed; an address
+             that answers with a page, 403 or 410 is Link expired with its bytes kept; weak and
+             dropped ETags; Content-MD5; an HLS segment that is a page is never written, and an
+             encrypted stream a CDN labels text/html completes; Start over keeps "<name>.old.part" and never
+             touches another file of that name or a .part it can't move; restarts: a corrupt store
+             loads from its .bak, a bad record loads settled, two unreadable copies are set aside;
+             the control: an unchanged resume makes as many requests as before
+  expiry     same-file proof and renewal (spikes/downloader/RESUME-DESIGN.md, Phase 2): a signed address
+             that expired during a pause is renewed from its original address before the first request
+             and the download continues from its segments; expiry mid-run on 8 connections asks the
+             original address once; /edge (a new ETag on every answer) completes; a swap with no
+             validators is File changed; /signed-once is Link expired, and Use another address… tells a
+             different file, a page and an unreachable address from a fresh signed one, which attaches
+             (asked with no Referer); after a restart the attempt schedule carries on; the control. From
+             the review of Phase 2: a farm whose backends differ in both validators (/flap) completes; a
+             file that changed after its first 64 KiB is caught on a download paused early (/tail); a
+             tiny file on a server that sends a 200 for a whole-file Range resumes in 2 requests
+             (/whole); an attach whose run is refused carries the schedule on; Pause stops an attempt;
+             Retry right after a failed renewal asks the original address again
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -67,6 +89,8 @@ TESTS = {
     'ui': (240, True),
     'safety': (240, False),
     'folders': (120, False),
+    'integrity': (300, True),
+    'expiry': (300, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

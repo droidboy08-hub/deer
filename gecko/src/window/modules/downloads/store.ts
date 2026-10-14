@@ -8,7 +8,7 @@ import type { DownloadEvent, DownloadView, StartOptions } from '../../../modules
 const ORDER: Record<DownloadView['state'], number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
 
 export type AddedEvent = Extract<DownloadEvent, { kind: 'added' }>;
-export type Command = 'pause' | 'resume' | 'start-now' | 'cancel' | 'remove' | 'open' | 'show-in-folder' | 'copy-address' | 'keep';
+export type Command = 'pause' | 'resume' | 'start-now' | 'cancel' | 'remove' | 'open' | 'show-in-folder' | 'copy-address' | 'keep' | 'start-over';
 
 export class DownloadStore {
   private items = new Map<string, DownloadView>();
@@ -127,17 +127,21 @@ export class DownloadStore {
       case 'show-in-folder': e.showInFolder(id); break;
       case 'copy-address': e.copyAddress(id); break;
       case 'keep': void e.keep(id); break;
+      case 'start-over': void e.startOver(id); break;
     }
   }
 
   /**
    * The primary verb for a row: pause, resume, start now, retry or show in folder. Decided on the
    * engine's state now, not this window's copy (which catches up a frame later): a quick second
-   * press (Space Space) is then Resume, not a second Pause.
+   * press (Space Space) is then Resume, not a second Pause. On a Link expired or File changed row it
+   * is Resume too, which only tries the address again and never destroys bytes (the panel moves
+   * focus to a File changed row's choice instead, RESUME-DESIGN.md 6). On a Renewing link row it is
+   * Pause: the attempt stops and the bytes stay (RESUME-DESIGN.md 6).
    */
   primary(seen: DownloadView): void {
     const v = this.engine.get(seen.id) ?? seen;
-    if (v.state === 'downloading' || v.state === 'starting') this.run('pause', v.id);
+    if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') this.run('pause', v.id);
     else if (v.state === 'queued') this.run('start-now', v.id);
     else if (v.state === 'completed' && !v.missing) this.run('show-in-folder', v.id);
     else this.run('resume', v.id);

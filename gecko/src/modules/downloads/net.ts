@@ -91,11 +91,74 @@ export class DiskError extends Error {
 /** 403 is here on purpose: on a CDN it is usually a token that fresh cookies fix. */
 export const RETRYABLE_STATUS = new Set([403, 408, 425, 429, 500, 502, 503, 504, 507, 509]);
 
+/** Statuses that mean the address no longer gives the file (RESUME-DESIGN.md 2.4, R1). */
+export const REFUSED_STATUS = new Set([401, 403, 404, 410, 451]);
+
+/**
+ * The address no longer gives the file (RESUME-DESIGN.md 2.4, R1): 401, 403, 404, 410 or 451, or a
+ * 400 whose body says the signed address expired (hint 'expired'). It is an HttpStatusError, so the
+ * retry rules and the sentence stay those of the status; classify() reads it as 'refused'.
+ */
+export class AddressRefusedError extends HttpStatusError {
+  constructor(
+    status: number,
+    retryAfter: number | null,
+    readonly hint = ''
+  ) {
+    super(status, retryAfter);
+  }
+}
+
+/**
+ * A 2xx answer that is not the download's file (R1): a web page, JSON, XML or text where a file was
+ * being saved, or a tiny answer where a big file was. Never retried, never written.
+ */
+export class NotTheFileError extends DownloadError {
+  constructor(
+    readonly contentType = '',
+    readonly reason = ''
+  ) {
+    super('The address now answers with a web page, not the file.');
+  }
+}
+
+/**
+ * The file on the server is not the one being saved (R2: another size; a 200 to If-Range; another
+ * ETag or Last-Modified). `evidence` says what differed, for the row ("was 24 MB, now 23 MB").
+ * `headersOnly`: only headers said so (a 200 to If-Range, another ETag or Last-Modified), which never
+ * decide alone while saved bytes can be compared (RESUME-DESIGN.md 2.4 R6; ranged.ts prove()).
+ */
+export class ChangedError extends DownloadError {
+  /**
+   * With headersOnly: the answer's own validators, adopted once the saved bytes prove it is the same
+   * file, or when nothing saved could be compared (R7, Phase 2). `whole`: the answer was the whole file
+   * (a 200) to an If-Range carrying `sent` (ranged.ts held()).
+   */
+  validators?: { etag: string; lastModified: string; whole?: boolean; sent?: string };
+  /** The address that gives the other version, kept for Start over (RESUME-DESIGN.md 3 G3, need.candidate). */
+  candidate?: { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string };
+  constructor(
+    readonly evidence = '',
+    readonly headersOnly = false
+  ) {
+    super('The file changed on the server while downloading.');
+  }
+}
+
+/** The finished file doesn't match the checksum the server gave. */
+export class ChecksumError extends DownloadError {
+  constructor() {
+    super('The finished file doesn’t match the server’s checksum.');
+  }
+}
+
 export function refusedConnection(err: unknown): boolean {
   return err instanceof HttpStatusError && (err.status === 429 || err.status === 503);
 }
 
 const IDLE_TIMEOUT_MS = 30000;
+/** Redirect hops kept per answer (RESUME-DESIGN.md 5.2). */
+const CHAIN_MAX = 8;
 const system = (): any => Services.scriptSecurityManager.getSystemPrincipal();
 
 /**
@@ -308,6 +371,11 @@ class Exchange {
   early: ArrayBuffer[] = [];
   endError: unknown = null;
   hops = 0;
+  /**
+   * The addresses the request was redirected from, the requested one first (at most CHAIN_MAX): the
+   * hops a renewal asks again when the final address expires (RESUME-DESIGN.md 5.2, G1 step 1).
+   */
+  chain: string[] = [];
   private onAbort = (): void => this.cancel(Cr.NS_BINDING_ABORTED);
 
   constructor(
@@ -329,12 +397,13 @@ class Exchange {
   }
 
   // nsIChannelEventSink: every redirect hop passes through here before it is followed.
-  asyncOnChannelRedirect(_old: any, next: any, _flags: number, callback: any): void {
+  asyncOnChannelRedirect(old: any, next: any, _flags: number, callback: any): void {
     let verdict = Cr.NS_OK;
     try {
       if (!next.URI.schemeIs('http') && !next.URI.schemeIs('https')) throw new Error('not http');
       this.dress(next);
       this.hops++;
+      if (this.chain.length < CHAIN_MAX) this.chain.push(String(old.URI.spec));
     } catch {
       this.failure = new DownloadError('The site redirected to an address Deer can’t download.');
       verdict = Cr.NS_ERROR_ABORT;
@@ -494,6 +563,8 @@ export class Response {
   readonly status: number;
   /** Where the request ended up after redirects. */
   readonly url: string;
+  /** The addresses it was redirected from on the way, the requested one first; [] without a redirect. */
+  readonly chain: string[];
   /** "http/1.1", "h2", "h3". */
   readonly protocol: string = '';
 
@@ -503,6 +574,7 @@ export class Response {
   ) {
     this.status = http.responseStatus;
     this.url = http.URI.spec;
+    this.chain = ex.chain.slice();
     try {
       this.protocol = http.protocolVersion;
     } catch {
@@ -592,6 +664,53 @@ export class Response {
   async text(opts: { max?: number } = {}): Promise<string> {
     return new TextDecoder('utf-8').decode(await this.bytes(opts));
   }
+
+  /**
+   * The first `n` bytes of the body (fewer when it is shorter), then the response is dropped: an
+   * error body to read, a beginning to sniff. Unlike bytes() it never throws over its size, and a
+   * connection that breaks returns what had arrived.
+   */
+  async head(n: number): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    try {
+      await this.stream((stream, count) => {
+        const take = Math.min(count, n - size);
+        if (take > 0) {
+          parts.push(new Uint8Array(NetUtil.readInputStream(stream, take)));
+          size += take;
+        }
+        return size >= n ? { stop: true } : undefined;
+      });
+    } catch {
+      /* what arrived is enough */
+    }
+    this.destroy();
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const p of parts) {
+      out.set(p, at);
+      at += p.length;
+    }
+    return out;
+  }
+}
+
+/** Bodies of a 400 that say a signed address expired (S3, GCS, Azure XML; RESUME-DESIGN.md 2.4 R1). */
+const EXPIRED_BODY = /ExpiredToken|Request has expired|Signature|expired/i;
+
+/**
+ * The error for an answer that is not 2xx; the response is dropped. A refused address (R1) is an
+ * AddressRefusedError. Only a 400's body is read (its first 4 KB), because only there the body
+ * decides whether the address expired.
+ */
+export async function refusal(res: Response, wait: number | null): Promise<HttpStatusError> {
+  if (res.status === 400) {
+    const body = new TextDecoder('utf-8').decode(await res.head(4096));
+    return EXPIRED_BODY.test(body) ? new AddressRefusedError(400, wait, 'expired') : new HttpStatusError(400, wait);
+  }
+  res.destroy();
+  return REFUSED_STATUS.has(res.status) ? new AddressRefusedError(res.status, wait) : new HttpStatusError(res.status, wait);
 }
 
 /**
@@ -698,6 +817,60 @@ export function describeError(err: unknown): string {
   if (/NET_TIMEOUT/.test(code)) return 'The connection timed out.';
   if (err instanceof NetError && isSecurityError(err.result)) return 'The site’s security certificate isn’t trusted.';
   return 'The connection was lost.';
+}
+
+/** What kind of failure an error is (RESUME-DESIGN.md 3.0); describeError() stays its sentence. */
+export type ErrorKind = 'offline' | 'timeout' | 'server' | 'refused' | 'not-file' | 'changed' | 'unknown' | 'disk' | 'damaged' | 'fatal';
+
+/**
+ * Sort an error for stopped() (RESUME-DESIGN.md 3.0). Phases 1 and 2 act on 'refused', 'not-file' and
+ * 'changed' only (the proof's R7 arrives as a ChangedError saying "Deer can't confirm it is the same
+ * file"); every other kind still ends as today. Phase 4 adds the waits for 'offline', 'timeout' and
+ * 'server'. An error nobody recognised is 'fatal'.
+ */
+export function classify(err: unknown): { kind: ErrorKind; status: number } {
+  if (err instanceof ChangedError) return { kind: 'changed', status: 0 };
+  if (err instanceof NotTheFileError) return { kind: 'not-file', status: 0 };
+  if (err instanceof ChecksumError) return { kind: 'damaged', status: 0 };
+  if (err instanceof HttpStatusError) {
+    const status = err.status;
+    if (err instanceof AddressRefusedError || REFUSED_STATUS.has(status)) return { kind: 'refused', status };
+    if (status === 429 || status >= 500) return { kind: 'server', status };
+    return { kind: 'fatal', status };
+  }
+  const code = String((err as { code?: string; name?: string })?.code ?? (err as { name?: string })?.name ?? '');
+  if (err instanceof DiskError || /^NS_ERROR_FILE_|NotFoundError|NotAllowedError|OperationError/.test(code)) return { kind: 'disk', status: 0 };
+  if (err instanceof ShortBodyError) return { kind: 'offline', status: 0 };
+  if (err instanceof NetError) {
+    if (isSecurityError(err.result) || code === 'NS_ERROR_MALFORMED_URI') return { kind: 'fatal', status: 0 };
+    return { kind: /NET_TIMEOUT/.test(code) ? 'timeout' : 'offline', status: 0 };
+  }
+  return { kind: 'fatal', status: 0 };
+}
+
+/**
+ * A Content-Type of the text kind R1 names: a web page, JSON, XML or plain text (RESUME-DESIGN.md 2.4).
+ * Such an answer where a file of another kind was being saved is not the file.
+ */
+export function textual(contentType: string): boolean {
+  const type = contentType.split(';')[0].trim().toLowerCase();
+  return /^(text\/(html|plain|xml)|application\/(xhtml\+xml|json|xml)|[a-z]+\/[\w.-]+\+(json|xml))$/.test(type);
+}
+
+/**
+ * The narrow part of textual(): a web page or JSON. Used where the saved kind is only a guess (Firefox's
+ * type, an older record, a sniff of the saved bytes), so a text or XML file is never taken for a page.
+ */
+export function pageLike(contentType: string): boolean {
+  const type = contentType.split(';')[0].trim().toLowerCase();
+  return /^(text\/html|application\/(xhtml\+xml|json)|[a-z]+\/[\w.-]+\+json)$/.test(type);
+}
+
+/** The bytes start like a web page or JSON: '<' ("<!doctype", "<html", "<?xml") or '{', after any spaces or BOM (R1). */
+export function textStart(bytes: Uint8Array): boolean {
+  let i = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
+  while (i < bytes.length && i < 64 && (bytes[i] === 0x20 || bytes[i] === 0x09 || bytes[i] === 0x0a || bytes[i] === 0x0d)) i++;
+  return i < bytes.length && (bytes[i] === 0x3c || bytes[i] === 0x7b);
 }
 
 export function sleep(ms: number, signal: AbortSignal | null = null): Promise<void> {

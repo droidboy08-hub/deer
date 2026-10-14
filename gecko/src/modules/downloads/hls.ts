@@ -18,12 +18,12 @@ import { dashAudio, dashLadder, isMpd, parseMpd, type DashRep, type Mpd } from '
 import { runFfmpeg } from './ffmpeg';
 import { throttle } from './limiter';
 import {
-  AbortedError, ConnectionRefusedError, DownloadError, HttpStatusError, ShortBodyError, backoff, isRetryable, open, parseContentRange,
-  refusedConnection, retryAfter, sleep,
+  AbortedError, ChangedError, ConnectionRefusedError, DownloadError, HttpStatusError, NotTheFileError, ShortBodyError, backoff, isRetryable, open,
+  parseContentRange, refusedConnection, retryAfter, sleep, textStart,
 } from './net';
 import { Writer, setSize, sizeOf } from './partfile';
 import { audioFor, isMaster, isPlaylist, ladder, parseMaster, parseMedia, type KeyRef, type MediaPlaylist, type MediaSegment } from './playlist';
-import type { TransferEnv } from './ranged';
+import { silentRestart, type TransferEnv } from './ranged';
 import type { FfmpegInfo } from './types';
 
 export type Container = '' | 'ts' | 'mp4' | 'aac' | 'webm';
@@ -58,6 +58,8 @@ export interface StreamState {
   /** A size estimate from the picker, used until segments are measured. */
   expected?: number;
   tracks: StreamTrack[];
+  /** When the tracks started again by themselves after the stream changed (ranged.ts silentRestart). */
+  silent?: number[];
 }
 
 export interface StreamEnv extends TransferEnv {
@@ -83,6 +85,8 @@ export class StreamTransfer {
   live = 0;
   /** A sentence for the finished download when it could not be joined ("" when it was). */
   note = '';
+  /** A changed stream may start its tracks again by itself; false for a row that already asks (see ranged.ts). */
+  silentRestarts = true;
   private inflight = 0;
   /** Segments fetched but not yet written (they arrive out of order): bytes and media seconds. */
   private early = { bytes: 0, secs: 0 };
@@ -148,14 +152,25 @@ export class StreamTransfer {
     this.muxer = await this.env.ffmpeg();
     if (this.state.format === 'dash') await this.prepareDash(signal);
     else await this.prepareHls(signal);
+    let restart: boolean | null = null;
     for (const t of this.state.tracks) {
       const pl = this.playlists.get(t.url);
       if (!pl) throw new DownloadError('The stream’s playlist couldn’t be read.');
       if (pl.drm) throw new DownloadError(DRM_MESSAGE);
       if (!pl.endList) throw new DownloadError(LIVE_MESSAGE);
       if (pl.iframesOnly || !pl.segments.length) throw new DownloadError('This video can’t be saved.');
-      // A playlist that changed shape since the last run can't be continued by position.
-      if (t.count && t.count !== pl.segments.length) Object.assign(t, { done: 0, bytes: 0, initBytes: 0, secs: 0 });
+      // A playlist that changed shape since the last run can't be continued by position. With more
+      // than 1 MiB written the row asks (RESUME-DESIGN.md 3 G3, Phase 1); with less the tracks start
+      // again by themselves, at most twice in ten minutes. Nothing is changed before the decision.
+      if (t.count && t.count !== pl.segments.length) {
+        if (restart === null) {
+          const log = silentRestart(this.state.silent, this.state.tracks.reduce((n, x) => n + x.bytes, 0), this.silentRestarts);
+          restart = !!log;
+          if (log) this.state.silent = log;
+        }
+        if (!restart) throw new ChangedError(`it now has ${pl.segments.length} parts instead of ${t.count}`);
+        Object.assign(t, { done: 0, bytes: 0, initBytes: 0, secs: 0 });
+      }
       t.count = pl.segments.length;
       t.length = pl.duration;
       t.secs = pl.segments.slice(0, t.done).reduce((n, x) => n + x.duration, 0);
@@ -521,9 +536,28 @@ export class StreamTransfer {
     for (let attempt = 1; ; attempt++) {
       try {
         const got = await this.fetchBytes(current.url, current.range, signal, true, lane);
+        // RESUME-DESIGN.md G2 (Phase 1): a segment that is a web page or JSON is never written. A clear
+        // segment of a page type that starts like a page is one at once. An encrypted one is judged
+        // only after decryption (review of Phase 1): about 1 ciphertext in 130 starts with '<' or '{',
+        // and some CDNs label real segments text/html. A page fed to AES-CBC fails its padding (then
+        // it is not the file, not "couldn't be decrypted"); one that decrypts is no media. After
+        // decryption, a whole segment that starts with '<' or '{', or a page type whose bytes are not
+        // media, is not the file either.
+        const pageType = /text\/html|xhtml|json/i.test(got.type);
+        if (pageType && !current.key && textStart(got.buf)) throw this.notMedia(got);
         let buf = got.buf;
-        if (current.key) buf = await decrypt(buf, await this.key(current.key, signal), current.key.iv ?? sequenceIv(current.seq));
-        return { buf: unwrapDisguised(buf), net: got.net };
+        if (current.key) {
+          const key = await this.key(current.key, signal);
+          try {
+            buf = await decrypt(buf, key, current.key.iv ?? sequenceIv(current.seq));
+          } catch (err) {
+            if (pageType && textStart(got.buf)) throw this.notMedia(got);
+            throw err;
+          }
+        }
+        buf = unwrapDisguised(buf);
+        if ((!current.range && textStart(buf)) || (pageType && !looksLikeMedia(buf))) throw this.notMedia(got);
+        return { buf, net: got.net };
       } catch (err) {
         if (signal.aborted) throw new AbortedError();
         if (refusedConnection(err) && mayYield?.(attempt)) throw new ConnectionRefusedError();
@@ -531,7 +565,6 @@ export class StreamTransfer {
           // An expired address: the same segment as a fresh playlist describes it. A new address does
           // not use up an attempt.
           refreshes++;
-          this.env.refreshIdentity?.();
           const fresh = await this.refreshed(track, current, signal).catch(() => null);
           if (fresh && fresh.url !== current.url) {
             current = fresh;
@@ -545,7 +578,13 @@ export class StreamTransfer {
     }
   }
 
-  private async fetchBytes(url: string, range: [number, number] | null, signal: AbortSignal, counts: boolean, lane: number | null = null): Promise<{ buf: Uint8Array; net: number }> {
+  /** A fetched answer that is not a segment: its bytes leave the in-flight count, nothing is written. */
+  private notMedia(got: { net: number; type: string }): NotTheFileError {
+    this.inflight -= got.net;
+    return new NotTheFileError(got.type);
+  }
+
+  private async fetchBytes(url: string, range: [number, number] | null, signal: AbortSignal, counts: boolean, lane: number | null = null): Promise<{ buf: Uint8Array; net: number; type: string }> {
     const res = await open(url, this.env.identity, range ? { Range: `bytes=${range[0]}-${range[1] - 1}` } : {}, signal, { lane });
     if (res.status < 200 || res.status >= 300) {
       res.destroy();
@@ -578,7 +617,7 @@ export class StreamTransfer {
         } else if (buf.length !== range[1] - range[0]) throw new DownloadError('The site wouldn’t send this video in parts.');
       }
       if (!buf.length) throw new ShortBodyError();
-      return { buf, net };
+      return { buf, net, type: res.header('content-type') };
     } catch (err) {
       this.inflight -= net;
       throw err;
@@ -600,7 +639,6 @@ export class StreamTransfer {
       } catch (err) {
         if (signal.aborted) throw new AbortedError();
         if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
-        if (err instanceof HttpStatusError && (err.status === 401 || err.status === 403)) this.env.refreshIdentity?.();
         await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
     }
@@ -730,6 +768,18 @@ export function sniff(buf: Uint8Array): Container {
 
 function looksLikeSegment(buf: Uint8Array): boolean {
   return buf.length >= 8 && (buf[0] === 0x47 || ['ftyp', 'styp', 'moof'].includes(boxType(buf, 0)));
+}
+
+/**
+ * Media a stream segment may be (RESUME-DESIGN.md G2): TS (sync byte at 0 and 188), MP4 boxes, WebM
+ * (EBML or a Cluster), ADTS or MP3 audio, ID3.
+ */
+function looksLikeMedia(buf: Uint8Array): boolean {
+  if (buf.length < 4) return false;
+  if (buf[0] === 0x47 && (buf.length < 189 || buf[188] === 0x47)) return true;
+  if (['ftyp', 'styp', 'moof', 'sidx', 'emsg', 'prft', 'mdat', 'free'].includes(boxType(buf, 0))) return true;
+  if ((buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) || (buf[0] === 0x1f && buf[1] === 0x43 && buf[2] === 0xb6 && buf[3] === 0x75)) return true;
+  return latin1(buf, 0, 3) === 'ID3' || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0);
 }
 
 function indexOfPair(buf: Uint8Array, a: number, b: number, from: number): number {

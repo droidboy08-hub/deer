@@ -22,9 +22,10 @@ const PIPE_SEGMENT = 256 * 1024;
 /**
  * The copier takes a chunk out of the pipe and then writes it: a failed write loses at most that
  * chunk (NetUtil.asyncCopy: nsIAsyncStreamCopier2 with the default chunk size, at most one pipe
- * segment). Everything that left the pipe before the chunk in flight was written.
+ * segment). Everything that left the pipe before the chunk in flight was written. Bytes read back
+ * while a writer still runs stay this far below what left its pipe (ranged.ts provable()).
  */
-const IN_FLIGHT = 2 * PIPE_SEGMENT;
+export const IN_FLIGHT = 2 * PIPE_SEGMENT;
 
 export function fileFor(path: string): any {
   const f = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
@@ -48,6 +49,20 @@ export async function sizeOf(path: string): Promise<number> {
     return (await IOUtils.stat(path)).size;
   } catch {
     return -1;
+  }
+}
+
+/**
+ * `length` bytes of the file from `offset` (fewer at its end), read off the main thread by IOUtils as
+ * reputation.ts does; null when the file can't be read. The same-file proof compares saved bytes
+ * through it (RESUME-DESIGN.md 2.4 R4).
+ */
+export async function readAt(path: string, offset: number, length: number): Promise<Uint8Array | null> {
+  if (length <= 0) return new Uint8Array(0);
+  try {
+    return await IOUtils.read(path, { offset, maxBytes: length });
+  } catch {
+    return null;
   }
 }
 

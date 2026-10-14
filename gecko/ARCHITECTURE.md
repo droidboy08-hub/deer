@@ -382,8 +382,45 @@ local look-alike type, so a contract change fails `tsc`.
   before opening an executable that is not an .exe, page-derived addresses fetched with the page's
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
-  main window from a popup. Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders; perf and ytdlp-real on demand; the
+  main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
+  Phases 1 and 2 built): the resume probe judges the answer before it changes the saved state; an address
+  that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
+  as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
+  site (another size, other saved bytes, a stream with another segment count) pauses it as File
+  changed (`need` 'choice') with the .part untouched, unless under 1 MiB was saved (it then starts
+  again by itself, at most twice in ten minutes). Headers alone (a 200 to If-Range, another ETag or
+  Last-Modified) never decide: 64 KiB windows of the saved bytes are compared with the address
+  (`proof.ts`: block 0, the newest bytes below the lowest unfinished frontier, one placed by the
+  download's id, the median segment's; a window that overlaps another is cut, never dropped, and a
+  proof is 3 windows over 3 stretches or every saved byte, never window 0 alone), and the same bytes
+  carry on under the new validators; a validator that fails to hold over the same bytes twice in ten
+  minutes stops being trusted (`etagUnstable`: If-Range carries Last-Modified; `dateUnstable` too, as
+  on a farm whose backends differ in both: no If-Range, a resume compares 3 or 4 windows; either way
+  one window is compared every 256 MiB or 5 minutes). A resume's probe asks bytes=0-65535 (a file of
+  at most 64 KiB one byte short of its end), so window 0 rides on it (an unchanged resume makes no
+  extra request; a same-size swap with no validators is caught). An address that refused or expired (its expiry read from the address,
+  `expiry.ts`: renewed before a resume's first request; a 403 gets one retry at the same address only
+  while that time is unknown or ahead) is renewed from the original address and its recorded redirect
+  hops (`renew.ts`, `FileState.chain`): one request for all connections (single-flight, at most one per
+  10 s and 3 per run), and a new address proven to be the same file is adopted with the segments kept.
+  Found nowhere: Link expired, tried again by itself 2 min, 15 min, 1 h and 6 h after the failure
+  (`rec.wait`, one timer, survives restarts; the row shows Renewing link and "next try"; an attach
+  whose run is refused before it saves a byte carries the count on, `rec.renewTries`; Pause stops the
+  attempt and the ones planned; any manual action starts the count again), or from an address the
+  person pastes in the details ("Use another address…", engine `setAddress`; asked with no Referer or
+  Origin, as Add link), which tells another file, a page and an unreachable address apart and attaches
+  the same file. A download whose length was
+  never known continues by ranges only when If-Range or the windows say it is the same file, and an
+  answer shorter than what is saved is File changed. Start over records `<name>.old.part` before
+  moving the .part there (`<name>.old (n).part` when that name is another file), keeps it until the
+  new file completes, and starts nothing when the .part can't be moved; a single-stream answer over
+  saved bytes goes to `<part>.new` and replaces them only once complete, as long as the saved size,
+  and starting with the same bytes; a stream segment that is a web page is never written (an
+  encrypted one is judged after decryption). The store (version 2) is flushed on state changes and
+  every 30 s, each flushed list is also written as `.bak`, and load() sets an unreadable copy aside
+  as `.corrupt` and falls back to the `.bak`.
+  Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

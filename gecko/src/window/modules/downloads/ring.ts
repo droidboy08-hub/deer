@@ -309,7 +309,12 @@ class Popover {
     });
     btn.addEventListener('click', () => {
       const v = this.store.get(id);
-      if (v) this.store.primary(v);
+      if (!v) return;
+      // A File changed row's choice is made in the panel (RESUME-DESIGN.md 6: no destructive verb here).
+      if (v.need?.kind === 'choice') {
+        this.close(false);
+        this.panel.choose(id);
+      } else this.store.primary(v);
     });
     return row;
   }
@@ -328,16 +333,21 @@ class Popover {
     fills.forEach((x, i) => ((segs.children[i].firstElementChild as HTMLElement).style.width = `${Math.round(Math.min(1, x) * 100)}%`));
     f.setText(row.querySelector('.vd-pop-meta'), meta(v));
     const btn = row.querySelector('button') as HTMLElement;
+    // Renewing link: Pause, as store.primary() runs it (RESUME-DESIGN.md 6).
     const [k, label, icon] =
-      v.state === 'downloading' || v.state === 'starting'
+      v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing'
         ? ['p', 'Pause', ic.pause(12)]
         : v.state === 'queued'
           ? ['n', 'Start now', ic.play(12)]
-          : v.state === 'paused'
-            ? ['r', 'Resume', ic.play(12)]
-            : v.state === 'completed' && !v.missing
-              ? ['f', 'Show in folder', ic.folder(14, 1.6)]
-              : ['t', 'Retry', ic.retry];
+          : v.need?.kind === 'address'
+            ? ['t', 'Retry', ic.retry]
+            : v.need?.kind === 'choice'
+              ? ['c', 'Choose', ic.chevron]
+              : v.state === 'paused'
+                ? ['r', 'Resume', ic.play(12)]
+                : v.state === 'completed' && !v.missing
+                  ? ['f', 'Show in folder', ic.folder(14, 1.6)]
+                  : ['t', 'Retry', ic.retry];
     if (btn.dataset.k !== k) {
       btn.dataset.k = k;
       btn.replaceChildren(node(icon));
@@ -372,7 +382,8 @@ function meta(v: DownloadView): string {
   if (v.state === 'completed') return v.missing ? 'Moved or deleted' : [f.bytes(v.total), 'Completed'].filter(Boolean).join(' · ');
   if (v.state === 'failed') return v.error || 'Failed';
   if (v.state === 'queued') return 'Queued';
-  if (v.state === 'paused') return [of, 'Paused'].filter(Boolean).join(' · ');
+  if (v.phase === 'renewing') return [of, 'Renewing link'].filter(Boolean).join(' · ');
+  if (v.state === 'paused') return [of, v.need?.kind === 'address' ? 'Link expired' : v.need?.kind === 'choice' ? 'File changed' : 'Paused'].filter(Boolean).join(' · ');
   if (v.state === 'starting' || v.phase === 'probing') return 'Starting';
   if (v.phase === 'merging') return 'Saving';
   return [of, f.speed(v.speed), v.eta >= 0 ? `${f.eta(v.eta)} left` : ''].filter(Boolean).join(' · ');

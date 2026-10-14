@@ -20,7 +20,7 @@ import { el } from '../../dom';
 import * as fx from '../../firefox';
 import { scrollThumb } from '../../scrollthumb';
 import { glass, lens } from '../../glass';
-import type { Category, DownloadView } from '../../../modules/downloads/types';
+import type { AddressResult, Category, DownloadView } from '../../../modules/downloads/types';
 import * as f from './format';
 import { CATEGORY_ICON, ic, node } from './icons';
 import { closeMenu, openMenu, type MenuEntry } from './menu';
@@ -95,6 +95,8 @@ export class Panel {
   /** The open panel's overlay scroll thumbs (detached when it closes). */
   private thumbs: (() => void)[] = [];
   private details: { id: string; acts: string; els: Record<string, HTMLElement> } | null = null;
+  /** The address the "Use another address…" note is about ("Use it and start over" starts from it). */
+  private addrUrl = '';
 
   constructor(
     private b: Browser,
@@ -482,7 +484,7 @@ export class Panel {
     });
     primary.addEventListener('click', () => {
       const v = this.store.get(id);
-      if (v) this.store.primary(v);
+      if (v) this.primary(v);
     });
     more.addEventListener('click', (e) => this.rowMenu(id, { at: more, align: 'end' }, (e as MouseEvent).detail === 0, more));
     row.addEventListener('contextmenu', (e) => {
@@ -506,7 +508,8 @@ export class Panel {
 
     const pct = f.percent(v);
     const transferring = v.state === 'downloading' && !v.phase;
-    const showBar = (transferring && v.total > 0) || (v.state === 'paused' && v.total > 0);
+    // A row that needs the person says why where the bar was (RESUME-DESIGN.md 6).
+    const showBar = !v.need && ((transferring && v.total > 0) || (v.state === 'paused' && v.total > 0));
     r.prog.hidden = !showBar;
     r.status.hidden = showBar;
     if (showBar) {
@@ -545,7 +548,7 @@ export class Panel {
     box.setAttribute('aria-label', `Details for ${v.filename}`);
     if (this.details?.id !== v.id) {
       const e: Record<string, HTMLElement> = {
-        cap: el('span', { class: 'vd-d-cap' }),
+        cap: el('span', { class: 'vd-d-cap', id: 'vd-d-cap' }),
         segs: el('div', { class: 'vd-segs' }),
         note: el('span', { class: 'vd-d-note' }),
         avg: el('span', { class: 'v' }),
@@ -557,6 +560,7 @@ export class Panel {
         started: el('span', { class: 'v' }),
         acts: el('div', { class: 'vd-d-acts' }),
       };
+      this.buildAddress(e);
       const stat = (k: string, v2: HTMLElement): HTMLElement => el('div', {}, el('span', { class: 'k' }, k), v2);
       box.replaceChildren(
         el('div', { class: 'vd-d-left' }, el('span', { class: 'vd-d-title' }, 'Connections'), e.cap, e.segs, e.note, el('div', { class: 'vd-stats' }, stat('Average', e.avg), stat('Peak', e.peak), stat('Received', e.got))),
@@ -564,7 +568,8 @@ export class Panel {
           'div',
           { class: 'vd-d-right' },
           el('div', { class: 'vd-facts' }, el('span', { class: 'k' }, 'Address'), e.addr, el('span', { class: 'k' }, 'Saved to'), e.dir, el('span', { class: 'k' }, 'From page'), e.page, el('span', { class: 'k' }, 'Started'), e.started),
-          e.acts
+          e.acts,
+          e.newAddr
         )
       );
       e.acts.addEventListener('click', (ev) => {
@@ -582,17 +587,35 @@ export class Panel {
     else if (v.state === 'failed') cap = v.error || 'Failed';
     else if (v.state === 'cancelled') cap = 'Cancelled';
     else if (v.state === 'queued') cap = v.queuePos === 1 ? 'Queued · Next' : 'Queued';
+    else if (v.phase === 'renewing') cap = `The link stopped working${v.status ? ` (${v.status})` : ''}. Looking for a new one`;
+    else if (v.need?.kind === 'address') cap = `The link stopped working${v.need.status ? ` (${v.need.status})` : ''} · ${f.percent(v)}% is saved${v.nextAt ? ` · next try ${nextTry(v.nextAt)}` : ''}`;
+    else if (v.need?.kind === 'choice') cap = `The file on the site is different from the one being downloaded. ${f.percent(v)}% of the old one is saved.`;
     else if (v.state === 'starting' || v.phase === 'probing') cap = 'Starting';
     else if (v.phase === 'merging') cap = v.stream ? 'Joining video and sound' : 'Saving';
     else if (v.engine === 'browser') cap = `${v.state === 'downloading' ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else if (v.maxConnections <= 1) cap = `${running ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else cap = `${running ? `${Math.min(v.connections, v.maxConnections)} of ${v.maxConnections} active` : `${v.maxConnections} connections`} · ${v.stream ? 'Stream' : 'Resumable'}`;
     e.cap.classList.toggle('err', v.state === 'failed');
+    e.cap.classList.toggle('wrap', !!v.need || v.phase === 'renewing');
     f.setText(e.cap, cap);
     const fills = v.state === 'completed' && !v.missing ? new Array<number>(v.maxConnections > 1 ? 8 : 1).fill(1) : v.segments;
     e.segs.hidden = !fills.length;
-    e.note.hidden = !fills.length || v.maxConnections <= 1;
-    f.setText(e.note, v.stream ? 'Each block is a stretch of the video' : 'Each block is one part of the file, fetched in parallel');
+    const choice = v.need?.kind === 'choice';
+    // Every automatic fix leaves a history line here (RESUME-DESIGN.md 6): "New link found today, 13:02".
+    const line = choice ? '' : historyLine(v);
+    e.note.hidden = !choice && !line && (!fills.length || v.maxConnections <= 1);
+    // File changed: what differed, and exactly what Start over keeps (RESUME-DESIGN.md 6; owner's decision 2).
+    const evidence = choice && v.need?.evidence ? `${v.need.evidence[0].toUpperCase()}${v.need.evidence.slice(1)}. ` : '';
+    f.setText(
+      e.note,
+      choice
+        ? `${evidence}Start over keeps what is saved as ${v.stream ? 'old parts' : `${v.filename}.old.part`} until the new file is complete.`
+        : line
+          ? line
+          : v.stream
+            ? 'Each block is a stretch of the video'
+            : 'Each block is one part of the file, fetched in parallel'
+    );
     if (e.segs.childElementCount !== fills.length) e.segs.replaceChildren(...fills.map(() => el('span', {}, el('i', {}))));
     e.segs.classList.toggle('dim', v.state === 'paused' || v.state === 'failed');
     fills.forEach((x, i) => ((e.segs.children[i].firstElementChild as HTMLElement).style.width = `${Math.round(x * 100)}%`));
@@ -612,7 +635,7 @@ export class Panel {
       const at = Array.from(holder.children).indexOf(document.activeElement as Element);
       holder.replaceChildren(
         ...acts.map(([act, label, cls]) =>
-          el('button', { type: 'button', class: `vd-d-btn ${cls}`, 'data-act': act, 'aria-haspopup': act === 'limit' ? 'menu' : null }, act === 'limit' && v.limitKBps ? `Limited to ${limitLabel(v.limitKBps)}` : label)
+          el('button', { type: 'button', class: `vd-d-btn ${cls}`, 'data-act': act, 'aria-haspopup': act === 'limit' ? 'menu' : null, 'aria-describedby': act === 'start-over' ? 'vd-d-cap' : null }, act === 'limit' && v.limitKBps ? `Limited to ${limitLabel(v.limitKBps)}` : label)
         )
       );
       if (at >= 0) (holder.children[Math.min(at, holder.children.length - 1)] as HTMLElement | undefined)?.focus();
@@ -628,9 +651,128 @@ export class Panel {
       this.removeRow(v.id);
       return;
     }
-    const map: Record<string, Command> = { pause: 'pause', resume: 'resume', now: 'start-now', retry: 'resume', open: 'open', folder: 'show-in-folder', copy: 'copy-address', cancel: 'cancel', keep: 'keep' };
+    if (act === 'use-address') {
+      this.openAddress(v.id);
+      return;
+    }
+    const map: Record<string, Command> = { pause: 'pause', resume: 'resume', now: 'start-now', retry: 'resume', open: 'open', folder: 'show-in-folder', copy: 'copy-address', cancel: 'cancel', keep: 'keep', 'start-over': 'start-over' };
     const cmd = map[act];
     if (cmd) this.store.run(cmd, v.id);
+  }
+
+  /**
+   * A row's primary verb (its button, Space). On a File changed row it only moves focus to the choice:
+   * Space never destroys bytes (RESUME-DESIGN.md 6).
+   */
+  private primary(v: DownloadView): void {
+    if (v.need?.kind === 'choice') this.choose(v.id);
+    else this.store.primary(v);
+  }
+
+  /** Select a File changed row and put focus on its first choice (Start over). The quick view uses it too. */
+  choose(id: string): void {
+    if (!this.isOpen) this.show(id);
+    this.select(id, false);
+    requestAnimationFrame(() => this.details?.els.acts.querySelector<HTMLElement>('[data-act="start-over"]')?.focus());
+  }
+
+  // ---- Use another address… (RESUME-DESIGN.md 6) ----
+
+  /**
+   * The inline address field in the details: the Add link form's look and Esc handling, labelled "New
+   * address for <name>". Its note says what the address turned out to be (a polite live region); for
+   * another file it offers "Use it and start over".
+   */
+  private buildAddress(e: Record<string, HTMLElement>): void {
+    const input = el('input', { type: 'text', inputmode: 'url', placeholder: 'Paste the new address', spellcheck: 'false', autocomplete: 'off' });
+    const go = el('button', { type: 'submit', class: 'vd-btn accent vd-addr-go' }, 'Use address');
+    const cancel = el('button', { type: 'button', class: 'vd-btn vd-addr-cancel' }, 'Cancel');
+    const note = el('span', { class: 'vd-addr-note', role: 'status' });
+    const over = el('button', { type: 'button', class: 'vd-d-btn danger vd-addr-over' }, 'Use it and start over');
+    const form = el('form', { class: 'vd-add vd-addr', novalidate: true }, el('label', { class: 'vd-field' }, node(ic.link), input), go, cancel, note, over);
+    form.hidden = true;
+    over.hidden = true;
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      void this.submitAddress();
+    });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.closeAddress();
+      } else if (ev.key === 'Enter') {
+        ev.preventDefault();
+        void this.submitAddress();
+      }
+    });
+    cancel.addEventListener('click', () => this.closeAddress());
+    over.addEventListener('click', () => {
+      const id = this.details?.id;
+      if (!id || !this.addrUrl) return;
+      void this.store.engine.startOver(id, this.addrUrl);
+      this.closeAddress();
+    });
+    Object.assign(e, { newAddr: form, addrInput: input, addrGo: go, addrNote: note, addrOver: over });
+  }
+
+  /** Open the address field for a row (its details, its menu). */
+  openAddress(id: string): void {
+    if (!this.isOpen) this.show(id);
+    if (this.selected !== id) this.select(id, false);
+    const d = this.details;
+    if (!d || d.id !== id) return;
+    const v = this.store.get(id);
+    (d.els.addrInput as HTMLInputElement).setAttribute('aria-label', `New address for ${v?.filename ?? 'this download'}`);
+    d.els.newAddr.hidden = false;
+    d.els.addrOver.hidden = true;
+    f.setText(d.els.addrNote, '');
+    this.addrUrl = '';
+    requestAnimationFrame(() => (this.details?.els.addrInput as HTMLInputElement | undefined)?.focus());
+  }
+
+  private closeAddress(): void {
+    const d = this.details;
+    if (!d) return;
+    d.els.newAddr.hidden = true;
+    (d.els.addrInput as HTMLInputElement).value = '';
+    f.setText(d.els.addrNote, '');
+    d.els.addrOver.hidden = true;
+    this.addrUrl = '';
+    const back = d.els.acts.querySelector<HTMLElement>('[data-act="use-address"]') ?? this.rows.get(d.id)?.row;
+    back?.focus();
+  }
+
+  private async submitAddress(): Promise<void> {
+    const d = this.details;
+    if (!d) return;
+    const id = d.id;
+    let url = (d.els.addrInput as HTMLInputElement).value.trim();
+    if (url && !/^[a-z]+:/i.test(url)) url = `https://${url}`;
+    d.els.addrOver.hidden = true;
+    if (!/^https?:\/\/\S+$/i.test(url)) {
+      f.setText(d.els.addrNote, 'Enter a web address that starts with http or https.');
+      return;
+    }
+    const go = d.els.addrGo as HTMLButtonElement;
+    go.disabled = true;
+    f.setText(d.els.addrNote, 'Checking that address…');
+    let r: AddressResult;
+    try {
+      r = await this.store.engine.setAddress(id, url);
+    } catch {
+      r = { ok: false, kind: 'unreachable', note: 'Deer couldn’t reach that address.' };
+    }
+    go.disabled = false;
+    // Another row was chosen meanwhile: its details are not this note's.
+    if (this.details?.id !== id) return;
+    if (r.ok) {
+      this.closeAddress();
+      return;
+    }
+    this.addrUrl = url;
+    f.setText(this.details.els.addrNote, r.note);
+    this.details.els.addrOver.hidden = !(r.kind === 'different' || r.kind === 'unknown');
   }
 
   // ---- selection and keys ----
@@ -691,7 +833,7 @@ export class Panel {
     else if (e.key === 'Enter' && v) {
       if (v.state === 'completed' && !v.missing) this.store.run('open', v.id);
     } else if (e.key === ' ' && v) {
-      if (v.state !== 'completed') this.store.primary(v);
+      if (v.state !== 'completed') this.primary(v);
     } else if (e.key === 'Delete' && v) {
       this.removeRow(v.id);
     } else if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
@@ -716,6 +858,15 @@ export class Panel {
     else if (v.state === 'completed') entries.push({ label: 'Download again', access: 'd', icon: 'reload', run: run('resume') });
     else if (active) entries.push({ label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else if (v.state === 'queued') entries.push({ label: 'Start now', access: 's', icon: 'play', run: run('start-now') }, { label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') });
+    else if (v.need?.kind === 'address') {
+      // Renewing link: Space pauses (the attempt stops); with attempts planned, Pause stops those too (RESUME-DESIGN.md 6, G4).
+      if (v.phase === 'renewing') entries.push({ label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') });
+      else if (v.nextAt) entries.push({ label: 'Pause', access: 'p', icon: 'pause', run: run('pause') });
+      entries.push({ label: 'Retry', access: 't', key: v.phase === 'renewing' ? undefined : 'Space', icon: 'reload', run: run('resume') });
+      if (canUseAddress(v)) entries.push({ label: 'Use another address…', access: 'u', icon: 'link', run: () => this.openAddress(id) });
+      entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+    }
+    else if (v.need?.kind === 'choice') entries.push({ label: 'Start over with the new file', access: 'n', icon: 'reload', run: run('start-over') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else if (v.state === 'paused') entries.push({ label: 'Resume', access: 's', key: 'Space', icon: 'play', run: run('resume') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else {
       // Safe Browsing blocked it as uncommon or unwanted: the person may keep it anyway.
@@ -783,6 +934,9 @@ function statusOf(v: DownloadView): [string, string, string] {
   if (v.state === 'failed') return ['Failed', 'err', ''];
   if (v.state === 'cancelled') return ['Cancelled', 'dim', ''];
   if (v.state === 'queued') return ['Queued', '', ''];
+  if (v.phase === 'renewing') return ['Renewing link', '', ic.link];
+  if (v.need?.kind === 'address') return ['Link expired', '', ic.link];
+  if (v.need?.kind === 'choice') return ['File changed', '', ''];
   if (v.state === 'paused') return ['Paused', '', ''];
   if (v.state === 'starting' || v.phase === 'probing') return ['Starting', '', ''];
   if (v.phase === 'merging') return ['Saving', '', ''];
@@ -790,8 +944,11 @@ function statusOf(v: DownloadView): [string, string, string] {
 }
 
 function primaryOf(v: DownloadView): [string, string, string] {
-  if (v.state === 'downloading' || v.state === 'starting') return ['pause', 'Pause', ic.pause(14)];
+  // Renewing link: Pause cancels the attempt and keeps the bytes (RESUME-DESIGN.md 6).
+  if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') return ['pause', 'Pause', ic.pause(14)];
   if (v.state === 'queued') return ['now', 'Start now', ic.play(14)];
+  if (v.need?.kind === 'address') return ['retry', 'Retry', ic.retry];
+  if (v.need?.kind === 'choice') return ['choose', 'Choose', ic.chevron];
   if (v.state === 'paused') return ['resume', 'Resume', ic.play(14)];
   if (v.state === 'completed' && !v.missing) return ['folder', 'Show in folder', ic.folder()];
   return ['retry', v.state === 'completed' ? 'Download again' : 'Retry', ic.retry];
@@ -799,7 +956,28 @@ function primaryOf(v: DownloadView): [string, string, string] {
 
 function rowState(v: DownloadView): string {
   if (v.state === 'downloading' && !v.phase) return `${f.percent(v)} percent${v.speed ? `, ${f.speed(v.speed)}` : ''}${v.eta >= 0 ? `, ${f.eta(v.eta)} left` : ''}`;
+  if (v.need) return `${statusOf(v)[0]}, ${f.percent(v)} percent saved`;
   return statusOf(v)[0];
+}
+
+/** "Use another address…" is for a one-file download Deer moves itself (streams renew with Phase 6). */
+function canUseAddress(v: DownloadView): boolean {
+  return v.engine === 'vitre' && !v.stream;
+}
+
+/** "next try 14:05"; another day's time with its date. */
+function nextTry(ms: number): string {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return ms >= start && ms < start + 86_400_000 ? f.clock(ms) : f.when(ms);
+}
+
+/** The row's latest history line with when it happened: "New link found today, 13:02". */
+function historyLine(v: DownloadView): string {
+  const last = v.history[v.history.length - 1];
+  if (!last) return '';
+  const when = f.when(last.at);
+  return `${last.text} ${/^(Today|Yesterday)/.test(when) ? when[0].toLowerCase() + when.slice(1) : `on ${when}`}`;
 }
 
 function detailActions(v: DownloadView): [string, string, string][] {
@@ -808,6 +986,16 @@ function detailActions(v: DownloadView): [string, string, string][] {
   if (v.state === 'completed') return [['retry', 'Download again', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' && v.keepable) return [['keep', 'Keep file', ''], ['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' || v.state === 'cancelled') return [['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  // RESUME-DESIGN.md 6 as far as Phase 2 goes: Link expired retries, takes another address or copies the
+  // address (Refresh address and Open page come with Phase 3); File changed offers Start over. While
+  // an attempt runs (Renewing link) Pause comes first: it stops that attempt and the ones planned.
+  if (v.need?.kind === 'address') {
+    const acts: [string, string, string][] = v.phase === 'renewing' ? [['pause', 'Pause', ''], ['retry', 'Retry', '']] : [['retry', 'Retry', '']];
+    if (canUseAddress(v)) acts.push(['use-address', 'Use another address…', '']);
+    acts.push(['copy', 'Copy address', ''], ['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']);
+    return acts;
+  }
+  if (v.need?.kind === 'choice') return [['start-over', 'Start over with the new file', 'danger'], ['folder', 'Show in folder', '']];
   const first: [string, string, string] = active ? ['pause', 'Pause', ''] : v.state === 'queued' ? ['now', 'Start now', ''] : ['resume', 'Resume', ''];
   const acts: [string, string, string][] = [first];
   if (v.engine === 'vitre') acts.push(['limit', 'Limit speed', '']);

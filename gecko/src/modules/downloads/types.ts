@@ -5,6 +5,19 @@
 
 export type DownloadState = 'starting' | 'queued' | 'downloading' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
+/**
+ * Why a paused row waits for the person (spikes/downloader/RESUME-DESIGN.md 5.1). Phase 1 sets
+ * 'address' (Link expired) and 'choice' (File changed); 'repair' and 'page' come with later phases.
+ */
+export type NeedKind = 'address' | 'choice' | 'repair' | 'page';
+
+/**
+ * What a paused row waits for, Deer acting by itself when it comes (RESUME-DESIGN.md 5.1). Phase 2 sets
+ * 'address': the next automatic attempt to renew a Link expired row's address; 'network', 'server' and
+ * 'sleep' come with Phase 4.
+ */
+export type WaitFor = 'network' | 'server' | 'sleep' | 'address';
+
 export type Category = 'video' | 'music' | 'documents' | 'compressed' | 'programs' | 'images' | 'other';
 
 /** Whose request a download is: the page it came from and the cookie jar it lives in (VitreNet Identity). */
@@ -52,8 +65,11 @@ export interface DownloadView {
   path: string;
   category: Category;
   state: DownloadState;
-  /** '' while transferring; 'probing' before the first byte; 'merging' while ffmpeg joins a stream. */
-  phase: '' | 'probing' | 'merging';
+  /**
+   * '' while transferring; 'probing' before the first byte; 'merging' while ffmpeg joins a stream;
+   * 'renewing' while Deer looks for a new address for it (Renewing link, RESUME-DESIGN.md 6).
+   */
+  phase: '' | 'probing' | 'merging' | 'renewing';
   received: number;
   /** -1 when the server didn't say. For streams this is an estimate. */
   total: number;
@@ -91,6 +107,31 @@ export interface DownloadView {
   blocked: '' | 'dangerous' | 'uncommon' | 'unwanted';
   /** The blocked file waits aside and may be kept anyway (engine keep(id)). */
   keepable: boolean;
+  /**
+   * A paused row that needs the person (RESUME-DESIGN.md 6), null otherwise. 'address': Link expired
+   * (`status` is the HTTP status that refused it, 0 for an answer that was a page); 'choice': File
+   * changed (`evidence` says what differed, "was 24 MB, now 23 MB"). The saved bytes are kept either way.
+   */
+  need: { kind: NeedKind; status: number; evidence: string } | null;
+  /** A paused row Deer comes back to by itself: what for, how many attempts so far, when the next is (0: none planned). */
+  wait: { for: WaitFor; tries: number; nextAt: number } | null;
+  /** When the next automatic attempt runs ("next try 14:05"), 0 when none is planned. */
+  nextAt: number;
+  /** The HTTP status behind Link expired or Renewing link, 0 when there is none (an answer that was a page). */
+  status: number;
+  /** The row's last history lines, oldest first ("New link found", with when): every automatic fix leaves one. */
+  history: { at: number; text: string }[];
+}
+
+/**
+ * What "Use another address…" made of an address (engine setAddress(), RESUME-DESIGN.md 6). ok: it is
+ * the same file and the download continues from it. Otherwise `note` is the sentence to show; with
+ * 'different' or 'unknown' the person may use it anyway and start over.
+ */
+export interface AddressResult {
+  ok: boolean;
+  kind: '' | 'different' | 'unknown' | 'page' | 'unreachable' | 'busy';
+  note: string;
 }
 
 export interface StartOptions {

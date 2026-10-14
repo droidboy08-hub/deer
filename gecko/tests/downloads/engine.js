@@ -82,7 +82,8 @@ spike.main(async () => {
   const st3 = await DL.stats();
   const after = st3.requests.filter((r) => r.path.startsWith("/blob/big") && r.status === 206 && r.end > r.start);
   check("every request after the resume carries If-Range", after.length > 0 && after.every((r) => r.ifrange), after.length);
-  const fetched = after.reduce((n, r) => n + (r.sent || 0), 0);
+  // The resume's probe carries window 0 (bytes=0-65535, RESUME-DESIGN.md 2.5): compared, not fetched again.
+  const fetched = after.filter((r) => r.range !== "bytes=0-65535").reduce((n, r) => n + (r.sent || 0), 0);
   check("the resume fetched only what was missing", Math.abs(fetched - (m["big.bin"].size - before)) < 64 * 1024 * 1024 && fetched < m["big.bin"].size - before + 1, { fetched, missing: m["big.bin"].size - before });
 
   // ---- 3. the speed limit (Settings › Downloads, shared by every download) ----

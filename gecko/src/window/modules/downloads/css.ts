@@ -106,6 +106,13 @@ export const CSS = `
 #vitre-root .vd-d-title { font-size: 13px; font-weight: 600; }
 #vitre-root .vd-d-cap { margin-top: 2px; font-size: 12px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #vitre-root .vd-d-cap.err { color: #ff99a4; }
+/* Link expired and File changed say why in a sentence (RESUME-DESIGN.md 6): it wraps instead of being cut. */
+#vitre-root .vd-d-cap.wrap { white-space: normal; overflow: visible; }
+/* "Use another address…" (RESUME-DESIGN.md 6): the Add link form in the details; its note is not an error. */
+#vitre-root .vd-addr { margin-top: 10px; }
+#vitre-root .vd-addr .vd-field { min-width: 120px; }
+#vitre-root .vd-addr-note { width: 100%; font-size: 12px; color: rgba(255,255,255,0.7); }
+#vitre-root .vd-addr-note:empty { display: none; }
 #vitre-root .vd-segs { margin-top: 12px; height: 16px; display: flex; gap: 2px; }
 #vitre-root .vd-segs > span { flex: 1; height: 16px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.12); }
 #vitre-root .vd-segs > span > i { display: block; width: 0; height: 16px; background: #4cc2ff; transition: width 250ms linear; }
@@ -332,6 +339,7 @@ export const CSS = `
   #vitre-root .vd-summary, #vitre-root .vd-pct, #vitre-root .vd-status, #vitre-root .vd-cell.soft, #vitre-root .vd-quit p { color: rgba(0,0,0,0.68); }
   #vitre-root .vd-status.dim, #vitre-root .vd-cell.dim { color: rgba(0,0,0,0.45); }
   #vitre-root .vd-add-note, #vitre-root .vd-name .s.err, #vitre-root .vd-status.err, #vitre-root .vd-d-cap.err { color: #c42b1c; }
+  #vitre-root .vd-addr-note { color: rgba(0,0,0,0.7); }
   #vitre-root .vd-panel .vd-btn, #vitre-root .vd-quit .vd-btn, #vitre-root .vd-d-btn { background: rgba(255,255,255,0.72); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.09); }
   #vitre-root .vd-panel .vd-btn:hover, #vitre-root .vd-quit .vd-btn:hover, #vitre-root .vd-d-btn:hover { background: rgba(249,249,249,0.55); }
   #vitre-root .vd-panel .vd-btn:active, #vitre-root .vd-quit .vd-btn:active, #vitre-root .vd-d-btn:active { background: rgba(249,249,249,0.32); }

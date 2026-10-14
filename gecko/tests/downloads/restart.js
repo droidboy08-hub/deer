@@ -71,7 +71,8 @@ spike.main(async () => {
   check("sha256 after the restart matches", (await DL.sha256(done.path)) === m["big.bin"].sha256);
   const st = await DL.stats();
   const reqs = st.requests.filter((r) => r.path.startsWith("/blob/big") && r.status === 206 && r.end > r.start);
-  const fetched = reqs.reduce((n, r) => n + (r.sent || 0), 0);
+  // The resume's probe carries window 0 (bytes=0-65535, RESUME-DESIGN.md 2.5): compared, not fetched again.
+  const fetched = reqs.filter((r) => r.range !== "bytes=0-65535").reduce((n, r) => n + (r.sent || 0), 0);
   check("every request after the restart carries If-Range", reqs.length >= 8 && reqs.every((r) => r.ifrange), reqs.length);
   check("only what was missing was fetched again", fetched <= m["big.bin"].size - v.received + 1, { fetched, missing: m["big.bin"].size - v.received });
 });
