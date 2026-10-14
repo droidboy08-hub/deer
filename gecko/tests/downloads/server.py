@@ -63,7 +63,8 @@ Routes (GET):
   /signed-once/<f>?ttl=S&k=KEY&hang=S2&rate=
                             /sign/ whose own address works once per KEY: afterwards it answers 403 too, so a
                             renewal from the original address finds nothing; once /flag?k=hang-KEY was asked,
-                            that 403 comes only after S2 seconds (hang, default 60: an attempt that hangs)
+                            that 403 comes only after S2 seconds (hang, default 60: an attempt that hangs);
+                            once /flag?k=revive-KEY was asked, it works one more time (a site back up)
   /mint/<f>?ttl=S&rate=     JSON {"url": "/signed/<tok>/<f>?..."}: a fresh signed address to paste (ttl default 600)
   /edge/<f>?lm=0|1&rate=    <f> with Range, a new ETag on every answer over the same bytes (another CDN edge each
                             time) and a stable Last-Modified (unless lm=0); If-Range is honoured only when it
@@ -79,6 +80,31 @@ Routes (GET):
                             its ETag
   /flag?k=KEY[&f=F[&tail=1]] sets KEY's flag (/expire, /swap, /tail); with f, answers the sha256 of F's swapped
                             bytes (with tail=1: swapped from 64 KiB on, as /tail sends them)
+  /attach.html?k=KEY&f=F&name=N&ttl=S&ttl2=S2&rate=&crate=
+                            a download page (Phase 3 of RESUME-DESIGN.md: starting a download again on its page)
+                            that sets the page's cookie and mints a fresh signed address on every load: #dl, F
+                            as N (the first load per KEY valid for S seconds, later loads for S2, default 600);
+                            #changed, the same name over other bytes (every byte XOR 0xA5, same size; at crate,
+                            default rate); #other, an unrelated file (/named, other.bin); #once, a one-time link
+                            (/onetime/)
+  /fetch.html?k=KEY&ttl=S&rate=&anon=1
+                            a page whose two files come from one script, as many sites serve them (review of
+                            Phase 3): #a, medium.bin as a.bin (the first load per KEY valid for S seconds, later
+                            loads for 600); #b, the first 3 MiB of big.bin as b.bin. With anon=1 neither has a
+                            Content-Disposition name (both are named after the address: "fetch")
+  /fetch?f=F&tok=T&name=N&cap=C&rate=
+                            that script: fixture F (its first C bytes, a file of C bytes, with cap) with Range and
+                            If-Range (an ETag per file) while the token works, then 403 "Request has expired";
+                            name gives Content-Disposition
+  /qsigned/<f>?tok=T&Expires=E&name=N&xor=1&rate=
+                            /signed/ with the token in the query, so every address of the file has the same
+                            path: <f> with Range and If-Range while the token works, then 403 "Request has
+                            expired"; name gives Content-Disposition; xor=1 sends other bytes under another ETag
+  /qmint/<f>?ttl=S&name=N&rate=
+                            JSON {"url": "/qsigned/<f>?..."}: a fresh address to paste (Add link)
+  /onetime/<f>?k=KEY&name=N&rate=
+                            <f> once per KEY (the first request, a 200 with Content-Disposition N); after that a
+                            410 page: a one-time link, which the take-over leaves to Firefox
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
                             (/reset leaves the flags and counts of /expire and /swap alone)
 
@@ -322,6 +348,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.text(404, 'not found')
             self.record(status=200, minted=True)
             return self.text(200, json.dumps({'url': self.token(name, float(q.get('ttl', '600')), 0, q.get('rate', '0'))}), 'application/json')
+        if p == '/attach.html':
+            return self.attach_page(q)
+        if p.startswith('/qsigned/'):
+            return self.qsigned(p[len('/qsigned/'):], q, rate)
+        if p.startswith('/qmint/'):
+            name = p[len('/qmint/'):]
+            if not fixture(name):
+                return self.text(404, 'not found')
+            self.record(status=200, minted=True)
+            return self.text(200, json.dumps({'url': self.qtoken(name, float(q.get('ttl', '600')), q.get('name', ''), q.get('rate', '0'))}), 'application/json')
+        if p.startswith('/onetime/'):
+            return self.onetime(p[len('/onetime/'):], q, rate)
+        if p == '/fetch.html':
+            return self.fetch_page(q)
+        if p == '/fetch':
+            return self.fetch(q, rate)
         if p.startswith('/edge/'):
             return self.edge(p[len('/edge/'):], q, rate)
         if p.startswith('/flap/'):
@@ -520,6 +562,148 @@ class Handler(BaseHTTPRequestHandler):
         query = ('Expires=%d&' % int(expires + 0.999) if expires else '') + 'rate=' + rate
         return '/signed/%s/%s?%s' % (tok, name, query)
 
+    def qtoken(self, name, ttl, filename, rate, xor=False):
+        """A fresh /qsigned/ address for fixture `name`: the token in the query, valid for ttl seconds (0: no limit)."""
+        from urllib.parse import urlencode
+        tok = os.urandom(8).hex()
+        expires = time.time() + ttl if ttl else 0
+        with LOCK:
+            TOKENS[tok] = {'expires': expires, 'uses': 0, 'used': 0}
+        query = [('tok', tok)] + ([('Expires', '%d' % int(expires + 0.999))] if expires else []) + [('rate', rate)]
+        if filename:
+            query.append(('name', filename))
+        if xor:
+            query.append(('xor', '1'))
+        return '/qsigned/%s?%s' % (name, urlencode(query))
+
+    def attach_page(self, q):
+        """/attach.html: a download page whose links carry fresh signed addresses on every load (see the docstring)."""
+        from html import escape
+        self.record()
+        key = q.get('k', 'attach')
+        name = q.get('f', 'medium')
+        if not fixture(name):
+            return self.text(404, 'not found')
+        with LOCK:
+            first = ('attach-' + key) not in SIGNED_KEYS
+            SIGNED_KEYS.add('attach-' + key)
+        ttl = float(q.get('ttl', '600')) if first else float(q.get('ttl2', '600'))
+        filename = q.get('name', 'song.mp3')
+        rate = q.get('rate', '0')
+        dl = self.qtoken(name, ttl, filename, rate)
+        changed = self.qtoken(name, 600, filename, q.get('crate', rate), xor=True)
+        once = '/onetime/%s?k=%s&rate=%s&name=once.bin' % (name, os.urandom(6).hex(), rate)
+        return self.text(200, '<!doctype html><meta charset=utf-8><title>Tideline · %s</title>'
+                         '<style>%s</style><main><h1>%s</h1><p>tideline.fm</p><ul>'
+                         '<li><a id="dl" href="%s">Download %s</a></li>'
+                         '<li><a id="changed" href="%s">Download %s (remastered)</a></li>'
+                         '<li><a id="other" href="/named?name=other.bin">Liner notes</a></li>'
+                         '<li><a id="once" href="%s">A one-time link</a></li>'
+                         '</ul></main>' % (escape(filename), STYLE, escape(filename), escape(dl), escape(filename), escape(changed), escape(filename), escape(once)),
+                         headers=[('Set-Cookie', SID + '; Path=/')])
+
+    def qsigned(self, name, q, rate):
+        """/qsigned/<f>?tok=: the file while its token works (other bytes with xor=1), then 403; a running transfer is cut at expiry."""
+        from urllib.parse import quote
+        path = fixture(name)
+        tok = q.get('tok', '')
+        with LOCK:
+            t = TOKENS.get(tok)
+            ok = bool(t) and bool(path) and (not t['expires'] or time.time() < t['expires'])
+        if not ok:
+            self.record(status=403, expired='token')
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        extra = [('Content-Disposition', "attachment; filename*=UTF-8''" + quote(q['name'], safe=''))] if q.get('name') else []
+        if q.get('xor') != '1':
+            return self.send_file(path, rate, extra=extra, until=t['expires'])
+        size = os.path.getsize(path)
+        etag = '"X%x"' % size
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag)] + extra
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes=') and self.headers.get('If-Range') in (None, etag):
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            status = 206
+            headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, rate, headers, xor=0xA5)
+
+    def fetch_page(self, q):
+        """/fetch.html: two files behind one script (/fetch?f=...), fresh tokens on every load (see the docstring)."""
+        from html import escape
+        from urllib.parse import urlencode
+        self.record()
+        key = q.get('k', 'fetch')
+        with LOCK:
+            first = ('fetch-' + key) not in SIGNED_KEYS
+            SIGNED_KEYS.add('fetch-' + key)
+        ttl = float(q.get('ttl', '600')) if first else 600.0
+        anon = q.get('anon') == '1'
+
+        def link(f, ttl, name, rate, cap=0):
+            tok = os.urandom(8).hex()
+            with LOCK:
+                TOKENS[tok] = {'expires': time.time() + ttl, 'uses': 0, 'used': 0}
+            query = [('f', f), ('tok', tok)] + ([('cap', str(cap))] if cap else []) + ([] if anon else [('name', name)]) + [('rate', rate)]
+            return '/fetch?' + urlencode(query)
+
+        a = link('medium', ttl, 'a.bin', q.get('rate', '0'))
+        b = link('big', 600, 'b.bin', '0', cap=3 << 20)
+        return self.text(200, '<!doctype html><meta charset=utf-8><title>Files</title><style>%s</style><main><h1>Files</h1><ul>'
+                         '<li><a id="a" href="%s">a.bin</a></li><li><a id="b" href="%s">b.bin</a></li></ul></main>' % (STYLE, escape(a), escape(b)),
+                         headers=[('Set-Cookie', SID + '; Path=/')])
+
+    def fetch(self, q, rate):
+        """/fetch?f=F&tok=T: fixture F (its first `cap` bytes) while the token works, then 403 (see the docstring)."""
+        from urllib.parse import quote
+        path = fixture(q.get('f', ''))
+        with LOCK:
+            t = TOKENS.get(q.get('tok', ''))
+            ok = bool(t) and bool(path) and time.time() < t['expires']
+        if not ok:
+            self.record(status=403, expired='token')
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        size = os.path.getsize(path)
+        cap = int(q.get('cap', '0') or 0)
+        if 0 < cap < size:
+            size = cap
+        etag = '"F%s-%x"' % (q.get('f', ''), size)
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag)]
+        if q.get('name'):
+            headers.append(('Content-Disposition', "attachment; filename*=UTF-8''" + quote(q['name'], safe='')))
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes=') and self.headers.get('If-Range') in (None, etag):
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            if start >= size:
+                self.record(status=416)
+                return self.text(416, '', headers=[('Content-Range', 'bytes */%d' % size)])
+            status = 206
+            headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        return self.send_part(path, status, start, end, rate, headers)
+
+    def onetime(self, name, q, rate):
+        """/onetime/<f>?k=: the file for the first request per KEY, then a 410 page (a one-time link)."""
+        from urllib.parse import quote
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        key = 'onetime-' + q.get('k', name)
+        with LOCK:
+            used = key in ONCE
+            ONCE.add(key)
+        if used:
+            self.record(status=410, expired='onetime')
+            return self.text(410, EXPIRED_PAGE)
+        extra = [('Content-Disposition', "attachment; filename*=UTF-8''" + quote(q.get('name', 'once.bin'), safe=''))]
+        return self.send_file(path, rate, extra=extra)
+
     def sign(self, name, q, once):
         """/sign/<f> and /signed-once/<f>: a 302 to a fresh signed address (see the docstring)."""
         if not fixture(name):
@@ -532,6 +716,11 @@ class Handler(BaseHTTPRequestHandler):
                 ONCE.add(key)
             first = key not in SIGNED_KEYS
             SIGNED_KEYS.add(key)
+        if used:
+            with LOCK:
+                if ('revive-' + key) in FLAGS:
+                    FLAGS.discard('revive-' + key)
+                    used = False
         if used:
             with LOCK:
                 hang = ('hang-' + key) in FLAGS

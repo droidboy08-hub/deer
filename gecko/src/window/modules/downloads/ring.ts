@@ -5,6 +5,12 @@
 // Shift+F10: the ring menu (opens up and to the left, right edge 1368, bottom 828). New downloads
 // fly into it as a 32 px glass file-type circle (480 ms on the spring) and it pulses 1 -> 1.06 -> 1.
 // Port of app/src/renderer/modules/downloads/ring.ts.
+//
+// Needing the person (spikes/downloader/RESUME-DESIGN.md 6, Phase 3): an 8 px dot on the ring for rows
+// that started needing the person during this session (Link expired, File changed, Start it again from
+// its page; view.attention), never a dialog; the ring stays shown while there is one, and its label
+// becomes "Downloads, 1 needs attention". A polite live region beside it says when a row starts needing
+// the person and when a start again continued a row ("Continuing song.mp3 from 62%").
 import type { Browser } from '../../browser';
 import { el, svg } from '../../dom';
 import { glass, lens } from '../../glass';
@@ -12,7 +18,7 @@ import type { DownloadView } from '../../../modules/downloads/types';
 import * as f from './format';
 import { ic, node } from './icons';
 import { closeMenu, openMenu, type MenuEntry } from './menu';
-import type { Panel } from './panel';
+import { needAttention, type Panel } from './panel';
 import type { DownloadStore } from './store';
 
 const CIRC = 2 * Math.PI * 14;
@@ -27,6 +33,10 @@ export class Ring {
   private shown = false;
   private hideTimer = 0;
   readonly pop: Popover;
+  /** The polite live region (outside the ring, which is inert while hidden). */
+  private live: HTMLElement;
+  /** What each row needed at the last update (row id -> its state's words), to say only what is new. */
+  private needs: Map<string, string> | null = null;
 
   constructor(
     private b: Browser,
@@ -41,9 +51,10 @@ export class Ring {
     );
     // data-bar-stop: a keyboard stop of the tab bar, after + (src/window/barkeys.ts header).
     this.btn = el('button', { type: 'button', 'aria-haspopup': 'dialog', 'aria-label': 'Downloads', 'data-bar-stop': '' }, face);
-    this.el.append(this.btn);
+    this.el.append(this.btn, el('span', { class: 'vd-ring-dot', 'aria-hidden': 'true' }));
     this.el.setAttribute('inert', '');
-    layer.append(this.el);
+    this.live = el('span', { class: 'vd-live', role: 'status', 'aria-live': 'polite' });
+    layer.append(this.el, this.live);
     this.arc = face.querySelector('.arc') as SVGCircleElement;
     this.pop = new Popover(b, store, panel, this);
     // The panel is the topmost surface: the quick view under it would take the first Esc.
@@ -76,16 +87,20 @@ export class Ring {
   update(): void {
     const views = this.store.all();
     const active = views.filter(f.isActive);
-    if (active.length) {
+    // Rows that started needing the person this session: the dot, and the ring stays (RESUME-DESIGN.md 6).
+    const attention = views.filter((v) => v.attention).length;
+    if (active.length || attention) {
       window.clearTimeout(this.hideTimer);
       this.hideTimer = 0;
       this.show();
     } else if (this.shown && !this.hideTimer) {
       this.hideTimer = window.setTimeout(() => {
         this.hideTimer = 0;
-        if (!this.pop.isOpen && !this.store.all().some(f.isActive)) this.hide();
+        if (!this.pop.isOpen && !this.store.all().some((v) => f.isActive(v) || v.attention)) this.hide();
       }, HIDE_AFTER);
     }
+    this.el.classList.toggle('attention', attention > 0);
+    this.sayNeeds(views);
     const known = active.filter((v) => v.total > 0);
     const total = known.reduce((n, v) => n + v.total, 0);
     const got = known.reduce((n, v) => n + Math.min(v.received, v.total), 0);
@@ -93,9 +108,27 @@ export class Ring {
     const spinning = active.length > 0 && !known.length && active.some((v) => v.state === 'downloading');
     this.el.classList.toggle('indeterminate', spinning);
     this.arc.setAttribute('stroke-dasharray', `${((spinning ? 0.25 : Math.max(pct, active.length ? 0.02 : 1)) * CIRC).toFixed(2)} ${CIRC.toFixed(2)}`);
-    const label = active.length ? `Downloads, ${active.length} active${known.length ? `, ${Math.floor(pct * 100)} percent` : ''}` : 'Downloads, finished';
+    const running = active.length ? `${active.length} active${known.length ? `, ${Math.floor(pct * 100)} percent` : ''}` : '';
+    const label = attention ? `Downloads, ${needAttention(attention)}${running ? `, ${running}` : ''}` : running ? `Downloads, ${running}` : 'Downloads, finished';
     this.btn.setAttribute('aria-label', label);
     this.pop.render();
+  }
+
+  /** One sentence for screen readers (the polite live region): a row that needs the person, an attach. */
+  announce(text: string): void {
+    f.setText(this.live, '');
+    window.setTimeout(() => f.setText(this.live, text), 50);
+  }
+
+  /** Rows that start needing the person are said once (RESUME-DESIGN.md 6); those already there when the window opened are not. */
+  private sayNeeds(views: DownloadView[]): void {
+    const now = new Map<string, string>();
+    for (const v of views) if (v.attention) now.set(v.id, needWords(v));
+    const before = this.needs;
+    this.needs = now;
+    if (!before) return;
+    const fresh = views.filter((v) => now.has(v.id) && before.get(v.id) !== now.get(v.id));
+    if (fresh.length) this.announce(fresh.map((v) => `${v.filename}: ${now.get(v.id)}`).join('. '));
   }
 
   show(): void {
@@ -257,7 +290,9 @@ class Popover {
     const views = this.store.all().filter((v) => v.state !== 'cancelled');
     const active = views.filter((v) => f.isActive(v));
     const rate = active.reduce((n, v) => n + v.speed, 0);
-    f.setText(elm.querySelector('.vd-pop-sum'), active.length ? `${active.length} active${rate > 0 ? ` · ${f.speed(rate)}` : ''}` : views.length ? 'All done' : 'Nothing yet');
+    // Not "All done" while rows wait for the person (RESUME-DESIGN.md 6).
+    const attention = views.filter((v) => v.state === 'paused' && !!v.need).length;
+    f.setText(elm.querySelector('.vd-pop-sum'), active.length ? `${active.length} active${rate > 0 ? ` · ${f.speed(rate)}` : ''}` : attention ? needAttention(attention) : views.length ? 'All done' : 'Nothing yet');
     const pick = views.slice(0, 3);
     const list = elm.querySelector('.vd-pop-list') as HTMLElement;
     const keep = new Set(pick.map((v) => v.id));
@@ -314,13 +349,21 @@ class Popover {
       if (v.need?.kind === 'choice') {
         this.close(false);
         this.panel.choose(id);
-      } else this.store.primary(v);
+        return;
+      }
+      // Refresh address that finds nothing and has no page to open: the panel's address field.
+      void this.store.primary(v)?.then((kind) => {
+        if (kind !== 'none') return;
+        this.close(false);
+        this.panel.openAddress(id);
+      });
     });
     return row;
   }
 
   private update(row: HTMLElement, v: DownloadView): void {
-    const done = f.isFinished(v);
+    // A row Firefox moved keeps none of its bytes: nothing to show a bar for (Start it again from its page).
+    const done = f.isFinished(v) || v.need?.kind === 'page';
     row.classList.toggle('done', done);
     f.setText(row.querySelector('.vd-tile'), f.tile(v.filename));
     f.setText(row.querySelector('.vd-pop-name'), v.filename);
@@ -333,14 +376,17 @@ class Popover {
     fills.forEach((x, i) => ((segs.children[i].firstElementChild as HTMLElement).style.width = `${Math.round(Math.min(1, x) * 100)}%`));
     f.setText(row.querySelector('.vd-pop-meta'), meta(v));
     const btn = row.querySelector('button') as HTMLElement;
-    // Renewing link: Pause, as store.primary() runs it (RESUME-DESIGN.md 6).
+    // Renewing link: Pause; Link expired: Refresh address; Waiting for link and Start it again from its
+    // page: Open page; as store.primary() runs them (RESUME-DESIGN.md 6).
     const [k, label, icon] =
       v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing'
         ? ['p', 'Pause', ic.pause(12)]
         : v.state === 'queued'
           ? ['n', 'Start now', ic.play(12)]
+          : v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)
+            ? ['o', 'Open page', ic.open]
           : v.need?.kind === 'address'
-            ? ['t', 'Retry', ic.retry]
+            ? v.canRenew ? ['e', 'Refresh address', ic.retry] : ['t', 'Retry', ic.retry]
             : v.need?.kind === 'choice'
               ? ['c', 'Choose', ic.chevron]
               : v.state === 'paused'
@@ -377,13 +423,22 @@ class Popover {
   }
 }
 
+/** A row that needs the person, in the panel's words (RESUME-DESIGN.md 6). */
+function needWords(v: DownloadView): string {
+  if (v.need?.kind === 'address') return v.armed ? 'Waiting for link' : 'Link expired';
+  if (v.need?.kind === 'choice') return 'File changed';
+  if (v.need?.kind === 'page') return 'Start it again from its page';
+  return 'Needs attention';
+}
+
 function meta(v: DownloadView): string {
   const of = v.total > 0 ? `${f.bytes(v.received)} of ${f.bytes(v.total)}` : f.bytes(v.received);
   if (v.state === 'completed') return v.missing ? 'Moved or deleted' : [f.bytes(v.total), 'Completed'].filter(Boolean).join(' · ');
   if (v.state === 'failed') return v.error || 'Failed';
   if (v.state === 'queued') return 'Queued';
   if (v.phase === 'renewing') return [of, 'Renewing link'].filter(Boolean).join(' · ');
-  if (v.state === 'paused') return [of, v.need?.kind === 'address' ? 'Link expired' : v.need?.kind === 'choice' ? 'File changed' : 'Paused'].filter(Boolean).join(' · ');
+  if (v.need?.kind === 'page') return needWords(v);
+  if (v.state === 'paused') return [of, v.need ? needWords(v) : 'Paused'].filter(Boolean).join(' · ');
   if (v.state === 'starting' || v.phase === 'probing') return 'Starting';
   if (v.phase === 'merging') return 'Saving';
   return [of, f.speed(v.speed), v.eta >= 0 ? `${f.eta(v.eta)} left` : ''].filter(Boolean).join(' · ');

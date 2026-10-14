@@ -125,6 +125,10 @@ export const CSS = `
 #vitre-root .vd-facts { display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 8px; font-size: 13px; }
 #vitre-root .vd-facts .k { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 18px; }
 #vitre-root .vd-facts .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; -moz-user-select: text; }
+/* From page is a button (RESUME-DESIGN.md 6): it reads as the fact it was, underlined under the pointer. */
+#vitre-root .vd-facts button.vd-page { display: block; min-width: 0; max-width: 100%; height: auto; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 3px; }
+#vitre-root .vd-facts button.vd-page:hover:not(:disabled) { text-decoration: underline; }
+#vitre-root .vd-facts button.vd-page:disabled { cursor: default; }
 #vitre-root .vd-d-acts { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 #vitre-root .vd-d-btn { height: 30px; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,0.1); font-size: 12.5px; white-space: nowrap; }
 #vitre-root .vd-d-btn:hover { background: rgba(255,255,255,0.15); }
@@ -142,6 +146,12 @@ export const CSS = `
 #vitre-root .vd-ring .track { stroke: currentColor; opacity: 0.22; }
 #vitre-root .vd-ring .arc { stroke: currentColor; transition: stroke-dasharray 250ms linear; }
 #vitre-root .vd-ring.indeterminate .spin { transform-origin: 17px 17px; animation: vd-spin 1.2s linear infinite; }
+/* Rows that started needing the person this session (RESUME-DESIGN.md 6): an 8 px dot, not red (red is for damage). */
+#vitre-root .vd-ring-dot { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 4px; background: #4cc2ff; box-shadow: 0 0 0 1.5px rgba(16,16,20,0.55); pointer-events: none; display: none; }
+#vitre-root .vd-ring.attention .vd-ring-dot { display: block; }
+#vitre-root.theme-light .vd-ring-dot { background: #005fb8; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8); }
+/* The downloads' polite live region: read, never seen. */
+#vitre-root .module-layer > .vd-live { position: fixed; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; pointer-events: none; }
 @keyframes vd-spin { to { transform: rotate(360deg); } }
 #vitre-root.element-fullscreen .vd-ring, #vitre-root.element-fullscreen .vd-pill { display: none; }
 /* The address field dims the page (omni-scrim): the pill belongs to the page and must not float over

@@ -383,7 +383,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 and 2 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 3 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -418,9 +418,37 @@ local look-alike type, so a contract change fails `tsc`.
   and starting with the same bytes; a stream segment that is a web page is never written (an
   encrypted one is judged after decryption). The store (version 2) is flushed on state changes and
   every 30 s, each flushed list is also written as `.bak`, and load() sets an unreadable copy aside
-  as `.corrupt` and falls back to the `.bak`.
+  as `.corrupt` and falls back to the `.bak`. Starting a download again on its page (Phase 3,
+  `downloads/attach.ts`): a Link expired row's verb is Refresh address (engine `refreshAddress`: a
+  renewal attempt at once, its schedule's count started again); when it finds nothing the window opens
+  the download's page in a foreground tab of its container (system principal plus userContextId; a
+  private download in its private window) and arms the row with that tab (`rec.catcher`, 30 minutes:
+  Waiting for link, the note under the tab pill with Stop waiting; closing the tab does not stop it). A
+  download started again (a click the take-over sees, Alt+click, Add link, Download copied link, the
+  'downloads' service; not the video picker, and not a start the person sent to a folder or a save dialog)
+  in the same privacy and container is scored against the rows that wait for an address (`preMatch`: the
+  armed tab +5, a name stem +3, the page +2, the path shape +3, the site +1; 5 or more; a row an attempt of
+  the schedule is renewing counts, and that attempt gives way); a pre-match holds the take-over's row back
+  (no 'added') until the probe and the byte proof (`proveAddress` with the start's own identity; a start
+  with no page is asked as a pasted address and the row keeps its page) decide: the same file continues
+  the old row (Firefox's copy dropped from the scratch folder, no new row or " (1)", only the missing
+  ranges fetched, an 'attached' event that flies from the tab or the peek sheet and "Continuing <name>
+  from 62%"); the real file over other bytes (`realFile`: the same page and a name the person or the
+  server gave, never an address's script name such as "fetch" of /fetch?id=) makes it File changed with
+  that address and identity kept for Start over (`need.candidate`), or with at most 1 MiB saved starts it
+  over from that address at once; anything else is today's path, its row added late (`start()` returned
+  the old row's id: that 'added' names it in `replaces`, and Add link selects the new row). File changed
+  offers Keep partial file (`keepPartial`: the unbroken beginning from byte 0 as "<stem> (partial).<ext>",
+  the name written to the store before the move, a completed row with Safe Browsing and the Mark of the
+  Web; the row takes no other command until that is done). Rows Firefox moves itself keep why on the record (`rec.origin`) and
+  are never fetched again by Deer: Retry gives "Start it again from its page" (`need` 'page') with Open
+  page. The panel: Refresh address · Use another address… · Open page · Show in folder · Cancel for Link
+  expired (Retry for a stream), Open page · Stop waiting for Waiting for link, Start over · Keep partial
+  file for File changed, "N need attention" in the toolbar, From page as a button; the ring's 8 px dot
+  and "Downloads, 1 needs attention" for rows that started needing the person this session
+  (`view.attention`), with a polite live region.
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry; perf and ytdlp-real on demand; the
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

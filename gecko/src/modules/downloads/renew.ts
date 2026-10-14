@@ -103,14 +103,22 @@ export async function originalAddress(sub: Subject, list: string[], signal: Abor
 }
 
 /**
+ * How an address became the download's: 'original' (renewed from its original address), 'pasted' (Use
+ * another address…), 'page' (started again on its page: a click, Alt+click, the 'downloads' service;
+ * Phase 3), 'link' (started again from an address with no page: Add link, Download copied link).
+ */
+export type AttachHow = 'original' | 'pasted' | 'page' | 'link';
+
+/**
  * A proven address becomes the download's (RESUME-DESIGN.md 5.2 address, G1 attach): the one it
  * replaces goes to address.history (at most 5); finalUrl, validators and the redirect hops are the new
- * answer's, and a pasted address becomes file.url too. Segments, total and the .part stay as they are.
+ * answer's, and an address that came from the person (pasted, or started again: Phase 3) becomes
+ * file.url too. Segments, total and the .part stay as they are.
  */
-export function adopt(s: FileState, found: Found, how: 'original' | 'pasted', now = Date.now()): void {
+export function adopt(s: FileState, found: Found, how: AttachHow, now = Date.now()): void {
   const prev = s.address ?? { obtainedAt: 0, expiresAt: 0, how: 'first', history: [] };
   const history = [{ url: s.url, finalUrl: s.finalUrl, at: prev.obtainedAt, how: prev.how }, ...prev.history].slice(0, HISTORY);
-  if (how === 'pasted') s.url = found.url;
+  if (how !== 'original') s.url = found.url;
   s.finalUrl = found.finalUrl;
   s.chain = found.chain.slice(0, CHAIN);
   s.etag = found.etag;

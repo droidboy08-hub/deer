@@ -14,6 +14,7 @@ import {
   AbortedError, AddressRefusedError, ChangedError, HttpStatusError, NotTheFileError, Response, ShortBodyError, backoff, isRetryable, open,
   pageLike, parseContentRange, refusal, retryAfter, sleep, textStart, textual, type Identity,
 } from './net';
+import { nameFromDisposition } from './naming';
 import { readAt } from './partfile';
 import type { FileState, Segment } from './ranged';
 
@@ -64,6 +65,11 @@ export interface Found {
   contentType: string;
   /** The address takes ranges (a 206 with a total). */
   ranges: boolean;
+  /**
+   * The name the answer's Content-Disposition gives ('' when none): a candidate from a click or a page
+   * with another size and another name is not the download's (RESUME-DESIGN.md 2.4 R2, Phase 3).
+   */
+  disposition: string;
 }
 
 /**
@@ -404,6 +410,7 @@ export async function proveAddress(c: ProofCtx, partPath: string, segments: Segm
     total,
     contentType: type,
     ranges: answer.status === 206 && total > 0,
+    disposition: nameFromDisposition(answer.header('content-disposition')),
   };
   const stop = <T>(v: T): T => {
     answer.destroy();

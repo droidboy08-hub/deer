@@ -3,6 +3,10 @@
 // a blob: download the page makes itself (left to Firefox, mirrored, moved out of the scratch
 // folder); the 'downloads' service. Mark of the Web on finished files; Firefox's list and scratch
 // folder stay empty.
+// RESUME-DESIGN.md G1, browser-mode rows (Phase 3): why Deer left a download to Firefox is saved on the
+// record (blob:, an extension's, a one-time link whose second request gets a page); Retry of such a row
+// never fetches it again: it asks for its page (Start it again from its page), and Open page opens it.
+// Starting a download again on its page is tests/downloads/attach.js.
 /* global spike, Services, ChromeUtils, Cc, Ci, IOUtils, PathUtils, gBrowser, DL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 
@@ -81,6 +85,9 @@ spike.main(async () => {
   const done4 = await DL.until(taken4.id, ["completed", "failed"], { timeout: 20000 });
   check("it shows in the list as Firefox's, completed", done4.engine === "browser" && done4.state === "completed", [done4.engine, done4.state, done4.error]);
   check("it was moved from the scratch folder to the downloads folder", PathUtils.parent(done4.path) === DL.dir && (await IOUtils.exists(done4.path)), done4.path);
+  await engine.save(true);
+  const stored4 = (await IOUtils.readJSON(PathUtils.join(PathUtils.profileDir, "vitre-downloads.json"))).items.find((r) => r.id === taken4.id);
+  check("why it was left to Firefox is saved on the record (blob:)", stored4?.origin?.kind === "takeover" && stored4.origin.reason === "not-http", stored4?.origin);
   const left = await waitFor(async () => ((await IOUtils.getChildren(engine.scratch)).length === 0 ? [] : null), { timeout: 3000, what: "the scratch folder to empty" }).catch(async () => IOUtils.getChildren(engine.scratch));
   check("the scratch folder is empty again", left.length === 0, left);
   log("blob trace", engine.firefoxTrace.get(taken4.id));
@@ -132,8 +139,35 @@ spike.main(async () => {
   log("extension trace", engine.firefoxTrace.get(taken7.id), engine.get(taken7.id));
   const ff7 = (await firefoxList.getAll()).find((d) => d.source.url.includes("ext=1"));
   check("Firefox still reports it to the extension as succeeded", !!ff7 && ff7.succeeded === true, ff7 ? { succeeded: ff7.succeeded, canceled: ff7.canceled } : null);
+  check("why it was left to Firefox is saved on the record (an extension's)", engine.recs.find((r) => r.id === taken7.id)?.origin?.reason === "extension", engine.recs.find((r) => r.id === taken7.id)?.origin);
   await addon.uninstall();
   await IOUtils.remove(extDir, { recursive: true, ignoreAbsent: true });
+
+  // ---- 8. a one-time link: left to Firefox; Retry asks for its page, never fetches it again ----
+  const page8 = `${DL.base}/attach.html?k=takeover8&name=one.bin&rate=256`;
+  await DL.open(page8);
+  const before8 = engine.takeovers.length;
+  await DL.clickInPage("#once");
+  const taken8 = await waitFor(() => engine.takeovers.slice(before8).find((t) => t.url.includes("/onetime/")), { timeout: 20000, what: "the one-time link" });
+  check("a one-time link (Deer's own request gets a page) is left to Firefox, the reason saved", /^left: probe/.test(taken8.action) && engine.recs.find((r) => r.id === taken8.id)?.origin?.reason === "needs-request", [taken8.action, engine.recs.find((r) => r.id === taken8.id)?.origin]);
+  await DL.until(taken8.id, ["downloading"], { timeout: 10000 });
+  engine.cancel(taken8.id);
+  await DL.until(taken8.id, ["cancelled"], { timeout: 10000 });
+  await DL.reset();
+  engine.resume(taken8.id);
+  const v8 = await DL.until(taken8.id, ["paused", "failed", "queued", "downloading"], { timeout: 10000 });
+  await sleep(800);
+  const asked8 = (await DL.stats()).requests.filter((r) => r.path.startsWith("/onetime/"));
+  check("Retry on it never fetches it again: it asks for its page (need 'page'), as Firefox's", v8.state === "paused" && v8.need?.kind === "page" && v8.engine === "browser" && asked8.length === 0 && engine.get(taken8.id).state === "paused", { state: v8.state, need: v8.need, engine: v8.engine, asked: asked8.length });
+  const tabs8 = b.tabs.length;
+  DL.ui().store.run("open-page", taken8.id);
+  await waitFor(() => b.tabs.length > tabs8, { timeout: 10000, what: "Open page" });
+  check("Open page opens its page in a new foreground tab; the row still asks", b.active().url === page8 && engine.get(taken8.id).need?.kind === "page", b.active().url);
+  engine.remove(taken8.id);
+  // Back to the page the rest of the test uses (the opened tab took the keyboard while it loaded).
+  await waitFor(() => !b.active().loading, { timeout: 10000, what: "the page to load" });
+  b.closeTab(b.active().id);
+  await sleep(600);
 
   // The panel lists all of them.
   spike.press("Ctrl+J");

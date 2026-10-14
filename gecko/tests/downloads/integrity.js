@@ -19,7 +19,8 @@
 //   - an address that now answers with a web page (200, or a 302 to one) is never completed and its
 //     .part stays intact; 403 with S3's "Request has expired" and 410: Link expired, the bytes kept;
 //   - the panel: the rows read Link expired and File changed, Space on a File changed row only moves
-//     focus to Start over, Retry keeps a Link expired row's bytes; Start over while another program
+//     focus to Start over, Refresh address (Phase 3; Retry before it) keeps a Link expired row's bytes
+//     and, with no page to open, offers the address field; Start over while another program
 //     has the .part open moves and empties nothing; Start over keeps "<name>.old.part" until the new
 //     file is complete (the owner's decision of 2026-10-13), and never touches another file of that
 //     name ("<name>.old (1).part" then);
@@ -389,13 +390,16 @@ spike.main(async () => {
     const lxStatus = row(lx.id).querySelector(".vd-status")?.textContent;
     const lxCap = details().querySelector(".vd-d-cap").textContent;
     const lxActs = Array.from(details().querySelectorAll("[data-act]")).map((x) => x.textContent);
-    check("a Link expired row says so, why, how much is saved and when the next try is; Retry and Copy address are offered", lxStatus === "Link expired" && /^The link stopped working \(410\) · \d+% is saved · next try \S/.test(lxCap) && lxActs.includes("Retry") && lxActs.includes("Copy address"), { lxStatus, lxCap, lxActs });
+    // Phase 3 (RESUME-DESIGN.md 6): Refresh address is the Link expired row's verb (Retry and Copy address
+    // stay in its menu); with no source page there is nothing to open.
+    check("a Link expired row says so, why, how much is saved and when the next try is; Refresh address and Use another address… are offered", lxStatus === "Link expired" && /^The link stopped working \(410\) · \d+% is saved · next try \S/.test(lxCap) && lxActs.includes("Refresh address") && lxActs.includes("Use another address…") && !lxActs.includes("Open page"), { lxStatus, lxCap, lxActs });
     check("its row's name reads it to a screen reader", /, Link expired, \d+ percent saved$/.test(row(lx.id).getAttribute("aria-label") ?? ""), row(lx.id).getAttribute("aria-label"));
     await spike.capture("integrity-1-link-expired");
-    spike.click(details().querySelector('[data-act="retry"]'));
-    await waitFor(() => engine.transferInfo(lx.id), { timeout: 5000, what: "Retry to start" });
-    const lxAgain = await settled(lx.id, "Retry on the expired link");
-    check("Retry on an address that is still gone: Link expired again, the bytes kept", lxAgain.state === "paused" && lxAgain.need?.kind === "address" && (await DL.sha256(lx.p.path + ".part")) === lx.before, [lxAgain.state, lxAgain.need]);
+    await DL.reset();
+    spike.click(details().querySelector('[data-act="refresh"]'));
+    await waitFor(async () => (await seen("/expire/")).length > 0 && engine.get(lx.id).phase !== "renewing" && engine.get(lx.id).wait?.tries === 1, { timeout: 15000, what: "Refresh address to ask the address" });
+    const lxAgain = engine.get(lx.id);
+    check("Refresh address on an address that is still gone: Link expired again, the bytes kept, and the address field offered (no page to open)", lxAgain.state === "paused" && lxAgain.need?.kind === "address" && (await DL.sha256(lx.p.path + ".part")) === lx.before && !details().querySelector(".vd-addr").hidden, [lxAgain.state, lxAgain.need]);
 
     row(s1).scrollIntoView({ block: "nearest" });
     await sleep(100);

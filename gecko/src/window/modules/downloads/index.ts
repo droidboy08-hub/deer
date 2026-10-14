@@ -100,6 +100,8 @@ export function install(b: Browser): void {
   const panel = new Panel(b, store);
   const ring = new Ring(b, store, panel);
   const video = new VideoUI(b, store, ring, panel);
+  // Open page, From page and Refresh address open the download's page in this window (RESUME-DESIGN.md G1).
+  store.pageOpener = (id) => video.openPage(id);
   const prompt = new QuitPrompt(b);
   installTaskbar(b, store);
   registerSettingsPage(b);

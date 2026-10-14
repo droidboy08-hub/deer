@@ -7,7 +7,8 @@
 //   init()                         idempotent; installs the take-over, media watch, quit guard. ready: Promise
 //   list(isPrivate?)               DownloadView[] (src/modules/downloads/types.ts), newest first per state
 //   subscribe(fn)                  fn(DownloadEvent): 'added' (with the source tab's browserId and the
-//                                  flight origin), 'update' (about four a second while running), 'removed'
+//                                  flight origin), 'update' (about four a second while running), 'removed',
+//                                  'attached' (a start again continued a waiting row: it flies like 'added')
 //   start(url, StartOptions)       a download Deer starts itself (picker, Add link, menus, Alt+click); id
 //   pause / resume(id, now?) / cancel / remove / clearFinished / pauseAll / resumeAll / setLimit(id, kbps)
 //   open(id) / showInFolder(id) / openFolder() / copyAddress(id) / clipboardUrl()
@@ -19,6 +20,16 @@
 //                                  ("Use it and start over")
 //   setAddress(id, url)            "Use another address…": a paused file row continues from a pasted
 //                                  address that proves to be the same file; AddressResult (types.ts)
+//   refreshAddress(id)             Refresh address: a renewal attempt at once; RefreshResult (types.ts)
+//                                  'page' asks the window to open the download's page, then arm it
+//   arm(id, browserId) / stopWaiting(id)
+//                                  Waiting for link: for 30 minutes a start of the download again on its
+//                                  page (that tab scores most) continues the row / no longer
+//   openPage(id)                   PageTarget (types.ts): the download's page, its container and privacy,
+//                                  and whether the window arms the row once the tab is open
+//   keepPartial(id) / decide(id, 'start-over' | 'keep-partial')
+//                                  File changed: the unbroken beginning kept as "<stem> (partial).<ext>"
+//                                  (a completed row), or Start over (startOver(id))
 //   media                          MediaWatch: notice(browserId), subscribe(fn), offer(...), eme(...)
 //   ffmpeg()                       FfmpegInfo (settings path, bundled copy, the downloaded copy, PATH; or 'none')
 //   installFfmpeg(), ffmpegInstall(), onFfmpegInstall(fn), cancelFfmpegInstall()
@@ -66,6 +77,17 @@
 //     same file (downloads/proof.ts) is adopted and the download carries on from its segments. Found
 //     nowhere: Link expired, tried again by itself 2 min, 15 min, 1 h and 6 h after the failure
 //     (rec.wait, one timer for the earliest), or from an address the person pastes (setAddress).
+//   - Starting it again on its page (RESUME-DESIGN.md G1 manual fallback, Phase 3; downloads/attach.ts):
+//     Refresh address runs a renewal attempt, then the window opens the download's page in a foreground
+//     tab and arms the row (Waiting for link, 30 minutes, rec.catcher). A download started again (a click
+//     Firefox hands over, Alt+click, Add link, Download copied link, the 'downloads' service) in the same
+//     privacy and container is scored against the rows that wait for an address (preMatch); a pre-match
+//     is held back (no 'added') until the byte proof says: the same file continues the old row (Firefox's
+//     copy is dropped, no new row, 'attached'); the same name with other bytes makes it File changed (the
+//     new address kept for Start over); anything else goes on as before. File changed can also keep the
+//     unbroken beginning of its part (keepPartial). Rows Firefox moves itself (a form's answer, a
+//     one-time link, blob:, data:, an extension's) are never fetched again by Deer: Retry asks for their
+//     page (need 'page'), and why Deer left them to Firefox is kept on the record (rec.origin).
 //   - Quit while downloads run: refused (quit-application-requested), the window shows its prompt;
 //     a quit that goes ahead pauses everything, resumable, and the list (with every segment) is
 //     written before the profile closes. Unfinished downloads come back paused.
@@ -95,16 +117,17 @@ import { DRM_MESSAGE, StreamTransfer, streamEstimate, streamFills, trackPart, ty
 import { RateLimiter } from './downloads/limiter';
 import { MediaWatch } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
-import { categoryOf, chooseName, extOf, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
+import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from './downloads/attach';
+import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
 import { AbortedError, ChangedError, DiskError, DownloadError, Identity, classify, describeError } from './downloads/net';
-import { existsSync, fileFor } from './downloads/partfile';
+import { existsSync, fileFor, setSize, sizeOf } from './downloads/partfile';
 import * as platform from './downloads/platform';
 import { ASK_ABOVE, UNSURE, proveAddress, readKind, sizeText, type Candidate, type Found } from './downloads/proof';
 import { asPolicy, readReferrerInfo } from './downloads/referrer';
 import { mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
-import { FileTransfer, fileFills, hasRoom, type FileState, type TransferEnv } from './downloads/ranged';
-import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
-import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, StartOptions, WaitFor } from './downloads/types';
+import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
+import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
+import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, StartOptions, WaitFor } from './downloads/types';
 import { YtdlpTransfer, cancelToolsInstall, installTools, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
 
 declare global {
@@ -125,6 +148,8 @@ const FLUSH_EVERY = 30000;
 const STORE_VERSION = 2;
 /** Attempts of the schedule that fell due while Deer was closed wait this long after start (renewing, Phase 2). */
 const WAIT_GRACE = 5000;
+/** How long Refresh address waits for the download to be started again on its page (RESUME-DESIGN.md G1). */
+const CATCH_FOR = 30 * 60 * 1000;
 const ACTIVE: DownloadState[] = ['starting', 'queued', 'downloading'];
 const FINISHED: DownloadState[] = ['completed', 'cancelled', 'failed'];
 const ORDER: Record<DownloadState, number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
@@ -143,6 +168,23 @@ const TAKEOVER_PREFS: Record<string, boolean | number> = {
 
 /** The person closed the save dialog: the download never happened. */
 class SaveDeclined extends Error {}
+
+/**
+ * Why the take-over left a download to Firefox (rec.origin.reason, RESUME-DESIGN.md G1 browser-mode
+ * rows): blob: or data:; an extension started it; it was saved where Firefox was told; Deer's own request
+ * got a page or an error (a form's answer, a one-time link).
+ */
+type LeftReason = 'not-http' | 'extension' | 'saved-elsewhere' | 'needs-request';
+
+/** Start it again from its page (need 'page'): why, as the row's caption says it. */
+const LEFT_WHY: Record<LeftReason, string> = {
+  'not-http': 'the page made this file itself',
+  extension: 'an extension started it',
+  'saved-elsewhere': 'it was saved where Firefox was told',
+  'needs-request': 'the site gives it only to its page’s own request',
+};
+
+type StartMode = 'file' | 'hls' | 'dash' | 'ytdlp';
 
 interface Rec {
   id: string;
@@ -208,10 +250,28 @@ interface Rec {
   events?: { at: number; text: string }[];
   /** Start over kept the old partial files here ("<name>.old.part") until the new file completes (owner's decision 2). */
   oldParts?: string[];
+  /**
+   * Refresh address opened the download's page and waits for the person to start it again there
+   * (RESUME-DESIGN.md 5.1, G1; Phase 3): until when, and the tab it opened (the strongest nominator,
+   * preMatch()). Waiting for link while `until` is ahead. Not kept over a restart (browserIds are per
+   * session).
+   */
+  catcher?: { until: number; browserId?: number };
+  /**
+   * How the download came (RESUME-DESIGN.md 5.1). Phase 3 sets it on the take-over's rows, with why Deer
+   * left one to Firefox (`reason`), which today lived only in memory: Retry then asks for its page.
+   */
+  origin?: { kind: 'takeover'; reason?: LeftReason };
+  /** Keep partial file is moving the .part to this name (written, flushed, before the move; load() undoes a move cut short). */
+  keeping?: string;
 }
 
-/** The address that gives the other version of a File changed row's file, kept for Start over (RESUME-DESIGN.md 5.1). */
-type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string };
+/**
+ * The address that gives the other version of a File changed row's file, kept for Start over
+ * (RESUME-DESIGN.md 5.1). `identity`: the download was started again on its page (Phase 3), whose
+ * requests (its page, cookies, container) Start over makes.
+ */
+type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string; identity?: IdentityJSON };
 
 /** Why a finished file was blocked, as the row says it. */
 const BLOCKED: Record<Exclude<Verdict, 'safe'>, string> = {
@@ -342,6 +402,17 @@ class Manager {
   /** When a row's last renewal found nothing: not asked again within FORGET_FAILURE (renew.ts). */
   private renewFailed = new Map<string, number>();
   /**
+   * The probes of Firefox downloads that pre-matched a waiting row (adopt(), Phase 3): no row's run, so
+   * they hold no download slot (pump() counts runs); a quit stops them.
+   */
+  private holding = new Set<Run>();
+  /**
+   * Rows whose `renewing` entry is the person's address being proven (a pasted one, setAddress(); a
+   * download started again, proveFor()), not an attempt of the schedule: a start again never takes such
+   * a row, but it does take one an attempt of the schedule is renewing (review of Phase 3).
+   */
+  private proving = new Set<string>();
+  /**
    * The one timer for the earliest wait.nextAt (RESUME-DESIGN.md 3.0): the ticker stops when nothing
    * runs, so waiting rows have their own. Re-armed at load and on every save.
    */
@@ -436,6 +507,19 @@ class Manager {
       }
       r.hold = false;
       r.note ??= '';
+      // Waiting for link belongs to this session's tabs (browserIds are per session).
+      r.catcher = undefined;
+      // Keep partial file stopped between writing its decision and moving the part: the part is put
+      // back where the row expects it, and the row asks again.
+      if (r.keeping) {
+        const part = `${r.path}.part`;
+        try {
+          if (r.path && !existsSync(part) && existsSync(r.keeping)) fileFor(r.keeping).moveTo(null, PathUtils.filename(part));
+        } catch {
+          /* the row asks again; its part is wherever the move left it */
+        }
+        r.keeping = undefined;
+      }
       // Only a paused row waits (Link expired's schedule); anything else lost its wait.
       if (r.wait && (r.state !== 'paused' || r.mode !== 'file' || !r.file)) r.wait = undefined;
       r.identity = new Identity(r.identity ?? {}).toJSON();
@@ -539,13 +623,44 @@ class Manager {
     };
   }
 
-  /** A download Deer starts itself (the video picker, Add link, menus, Alt+click). Returns its id. */
+  /**
+   * A download Deer starts itself (the video picker, Add link, menus, Alt+click). Returns its id: the id
+   * of the row it continues when it is that row's file started again (RESUME-DESIGN.md G1, Phase 3).
+   */
   start(url: string, opts: StartOptions = {}): string {
     if (!/^https?:\/\//i.test(url)) throw new DownloadError('Only web addresses can be downloaded.');
-    const mode = opts.mode === 'hls' || opts.mode === 'dash' || opts.mode === 'ytdlp' ? opts.mode : opts.mode === 'file' ? 'file' : /\.m3u8(\?|#|$)/i.test(url) ? 'hls' : /\.mpd(\?|#|$)/i.test(url) ? 'dash' : 'file';
+    const mode: StartMode = opts.mode === 'hls' || opts.mode === 'dash' || opts.mode === 'ytdlp' ? opts.mode : opts.mode === 'file' ? 'file' : /\.m3u8(\?|#|$)/i.test(url) ? 'hls' : /\.mpd(\?|#|$)/i.test(url) ? 'dash' : 'file';
     // DRM, whoever asks: the page may have started its key session after its picker opened.
     const browserId = Number(opts.browserId) || 0;
     if (browserId && this.media.isProtected(browserId) && (mode !== 'file' || !!opts.videoKey || MEDIA_URL.test(url))) throw new DownloadError(DRM_MESSAGE);
+    // RESUME-DESIGN.md G1, "Catching a re-click in start()" (Phase 3): the menus, Alt+click, Add link,
+    // Download copied link and the 'downloads' service. Only when a row waits for its address and this is
+    // an http(s) file (not the video picker's): on a pre-match no new record is made; the address is
+    // proven against that row's saved bytes and continues it, and the row's id is returned. Anything else
+    // then starts as it always did, a moment later (attachStart()). Never when the person chose where it
+    // goes (Save link as…, Save video as…: saveAs; a folder: dir): that start makes its own row, with its
+    // dialog (review of Phase 3).
+    if (mode === 'file' && !opts.videoKey && !opts.saveAs && !opts.dir) {
+      const asked = new Identity({ pageUrl: opts.pageUrl, ...(opts.identity ?? {}) }).toJSON();
+      const match = this.preMatch({ url, identity: asked, browserId, pageUrl: asked.pageUrl, names: [opts.filename ?? ''] });
+      if (match) {
+        // A start with no page (Add link, Download copied link) is asked as a pasted address is
+        // (setAddress()), and the row keeps its page, container and privacy (review of Phase 3: its page
+        // was lost for every later Refresh address and Open page).
+        const how: AttachHow = asked.pageUrl ? 'page' : 'link';
+        void this.attachStart(match, url, opts, how === 'page' ? asked : pastedIdentity(match.identity), how);
+        return match.id;
+      }
+    }
+    return this.startNew(url, opts, mode);
+  }
+
+  /**
+   * start() as it always was: a new row, queued. `replaces`: the waiting row's id start() returned for
+   * it, before the proof said it was not that row's file; the 'added' event carries it, so the window that
+   * asked (Add link) selects this row instead.
+   */
+  private startNew(url: string, opts: StartOptions, mode: StartMode, replaces = ''): string {
     const rec = this.newRec(url, opts);
     if (mode === 'ytdlp') {
       if (!opts.ytdlpFormat) throw new DownloadError('No format was chosen.');
@@ -562,13 +677,13 @@ class Manager {
       rec.filename = chooseName({ url, title: rec.title });
     }
     this.recs.unshift(rec);
-    this.added(rec, opts.origin ?? null);
+    this.added(rec, opts.origin ?? null, replaces);
     this.pump();
     return rec.id;
   }
 
-  private added(rec: Rec, origin: { x: number; y: number } | null): void {
-    this.emit({ kind: 'added', view: this.view(rec, false), origin, browserId: rec.browserId });
+  private added(rec: Rec, origin: { x: number; y: number } | null, replaces = ''): void {
+    this.emit({ kind: 'added', view: this.view(rec, false), origin, browserId: rec.browserId, ...(replaces ? { replaces } : {}) });
     this.save(true);
   }
 
@@ -626,20 +741,33 @@ class Manager {
     rec.mime = download.contentType ?? '';
     rec.fromScratch = inScratch;
     rec.fromExtension = fromExtension;
+    rec.origin = { kind: 'takeover' };
     if (!/^https?:/i.test(url) || fromExtension || !inScratch) {
+      // Why it is left to Firefox is kept on the record (RESUME-DESIGN.md G1, browser-mode rows).
+      rec.origin.reason = !inScratch ? 'saved-elsewhere' : fromExtension ? 'extension' : 'not-http';
       this.takeovers.push({ url, action: !inScratch ? 'left: saved where Firefox was told' : fromExtension ? 'left: extension' : 'left: not http', id: rec.id, page: pageUrl });
       this.mirror(rec, download);
       return;
     }
+    // RESUME-DESIGN.md G1, "Catching a re-click in adopt()" (Phase 3): the file a row waits an address
+    // for, started again on its page. With a pre-match the row is held back ('added' is not sent) until
+    // the probe and the byte proof have spoken, about 0.3-2 s, so the window never flies a row that then
+    // vanishes. Without one (no row waits, or none scores) this is today's path, unchanged. The claim
+    // registry for hidden pages comes with Phase 7.
+    const match = this.preMatch({ url, identity, browserId, pageUrl, names: [suggested] });
     rec.state = 'starting';
     rec.queuedAt = 0;
-    this.recs.unshift(rec);
-    this.added(rec, null);
+    if (!match) {
+      this.recs.unshift(rec);
+      this.added(rec, null);
+    }
     // Ask the server ourselves while Firefox's transfer keeps going (a probe that fails, or gets a
     // page where Firefox got a file, means the download needs the original request).
     const run = this.makeRun();
     run.phase = 'probing';
-    this.runs.set(rec.id, run);
+    // A held probe is no row's run: it holds no download slot and nothing can pause it.
+    if (match) this.holding.add(run);
+    else this.runs.set(rec.id, run);
     this.ensureTicker();
     const transfer = new FileTransfer(FileTransfer.fresh(url), this.env(rec, run));
     let info: Awaited<ReturnType<FileTransfer['probe']>> | null = null;
@@ -648,7 +776,8 @@ class Manager {
     } catch {
       info = null;
     }
-    this.runs.delete(rec.id);
+    if (match) this.holding.delete(run);
+    else this.runs.delete(rec.id);
     if (run.reason === 'quit') return;
     if (run.reason === 'cancel') {
       transfer.dropPending();
@@ -659,9 +788,31 @@ class Manager {
     const html = !!info && /text\/html/i.test(info.contentType) && !/text\/html/i.test(rec.mime);
     if (!info || html) {
       this.takeovers.push({ url, action: `left: probe ${info ? info.status + ' ' + info.contentType : 'failed'}`, id: rec.id });
+      rec.origin.reason = 'needs-request';
       this.recs = this.recs.filter((r) => r !== rec);
-      this.mirror(rec, download, true);
+      // A held row was never listed: it is added now.
+      this.mirror(rec, download, !match);
       return;
+    }
+    if (match) {
+      // The same file continues the waiting row; the real file (same page and name) with other bytes makes
+      // it File changed. Either way Firefox's copy goes and no row is made. Anything else: today's path,
+      // the row added now.
+      const verdict = await this.proveFor(match, url, identity, { pageUrl, names: [suggested], disposition: nameFromDisposition(info.disposition), urls: [url, info.finalUrl] }, info.total);
+      if (this.quitting) {
+        transfer.dropPending();
+        return;
+      }
+      if (verdict.kind !== 'not') {
+        transfer.dropPending();
+        await this.dropFirefox(list, download, target);
+        this.takeovers.push({ url, action: verdict.kind === 'same' ? 'attached' : 'changed', id: match.id, page: pageUrl, crossSite });
+        if (verdict.kind === 'same') this.attach(match, verdict.found, 'page', identity, { origin: null, browserId });
+        else this.changedFor(match, verdict.found, verdict.evidence, identity, { origin: null, browserId });
+        return;
+      }
+      this.recs.unshift(rec);
+      this.added(rec, null);
     }
     // Stop Firefox's transfer, delete what it wrote (its .part and the empty placeholder), forget it.
     await this.dropFirefox(list, download, target);
@@ -855,6 +1006,7 @@ class Manager {
     // The address gives the same file again: the row no longer needs the person or waits.
     rec.need = undefined;
     rec.wait = undefined;
+    rec.catcher = undefined;
     run.phase = '';
     rec.total = transfer.state.total;
     if (!rec.path) {
@@ -990,6 +1142,7 @@ class Manager {
     rec.finishedAt = Date.now();
     rec.error = '';
     rec.need = undefined;
+    rec.catcher = undefined;
     try {
       rec.total = rec.received = (await IOUtils.stat(rec.path)).size;
     } catch {
@@ -1132,6 +1285,7 @@ class Manager {
     rec.finishedAt = Date.now();
     rec.need = undefined;
     rec.wait = undefined;
+    rec.catcher = undefined;
     this.stopRenewing(rec.id);
     this.removeParts(rec);
     this.rewind(rec);
@@ -1249,22 +1403,23 @@ class Manager {
         return;
       }
       if (run) return;
-      if (!/^https?:/i.test(rec.url)) {
-        // blob: and data: addresses only ever lived in the page that made them.
+      // RESUME-DESIGN.md G1, browser-mode rows (Phase 3): a download Firefox moved (a form's answer, a
+      // one-time link, blob:, data:, an extension's) is never fetched again by Deer, which could only
+      // send its address a plain GET with no checks (before Phase 1) or guarded (Phase 1). Retry asks
+      // for its page instead: Start it again from its page (need 'page'), with Open page and why it was
+      // Firefox's (rec.origin). With no page to open it fails with that sentence, as blob: did.
+      if (rec.identity.pageUrl) {
+        rec.state = 'paused';
+        rec.error = '';
+        rec.need = { kind: 'page', since: Date.now(), evidence: rec.origin?.reason ? LEFT_WHY[rec.origin.reason] : '' };
+      } else {
         rec.state = 'failed';
         rec.error = 'Start this download again from its page.';
-        this.touch(rec);
-        this.save(true);
-        return;
       }
-      // Firefox can't carry on: start over with Deer's engine. Its first answer must be the file
-      // Firefox was getting (RESUME-DESIGN.md G1, browser-mode rows; Phase 1 guard): a page where
-      // Firefox had a file (a form's answer, a one-time link) ends the row with "Start this download
-      // again from its page." instead of being saved as the download.
-      rec.mode = 'file';
-      // Firefox's type is a guess about the server's: only a page or JSON answer counts against it.
-      rec.file = { ...FileTransfer.fresh(rec.url), contentType: rec.mime, typeGuessed: true, guarded: true };
-      rec.path = '';
+      this.touch(rec);
+      this.settle(rec);
+      this.save(true);
+      return;
     }
     if (!['paused', 'failed', 'cancelled', 'queued'].includes(rec.state)) return;
     // Retry of a blocked download: it is fetched (and checked) again.
@@ -1290,18 +1445,29 @@ class Manager {
    *   - a part that can't be set aside (another program has it open) stops the Start over: nothing is
    *     moved or emptied, the row still asks, and its note says why.
    */
-  async startOver(id: string, url = ''): Promise<void> {
+  startOver(id: string, url = ''): Promise<void> {
+    return this.startAfresh(id, url, null);
+  }
+
+  /**
+   * startOver()'s work. `quiet`: another version of the file a waiting row's start again found, with
+   * nothing worth asking about saved (changedFor(), the owner's decision 1): the row starts over from it
+   * without ever reading File changed.
+   */
+  private async startAfresh(id: string, url: string, quiet: NeedCandidate | null): Promise<void> {
     const rec = this.find(id);
     if (!rec) return;
     // With `url` (Use another address…, "Use it and start over"): a paused file row, from that address.
     const ready = (): boolean =>
-      this.recs.includes(rec) && rec.state === 'paused' && (url ? rec.mode === 'file' : rec.need?.kind === 'choice') && !this.runs.has(rec.id) && (rec.mode === 'file' || rec.mode === 'stream') && !!rec.path;
+      this.recs.includes(rec) && rec.state === 'paused' && (url || quiet ? rec.mode === 'file' : rec.need?.kind === 'choice') && !this.runs.has(rec.id) && (rec.mode === 'file' || rec.mode === 'stream') && !!rec.path;
     if (!ready() || this.deciding.has(id) || (url && !/^https?:\/\//i.test(url))) return;
     this.stopRenewing(id);
     this.renewFailed.delete(id);
     rec.renewTries = undefined;
     // Resume waits while the decision is written (resume()).
     this.deciding.add(id);
+    // The address a renewal or a start again found for the new file (need.candidate): no new lookup.
+    const cand = url ? undefined : (quiet ?? rec.need?.candidate);
     try {
       const parts = (rec.mode === 'stream' && rec.stream ? rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)) : [`${rec.path}.part`]).filter((p) => existsSync(p));
       const before = rec.oldParts ?? [];
@@ -1343,11 +1509,16 @@ class Manager {
       if (rec.mode === 'stream' && rec.stream) {
         const s = rec.stream;
         rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
-      } else rec.file = FileTransfer.fresh(url || rec.file?.url || rec.url);
+      } else rec.file = FileTransfer.fresh(url || cand?.url || rec.file?.url || rec.url);
       if (url) {
         rec.url = url;
         rec.identity = pastedIdentity(rec.identity);
+      } else if (rec.mode === 'file' && cand?.identity) {
+        // Found by a start again on the page (Phase 3): its address, asked as that start asked it.
+        rec.url = cand.url;
+        rec.identity = cand.identity;
       }
+      rec.catcher = undefined;
       rec.need = undefined;
       rec.wait = undefined;
       rec.error = '';
@@ -1699,23 +1870,29 @@ class Manager {
 
   /**
    * A proven address becomes the row's (RESUME-DESIGN.md G1 attach): adopted into rec.file (the old one
-   * goes to address.history); a pasted one also becomes rec.url, with its identity. need and wait are
-   * cleared and the row queues. Segments, path and .part stay, so it carries on under the same name.
+   * goes to address.history); one from the person (pasted, or the download started again: Phase 3) also
+   * becomes rec.url, with its identity (for a click, the page's principal and cookie jar), and is a
+   * manual action: what the schedule remembers starts again. need, wait and catcher are cleared and the
+   * row queues. Segments, path and .part stay, so it carries on under the same name (taken() and
+   * uniquePath never make " (1)"). `from`: a start again, announced as 'attached' (it flies from that tab).
    */
-  private attach(rec: Rec, found: Found, how: 'original' | 'pasted', identity?: IdentityJSON): void {
+  private attach(rec: Rec, found: Found, how: AttachHow, identity?: IdentityJSON, from?: { origin: { x: number; y: number } | null; browserId: number }): void {
     if (!rec.file) return;
     adopt(rec.file, found, how);
-    if (how === 'pasted') {
+    if (how !== 'original') {
       rec.url = found.url;
       if (identity) rec.identity = identity;
+      rec.renewTries = undefined;
     }
     rec.need = undefined;
     rec.wait = undefined;
+    rec.catcher = undefined;
     rec.error = '';
     this.renewFailed.delete(rec.id);
-    this.event(rec, how === 'pasted' ? 'Continued from another address' : 'New link found');
+    this.event(rec, how === 'pasted' || how === 'link' ? 'Continued from another address' : how === 'page' ? 'Continued from its page' : 'New link found');
     rec.state = 'queued';
     rec.queuedAt = queueStamp();
+    if (from) this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
     this.touch(rec);
     this.save(true);
     this.pump();
@@ -1740,6 +1917,7 @@ class Manager {
     rec.renewTries = undefined;
     const ac = new AbortController();
     this.renewing.set(id, ac);
+    this.proving.add(id);
     this.touch(rec);
     const s = rec.file;
     const part = `${rec.path}.part`;
@@ -1751,7 +1929,10 @@ class Manager {
     } catch {
       c = { verdict: 'unreachable', status: 0 };
     } finally {
-      if (this.renewing.get(id) === ac) this.renewing.delete(id);
+      if (this.renewing.get(id) === ac) {
+        this.renewing.delete(id);
+        this.proving.delete(id);
+      }
       this.touch(rec);
     }
     if (ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || this.runs.has(id)) return no('busy', '');
@@ -1772,11 +1953,294 @@ class Manager {
     return no('unreachable', 'Deer couldn’t reach that address.');
   }
 
+  // ---- starting it again on its page (RESUME-DESIGN.md G1 manual fallback; Phase 3) ----
+
+  /**
+   * Refresh address, a Link expired row's primary verb: a renewal attempt at once (an attempt of the
+   * schedule with its count started again, as for any manual action; the row reads Renewing link). When
+   * it finds nothing and the download has a source page, the result asks the window to open that page
+   * in a foreground tab in the download's container (a private download in its private window) and then
+   * to arm the row (arm()): Waiting for link. Pause meanwhile stops it ('busy'), and nothing opens.
+   */
+  async refreshAddress(id: string): Promise<RefreshResult> {
+    const rec = this.find(id);
+    const out = (kind: RefreshResult['kind']): RefreshResult => ({ kind, pageUrl: rec?.identity.pageUrl ?? '', userContextId: rec?.identity.userContextId ?? 0, isPrivate: !!rec?.identity.isPrivate });
+    if (!rec || rec.state !== 'paused' || rec.need?.kind !== 'address' || this.runs.has(id) || this.deciding.has(id)) return out('busy');
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
+    rec.renewTries = undefined;
+    rec.catcher = undefined;
+    if (rec.mode === 'file' && rec.file && rec.path) {
+      rec.wait = { for: 'address', since: Date.now(), tries: 0, nextAt: 0, status: rec.need.status };
+      await this.episode(rec);
+      // Pause (or Cancel, Remove) stopped the attempt: theirs is the last word. So did the download
+      // started again meanwhile, whose proof now decides (proveFor()): no page opens.
+      if ((rec.state === 'paused' && rec.need?.kind === 'address' && !rec.wait) || this.proving.has(id)) return out('busy');
+    }
+    // What the attempt left (episode() changed the row).
+    const need = rec.need as Rec['need'];
+    if (!this.recs.includes(rec)) return out('busy');
+    if (rec.state !== 'paused' || !need) return out('renewed');
+    if (need.kind === 'choice') return out('changed');
+    if (need.kind !== 'address') return out('busy');
+    return out(rec.identity.pageUrl ? 'page' : 'none');
+  }
+
+  /**
+   * The window opened the download's page for Refresh address or Open page (that tab: browserId): for 30
+   * minutes the row waits for the download to be started again (Waiting for link). A start in that tab
+   * scores most; one in another tab of the same container may still continue it (the person may sign in
+   * elsewhere first), and closing the tab does not stop the wait.
+   */
+  arm(id: string, browserId = 0): void {
+    const rec = this.find(id);
+    if (!rec || rec.state !== 'paused' || rec.need?.kind !== 'address' || rec.mode !== 'file' || !rec.file || !rec.path) return;
+    rec.catcher = { until: Date.now() + CATCH_FOR, browserId: Number(browserId) || 0 };
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /** Stop waiting: the row no longer waits for a start on its page (Link expired again; the schedule's attempts stay). */
+  stopWaiting(id: string): void {
+    const rec = this.find(id);
+    if (!rec?.catcher) return;
+    rec.catcher = undefined;
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /** Open page, From page: the download's page, its container and privacy, and whether the window arms the row once it is open. */
+  openPage(id: string): PageTarget | null {
+    const rec = this.find(id);
+    if (!rec?.identity.pageUrl) return null;
+    const arm = rec.state === 'paused' && rec.need?.kind === 'address' && rec.mode === 'file' && !!rec.file && !!rec.path;
+    return { pageUrl: rec.identity.pageUrl, userContextId: rec.identity.userContextId, isPrivate: rec.identity.isPrivate, arm };
+  }
+
+  /**
+   * A row that waits for its address (RESUME-DESIGN.md G1): a one-file download with saved bytes, paused,
+   * needing an address (Link expired), waiting for one or armed, and free to be proven against now. An
+   * attempt of the schedule running (Renewing link) does not keep it out: the person's start again is a
+   * manual action and comes first (proveFor() stops that attempt; review of Phase 3: a start again during
+   * an attempt became "name (1)" and downloaded the whole file again). Another address of the person's
+   * being proven (a paste, another start) does.
+   */
+  private waitsForAddress(r: Rec): boolean {
+    return r.state === 'paused' && r.mode === 'file' && !!r.file?.probed && !!r.path && (r.need?.kind === 'address' || r.wait?.for === 'address' || !!r.catcher) && !this.runs.has(r.id) && !this.proving.has(r.id) && !this.deciding.has(r.id);
+  }
+
+  /**
+   * Which waiting row a download started again may be (RESUME-DESIGN.md G1; downloads/attach.ts score()):
+   * only rows of the same privacy and container (2.1), the best scoring PRE_MATCH or more; null otherwise.
+   * Costs nothing while no row waits for an address.
+   */
+  private preMatch(s: { url: string; identity: IdentityJSON; browserId: number; pageUrl: string; names: string[] }): Rec | null {
+    if (!/^https?:\/\//i.test(s.url)) return null;
+    const now = Date.now();
+    let best: Rec | null = null;
+    let top = 0;
+    for (const r of this.recs) {
+      if (r.identity.isPrivate !== s.identity.isPrivate || r.identity.userContextId !== s.identity.userContextId || !this.waitsForAddress(r)) continue;
+      const armed = r.catcher && r.catcher.until > now ? (r.catcher.browserId ?? 0) : 0;
+      const n = score({ armedBrowserId: armed, names: namesOf(r), pageUrl: r.identity.pageUrl, urls: urlsOf(r) }, { url: s.url, browserId: s.browserId, pageUrl: s.pageUrl, names: s.names }, sameSite);
+      if (n >= PRE_MATCH && n > top) {
+        best = r;
+        top = n;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The byte proof for a download started again (RESUME-DESIGN.md G1 step 4, Phase 3): its address,
+   * asked with `identity` (a click's page, cookies and container; a start with no page as a pasted
+   * address), against the waiting row's saved bytes (proof.ts proveAddress(): window 0, R1-R7, the
+   * windows). 'same' continues the row; 'changed' only for the real file (attach.ts realFile(): the same
+   * page and a name a person or the server gave, never an address's script name), another version of it;
+   * anything else is not this row's ('not'): a refused address or a page, another file, and another size
+   * that is not the real file (R2, decided from the probe's `total` and names without a request). An
+   * attempt of the schedule running for the row gives way (a manual action); meanwhile the row reads
+   * Renewing link, and no other start or attempt takes it.
+   */
+  private async proveFor(rec: Rec, url: string, identity: IdentityJSON, start: Named, total = -1): Promise<{ kind: 'same'; found: Found } | { kind: 'changed'; found: Found; evidence: string } | { kind: 'not' }> {
+    const not = { kind: 'not' as const };
+    const s = rec.file;
+    if (!s || !this.waitsForAddress(rec)) return not;
+    const ours: Named = { pageUrl: rec.identity.pageUrl, names: [rec.filename], disposition: s.dispositionName ?? '', urls: urlsOf(rec) };
+    const real = (disposition: string): boolean => realFile(ours, { ...start, disposition: disposition || start.disposition });
+    if (total >= 0 && s.total >= 0 && total !== s.total && !real('')) return not;
+    this.stopRenewing(rec.id);
+    const ac = new AbortController();
+    this.renewing.set(rec.id, ac);
+    this.proving.add(rec.id);
+    this.touch(rec);
+    let c: Candidate;
+    try {
+      const part = `${rec.path}.part`;
+      const ctx = { state: s, identity: new Identity(identity), kind: await readKind(s, part), saved: savedBytes(rec) };
+      c = await proveAddress(ctx, part, s.segments, rec.id, url, ac.signal);
+    } catch {
+      c = { verdict: 'unreachable', status: 0 };
+    } finally {
+      if (this.renewing.get(rec.id) === ac) {
+        this.renewing.delete(rec.id);
+        this.proving.delete(rec.id);
+      }
+      this.touch(rec);
+    }
+    if (ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || this.runs.has(rec.id) || this.deciding.has(rec.id)) return not;
+    if (c.verdict === 'same') return { kind: 'same', found: c.found };
+    if ((c.verdict === 'changed' || c.verdict === 'unknown') && real(c.found.disposition)) return { kind: 'changed', found: c.found, evidence: c.verdict === 'changed' ? c.evidence : UNSURE };
+    return not;
+  }
+
+  /**
+   * start()'s pre-match (Phase 3): proven and continued, File changed, or started as it always was, a
+   * moment later; that new row's 'added' names the row start() returned (replaces), so Add link selects
+   * the new one (review of Phase 3).
+   */
+  private async attachStart(rec: Rec, url: string, opts: StartOptions, identity: IdentityJSON, how: AttachHow): Promise<void> {
+    const from = { origin: opts.origin ?? null, browserId: Number(opts.browserId) || 0 };
+    const verdict = await this.proveFor(rec, url, identity, { pageUrl: identity.pageUrl && how === 'page' ? identity.pageUrl : '', names: [opts.filename ?? ''], disposition: '', urls: [url] });
+    if (this.quitting) return;
+    if (verdict.kind === 'same') {
+      this.attach(rec, verdict.found, how, identity, from);
+      return;
+    }
+    if (verdict.kind === 'changed') {
+      this.changedFor(rec, verdict.found, verdict.evidence, identity, from);
+      return;
+    }
+    try {
+      this.startNew(url, opts, 'file', rec.id);
+    } catch (e) {
+      console.warn('Deer downloads: could not start', String(e));
+    }
+  }
+
+  /**
+   * A download started again gives another version of the waiting row's file (the real file, other
+   * bytes: G1 step 4, 3 G3): the row becomes File changed, with that address and the start's identity
+   * kept for Start over (need.candidate). With nothing at stake (at most ASK_ABOVE saved, the owner's
+   * decision 1, whatever the evidence; at most twice in ten minutes, ranged.ts silentRestart()) it starts
+   * over from it at once instead of asking, and the start flies to the row as an attach does (review of
+   * Phase 3: a click over a few KiB saved got a question about almost nothing).
+   */
+  private changedFor(rec: Rec, found: Found, evidence: string, identity: IdentityJSON, from: { origin: { x: number; y: number } | null; browserId: number }): void {
+    this.stopRenewing(rec.id);
+    const candidate: NeedCandidate = { ...candidateOf(found), identity };
+    rec.wait = undefined;
+    rec.catcher = undefined;
+    rec.renewTries = undefined;
+    const log = silentRestart(rec.file?.silent, savedBytes(rec));
+    if (log) {
+      // Straight from Link expired to the new file: the row never reads File changed (no dot, nothing
+      // announced but the start); the old part waits as "<name>.old.part" until the new file completes.
+      void this.startAfresh(rec.id, '', candidate).then(() => {
+        if (!this.recs.includes(rec)) return;
+        if (rec.state === 'paused' && !this.runs.has(rec.id)) {
+          // It could not start over (the part is held open, or another decision came first): the row asks.
+          rec.need = { kind: 'choice', since: Date.now(), evidence: rec.need?.evidence || evidence, candidate };
+          this.touch(rec);
+          this.save(true);
+          return;
+        }
+        if (rec.need || (rec.state !== 'queued' && rec.state !== 'downloading')) return;
+        if (rec.file) rec.file.silent = log;
+        this.event(rec, 'Started over: the file on the site changed');
+        this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
+      });
+      return;
+    }
+    rec.need = { kind: 'choice', since: Date.now(), evidence, candidate };
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /** File changed's two choices (RESUME-DESIGN.md 3 G3, 6): Start over with the new file, or Keep partial file. */
+  decide(id: string, choice: 'start-over' | 'keep-partial'): Promise<void> {
+    return choice === 'keep-partial' ? this.keepPartial(id) : this.startOver(id);
+  }
+
+  /**
+   * Keep partial file, File changed's second choice (RESUME-DESIGN.md 3 G3, the owner's decision 3): the
+   * unbroken beginning of the saved bytes from byte 0 becomes "<stem> (partial).<ext>" and the row is
+   * completed with a note; Safe Browsing and the Mark of the Web run as for any finished file
+   * (complete()). As Start over does, the decision reaches the disk first: the new name is written to the
+   * store (flushed) before the part is moved; the moved file is then cut to that beginning. A part
+   * another program holds open moves nothing, and the row says why. Streams keep their written segments
+   * with Phase 6.
+   */
+  async keepPartial(id: string): Promise<void> {
+    const rec = this.find(id);
+    const ready = (): boolean => !!rec && this.recs.includes(rec) && rec.state === 'paused' && rec.need?.kind === 'choice' && rec.mode === 'file' && !!rec.file && !!rec.path && !this.runs.has(rec.id);
+    if (!rec || !ready() || this.deciding.has(id) || !rec.file) return;
+    const part = `${rec.path}.part`;
+    const bytes = Math.min(unbroken(rec.file.segments), Math.max(0, await sizeOf(part)));
+    if (bytes <= 0 || !ready() || this.deciding.has(id)) return;
+    this.stopRenewing(id);
+    this.deciding.add(id);
+    const total = rec.total > 0 ? rec.total : rec.file.total;
+    try {
+      const target = uniquePath(rec.dir, partialName(rec.filename), (p) => this.taken(p, rec.id));
+      rec.keeping = target;
+      await this.save(true);
+      if (!ready()) {
+        rec.keeping = undefined;
+        return;
+      }
+      const why = (e: unknown): void => {
+        console.warn('Deer downloads: the partial file could not be kept', String(e));
+        rec.keeping = undefined;
+        if (rec.need) rec.need = { ...rec.need, evidence: 'another program has the saved part open; close it and try again' };
+        this.touch(rec);
+      };
+      try {
+        fileFor(part).moveTo(null, PathUtils.filename(target));
+      } catch (e) {
+        why(e);
+        await this.save(true);
+        return;
+      }
+      try {
+        setSize(target, bytes);
+      } catch (e) {
+        // Never a file that holds more than the unbroken beginning under that name: the part goes back.
+        try {
+          fileFor(target).moveTo(null, PathUtils.filename(part));
+        } catch {
+          /* load() puts it back (rec.keeping) */
+        }
+        why(e);
+        await this.save(true);
+        return;
+      }
+      rec.keeping = undefined;
+      rec.path = target;
+      rec.filename = PathUtils.filename(target);
+      rec.file = { ...rec.file, segments: [{ start: 0, end: bytes, received: bytes }] };
+      rec.received = bytes;
+      rec.need = undefined;
+      rec.wait = undefined;
+      rec.catcher = undefined;
+      rec.note = `Kept the first ${sizeText(bytes)}${total > bytes ? ` of ${sizeText(total)}` : ''}`;
+      this.event(rec, 'Partial file kept');
+      // The row stays out of resume(), startOver(), setAddress() and preMatch() (deciding) until
+      // complete() is done, which waits for Safe Browsing: as a paused row with no need, Resume or Space
+      // then started the whole download again under the kept file's name, on a row that ended Completed
+      // (review of Phase 3).
+      await this.complete(rec);
+    } finally {
+      this.deciding.delete(id);
+    }
+  }
+
   /** An attempt of the schedule or a pasted address's proof for the row stops (Retry, Cancel, Remove, quit). */
   private stopRenewing(id: string): void {
     const ac = this.renewing.get(id);
     if (!ac) return;
     this.renewing.delete(id);
+    this.proving.delete(id);
     ac.abort();
   }
 
@@ -1786,22 +2250,36 @@ class Manager {
   }
 
   /**
-   * The one timer for the earliest wait.nextAt among paused rows (RESUME-DESIGN.md 3.0). Attempts that
-   * fell due while Deer was closed come WAIT_GRACE after it started.
+   * The one timer for the earliest wait.nextAt among paused rows (RESUME-DESIGN.md 3.0), and for the end
+   * of a Waiting for link (catcher.until, Phase 3). Attempts that fell due while Deer was closed come
+   * WAIT_GRACE after it started.
    */
   private armWaits(): void {
     if (this.waitTimer) clearTimeout(this.waitTimer);
     this.waitTimer = null;
     if (this.quitting || !this.loadedAt) return;
     let next = Infinity;
-    for (const r of this.recs) if (r.wait?.nextAt && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) next = Math.min(next, r.wait.nextAt);
+    for (const r of this.recs) {
+      if (r.wait?.nextAt && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) next = Math.min(next, r.wait.nextAt);
+      if (r.catcher) next = Math.min(next, r.catcher.until);
+    }
     if (next === Infinity) return;
     const now = Date.now();
     const delay = Math.min(2 ** 31 - 1, Math.max(0, next - now, this.loadedAt + WAIT_GRACE - now));
     this.waitTimer = setTimeout(() => {
       this.waitTimer = null;
       const due = Date.now() + 50;
-      for (const r of [...this.recs]) if (r.wait?.nextAt && r.wait.nextAt <= due && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) void this.episode(r);
+      let ended = false;
+      for (const r of [...this.recs]) {
+        if (r.catcher && r.catcher.until <= due) {
+          // Thirty minutes without the download started again: the row is Link expired again.
+          r.catcher = undefined;
+          this.touch(r);
+          ended = true;
+        }
+        if (r.wait?.nextAt && r.wait.nextAt <= due && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) void this.episode(r);
+      }
+      if (ended) this.save(true);
       this.armWaits();
     }, delay);
   }
@@ -1884,6 +2362,9 @@ class Manager {
     const connections = Math.max(1, Math.min(32, Number(s.connections) || 8));
     const renewing = !pausing && (this.renewing.has(r.id) || run?.phase === 'renewing');
     const wait = r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
+    const need = r.state === 'paused' && !pausing && r.need ? r.need : null;
+    // Keep partial file (3 G3): the unbroken beginning, for a one-file File changed row.
+    const kept = need?.kind === 'choice' && r.mode === 'file' && r.file && r.path ? unbroken(r.file.segments) : 0;
     return {
       id: r.id,
       url: r.url,
@@ -1923,6 +2404,11 @@ class Manager {
       nextAt: wait?.nextAt ?? 0,
       status: r.state === 'paused' ? (r.need?.status ?? 0) : (run?.status ?? 0),
       history: (r.events ?? []).map((e) => ({ at: e.at, text: e.text })),
+      armed: need?.kind === 'address' && !!r.catcher && r.catcher.until > Date.now(),
+      canRenew: r.mode === 'file' && !!r.file?.probed && !!r.path,
+      // The ring's dot (RESUME-DESIGN.md 6): only rows that started needing the person in this session.
+      attention: !!need && need.since >= this.session.startedAt,
+      keep: kept > 0 ? { bytes: kept, name: partialName(r.filename), older: !!r.oldParts?.length } : null,
     };
   }
 
@@ -2081,6 +2567,11 @@ class Manager {
       this.quitting = true;
       // Attempts of the schedule stop; their rows stay paused with the count and time saved.
       for (const id of [...this.renewing.keys()]) this.stopRenewing(id);
+      // Probes held for a waiting row (adopt()) stop as a row's would.
+      for (const run of this.holding) {
+        run.reason = 'quit';
+        run.ac.abort();
+      }
       this.armWaits();
       const waits: Promise<unknown>[] = [];
       for (const [id, run] of this.runs) {
@@ -2115,6 +2606,18 @@ function settleSegments(f: FileState): void {
     f.ranges = false;
   }
   for (const seg of f.segments) if (seg.end >= 0) seg.received = Math.max(0, Math.min(seg.received, seg.end - seg.start));
+}
+
+/** A row's names for preMatch() (RESUME-DESIGN.md 2.2): its file name and the server's. */
+function namesOf(r: Rec): string[] {
+  return [r.filename, r.file?.dispositionName ?? ''].filter(Boolean);
+}
+
+/** A row's addresses for preMatch() (2.2): its own, the final one, the redirect hops and the ones it replaced; its own first. */
+function urlsOf(r: Rec): string[] {
+  const f = r.file;
+  const all = [r.url, f?.url ?? '', f?.finalUrl ?? '', ...(f?.chain ?? []), ...(f?.address?.history ?? []).flatMap((h) => [h.url, h.finalUrl])];
+  return [...new Set(all.filter((u) => /^https?:\/\//i.test(u)))];
 }
 
 /** What a found address answered, kept on a File changed row for Start over (need.candidate). */

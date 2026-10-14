@@ -3,17 +3,31 @@
 // became direct calls on the VitreDownloads singleton. A window shows its own kind of downloads:
 // a private window the private ones, a normal window the others (as Firefox does).
 import type { Browser } from '../../browser';
-import type { DownloadEvent, DownloadView, StartOptions } from '../../../modules/downloads/types';
+import type { DownloadEvent, DownloadView, RefreshResult, StartOptions } from '../../../modules/downloads/types';
 
 const ORDER: Record<DownloadView['state'], number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
 
 export type AddedEvent = Extract<DownloadEvent, { kind: 'added' }>;
-export type Command = 'pause' | 'resume' | 'start-now' | 'cancel' | 'remove' | 'open' | 'show-in-folder' | 'copy-address' | 'keep' | 'start-over';
+export type AttachedEvent = Extract<DownloadEvent, { kind: 'attached' }>;
+/**
+ * What a row's verbs run (RESUME-DESIGN.md 6, wiring). Phase 3: refresh-address (a renewal attempt, then
+ * the page opened and the row armed), stop-waiting, open-page (Open page, From page: this window opens it,
+ * through the opener index.ts sets), keep-partial; use-address is the panel's own field.
+ */
+export type Command =
+  | 'pause' | 'resume' | 'start-now' | 'cancel' | 'remove' | 'open' | 'show-in-folder' | 'copy-address' | 'keep' | 'start-over'
+  | 'refresh-address' | 'stop-waiting' | 'open-page' | 'keep-partial';
 
 export class DownloadStore {
   private items = new Map<string, DownloadView>();
   private listeners = new Set<() => void>();
   private addedListeners = new Set<(ev: AddedEvent) => void>();
+  private attachedListeners = new Set<(ev: AttachedEvent) => void>();
+  /**
+   * Opens a download's page in this window (Open page, From page, Refresh address: VideoUI.openPage, set
+   * by index.ts), arming the row when the engine says so. False when there is no page to open.
+   */
+  pageOpener: ((id: string) => boolean) | null = null;
   private scheduled = false;
   /** The last 'open' that failed, with why (the panel shows it). */
   lastError = '';
@@ -45,6 +59,17 @@ export class DownloadStore {
           fn(e);
         } catch (err) {
           console.error('Deer downloads: added listener failed', err);
+        }
+      }
+    } else if (e.kind === 'attached') {
+      // A start again continued a waiting row (RESUME-DESIGN.md G1, Phase 3): the same row, no new one.
+      if (!this.mine(e.view)) return;
+      this.items.set(e.view.id, e.view);
+      for (const fn of this.attachedListeners) {
+        try {
+          fn(e);
+        } catch (err) {
+          console.error('Deer downloads: attached listener failed', err);
         }
       }
     }
@@ -81,6 +106,10 @@ export class DownloadStore {
 
   onAdded(fn: (ev: AddedEvent) => void): void {
     this.addedListeners.add(fn);
+  }
+
+  onAttached(fn: (ev: AttachedEvent) => void): void {
+    this.attachedListeners.add(fn);
   }
 
   /** Listeners run once per frame, however many updates arrived (a timer when no frame comes). */
@@ -127,24 +156,55 @@ export class DownloadStore {
       case 'show-in-folder': e.showInFolder(id); break;
       case 'copy-address': e.copyAddress(id); break;
       case 'keep': void e.keep(id); break;
-      case 'start-over': void e.startOver(id); break;
+      case 'start-over': void e.decide(id, 'start-over'); break;
+      case 'keep-partial': void e.decide(id, 'keep-partial'); break;
+      case 'refresh-address': void this.refresh(id); break;
+      case 'stop-waiting': e.stopWaiting(id); break;
+      case 'open-page': this.openPage(id); break;
     }
+  }
+
+  /**
+   * Refresh address (RESUME-DESIGN.md G1 manual fallback): the engine runs a renewal attempt at once; when
+   * it finds nothing and the download has a page, this window opens the page and arms the row (Waiting
+   * for link). Resolves with what happened ('none': nothing found and no page; the panel then offers the
+   * address field).
+   */
+  async refresh(id: string): Promise<RefreshResult['kind']> {
+    let r: RefreshResult;
+    try {
+      r = await this.engine.refreshAddress(id);
+    } catch (e) {
+      console.warn('Deer downloads: Refresh address failed', String(e));
+      return 'busy';
+    }
+    if (r.kind === 'page' && !this.openPage(id)) return 'none';
+    return r.kind;
+  }
+
+  /** Open page: the download's page in a foreground tab of this window (an armed row waits for its start there). */
+  openPage(id: string): boolean {
+    return this.pageOpener?.(id) ?? false;
   }
 
   /**
    * The primary verb for a row: pause, resume, start now, retry or show in folder. Decided on the
    * engine's state now, not this window's copy (which catches up a frame later): a quick second
-   * press (Space Space) is then Resume, not a second Pause. On a Link expired or File changed row it
-   * is Resume too, which only tries the address again and never destroys bytes (the panel moves
-   * focus to a File changed row's choice instead, RESUME-DESIGN.md 6). On a Renewing link row it is
-   * Pause: the attempt stops and the bytes stay (RESUME-DESIGN.md 6).
+   * press (Space Space) is then Resume, not a second Pause. None of them destroys bytes (RESUME-DESIGN.md
+   * 6): on a Renewing link row it is Pause (the attempt stops, the bytes stay); on a Link expired row
+   * Refresh address (Retry for a stream, whose renewal comes with Phase 6); on Waiting for link and Start
+   * it again from its page, Open page; on File changed Resume, which only checks the address again (the
+   * panel moves focus to the row's choice instead). Resolves with Refresh address's outcome.
    */
-  primary(seen: DownloadView): void {
+  primary(seen: DownloadView): Promise<RefreshResult['kind']> | null {
     const v = this.engine.get(seen.id) ?? seen;
     if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') this.run('pause', v.id);
     else if (v.state === 'queued') this.run('start-now', v.id);
     else if (v.state === 'completed' && !v.missing) this.run('show-in-folder', v.id);
+    else if (v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)) this.run('open-page', v.id);
+    else if (v.need?.kind === 'address' && v.canRenew) return this.refresh(v.id);
     else this.run('resume', v.id);
+    return null;
   }
 
   pauseAll(): void {

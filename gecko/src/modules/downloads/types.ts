@@ -7,7 +7,8 @@ export type DownloadState = 'starting' | 'queued' | 'downloading' | 'paused' | '
 
 /**
  * Why a paused row waits for the person (spikes/downloader/RESUME-DESIGN.md 5.1). Phase 1 sets
- * 'address' (Link expired) and 'choice' (File changed); 'repair' and 'page' come with later phases.
+ * 'address' (Link expired) and 'choice' (File changed); Phase 3 'page' (a download Firefox moved,
+ * which only its page can start again: Start it again from its page); 'repair' comes with Phase 5.
  */
 export type NeedKind = 'address' | 'choice' | 'repair' | 'page';
 
@@ -121,6 +122,53 @@ export interface DownloadView {
   status: number;
   /** The row's last history lines, oldest first ("New link found", with when): every automatic fix leaves one. */
   history: { at: number; text: string }[];
+  /**
+   * A Link expired row Refresh address armed (RESUME-DESIGN.md G1 manual fallback, Phase 3): Deer waits
+   * for the person to start the download again on its page (Waiting for link) and attaches that start
+   * to this row; it lasts 30 minutes.
+   */
+  armed: boolean;
+  /** Refresh address can run for this row: a one-file download Deer moves itself, with saved bytes (RESUME-DESIGN.md 5.5). */
+  canRenew: boolean;
+  /**
+   * The row started needing the person during this session (RESUME-DESIGN.md 6): the ring's dot and its
+   * "needs attention" label. Rows that already needed the person when Deer started don't count.
+   */
+  attention: boolean;
+  /**
+   * File changed (need 'choice') on a one-file download: what Keep partial file saves, the unbroken
+   * beginning from byte 0, and the name it takes ("song (partial).mp3"; RESUME-DESIGN.md 3 G3). Null
+   * when there is nothing to keep, or for streams (Phase 6). `older`: an earlier Start over set a
+   * partial file aside ("<name>.old.part"), which Keep partial deletes too, as the row says (review of
+   * Phase 3).
+   */
+  keep: { bytes: number; name: string; older: boolean } | null;
+}
+
+/**
+ * What Refresh address did (engine refreshAddress(), RESUME-DESIGN.md G1 manual fallback): 'renewed', a
+ * new address proven to be the same file was found and the row carries on; 'changed', the file on the
+ * site is another one (File changed); 'page', nothing was found and the window opens `pageUrl` in a
+ * foreground tab in the download's container, then arms the row (engine arm()); 'none', nothing was
+ * found and the row has no page; 'busy', the row can't be refreshed now.
+ */
+export interface RefreshResult {
+  kind: 'renewed' | 'changed' | 'page' | 'none' | 'busy';
+  pageUrl: string;
+  userContextId: number;
+  isPrivate: boolean;
+}
+
+/**
+ * A download's source page as engine openPage() gives it (Open page, From page): where to open it, in
+ * which container and privacy, and whether the window arms the row once its tab is open (a Link
+ * expired file download: engine arm(id, browserId)).
+ */
+export interface PageTarget {
+  pageUrl: string;
+  userContextId: number;
+  isPrivate: boolean;
+  arm: boolean;
 }
 
 /**
@@ -167,9 +215,16 @@ export interface StartOptions {
   browserId?: number;
 }
 
-/** Engine -> windows. One event per change batch (about four a second while downloading). */
+/**
+ * Engine -> windows. One event per change batch (about four a second while downloading). 'attached'
+ * (RESUME-DESIGN.md G1, Phase 3): a download started again on its page (a click, Alt+click, Add link,
+ * the 'downloads' service) proved to be a waiting row's file and continues that row: no new row; it
+ * flies from the tab like 'added' (browserId, origin). 'added' with `replaces`: start() returned that
+ * waiting row's id, then its proof said the address was another file, and this new row is the start.
+ */
 export type DownloadEvent =
-  | { kind: 'added'; view: DownloadView; origin: { x: number; y: number } | null; browserId: number }
+  | { kind: 'added'; view: DownloadView; origin: { x: number; y: number } | null; browserId: number; replaces?: string }
+  | { kind: 'attached'; view: DownloadView; origin: { x: number; y: number } | null; browserId: number }
   | { kind: 'update'; views: DownloadView[] }
   | { kind: 'removed'; ids: string[] };
 

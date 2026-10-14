@@ -108,7 +108,10 @@ export interface AddressInfo {
   obtainedAt: number;
   /** From the final address (expiry.ts); 0 when it does not say. */
   expiresAt: number;
-  /** 'first' (the download's own first answer), 'original' (renewed from it), 'pasted' (Use another address). */
+  /**
+   * 'first' (the download's own first answer), 'original' (renewed from it), 'pasted' (Use another
+   * address), 'page' or 'link' (started again on its page, or from an address with no page: Phase 3).
+   */
   how: string;
   /** The addresses it replaced, newest first (at most 5). */
   history: Array<{ url: string; finalUrl: string; at: number; how: string }>;

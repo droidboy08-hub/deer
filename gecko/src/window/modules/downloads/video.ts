@@ -10,6 +10,13 @@
 // DRM state come from the engine's MediaWatch (b.sys('VitreDownloads').media), keyed by the tab's
 // browserId; page rectangles (CSS px of the page) become window coordinates through the <browser>
 // box and the tab's zoom.
+//
+// Starting a download again on its page (spikes/downloader/RESUME-DESIGN.md G1 manual fallback, Phase
+// 3): openPage() opens a download's page for Open page, From page and Refresh address, in a foreground
+// tab of the download's container, and arms a Link expired row with that tab; the note under the tab
+// pill says "Start song.mp3 again on this page. Deer continues from 62%." with Stop waiting. When the
+// start continues the row ('attached'), it flies to the ring like a new download and the note says
+// "Continuing song.mp3 from 62%".
 import type { Browser, PageSource } from '../../browser';
 import { el } from '../../dom';
 import * as fx from '../../firefox';
@@ -177,6 +184,27 @@ export class VideoUI {
       }
       const origin = ev.origin ?? fromPeek ?? this.recentPointer(tab?.id ?? this.b.activeId);
       this.ring.fly(origin, ev.view);
+    });
+    // A download started again continued its waiting row (RESUME-DESIGN.md G1): no new row, but it flies
+    // from the tab as one would (from the open peek's page, from the sheet's header, as onAdded does), and
+    // the window whose tab or peek it was says so (the live region; the note under the pill for a tab).
+    // With nothing worth asking about saved, a changed file started over from the new one (the owner's
+    // decision 1) and says that instead.
+    store.onAttached((ev) => {
+      const tab = ev.browserId ? this.tabByBrowserId(ev.browserId) : undefined;
+      const fromPeek = !tab && ev.browserId && !ev.origin ? this.peekOrigin(ev.browserId) : null;
+      if (ev.browserId && !tab && !ev.origin && !fromPeek) {
+        this.ring.show();
+        return;
+      }
+      const words = ev.view.received > 0 ? `Continuing ${ev.view.filename} from ${f.percent(ev.view)}%` : `Starting ${ev.view.filename} again`;
+      this.ring.announce(words);
+      if (this.panel.open) {
+        this.ring.show();
+        return;
+      }
+      this.ring.fly(ev.origin ?? fromPeek ?? this.recentPointer(tab?.id ?? this.b.activeId), ev.view);
+      if (!fromPeek && (!tab || tab.id === this.b.activeId)) this.note(words, '');
     });
     const resize = (): void => this.renderPill();
     window.addEventListener('resize', resize);
@@ -634,6 +662,36 @@ export class VideoUI {
     this.offer = null;
     this.overPill = false;
     this.renderPill();
+  }
+
+  /**
+   * Open page, From page, Refresh address (RESUME-DESIGN.md G1 manual fallback, 6): the download's page in
+   * a visible foreground tab of this window, in the download's container (this window's store shows only
+   * its own privacy, so a private download opens in its private window). It loads as Deer's own request
+   * (the system principal, as an address the person typed) with the container's userContextId: the
+   * system principal is what lets the container be set (firefox.ts addTab). A Link expired row is then
+   * armed with that tab (engine arm(): Waiting for link) and the note under the tab pill says what to do;
+   * closing the tab does not stop the wait. False when there is no page.
+   */
+  openPage(id: string): boolean {
+    const engine = this.store.engine;
+    const target = engine.openPage(id);
+    if (!target || target.isPrivate !== this.b.isPrivate) return false;
+    const tab = this.b.openLink(target.pageUrl, 'tab', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(), userContextId: target.userContextId, background: false });
+    if (!tab) return false;
+    // The page is what the person looks at now: the panel and the quick view step aside.
+    this.panel.hide();
+    this.ring.pop.close(false);
+    const v = engine.get(id);
+    const name = v?.filename ?? 'the download';
+    if (target.arm) {
+      engine.arm(id, this.browserIdOf(tab));
+      const pct = v ? f.percent(v) : 0;
+      requestAnimationFrame(() =>
+        this.note(`Start ${name} again on this page.`, pct > 0 ? `Deer continues from ${pct}%.` : 'Deer continues from where it stopped.', 20000, { label: 'Stop waiting', run: () => engine.stopWaiting(id) })
+      );
+    } else if (v?.need?.kind === 'page') requestAnimationFrame(() => this.note(`Start ${name} again on this page.`, ''));
+    return true;
   }
 
   private recentPointer(tabId: number): { x: number; y: number } | null {

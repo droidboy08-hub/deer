@@ -18,7 +18,9 @@
              problem, keeps the bytes on disk, resumes intact
   drm        a ClearKey page is protected: no offer, "Protected video" pill, DRM HLS/DASH refused
   ui         every surface against the boards (panel states, popover, ring menu, pill states,
-             picker, live, quit prompt)
+             picker, live, quit prompt); the rows that need the person (Link expired, Waiting for link,
+             File changed, Start it again from its page): wording, aria labels, the ring's dot, Space
+             that never destroys bytes, access keys unique in every row's menu
   safety     names Firefox neutralises (.scf/.lnk/.url, bidi overrides); Safe Browsing verdicts (a
              stand-in reputation service: dangerous removed, uncommon kept aside with Keep file);
              the executable-launch prompt; page-derived downloads with the page's principal and
@@ -48,6 +50,20 @@
              tiny file on a server that sends a 200 for a whole-file Range resumes in 2 requests
              (/whole); an attach whose run is refused carries the schedule on; Pause stops an attempt;
              Retry right after a failed renewal asks the original address again
+  attach     starting a download again on its page (spikes/downloader/RESUME-DESIGN.md, Phase 3): a clicked
+             download whose signed address expired is Link expired; Refresh address opens its page and arms
+             the row (Waiting for link); a click there continues the same row (no new row or flight,
+             Firefox's copy gone from the scratch folder, no " (1)", only the missing ranges fetched); so do
+             Alt+click and Add link; an unrelated download makes its own row while the old one waits; the
+             same name over other bytes makes the old row File changed (no new row), and Start over then
+             gets that file, keeping "<name>.old.part" until it is done; Keep partial file saves the old
+             prefix byte for byte; another container never attaches; a private window's row attaches there
+             and is never written. From the review of Phase 3: the same name on another page, and another
+             file behind the same script (/fetch?f=, with and without Content-Disposition), make rows of
+             their own (Add link selects it); Add link keeps the row's page; the real file changed with
+             under 1 MiB saved starts over without asking; a start again during a scheduled attempt
+             attaches, one sent to a chosen folder does not; Resume during Keep partial starts nothing;
+             a peek's click flies from the sheet
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -91,6 +107,7 @@ TESTS = {
     'folders': (120, False),
     'integrity': (300, True),
     'expiry': (300, True),
+    'attach': (480, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

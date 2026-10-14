@@ -432,7 +432,8 @@ spike.main(async () => {
     await sleep(600);
     const cap = details().querySelector(".vd-d-cap").textContent;
     const acts = Array.from(details().querySelectorAll("[data-act]")).map((x) => x.textContent);
-    check("its caption says why, how much is saved and when the next try is; Use another address… is offered", /^The link stopped working \(403\) · \d+% is saved · next try \d/.test(cap) && acts.includes("Use another address…") && acts.includes("Retry"), { cap, acts });
+    // Phase 3 (RESUME-DESIGN.md 6): Refresh address is a Link expired row's verb, with Open page for one that has a page.
+    check("its caption says why, how much is saved and when the next try is; Use another address… is offered", /^The link stopped working \(403\) · \d+% is saved · next try \d/.test(cap) && acts.includes("Use another address…") && acts.includes("Refresh address") && acts.includes("Open page"), { cap, acts });
     const openField = async () => {
       spike.click(details().querySelector('[data-act="use-address"]'));
       await waitFor(() => !details().querySelector(".vd-addr").hidden, { what: "the address field" });

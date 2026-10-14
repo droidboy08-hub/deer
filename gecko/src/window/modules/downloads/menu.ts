@@ -44,6 +44,7 @@ const GLYPHS: Record<string, string> = {
   close: ic.cancel,
   remove: ic.remove,
   link: ic.link,
+  opentab: ic.open,
 };
 
 let current: { close: (how: 'dismiss' | 'activate') => void } | null = null;
