@@ -103,6 +103,8 @@ export class Panel {
    * `replaces`) is selected instead (review of Phase 3).
    */
   private addedAs = '';
+  /** Redraws the open panel every second while a row counts down to its next try (Retrying · in 40 s). */
+  private countdown = 0;
 
   constructor(
     private b: Browser,
@@ -127,6 +129,7 @@ export class Panel {
     b.on('settings', () => {
       if (this.isOpen) this.render();
     });
+    b.onDestroy(() => this.tickCountdown(false));
     // Switching tabs underneath (Ctrl+Tab, Ctrl+1) focuses the page; the panel keeps the keys.
     b.on('tab-activated', () => {
       if (this.isOpen) this.focusSelected();
@@ -407,10 +410,24 @@ export class Panel {
       f.setText(empty, views.length ? 'Nothing here.' : 'Downloads you start appear here.');
     } else empty?.remove();
     this.renderDetails(shown.find((v) => v.id === this.selected) ?? null);
+    // Retrying counts down to its next try (RESUME-DESIGN.md 6): drawn again every second meanwhile.
+    this.tickCountdown(shown.some((v) => f.isWaiting(v) && v.wait?.for === 'server'));
     if (hadFocus && !els.panel.contains(document.activeElement)) {
       const row = this.rows.get(this.selected);
       if (row) row.row.focus();
       else els.search.focus();
+    }
+  }
+
+  private tickCountdown(on: boolean): void {
+    if (on && !this.countdown) {
+      this.countdown = window.setInterval(() => {
+        if (this.isOpen) this.render();
+        else this.tickCountdown(false);
+      }, 1000);
+    } else if (!on && this.countdown) {
+      window.clearInterval(this.countdown);
+      this.countdown = 0;
     }
   }
 
@@ -455,16 +472,19 @@ export class Panel {
     const paused = views.filter((v) => v.state === 'paused').length;
     // Rows that need the person (Link expired, File changed, Start it again...): RESUME-DESIGN.md 6.
     const attention = views.filter((v) => v.state === 'paused' && !!v.need).length;
+    // Waiting for network and Retrying (G4): still under way, Deer continues them by itself.
+    const waiting = views.filter(f.isWaiting).length;
     const done = views.filter((v) => v.state === 'completed').length;
     const rate = running.reduce((n, v) => n + v.speed, 0);
     const parts: string[] = [];
     if (running.length) parts.push(`${running.length} downloading${rate > 0 ? ` at ${f.speed(rate)}` : ''}`);
     if (queued) parts.push(`${queued} queued`);
-    if (paused > attention) parts.push(`${paused - attention} paused`);
+    if (waiting) parts.push(`${waiting} waiting`);
+    if (paused > attention + waiting) parts.push(`${paused - attention - waiting} paused`);
     if (attention) parts.push(needAttention(attention));
     if (!parts.length) parts.push(done ? `${done} completed` : 'No downloads');
     f.setText(els.summary, parts.join(' · '));
-    const anyActive = running.length > 0 || queued > 0;
+    const anyActive = running.length > 0 || queued > 0 || waiting > 0;
     f.setText(els.pauseAll, anyActive || !paused ? 'Pause all' : 'Resume all');
     els.pauseAll.disabled = !anyActive && !paused;
     f.setText(els.limitText, limitLabel(this.b.settings.speedLimitKBps));
@@ -526,12 +546,15 @@ export class Panel {
 
     const pct = f.percent(v);
     const transferring = v.state === 'downloading' && !v.phase;
-    // A row that needs the person says why where the bar was (RESUME-DESIGN.md 6).
-    const showBar = !v.need && ((transferring && v.total > 0) || (v.state === 'paused' && v.total > 0));
+    // Checking (RESUME-DESIGN.md 6): the bar stays dimmed at its old percentage.
+    const checking = f.isChecking(v);
+    // A row that needs the person says why where the bar was (RESUME-DESIGN.md 6); so does one that waits
+    // to try again by itself (Waiting for network, Retrying: G4).
+    const showBar = !v.need && !f.isWaiting(v) && v.total > 0 && (transferring || checking || v.state === 'paused');
     r.prog.hidden = !showBar;
     r.status.hidden = showBar;
     if (showBar) {
-      r.bar.classList.toggle('dim', v.state === 'paused');
+      r.bar.classList.toggle('dim', v.state === 'paused' || checking);
       r.fill.style.width = `${pct}%`;
       f.setText(r.pct, `${pct}%`);
     } else {
@@ -542,7 +565,11 @@ export class Panel {
         r.status.replaceChildren(...(icon ? [node(icon)] : []), text);
       }
     }
-    const [s, sCls] = transferring ? [f.speed(v.speed) || '—', v.speed > 0 ? '' : 'dim'] : v.state === 'paused' && showBar ? ['Paused', 'soft'] : ['—', 'dim'];
+    const [s, sCls] = transferring
+      ? [f.speed(v.speed) || '—', v.speed > 0 ? '' : 'dim']
+      : checking && showBar
+        ? v.phase === 'checking' ? ['Checking', 'soft'] : ['—', 'dim']
+        : v.state === 'paused' && showBar ? ['Paused', 'soft'] : ['—', 'dim'];
     r.speed.className = `vd-cell speed ${sCls}`;
     f.setText(r.speed, s);
     const [t, tCls] = transferring && v.eta >= 0 ? [f.eta(v.eta), ''] : v.state === 'queued' && v.queuePos === 1 ? ['Next', 'soft'] : v.state === 'completed' ? [f.finished(v.finishedAt), 'soft'] : ['—', 'dim'];
@@ -615,13 +642,16 @@ export class Panel {
     else if (v.need?.kind === 'address') cap = `The link stopped working${v.need.status ? ` (${v.need.status})` : ''} · ${f.percent(v)}% is saved${v.nextAt ? ` · next try ${nextTry(v.nextAt)}` : ''}`;
     else if (v.need?.kind === 'choice') cap = `The file on the site is different from the one being downloaded. ${f.percent(v)}% of the old one is saved.`;
     else if (v.need?.kind === 'page') cap = `Start it again from its page${v.need.evidence ? `: ${v.need.evidence}` : ''}.`;
-    else if (v.state === 'starting' || v.phase === 'probing') cap = 'Starting';
+    // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4).
+    else if (f.isWaiting(v)) cap = v.wait?.for === 'server' ? `The site had a problem${v.status ? ` (${v.status})` : ''}. Trying again at ${nextTry(v.nextAt)}` : 'Continues when the connection is back';
+    else if (v.phase === 'checking') cap = 'Checking the saved part and the link';
+    else if (v.state === 'starting' || (v.phase === 'probing' && v.received <= 0)) cap = 'Starting';
     else if (v.phase === 'merging') cap = v.stream ? 'Joining video and sound' : 'Saving';
     else if (v.engine === 'browser') cap = `${v.state === 'downloading' ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else if (v.maxConnections <= 1) cap = `${running ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else cap = `${running ? `${Math.min(v.connections, v.maxConnections)} of ${v.maxConnections} active` : `${v.maxConnections} connections`} · ${v.stream ? 'Stream' : 'Resumable'}`;
     e.cap.classList.toggle('err', v.state === 'failed');
-    e.cap.classList.toggle('wrap', !!v.need || v.phase === 'renewing');
+    e.cap.classList.toggle('wrap', !!v.need || v.phase === 'renewing' || f.isWaiting(v));
     f.setText(e.cap, cap);
     const fills = v.state === 'completed' && !v.missing ? new Array<number>(v.maxConnections > 1 ? 8 : 1).fill(1) : v.segments;
     e.segs.hidden = !fills.length;
@@ -647,7 +677,7 @@ export class Panel {
             : 'Each block is one part of the file, fetched in parallel'
     );
     if (e.segs.childElementCount !== fills.length) e.segs.replaceChildren(...fills.map(() => el('span', {}, el('i', {}))));
-    e.segs.classList.toggle('dim', v.state === 'paused' || v.state === 'failed');
+    e.segs.classList.toggle('dim', v.state === 'paused' || v.state === 'failed' || f.isChecking(v));
     fills.forEach((x, i) => ((e.segs.children[i].firstElementChild as HTMLElement).style.width = `${Math.round(x * 100)}%`));
     f.setText(e.avg, f.speed(v.average) || '—');
     f.setText(e.peak, f.speed(v.peak) || '—');
@@ -693,7 +723,7 @@ export class Panel {
       return;
     }
     const map: Record<string, Command> = {
-      pause: 'pause', resume: 'resume', now: 'start-now', retry: 'resume', open: 'open', folder: 'show-in-folder', copy: 'copy-address', cancel: 'cancel', keep: 'keep',
+      pause: 'pause', resume: 'resume', now: 'start-now', try: 'start-now', retry: 'resume', open: 'open', folder: 'show-in-folder', copy: 'copy-address', cancel: 'cancel', keep: 'keep',
       'start-over': 'start-over', 'keep-partial': 'keep-partial', 'open-page': 'open-page', 'stop-waiting': 'stop-waiting',
     };
     const cmd = map[act];
@@ -935,6 +965,8 @@ export class Panel {
       entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     }
     else if (v.need?.kind === 'page') entries.push({ label: 'Open page', access: 'o', key: 'Space', icon: 'opentab', run: run('open-page') });
+    // Waiting for network, Retrying (RESUME-DESIGN.md 6, G4): Try now; Pause ends the wait.
+    else if (f.isWaiting(v)) entries.push({ label: 'Try now', access: 't', key: 'Space', icon: 'reload', run: run('start-now') }, { label: 'Pause', access: 'p', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else if (v.state === 'paused') entries.push({ label: 'Resume', access: 's', key: 'Space', icon: 'play', run: run('resume') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else {
       // Safe Browsing blocked it as uncommon or unwanted: the person may keep it anyway.
@@ -1009,8 +1041,11 @@ function statusOf(v: DownloadView): [string, string, string] {
   if (v.need?.kind === 'choice') return ['File changed', '', ''];
   // No glyph: the design's words fill the column.
   if (v.need?.kind === 'page') return ['Start it again from its page', '', ''];
+  // RESUME-DESIGN.md 6 (G4): Waiting for network; Retrying · in 40 s.
+  if (f.isWaiting(v)) return [v.wait?.for === 'server' ? retrying(v) : 'Waiting for network', '', ''];
   if (v.state === 'paused') return ['Paused', '', ''];
-  if (v.state === 'starting' || v.phase === 'probing') return ['Starting', '', ''];
+  if (v.phase === 'checking') return ['Checking', '', ''];
+  if (v.state === 'starting' || (v.phase === 'probing' && v.received <= 0)) return ['Starting', '', ''];
   if (v.phase === 'merging') return ['Saving', '', ''];
   return [f.bytes(v.received) || 'Starting', '', ''];
 }
@@ -1024,6 +1059,8 @@ function primaryOf(v: DownloadView): [string, string, string] {
   if (v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)) return ['open-page', 'Open page', ic.open];
   if (v.need?.kind === 'address') return v.canRenew ? ['refresh', 'Refresh address', ic.retry] : ['retry', 'Retry', ic.retry];
   if (v.need?.kind === 'choice') return ['choose', 'Choose', ic.chevron];
+  // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4): Try now.
+  if (f.isWaiting(v)) return ['try', 'Try now', ic.retry];
   if (v.state === 'paused') return ['resume', 'Resume', ic.play(14)];
   if (v.state === 'completed' && !v.missing) return ['folder', 'Show in folder', ic.folder()];
   return ['retry', v.state === 'completed' ? 'Download again' : 'Retry', ic.retry];
@@ -1033,7 +1070,15 @@ function rowState(v: DownloadView): string {
   if (v.state === 'downloading' && !v.phase) return `${f.percent(v)} percent${v.speed ? `, ${f.speed(v.speed)}` : ''}${v.eta >= 0 ? `, ${f.eta(v.eta)} left` : ''}`;
   // "song.mp3, Link expired, 62 percent saved" (RESUME-DESIGN.md 6); a row Firefox moved saved nothing.
   if (v.need && v.need.kind !== 'page') return `${statusOf(v)[0]}, ${f.percent(v)} percent saved`;
+  // Without Retrying's countdown, which would change the label every second.
+  if (f.isWaiting(v)) return `${v.wait?.for === 'server' ? 'Retrying' : 'Waiting for network'}, ${f.percent(v)} percent saved`;
   return statusOf(v)[0];
+}
+
+/** "Retrying · in 40 s" (RESUME-DESIGN.md 6): the next try of a server wait, counted down; "Retrying" once it is due. */
+function retrying(v: DownloadView): string {
+  const left = Math.ceil((v.nextAt - Date.now()) / 1000);
+  return left > 0 ? `Retrying · in ${f.eta(left)}` : 'Retrying';
 }
 
 /** "1 needs attention", "2 need attention" (the toolbar summary; the ring says it too). */
@@ -1088,6 +1133,8 @@ function detailActions(v: DownloadView): [string, string, string][] {
   }
   if (v.need?.kind === 'choice') return [['start-over', 'Start over with the new file', 'danger'], ...(v.keep ? [['keep-partial', 'Keep partial file', ''] as [string, string, string]] : []), ['folder', 'Show in folder', '']];
   if (v.need?.kind === 'page') return [['open-page', 'Open page', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4): Try now · Pause (the wait ends) · Show in folder · Cancel.
+  if (f.isWaiting(v)) return [['try', 'Try now', ''], ['pause', 'Pause', ''], ['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']];
   const first: [string, string, string] = active ? ['pause', 'Pause', ''] : v.state === 'queued' ? ['now', 'Start now', ''] : ['resume', 'Resume', ''];
   const acts: [string, string, string][] = [first];
   if (v.engine === 'vitre') acts.push(['limit', 'Limit speed', '']);

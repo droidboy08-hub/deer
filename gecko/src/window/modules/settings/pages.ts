@@ -556,6 +556,24 @@ const downloads: SectionDef = {
         },
       ],
     },
+    {
+      // spikes/downloader/RESUME-DESIGN.md G4 (the owner's decision 5): on by default.
+      title: 'Restarts',
+      rows: [
+        {
+          title: 'Continue unfinished downloads when Deer starts',
+          desc: 'Downloads that were running when Deer closed carry on by themselves. Ones you paused stay paused.',
+          keywords: 'resume restart continue crash interrupted unfinished paused start',
+          build: (ctx) =>
+            row({
+              icon: ico.update,
+              title: 'Continue unfinished downloads when Deer starts',
+              desc: 'Downloads that were running when Deer closed carry on by themselves. Ones you paused stay paused.',
+              control: (ids) => toggle(ctx, { labelledBy: ids.title, describedBy: ids.desc, get: (s) => s.continueDownloadsOnStart, set: (v) => ctx.set({ continueDownloadsOnStart: v }) }),
+            }),
+        },
+      ],
+    },
   ],
 };
 

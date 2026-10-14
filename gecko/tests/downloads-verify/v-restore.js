@@ -1,9 +1,11 @@
 // Restart and session restore with downloads in every state.
 // Run 1: a completed, a failed, a paused, two running and a queued download; two tabs (a page and a
 // video page); restart. Run 2: the tabs come back (the video tab unloaded until shown); every download
-// comes back in a state that can't surprise anyone: completed and failed as they were, everything
-// that was running or waiting comes back paused with its bytes, nothing starts by itself; the panel
-// shows them; the video tab's download mark appears once it is shown; resuming completes intact.
+// comes back in a state that can't surprise anyone: completed and failed as they were, what the quit
+// stopped (running or waiting its turn) with its bytes, continuing by itself 10 s after the start
+// (spikes/downloader/RESUME-DESIGN.md G4, Phase 4: "Continue unfinished downloads when Deer starts", on
+// by default), the one the person paused staying paused; the panel shows them; the video tab's download
+// mark appears once it is shown; resuming the paused one completes intact.
 /* global spike, Services, gBrowser, DL, V, IOUtils, PathUtils */
 Services.scriptloader.loadSubScript("resource://vitre-boot/vlib.js", window);
 
@@ -51,16 +53,23 @@ spike.main(async () => {
   check("a completed download stays completed, its file there", states["r-completed.bin"]?.state === "completed" && !states["r-completed.bin"].missing);
   check("a failed one stays failed with its reason", states["r-failed.zip"]?.state === "failed" && !!states["r-failed.zip"].error, states["r-failed.zip"]?.error);
   check("a paused one stays paused with its bytes", states["r-paused.bin"]?.state === "paused" && states["r-paused.bin"].received > 16 << 20, states["r-paused.bin"]?.received);
-  for (const n of ["r-running-1.bin", "r-running-2.bin"]) check(`running ${n} comes back paused, with its bytes`, states[n]?.state === "paused" && states[n].received > 0, [states[n]?.state, states[n]?.received]);
-  check("a queued one comes back paused (nothing starts by itself)", states["r-queued.bin"]?.state === "paused", states["r-queued.bin"]?.state);
-  check("nothing is running after the restart", engine.runningCount() === 0, engine.runningCount());
+  // RESUME-DESIGN.md G4: what the quit stopped comes back with its bytes, marked to continue (or already
+  // continuing, if the start took long); the one the person paused is not marked.
+  const marked = (v) => !!v && (v.state !== "paused" || !!engine.recs.find((r) => r.id === v.id)?.resumeOnStart);
+  for (const n of ["r-running-1.bin", "r-running-2.bin"]) check(`running ${n} comes back with its bytes, to continue by itself`, states[n]?.received > 0 && marked(states[n]), [states[n]?.state, states[n]?.received]);
+  check("a queued one comes back to continue by itself too", marked(states["r-queued.bin"]), states["r-queued.bin"]?.state);
+  check("the paused one is not marked to continue", !engine.recs.find((r) => r.id === states["r-paused.bin"]?.id)?.resumeOnStart);
+  const stopped = ["r-running-1.bin", "r-running-2.bin", "r-queued.bin"];
+  await V.until(() => stopped.every((n) => byName(n)?.state !== "paused"), "the stopped downloads to continue", 25000);
+  check("what the quit stopped continues by itself after the restart (two run, the queued one waits its turn; Continued after restart)", ["downloading", "queued"].includes(byName("r-running-1.bin").state) && ["downloading", "queued"].includes(byName("r-queued.bin").state) && engine.runningCount() === 3 && stopped.every((n) => byName(n).history.some((h) => h.text === "Continued after restart")), stopped.map((n) => byName(n).state));
+  check("the one the person paused stays paused", byName("r-paused.bin").state === "paused", byName("r-paused.bin").state);
   await sleep(1000);
-  check("the ring stays hidden: nothing downloads", !ui.ring.isShown);
+  check("the ring shows the downloads that continue", ui.ring.isShown);
   spike.press("Ctrl+J");
   await V.until(() => ui.panel.open, "the panel");
   await sleep(600);
   check("the panel lists all six", b.root.querySelectorAll(".vd-row").length === 6, b.root.querySelectorAll(".vd-row").length);
-  check("its summary reads paused", /^5 paused$|^5 paused/.test(b.root.querySelector(".vd-summary").textContent) || /paused/.test(b.root.querySelector(".vd-summary").textContent), b.root.querySelector(".vd-summary").textContent);
+  check("its summary reads downloading, queued and paused", /downloading/.test(b.root.querySelector(".vd-summary").textContent) && /1 paused/.test(b.root.querySelector(".vd-summary").textContent), b.root.querySelector(".vd-summary").textContent);
   await V.capture("v-restore-2-panel-after");
   spike.press("Escape");
   await sleep(400);
@@ -71,7 +80,8 @@ spike.main(async () => {
   await V.until(() => !b.bar.downloadMark()?.classList.contains("empty"), "the mark on the restored video tab", 10000).catch(() => null);
   check("the restored video tab shows its download mark once loaded", !b.bar.downloadMark()?.classList.contains("empty"));
 
-  // Resume one: it continues from its bytes and is intact.
+  // Resume the paused one (the others give it their slot): it continues from its bytes and is intact.
+  for (const n of stopped) engine.cancel(byName(n).id);
   const p = byName("r-paused.bin");
   await DL.reset();
   engine.resume(p.id);

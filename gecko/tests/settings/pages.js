@@ -172,6 +172,13 @@ spike.main(async () => {
   store.reset("connections");
   store.reset("speedLimitKBps");
   store.reset("askWhereToSave");
+  // Restarts (spikes/downloader/RESUME-DESIGN.md G4, the owner's decision 5): on by default.
+  const cont = switchFor("Continue unfinished downloads when Deer starts");
+  check("Downloads › Continue unfinished downloads when Deer starts is there, on by default", !!cont && store.get().continueDownloadsOnStart === true && cont.getAttribute("aria-checked") === "true", cont?.getAttribute("aria-checked"));
+  spike.click(cont);
+  await settle(200);
+  check("…and turning it off writes continueDownloadsOnStart (vitre.continueDownloadsOnStart)", store.get().continueDownloadsOnStart === false && Services.prefs.getBoolPref("vitre.continueDownloadsOnStart") === false);
+  store.reset("continueDownloadsOnStart");
 
   // Search engine radios: the address field's engine follows.
   svc.open("search");

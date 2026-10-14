@@ -26,6 +26,12 @@ Script protocol (lines the script writes to the log; spike-lib does it):
   @@capture NAME [HWND]   screenshot that window (PrintWindow: the composited picture) to OUT/NAME.png
   @@modules TEXT          print the DLLs loaded in this run's processes whose name contains TEXT
   @@quit                  the script is done
+  @@pid PID               the runtime process the script runs in (spike-lib, once per process): followed with
+                          its children, as an in-place restart's new process may come from a launcher
+                          that exits before it is seen
+  @@kill [PID]            a hard kill: every runtime process of this run is terminated (taskkill /F, no
+                          shutdown runs, as in a crash) and the runtime is started again on the same
+                          profile; the script runs again with spike.run + 1 (spike.kill())
 Anything else is printed. Panels and menus are separate OS windows and are not in a window capture.
 
 The runtime is started as runtime/vitre.exe with -profile and -no-remote, focusmanager.testmode=true
@@ -130,6 +136,13 @@ class Tree:
 
     def __init__(self, root_pid):
         self.known = {root_pid}
+
+    def adopt(self, pid):
+        """A runtime process the script reported itself (@@pid): followed from now on, with its children."""
+        try:
+            self.known.add(int(pid))
+        except ValueError:
+            pass
 
     def alive(self):
         rows = processes()
@@ -534,6 +547,22 @@ def main():
                     open(os.path.join(out, 'modules.done'), 'w').close()
                 elif line.startswith('@@quit'):
                     quit_seen = True
+                elif line.startswith('@@pid '):
+                    tree.adopt(line[6:].strip())
+                elif line.startswith('@@kill'):
+                    # A crash, for tests of what survives one (tests/downloads/network.js): no shutdown
+                    # runs; then the same start as above, on the same profile.
+                    tree.adopt(line[6:].strip())
+                    kill(tree.alive())
+                    for _ in range(100):
+                        if not tree.alive():
+                            break
+                        time.sleep(0.1)
+                    time.sleep(1.0)
+                    proc = subprocess.Popen([exe, '-no-remote', '-profile', profile, *a.arg, a.url], env=env,
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    tree = Tree(proc.pid)
+                    print('[kill] the runtime was terminated and started again')
                 else:
                     if re.match(r'(FAIL|ERROR)\b', line):
                         failed += 1

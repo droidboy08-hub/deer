@@ -770,10 +770,30 @@ export function retryAfter(res: Response): number | null {
   return Number.isNaN(when) ? null : Math.max(0, (when - Date.now()) / 1000);
 }
 
+/** The longest Retry-After a run waits out itself (backoff()); a server that asks for more stops it (serverStops()). */
+export const IN_RUN_WAIT = 60;
+
 /** Seconds before retry number `attempt` (1 = the first retry). The server's own wait wins. */
 export function backoff(attempt: number, after: number | null): number {
-  if (after !== null && after > 0) return Math.min(after, 60);
+  if (after !== null && after > 0) return Math.min(after, IN_RUN_WAIT);
   return attempt <= 1 ? 2 : attempt === 2 ? 6 : 15;
+}
+
+/**
+ * A 429 or 5xx answer the run stops on at once instead of asking again itself (RESUME-DESIGN.md G4,
+ * review of Phase 4), so its row waits (Retrying) at the server's time with no request in between:
+ * the server asked for more than IN_RUN_WAIT (Retry-After), or `waitTry`, the run is a wait's
+ * automatic try still on its check, whose own schedule (waits.ts) already spaces the tries. A
+ * connection that may step aside for the others still does so as before (ranged.ts, hls.ts).
+ */
+export function serverStops(status: number, after: number | null, waitTry = false): boolean {
+  if (status !== 429 && status < 500) return false;
+  return waitTry || (after !== null && after > IN_RUN_WAIT);
+}
+
+/** serverStops() for an error: an HttpStatusError of the server kind (never a refused address). */
+export function stopsRun(err: unknown, waitTry = false): boolean {
+  return err instanceof HttpStatusError && !(err instanceof AddressRefusedError) && serverStops(err.status, err.retryAfter, waitTry);
 }
 
 let nssErrors: any = null;
@@ -823,10 +843,24 @@ export function describeError(err: unknown): string {
 export type ErrorKind = 'offline' | 'timeout' | 'server' | 'refused' | 'not-file' | 'changed' | 'unknown' | 'disk' | 'damaged' | 'fatal';
 
 /**
+ * The Necko failures that mean the site can't be reached right now (RESUME-DESIGN.md G4): the design's
+ * list (UNKNOWN_HOST, OFFLINE, NET_TIMEOUT, NET_RESET, CONNECTION_REFUSED, NET_INTERRUPT), Necko's own
+ * "the body was cut short" (NET_PARTIAL_TRANSFER, ShortBodyError's twin), and the same two failures
+ * one hop earlier, at a proxy. Only these wait (Waiting for network). Every other Necko failure (a
+ * blocked port, a redirect loop, a corrupted answer, a block by policy, Safe Browsing or an add-on) can't
+ * be fixed by waiting and ends as before Phase 4 (review of Phase 4).
+ */
+const UNREACHABLE = new Set([
+  'NS_ERROR_UNKNOWN_HOST', 'NS_ERROR_OFFLINE', 'NS_ERROR_NET_TIMEOUT', 'NS_ERROR_NET_RESET', 'NS_ERROR_CONNECTION_REFUSED', 'NS_ERROR_NET_INTERRUPT',
+  'NS_ERROR_NET_PARTIAL_TRANSFER', 'NS_ERROR_UNKNOWN_PROXY_HOST', 'NS_ERROR_PROXY_CONNECTION_REFUSED',
+]);
+
+/**
  * Sort an error for stopped() (RESUME-DESIGN.md 3.0). Phases 1 and 2 act on 'refused', 'not-file' and
- * 'changed' only (the proof's R7 arrives as a ChangedError saying "Deer can't confirm it is the same
- * file"); every other kind still ends as today. Phase 4 adds the waits for 'offline', 'timeout' and
- * 'server'. An error nobody recognised is 'fatal'.
+ * 'changed' (the proof's R7 arrives as a ChangedError saying "Deer can't confirm it is the same file");
+ * Phase 4 (G4) on 'offline' and 'timeout' (the Necko failures in UNREACHABLE, and a body cut short once
+ * its attempts are used up: Waiting for network) and 'server' (5xx, 429: Retrying). Every other kind
+ * still ends as today. An error nobody recognised is 'fatal'.
  */
 export function classify(err: unknown): { kind: ErrorKind; status: number } {
   if (err instanceof ChangedError) return { kind: 'changed', status: 0 };
@@ -841,10 +875,7 @@ export function classify(err: unknown): { kind: ErrorKind; status: number } {
   const code = String((err as { code?: string; name?: string })?.code ?? (err as { name?: string })?.name ?? '');
   if (err instanceof DiskError || /^NS_ERROR_FILE_|NotFoundError|NotAllowedError|OperationError/.test(code)) return { kind: 'disk', status: 0 };
   if (err instanceof ShortBodyError) return { kind: 'offline', status: 0 };
-  if (err instanceof NetError) {
-    if (isSecurityError(err.result) || code === 'NS_ERROR_MALFORMED_URI') return { kind: 'fatal', status: 0 };
-    return { kind: /NET_TIMEOUT/.test(code) ? 'timeout' : 'offline', status: 0 };
-  }
+  if (err instanceof NetError && UNREACHABLE.has(err.code)) return { kind: err.code === 'NS_ERROR_NET_TIMEOUT' ? 'timeout' : 'offline', status: 0 };
   return { kind: 'fatal', status: 0 };
 }
 

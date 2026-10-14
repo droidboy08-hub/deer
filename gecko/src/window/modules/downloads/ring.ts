@@ -11,6 +11,10 @@
 // its page; view.attention), never a dialog; the ring stays shown while there is one, and its label
 // becomes "Downloads, 1 needs attention". A polite live region beside it says when a row starts needing
 // the person and when a start again continued a row ("Continuing song.mp3 from 62%").
+//
+// Waiting rows (RESUME-DESIGN.md G4, Phase 4: Waiting for network, Retrying) count as active
+// (format.ts isActive): the ring stays shown, its arc includes them and Pause all reaches them; their
+// quick view row offers Try now.
 import type { Browser } from '../../browser';
 import { el, svg } from '../../dom';
 import { glass, lens } from '../../glass';
@@ -108,7 +112,10 @@ export class Ring {
     const spinning = active.length > 0 && !known.length && active.some((v) => v.state === 'downloading');
     this.el.classList.toggle('indeterminate', spinning);
     this.arc.setAttribute('stroke-dasharray', `${((spinning ? 0.25 : Math.max(pct, active.length ? 0.02 : 1)) * CIRC).toFixed(2)} ${CIRC.toFixed(2)}`);
-    const running = active.length ? `${active.length} active${known.length ? `, ${Math.floor(pct * 100)} percent` : ''}` : '';
+    // Waiting rows are said apart (review of Phase 4): "Downloads, 1 waiting, 13 percent", "1 active, 1 waiting, 40 percent".
+    const waits = active.filter(f.isWaiting).length;
+    const under = [active.length > waits ? `${active.length - waits} active` : '', waits ? `${waits} waiting` : ''].filter(Boolean).join(', ');
+    const running = active.length ? `${under}${known.length ? `, ${Math.floor(pct * 100)} percent` : ''}` : '';
     const label = attention ? `Downloads, ${needAttention(attention)}${running ? `, ${running}` : ''}` : running ? `Downloads, ${running}` : 'Downloads, finished';
     this.btn.setAttribute('aria-label', label);
     this.pop.render();
@@ -288,11 +295,14 @@ class Popover {
     const elm = this.el;
     if (!elm) return;
     const views = this.store.all().filter((v) => v.state !== 'cancelled');
-    const active = views.filter((v) => f.isActive(v));
+    // Waiting rows (G4) are said apart from what transfers: "1 active · 2.1 MB/s · 1 waiting".
+    const waiting = views.filter(f.isWaiting).length;
+    const active = views.filter((v) => f.isActive(v) && !f.isWaiting(v));
     const rate = active.reduce((n, v) => n + v.speed, 0);
     // Not "All done" while rows wait for the person (RESUME-DESIGN.md 6).
     const attention = views.filter((v) => v.state === 'paused' && !!v.need).length;
-    f.setText(elm.querySelector('.vd-pop-sum'), active.length ? `${active.length} active${rate > 0 ? ` · ${f.speed(rate)}` : ''}` : attention ? needAttention(attention) : views.length ? 'All done' : 'Nothing yet');
+    const under = [active.length ? `${active.length} active${rate > 0 ? ` · ${f.speed(rate)}` : ''}` : '', waiting ? `${waiting} waiting` : ''].filter(Boolean).join(' · ');
+    f.setText(elm.querySelector('.vd-pop-sum'), under || (attention ? needAttention(attention) : views.length ? 'All done' : 'Nothing yet'));
     const pick = views.slice(0, 3);
     const list = elm.querySelector('.vd-pop-list') as HTMLElement;
     const keep = new Set(pick.map((v) => v.id));
@@ -389,6 +399,8 @@ class Popover {
             ? v.canRenew ? ['e', 'Refresh address', ic.retry] : ['t', 'Retry', ic.retry]
             : v.need?.kind === 'choice'
               ? ['c', 'Choose', ic.chevron]
+              : f.isWaiting(v)
+                ? ['y', 'Try now', ic.retry]
               : v.state === 'paused'
                 ? ['r', 'Resume', ic.play(12)]
                 : v.state === 'completed' && !v.missing
@@ -438,7 +450,11 @@ function meta(v: DownloadView): string {
   if (v.state === 'queued') return 'Queued';
   if (v.phase === 'renewing') return [of, 'Renewing link'].filter(Boolean).join(' · ');
   if (v.need?.kind === 'page') return needWords(v);
+  // RESUME-DESIGN.md 6 (G4): Waiting for network, Retrying.
+  if (f.isWaiting(v)) return [of, v.wait?.for === 'server' ? 'Retrying' : 'Waiting for network'].filter(Boolean).join(' · ');
   if (v.state === 'paused') return [of, v.need ? needWords(v) : 'Paused'].filter(Boolean).join(' · ');
+  if (v.phase === 'checking') return [of, 'Checking'].filter(Boolean).join(' · ');
+  if (v.phase === 'probing' && v.received > 0) return of;
   if (v.state === 'starting' || v.phase === 'probing') return 'Starting';
   if (v.phase === 'merging') return 'Saving';
   return [of, f.speed(v.speed), v.eta >= 0 ? `${f.eta(v.eta)} left` : ''].filter(Boolean).join(' · ');

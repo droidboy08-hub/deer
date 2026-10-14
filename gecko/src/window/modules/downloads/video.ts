@@ -472,8 +472,10 @@ export class VideoUI {
     } else if ((mode === 'downloading' || mode === 'paused') && dl) {
       const pct = f.percent(dl);
       q('.arc')?.setAttribute('stroke-dasharray', `${(Math.max(0.03, pct / 100) * 44).toFixed(1)} 44`);
-      const starting = dl.state === 'starting' || dl.state === 'queued' || dl.phase === 'probing';
-      f.setText(q('.pct'), dl.state === 'paused' ? 'Paused' : starting ? 'Starting' : dl.phase === 'merging' ? 'Saving' : dl.total > 0 ? `${pct}%` : f.bytes(dl.received) || 'Starting');
+      // A resume asking its address shows its saved percentage, then Checking (RESUME-DESIGN.md 6).
+      const starting = dl.state === 'starting' || dl.state === 'queued' || (dl.phase === 'probing' && dl.received <= 0);
+      const paused = f.isWaiting(dl) ? 'Waiting' : 'Paused';
+      f.setText(q('.pct'), dl.state === 'paused' ? paused : starting ? 'Starting' : dl.phase === 'checking' ? 'Checking' : dl.phase === 'merging' ? 'Saving' : dl.total > 0 ? `${pct}%` : f.bytes(dl.received) || 'Starting');
       f.setText(q('.rest'), [dl.state === 'paused' ? '' : f.speed(dl.speed), dl.quality].filter(Boolean).join(' · '));
       const btn = q('.vd-pill-small');
       if (btn && btn.dataset.k !== dl.state) {

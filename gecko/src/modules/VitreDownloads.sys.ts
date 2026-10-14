@@ -30,6 +30,10 @@
 //   keepPartial(id) / decide(id, 'start-over' | 'keep-partial')
 //                                  File changed: the unbroken beginning kept as "<stem> (partial).<ext>"
 //                                  (a completed row), or Start over (startOver(id))
+//   hooks.beforeMerge(id) / hooks.afterMerge(id)
+//                                  tests only: awaited once a stream's merge phase is saved and before ffmpeg
+//                                  runs / between the merge and the save that completes the row (the merge
+//                                  crash window, RESUME-DESIGN.md G4)
 //   media                          MediaWatch: notice(browserId), subscribe(fn), offer(...), eme(...)
 //   ffmpeg()                       FfmpegInfo (settings path, bundled copy, the downloaded copy, PATH; or 'none')
 //   installFfmpeg(), ffmpegInstall(), onFfmpegInstall(fn), cancelFfmpegInstall()
@@ -88,9 +92,31 @@
 //     unbroken beginning of its part (keepPartial). Rows Firefox moves itself (a form's answer, a
 //     one-time link, blob:, data:, an extension's) are never fetched again by Deer: Retry asks for their
 //     page (need 'page'), and why Deer left them to Firefox is kept on the record (rec.origin).
+//   - Network, sleep and restarts (RESUME-DESIGN.md G4, Phase 4; downloads/waits.ts). A download whose
+//     site can't be reached waits (Waiting for network, wait 'network'; only the Necko failures net.ts
+//     classify() lists: others, a blocked port or a redirect loop, fail as before): tried again 10 s,
+//     30 s, 1 min, 2 min and 5 min after each failure, then every 10 min, and it never fails by itself;
+//     network link-up or wake brings the next try to 5 s. A site that answers 5xx or 429 waits the same
+//     way (Retrying, wait 'server'), never before its Retry-After, and fails as before 24 h after its
+//     first 5xx or 429. Network and server failures share one count (a site that drops some tries and
+//     answers 503 to others still backs off), which starts again after 8 MiB of progress or on the
+//     person's Try now. A run stops into its wait only once every connection has closed its writer, so
+//     the counts it keeps are exact; a Retry-After over a minute stops the run at once, and a wait's own
+//     try stops its check at the first 429 or 5xx. That try keeps the wait on the record until its check
+//     passed (rec.trying): it never holds a quit back, and a quit or a crash before then leaves the row
+//     waiting. Sleep pauses what runs (wait 'sleep'); after the wake it queues again on link-up or 10 s
+//     later, through Checking. Pause ends a wait; Try now is resume(id, true). The one wait timer
+//     (armWaits) serves every kind.
 //   - Quit while downloads run: refused (quit-application-requested), the window shows its prompt;
 //     a quit that goes ahead pauses everything, resumable, and the list (with every segment) is
-//     written before the profile closes. Unfinished downloads come back paused.
+//     written before the profile closes. Unfinished downloads come back paused; those the quit stopped
+//     (rec.resumeOnStart) continue 10 s after the first window opens while "Continue unfinished
+//     downloads when Deer starts" is on (the default, G4); rows the person paused stay paused, and
+//     waiting rows always continue. The store's session is unclean until the last save at quit: after
+//     a crash, the rows that were running continue the same way and fetch again the last 8 MiB below
+//     each segment's mark (rec.suspect; Phase 5's hash record replaces this rule). A stream's merge
+//     saves its phase and output path (flushed) before ffmpeg runs: after a crash an output in place
+//     completes the row (the parts left go), or the parts are merged again.
 //   - Private downloads are never written to disk lists and are dropped when the last private
 //     window closes (last-pb-context-exited), as Firefox does. Closing the last private window
 //     while one runs asks first (last-pb-context-exiting), and a quit cancels them (the prompt says so).
@@ -119,7 +145,7 @@ import { MediaWatch } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
 import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from './downloads/attach';
 import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
-import { AbortedError, ChangedError, DiskError, DownloadError, Identity, classify, describeError } from './downloads/net';
+import { AbortedError, ChangedError, DiskError, DownloadError, HttpStatusError, Identity, classify, describeError } from './downloads/net';
 import { existsSync, fileFor, setSize, sizeOf } from './downloads/partfile';
 import * as platform from './downloads/platform';
 import { ASK_ABOVE, UNSURE, proveAddress, readKind, sizeText, type Candidate, type Found } from './downloads/proof';
@@ -128,6 +154,7 @@ import { mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
 import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
 import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, StartOptions, WaitFor } from './downloads/types';
+import { CONTINUE_AFTER, FRESH_AFTER, SERVER_GIVE_UP, SLEEP_FALLBACK, SOON, WAKE_SETTLE, rewindTails, waitNext } from './downloads/waits';
 import { YtdlpTransfer, cancelToolsInstall, installTools, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
 
 declare global {
@@ -150,6 +177,10 @@ const STORE_VERSION = 2;
 const WAIT_GRACE = 5000;
 /** How long Refresh address waits for the download to be started again on its page (RESUME-DESIGN.md G1). */
 const CATCH_FOR = 30 * 60 * 1000;
+/** Checking shows only once a resume's check took this long, so a quick resume never flickers (RESUME-DESIGN.md 6). */
+const CHECKING_AFTER = 400;
+/** Link-up or wake does not bring an exhausted Link expired schedule's attempt within this long of the last one (G4). */
+const RENEW_ON_LINK = 10 * 60 * 1000;
 const ACTIVE: DownloadState[] = ['starting', 'queued', 'downloading'];
 const FINISHED: DownloadState[] = ['completed', 'cancelled', 'failed'];
 const ORDER: Record<DownloadState, number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
@@ -238,7 +269,14 @@ interface Rec {
    * attempt to renew a Link expired row's address (renew.ts schedule): `tries` attempts so far, the
    * next at `nextAt` (0: none planned). Saved with the row, so the schedule survives restarts.
    */
-  wait?: { for: WaitFor; since: number; nextAt: number; tries: number; status?: number };
+  wait?: WaitState;
+  /**
+   * The network or server wait whose automatic try is running (RESUME-DESIGN.md G4, review of Phase 4),
+   * kept on the record until the try got past its check: a quit or a crash before that leaves the row
+   * waiting (waiting rows always continue, whatever the setting says), and the try never holds a quit
+   * back (runningCount()). Past its check the run is a download like any other.
+   */
+  trying?: WaitState;
   /**
    * An attempt of the schedule proved an address and attached it: the `tries` the next Link expired
    * takes if the run it queued fails before it saves a byte, so a host that passes the proof but
@@ -264,7 +302,26 @@ interface Rec {
   origin?: { kind: 'takeover'; reason?: LeftReason };
   /** Keep partial file is moving the .part to this name (written, flushed, before the move; load() undoes a move cut short). */
   keeping?: string;
+  /**
+   * A quit or a crash stopped it while it ran or waited its turn (RESUME-DESIGN.md 5.1, G4): it
+   * continues CONTINUE_AFTER after the first window opens, while the setting is on. Cleared by that, by
+   * any action of the person's and when it starts.
+   */
+  resumeOnStart?: boolean;
+  /**
+   * It was running when a session ended without its last save (G4 crash detection): `bytes`, the tail
+   * below each segment's mark load() gave back to be fetched again (before Phase 5's hash record). Its
+   * next run that passes its check says so in the history and clears it.
+   */
+  suspect?: { at: number; bytes: number };
 }
+
+/**
+ * A paused row's wait (Rec.wait; RESUME-DESIGN.md 5.1). `since`: when the wait began (a network and a
+ * server wait are one: their failures share one count, review of Phase 4); `serverSince`: the first 5xx
+ * or 429 of it, kept through the network failures between, which SERVER_GIVE_UP counts from.
+ */
+type WaitState = { for: WaitFor; since: number; nextAt: number; tries: number; status?: number; serverSince?: number };
 
 /**
  * The address that gives the other version of a File changed row's file, kept for Start over
@@ -282,13 +339,23 @@ const BLOCKED: Record<Exclude<Verdict, 'safe'>, string> = {
 
 interface Run {
   ac: AbortController;
-  reason: 'pause' | 'cancel' | 'quit' | null;
+  /** Why the run is being stopped: 'sleep', the computer is going to sleep (RESUME-DESIGN.md G4). */
+  reason: 'pause' | 'cancel' | 'quit' | 'sleep' | null;
   transfer: FileTransfer | StreamTransfer | YtdlpTransfer | null;
   /** A download Firefox moves the bytes for (mode 'browser'). */
   firefox: any;
   samples: { t: number; bytes: number }[];
   speed: number;
-  phase: '' | 'probing' | 'merging' | 'renewing';
+  /** 'checking': a run with saved bytes asks its address before it continues (Checking, RESUME-DESIGN.md 6). */
+  phase: '' | 'probing' | 'merging' | 'renewing' | 'checking';
+  /** When `phase` began (Checking shows only after CHECKING_AFTER). */
+  phaseAt?: number;
+  /**
+   * The network, server or sleep wait this run continues (RESUME-DESIGN.md G4): the count of a network or
+   * server wait goes on if the run stops into either again (stopped(), waitAgain()), unless it made
+   * FRESH_AFTER of progress.
+   */
+  waited?: WaitState;
   last: number;
   /** The in-run renewal hook's limits (renew.ts Gate), made on its first use. */
   gate?: Gate;
@@ -418,6 +485,17 @@ class Manager {
    */
   private waitTimer: any = null;
   private loadedAt = 0;
+  /** Whether the session before this one ended with its last save (RESUME-DESIGN.md G4 crash detection). */
+  prevClean = true;
+  /** Streams whose merge finished before a crash, the output there and the parts gone (load()): completed at init. */
+  private joined: Rec[] = [];
+  /** continueAfterStart(), CONTINUE_AFTER after the engine started (G4). */
+  private continueTimer: any = null;
+  /**
+   * Test hooks (never set in the product): beforeMerge(id) runs once a stream's merge phase is saved, before
+   * ffmpeg; afterMerge(id) between the merge and the save that completes the row (network.js).
+   */
+  hooks: { beforeMerge?: (id: string) => Promise<void>; afterMerge?: (id: string) => Promise<void> } = {};
   private global = new RateLimiter(() => Number(settings().speedLimitKBps) || 0);
   private started = false;
   private quitting = false;
@@ -443,7 +521,19 @@ class Manager {
       await this.load();
       this.installLifecycle();
       this.loadedAt = Date.now();
+      // RESUME-DESIGN.md G4 crash detection: this session is unclean until shutdown's last save, and the
+      // store says so (flushed) before anything runs.
+      await this.save(true);
       this.armWaits();
+      // Merges a crash interrupted once their output was complete finish now (load(): the merge crash window),
+      // and the track parts the merge had not removed yet go.
+      for (const r of this.joined.splice(0)) {
+        const base = r.stream?.mergeBase || '';
+        if (base) for (const t of r.stream?.tracks ?? []) await IOUtils.remove(trackPart(base, t), { ignoreAbsent: true }).catch(() => undefined);
+        void this.complete(r);
+      }
+      // What a quit or a crash stopped continues once the first window has had its moment (G4).
+      this.continueTimer = setTimeout(() => this.continueAfterStart(), CONTINUE_AFTER);
       try {
         this.media.install();
       } catch (e) {
@@ -488,6 +578,11 @@ class Manager {
         await IOUtils.move(path, path + '.corrupt').catch(() => undefined);
       }
     }
+    // RESUME-DESIGN.md G4: a session ends clean only with shutdown()'s last save; a store that says
+    // otherwise was left by a crash or a power loss. A version 1 store never said: taken as clean.
+    const unclean = (saved as { session?: { clean?: unknown } } | null)?.session?.clean === false;
+    this.prevClean = !unclean;
+    const now = Date.now();
     for (const r of saved?.items ?? []) {
       if (!r?.id || !r.url || typeof r.url !== 'string') continue;
       // Version 1 records (RESUME-DESIGN.md 5.8): the row's type stands in for what the first probe
@@ -503,8 +598,25 @@ class Manager {
         if (r.mode === 'browser' || r.state === 'starting') {
           r.state = 'failed';
           r.error = 'Interrupted when Deer closed.';
-        } else r.state = 'paused';
+        } else if (r.trying && r.state === 'downloading') {
+          // A wait's automatic try stopped on its check (review of Phase 4): it wrote nothing, and the row
+          // still waits, so it continues by its wait whatever the setting says (G4, the owner's decision 5).
+          r.wait = { ...r.trying, nextAt: now };
+          r.state = 'paused';
+          r.resumeOnStart = undefined;
+        } else {
+          // G4: a crash stopped it, as a quit would have, so it continues the same way (resumeOnStart);
+          // what it was writing may never have reached the disk (its suspect tail, fetched again).
+          if (unclean) {
+            r.resumeOnStart = true;
+            if (r.state === 'downloading') suspectTail(r, now);
+          }
+          r.state = 'paused';
+        }
       }
+      r.trying = undefined;
+      // G4, the merge crash window: a stream whose merge had begun (runStream()).
+      if (r.mode === 'stream' && r.stream?.phase === 'merging' && !FINISHED.includes(r.state)) this.mergeLeft(r);
       r.hold = false;
       r.note ??= '';
       // Waiting for link belongs to this session's tabs (browserIds are per session).
@@ -520,11 +632,52 @@ class Manager {
         }
         r.keeping = undefined;
       }
-      // Only a paused row waits (Link expired's schedule); anything else lost its wait.
-      if (r.wait && (r.state !== 'paused' || r.mode !== 'file' || !r.file)) r.wait = undefined;
+      // Only a paused row waits: Link expired's schedule (a file with its record), and a network, server or
+      // sleep wait (G4), which always continues after a restart: one a quit caught in a run it had started,
+      // or between its tries, is due at the start, and so is a sleep's (the computer is awake now).
+      if (r.wait) {
+        if (r.state !== 'paused' || (r.wait.for === 'address' ? r.mode !== 'file' || !r.file : r.mode === 'browser')) r.wait = undefined;
+        else if (r.wait.for !== 'address' && (!r.wait.nextAt || r.wait.for === 'sleep')) r.wait = { ...r.wait, nextAt: now };
+      }
       r.identity = new Identity(r.identity ?? {}).toJSON();
       this.recs.push(r);
     }
+  }
+
+  /**
+   * A stream whose merge had begun when Deer stopped (RESUME-DESIGN.md G4, the merge crash window; the
+   * phase and output path were saved, flushed, before ffmpeg ran). The output is looked at first (review
+   * of Phase 4): it was a free path when the merge chose it, only the move of ffmpeg's finished file makes
+   * it, and a failed merge ends the phase before it moves anything else there (hls.ts finish()). So an
+   * output there, with no "<base>.merge.part" still being written, is the finished merge, whatever parts
+   * its removal left: the row is completed from it (init(), which removes those parts). Otherwise, its
+   * parts still there: the merge runs again when the row continues (runStream() goes straight to it).
+   * Neither: nothing of it is left, and the row fails saying so (Phase 5 gives such rows Damaged).
+   */
+  private mergeLeft(r: Rec): void {
+    const s = r.stream as StreamState;
+    const base = s.mergeBase || stem(r.path);
+    const out = s.mergeOut ?? '';
+    let size = 0;
+    try {
+      size = out && existsSync(out) && !(base && existsSync(`${base}.merge.part`)) ? Number(fileFor(out).fileSize) : 0;
+    } catch {
+      size = 0;
+    }
+    if (size > 0) {
+      r.path = out;
+      r.filename = PathUtils.filename(out);
+      r.state = 'paused';
+      r.resumeOnStart = undefined;
+      r.wait = undefined;
+      this.joined.push(r);
+      return;
+    }
+    if (base && s.tracks.some((t) => existsSync(trackPart(base, t)))) return;
+    r.state = 'failed';
+    r.error = 'Deer closed while joining this video, and its parts are gone. Retry downloads it again.';
+    r.resumeOnStart = undefined;
+    r.wait = undefined;
   }
 
   // ---- list ----
@@ -559,9 +712,13 @@ class Manager {
     }
   }
 
-  /** Downloads that are running or waiting to (the quit prompt counts these). */
+  /**
+   * Downloads that are running or waiting to (the quit prompt counts these). A wait's automatic try on
+   * its check, or waiting for a slot, is still the wait (RESUME-DESIGN.md 6: waits never hold a quit back;
+   * review of Phase 4): a quit gives it its wait back (stopped()), and it continues at the next start.
+   */
   runningCount(): number {
-    return this.recs.filter((r) => ACTIVE.includes(r.state)).length;
+    return this.recs.filter(running).length;
   }
 
   /** Resolves with the download's view once it is paused, finished, failed or cancelled. */
@@ -968,6 +1125,16 @@ class Manager {
   private launch(rec: Rec): void {
     const run = this.makeRun();
     run.saved0 = savedBytes(rec);
+    // A network, server or sleep wait goes on with the run that tries again (its count: stopped()). A
+    // network or server wait's try keeps it on the record until its check passed (rec.trying; review of
+    // Phase 4); the sleep is over once the computer woke, so that run is a download like any other.
+    rec.trying = undefined;
+    if (rec.wait && rec.wait.for !== 'address') {
+      run.waited = rec.wait;
+      if (rec.wait.for === 'network' || rec.wait.for === 'server') rec.trying = rec.wait;
+      rec.wait = undefined;
+    }
+    rec.resumeOnStart = undefined;
     this.runs.set(rec.id, run);
     rec.state = 'downloading';
     rec.error = '';
@@ -995,18 +1162,32 @@ class Manager {
     // A File changed row is only checked again here, never started over (RESUME-DESIGN.md 3 G3).
     transfer.silentRestarts = rec.need?.kind !== 'choice';
     if (!transfer.state.probed || transfer.received > 0) {
-      run.phase = 'probing';
+      // With saved bytes this is Checking (RESUME-DESIGN.md 6): the saved part and the link, before anything is fetched.
+      this.setPhase(run, transfer.received > 0 ? 'checking' : 'probing');
       this.touch(rec);
-      const info = await transfer.check(run.ac.signal, rec.path ? `${rec.path}.part` : '');
-      if (!rec.path && !rec.named) {
-        rec.filename = chooseName({ disposition: info.disposition, url: info.finalUrl, mime: info.contentType, title: rec.videoKey ? rec.title : '', suggested: rec.filename || nameFromUrl(rec.url) || undefined });
-        rec.mime = info.contentType;
+      // A wait's try ends its check at the first 429 or 5xx: the wait spaces the tries (review of Phase 4).
+      transfer.waitTry = !!rec.trying;
+      try {
+        const info = await transfer.check(run.ac.signal, rec.path ? `${rec.path}.part` : '');
+        if (!rec.path && !rec.named) {
+          rec.filename = chooseName({ disposition: info.disposition, url: info.finalUrl, mime: info.contentType, title: rec.videoKey ? rec.title : '', suggested: rec.filename || nameFromUrl(rec.url) || undefined });
+          rec.mime = info.contentType;
+        }
+      } finally {
+        transfer.waitTry = false;
       }
     }
-    // The address gives the same file again: the row no longer needs the person or waits.
+    // The address gives the same file again: the row no longer needs the person or waits, and a wait's
+    // try is a download like any other from here on.
     rec.need = undefined;
     rec.wait = undefined;
+    rec.trying = undefined;
     rec.catcher = undefined;
+    // After a crash (G4): the suspect tail load() gave back is fetched again from here on.
+    if (rec.suspect) {
+      this.event(rec, `Checked after Deer closed unexpectedly · ${sizeText(rec.suspect.bytes)} fetched again`);
+      rec.suspect = undefined;
+    }
     run.phase = '';
     rec.total = transfer.state.total;
     if (!rec.path) {
@@ -1029,25 +1210,53 @@ class Manager {
     const transfer = new StreamTransfer(state, { ...this.env(rec, run), ffmpeg: () => this.ffmpeg() });
     transfer.silentRestarts = rec.need?.kind !== 'choice';
     run.transfer = transfer;
-    run.phase = 'probing';
-    this.touch(rec);
-    await transfer.prepare(run.ac.signal);
-    rec.need = undefined;
-    run.phase = '';
-    if (!rec.path) {
-      if (!rec.named) rec.filename = rec.filename.replace(/\.(mp4|m4a|ts|aac|webm|weba)$/i, '') + transfer.expectedExtension();
-      if (!(await this.confirmPath(rec))) throw new SaveDeclined();
-      await this.reserve(rec);
+    // G4, the merge crash window: a merge a quit or a crash cut short, with every segment in its part,
+    // runs again at once: the parts are the whole download, so the stream's addresses are not asked.
+    const parted = state.mergeBase || (rec.path ? stem(rec.path) : '');
+    const remerge = state.phase === 'merging' && !!parted && state.tracks.length > 0 && state.tracks.every((t) => t.count > 0 && t.done >= t.count && existsSync(trackPart(parted, t)));
+    let base = parted;
+    if (remerge) {
+      rec.trying = undefined;
+      await transfer.loadMuxer();
+    } else {
+      this.setPhase(run, savedBytes(rec) > 0 ? 'checking' : 'probing');
+      this.touch(rec);
+      // A wait's try ends its check at the first 429 or 5xx (review of Phase 4; see runFile()).
+      transfer.waitTry = !!rec.trying;
+      try {
+        await transfer.prepare(run.ac.signal);
+      } finally {
+        transfer.waitTry = false;
+      }
+      rec.need = undefined;
+      rec.trying = undefined;
+      run.phase = '';
+      if (!rec.path) {
+        if (!rec.named) rec.filename = rec.filename.replace(/\.(mp4|m4a|ts|aac|webm|weba)$/i, '') + transfer.expectedExtension();
+        if (!(await this.confirmPath(rec))) throw new SaveDeclined();
+        await this.reserve(rec);
+      }
+      this.save(true);
+      base = stem(rec.path);
+      await transfer.download(base, run.ac.signal);
     }
-    this.save(true);
-    const base = stem(rec.path);
-    await transfer.download(base, run.ac.signal);
     run.phase = 'merging';
     this.touch(rec);
-    const out = await transfer.finish(base, (ext, suffix = '') => this.freePath(rec, `${PathUtils.filename(base)}${suffix}${ext}`), run.ac.signal);
+    const out = await transfer.finish(base, (ext, suffix = '') => this.freePath(rec, `${PathUtils.filename(base)}${suffix}${ext}`), run.ac.signal, null, async (target) => {
+      // G4: the phase, the output's path and where the parts are reach the disk before ffmpeg runs. They
+      // stay until complete() saves the row completed, so a crash in between is read right (mergeLeft()).
+      // ffmpeg failed (null): the phase ends before the tracks are moved as they are, so nothing they
+      // leave at that path is ever read as a finished merge (review of Phase 4).
+      state.phase = target === null ? undefined : 'merging';
+      state.mergeOut = target ?? undefined;
+      state.mergeBase = target === null ? undefined : base;
+      await this.save(true);
+      if (target !== null && this.hooks.beforeMerge) await this.hooks.beforeMerge(rec.id);
+    });
     rec.note = transfer.note;
     rec.path = out;
     rec.filename = PathUtils.filename(out);
+    if (this.hooks.afterMerge) await this.hooks.afterMerge(rec.id);
   }
 
   private async runYtdlp(rec: Rec, run: Run): Promise<void> {
@@ -1143,6 +1352,11 @@ class Manager {
     rec.error = '';
     rec.need = undefined;
     rec.catcher = undefined;
+    rec.resumeOnStart = undefined;
+    rec.suspect = undefined;
+    rec.trying = undefined;
+    // The merge's crash window closes with this save (runStream(), mergeLeft()).
+    if (rec.stream) rec.stream = { ...rec.stream, phase: undefined, mergeOut: undefined, mergeBase: undefined };
     try {
       rec.total = rec.received = (await IOUtils.stat(rec.path)).size;
     } catch {
@@ -1234,12 +1448,29 @@ class Manager {
     // A run that saved bytes ends what an attach left of the schedule (renewTries).
     if (savedBytes(rec) > (run.saved0 ?? 0)) rec.renewTries = undefined;
     const { kind, status } = classify(err);
+    // A wait's try that had not got past its check (review of Phase 4): only a quit gives the wait back.
+    const trying = rec.trying;
+    rec.trying = undefined;
     if (run.reason === 'pause' && run.resumeAfter && !this.quitting) {
       // Pause, then Resume before the connections had stopped: the last word wins.
       rec.state = 'queued';
       rec.queuedAt = queueStamp();
-    } else if (run.reason === 'pause' || run.reason === 'quit') rec.state = 'paused';
-    else if (run.reason === 'cancel' || (err instanceof AbortedError && !run.reason)) this.markCancelled(rec);
+    } else if (run.reason === 'pause') rec.state = 'paused';
+    else if (run.reason === 'quit') {
+      rec.state = 'paused';
+      // A wait's try the quit stopped on its check: the row still waits, and waiting rows always continue
+      // (G4). A run past its check is a download the quit stopped (resumeOnStart: the setting decides).
+      if (trying) {
+        rec.wait = { ...trying, nextAt: 0 };
+        rec.resumeOnStart = undefined;
+      }
+    } else if (run.reason === 'sleep') {
+      // RESUME-DESIGN.md G4: the computer is going to sleep. The row continues after the wake (wake():
+      // on network link-up or WAKE_SETTLE later); SLEEP_FALLBACK if no wake ever comes.
+      const now = Date.now();
+      rec.state = 'paused';
+      rec.wait = { for: 'sleep', since: now, tries: 0, nextAt: now + SLEEP_FALLBACK };
+    } else if (run.reason === 'cancel' || (err instanceof AbortedError && !run.reason)) this.markCancelled(rec);
     else if ((kind === 'refused' || kind === 'not-file') && (rec.mode === 'file' || rec.mode === 'stream') && savedBytes(rec) > 0) {
       // RESUME-DESIGN.md 3.0: the address no longer gives the file, and the run's renewal hook found
       // no new one (the attempt at the failure). Nothing saved is lost: the row pauses as Link expired
@@ -1262,6 +1493,8 @@ class Manager {
       rec.error = '';
       rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: err instanceof ChangedError ? err.candidate : undefined };
       rec.wait = undefined;
+    } else if ((kind === 'offline' || kind === 'timeout' || kind === 'server') && (rec.mode === 'file' || rec.mode === 'stream') && this.waitAgain(rec, run, kind === 'server' ? 'server' : 'network', status, err)) {
+      // RESUME-DESIGN.md G4: Waiting for network or Retrying; nothing is lost and Deer tries again by itself.
     } else {
       rec.state = 'failed';
       rec.error = kind === 'not-file' && rec.file?.guarded ? 'Start this download again from its page.' : describeError(err);
@@ -1271,6 +1504,40 @@ class Manager {
     this.settle(rec);
     this.save(true);
     this.pump();
+  }
+
+  /**
+   * RESUME-DESIGN.md G4: a run that could not reach its site ('network': offline, a timeout, a refused or
+   * reset connection, a body cut short once its attempts were used up) or whose site answered 5xx or 429
+   * ('server') waits, paused, and is tried again by itself (waits.ts waitNext(): 10 s, 30 s, 1 min, 2 min,
+   * 5 min, then every 10 min, never before the server's Retry-After). The count goes on from the network
+   * or server wait the run continued (run.waited), whichever of the two it was: a site that answers some
+   * tries with 503 and drops others still backs off (review of Phase 4). It starts again once the run
+   * saved FRESH_AFTER more, and on the person's Try now or Resume (resume() drops the wait). A network
+   * wait never ends by itself; a server wait does SERVER_GIVE_UP after the wait's first 5xx or 429
+   * (serverSince, kept through the network failures between): false, the row fails with today's sentence.
+   */
+  private waitAgain(rec: Rec, run: Run, what: 'network' | 'server', status: number, err: unknown): boolean {
+    const now = Date.now();
+    const carried = run.waited?.for === 'network' || run.waited?.for === 'server' ? run.waited : null;
+    const prev = carried && savedBytes(rec) - (run.saved0 ?? 0) < FRESH_AFTER ? carried : null;
+    const since = prev?.since ?? now;
+    // A server wait saved before serverSince existed counts from its since.
+    const before = prev?.serverSince ?? (prev?.for === 'server' ? prev.since : 0);
+    const serverSince = what === 'server' ? before || now : before;
+    if (what === 'server' && now - serverSince >= SERVER_GIVE_UP) return false;
+    const tries = (prev?.tries ?? 0) + 1;
+    rec.state = 'paused';
+    rec.error = '';
+    rec.wait = {
+      for: what,
+      since,
+      tries,
+      nextAt: waitNext(tries, now, err instanceof HttpStatusError ? err.retryAfter : null),
+      ...(serverSince ? { serverSince } : {}),
+      ...(status ? { status } : {}),
+    };
+    return true;
   }
 
   private settle(rec: Rec): void {
@@ -1286,6 +1553,7 @@ class Manager {
     rec.need = undefined;
     rec.wait = undefined;
     rec.catcher = undefined;
+    rec.resumeOnStart = undefined;
     this.stopRenewing(rec.id);
     this.removeParts(rec);
     this.rewind(rec);
@@ -1297,6 +1565,7 @@ class Manager {
   /** Back to the start: no partial file, no place on disk, no measurements (Retry after Cancel, Download again). */
   private rewind(rec: Rec): void {
     rec.file = null;
+    rec.suspect = undefined;
     if (rec.stream) {
       const s = rec.stream;
       rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
@@ -1332,8 +1601,12 @@ class Manager {
     const rec = this.find(id);
     if (!rec) return;
     const run = this.runs.get(id);
+    // The person paused it: it stays paused over a restart (RESUME-DESIGN.md G4).
+    rec.resumeOnStart = undefined;
     if (rec.state === 'queued') {
       rec.state = 'paused';
+      // A wait's try waiting its turn: Pause ends the wait too (G4).
+      rec.wait = undefined;
       this.warm.get(id)?.dropPending();
       this.warm.delete(id);
     } else if (rec.state === 'starting') {
@@ -1355,7 +1628,8 @@ class Manager {
     } else if (rec.state === 'paused' && (rec.wait || this.renewing.has(id))) {
       // RESUME-DESIGN.md 6 and G4: Pause on a row Deer comes back to by itself cancels the attempt
       // running (Renewing link) and the ones planned, and keeps the bytes; the row still says what it
-      // needs (Link expired) and Retry starts again (review of Phase 2).
+      // needs (Link expired) and Retry starts again (review of Phase 2). A network, server or sleep wait
+      // ends: the row is plainly paused (Phase 4).
       this.stopRenewing(id);
       rec.wait = undefined;
     } else return;
@@ -1375,6 +1649,7 @@ class Manager {
     this.renewFailed.delete(id);
     rec.wait = undefined;
     rec.renewTries = undefined;
+    rec.resumeOnStart = undefined;
     if (rec.state === 'completed') {
       // Download again: only when the finished file is gone.
       if (rec.path && existsSync(rec.path)) return;
@@ -1602,8 +1877,9 @@ class Manager {
     this.save(true);
   }
 
+  /** Pause all: what runs or waits its turn, and the waits Deer would continue by itself (format.ts isWaiting(), G4). */
   pauseAll(isPrivate?: boolean): void {
-    for (const r of [...this.recs]) if (ACTIVE.includes(r.state) && (isPrivate === undefined || r.identity.isPrivate === isPrivate)) this.pause(r.id);
+    for (const r of [...this.recs]) if ((ACTIVE.includes(r.state) || waiting(r)) && (isPrivate === undefined || r.identity.isPrivate === isPrivate)) this.pause(r.id);
   }
 
   resumeAll(isPrivate?: boolean): void {
@@ -1733,6 +2009,11 @@ class Manager {
 
   private makeRun(): Run {
     return { ac: new AbortController(), reason: null, transfer: null, firefox: null, samples: [], speed: 0, phase: '', last: Date.now() };
+  }
+
+  private setPhase(run: Run, phase: Run['phase']): void {
+    run.phase = phase;
+    run.phaseAt = Date.now();
   }
 
   /** Everything a transfer needs from its download. */
@@ -2277,11 +2558,120 @@ class Manager {
           this.touch(r);
           ended = true;
         }
-        if (r.wait?.nextAt && r.wait.nextAt <= due && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) void this.episode(r);
+        if (r.wait?.nextAt && r.wait.nextAt <= due && r.state === 'paused' && !this.renewing.has(r.id) && !this.runs.has(r.id)) {
+          if (r.wait.for === 'address') void this.episode(r);
+          else this.retryWait(r);
+        }
       }
       if (ended) this.save(true);
       this.armWaits();
     }, delay);
+  }
+
+  /**
+   * A network, server or sleep wait is due (RESUME-DESIGN.md G4): the row queues again and its run starts
+   * through Checking, carrying the wait on (launch(), stopped()). While Firefox is offline
+   * (Services.io.offline) a network wait only counts the try, since nothing can be reached; going online
+   * brings the next one (bringWaits()).
+   */
+  private retryWait(r: Rec): void {
+    if (r.state !== 'paused' || !r.wait || r.wait.for === 'address' || this.runs.has(r.id) || this.quitting) return;
+    const now = Date.now();
+    if (r.wait.for === 'network' && Services.io.offline) {
+      const tries = r.wait.tries + 1;
+      r.wait = { ...r.wait, tries, nextAt: waitNext(tries, now) };
+    } else {
+      r.state = 'queued';
+      r.queuedAt = queueStamp();
+      r.error = '';
+      r.wait = { ...r.wait, nextAt: 0 };
+    }
+    this.touch(r);
+    this.save(true);
+    this.pump();
+  }
+
+  /**
+   * RESUME-DESIGN.md G4: the network is back ('up': Firefox online again, a network link up), it changed
+   * ('changed': another network), or the computer woke ('wake'). The next try of every network wait comes
+   * SOON (never later than planned); a Link expired schedule that ran out gets one more attempt (3.0:
+   * "after that, only on wake, on network link-up, or on a manual action"), at most once per
+   * RENEW_ON_LINK; the transfers sleep stopped queue again WAKE_SETTLE after the wake, or at once on
+   * link-up. A change alone does not end that settle: Gecko reports one on every wake, before the
+   * network is really back (nsIOService's wake-up notifier).
+   */
+  private bringWaits(cause: 'up' | 'changed' | 'wake'): void {
+    if (this.quitting || !this.loadedAt) return;
+    const now = Date.now();
+    let moved = false;
+    for (const r of this.recs) {
+      const w = r.wait;
+      if (r.state !== 'paused' || !w || this.runs.has(r.id) || this.renewing.has(r.id)) continue;
+      let at = 0;
+      if (w.for === 'sleep') at = cause === 'wake' ? now + WAKE_SETTLE : cause === 'up' ? now : 0;
+      else if (w.for === 'network') at = now + SOON;
+      else if (w.for === 'address' && !w.nextAt && now - (this.renewFailed.get(r.id) ?? 0) >= RENEW_ON_LINK) at = now + SOON;
+      if (!at || (w.for !== 'sleep' && w.nextAt && w.nextAt <= at)) continue;
+      r.wait = { ...w, nextAt: at };
+      this.touch(r);
+      moved = true;
+    }
+    if (moved) this.save(true);
+  }
+
+  /**
+   * The computer is going to sleep (RESUME-DESIGN.md G4): what runs pauses with reason 'sleep' (every
+   * connection closes its writer, then stopped() saves the list, flushed) into wait 'sleep'. What waits
+   * its turn waits for the wake too, so nothing starts on the way down.
+   */
+  private sleep(): void {
+    if (this.quitting || !this.loadedAt) return;
+    const now = Date.now();
+    let changed = false;
+    for (const r of this.recs) {
+      if (r.state !== 'queued' || this.runs.has(r.id)) continue;
+      this.warm.get(r.id)?.dropPending();
+      this.warm.delete(r.id);
+      r.state = 'paused';
+      r.wait = { for: 'sleep', since: now, tries: 0, nextAt: now + SLEEP_FALLBACK };
+      this.touch(r);
+      changed = true;
+    }
+    for (const [id, run] of this.runs) {
+      const r = this.find(id);
+      if (!r || run.firefox || run.reason || r.state !== 'downloading') continue;
+      run.reason = 'sleep';
+      run.ac.abort();
+      this.touch(r);
+    }
+    if (changed) this.save(true);
+  }
+
+  /**
+   * CONTINUE_AFTER after the engine started (RESUME-DESIGN.md G4, the owner's decision 5): the downloads a
+   * quit or a crash stopped (resumeOnStart) queue again, through Checking, while "Continue unfinished
+   * downloads when Deer starts" is on (the default). Rows the person paused were never marked; waiting
+   * rows continue on their own schedule either way. The marks go now, whatever the setting says.
+   */
+  private continueAfterStart(): void {
+    this.continueTimer = null;
+    if (this.quitting) return;
+    const on = settings().continueDownloadsOnStart !== false;
+    let changed = false;
+    for (const r of [...this.recs].sort((a, b) => a.queuedAt - b.queuedAt)) {
+      if (!r.resumeOnStart) continue;
+      r.resumeOnStart = undefined;
+      changed = true;
+      if (!on || r.state !== 'paused' || r.need || r.wait || r.mode === 'browser' || this.runs.has(r.id) || this.deciding.has(r.id) || this.renewing.has(r.id)) continue;
+      r.state = 'queued';
+      r.queuedAt = queueStamp();
+      r.error = '';
+      this.event(r, 'Continued after restart');
+      this.touch(r);
+    }
+    if (!changed) return;
+    this.save(true);
+    this.pump();
   }
 
   private ensureTicker(): void {
@@ -2294,7 +2684,8 @@ class Manager {
     for (const [id, run] of this.runs) {
       const rec = this.find(id);
       if (!rec) continue;
-      const dt = now - run.last;
+      // Slept time is not active time (RESUME-DESIGN.md G4): a tick after a sleep counts as two at most.
+      const dt = Math.max(0, Math.min(now - run.last, 2 * TICK));
       run.last = now;
       if (run.firefox) {
         rec.received = Number(run.firefox.currentBytes) || 0;
@@ -2361,6 +2752,8 @@ class Manager {
     const multi = r.mode === 'stream' || (!!r.file?.ranges && r.file.total >= 8 * 1024 * 1024);
     const connections = Math.max(1, Math.min(32, Number(s.connections) || 8));
     const renewing = !pausing && (this.renewing.has(r.id) || run?.phase === 'renewing');
+    // Checking (RESUME-DESIGN.md 6) only once it took CHECKING_AFTER; 'probing' until then.
+    const phase = run?.phase === 'checking' && Date.now() - (run.phaseAt ?? 0) < CHECKING_AFTER ? 'probing' : (run?.phase ?? '');
     const wait = r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
     const need = r.state === 'paused' && !pausing && r.need ? r.need : null;
     // Keep partial file (3 G3): the unbroken beginning, for a one-file File changed row.
@@ -2374,7 +2767,7 @@ class Manager {
       path: r.path,
       category: categoryOf(r.filename, r.mime),
       state: pausing ? 'paused' : r.state,
-      phase: pausing ? '' : renewing ? 'renewing' : (run?.phase ?? ''),
+      phase: pausing ? '' : renewing ? 'renewing' : phase,
       received,
       total,
       speed,
@@ -2402,7 +2795,7 @@ class Manager {
       need: r.state === 'paused' && !pausing && r.need ? { kind: r.need.kind, status: r.need.status ?? 0, evidence: r.need.evidence ?? '' } : null,
       wait,
       nextAt: wait?.nextAt ?? 0,
-      status: r.state === 'paused' ? (r.need?.status ?? 0) : (run?.status ?? 0),
+      status: r.state === 'paused' ? (r.need?.status ?? r.wait?.status ?? 0) : (run?.status ?? 0),
       history: (r.events ?? []).map((e) => ({ at: e.at, text: e.text })),
       armed: need?.kind === 'address' && !!r.catcher && r.catcher.until > Date.now(),
       canRenew: r.mode === 'file' && !!r.file?.probed && !!r.path,
@@ -2492,7 +2885,7 @@ class Manager {
 
   /** Private downloads that are running or waiting to. */
   private privateRunning(): number {
-    return this.recs.filter((r) => r.identity.isPrivate && ACTIVE.includes(r.state)).length;
+    return this.recs.filter((r) => r.identity.isPrivate && running(r)).length;
   }
 
   private installLifecycle(): void {
@@ -2556,6 +2949,18 @@ class Manager {
         this.removeRec(r.id);
       }
     }, 'last-pb-context-exited');
+    // RESUME-DESIGN.md G4: the network and the computer's sleep (bringWaits(), sleep()). Firefox online
+    // again ("online"; netwerk/base/nsIOService.cpp), a network link up or changed ("up", "changed";
+    // netwerk/base/nsINetworkLinkService.idl), sleep_notification and wake_notification (widget/nsIWidget.h
+    // topics, sent by the Windows widget on power events).
+    Services.obs.addObserver((_s: unknown, _t: string, data: string) => {
+      if (data === 'online') this.bringWaits('up');
+    }, 'network:offline-status-changed');
+    Services.obs.addObserver((_s: unknown, _t: string, data: string) => {
+      if (data === 'up' || data === 'changed') this.bringWaits(data);
+    }, 'network:link-status-changed');
+    Services.obs.addObserver(() => this.sleep(), 'sleep_notification');
+    Services.obs.addObserver(() => this.bringWaits('wake'), 'wake_notification');
   }
 
   private shuttingDown: Promise<void> | null = null;
@@ -2573,6 +2978,11 @@ class Manager {
         run.ac.abort();
       }
       this.armWaits();
+      if (this.continueTimer) clearTimeout(this.continueTimer);
+      this.continueTimer = null;
+      // RESUME-DESIGN.md G4: what this quit stops continues at the next start (resumeOnStart); what the
+      // person had paused, or was cancelling, does not.
+      for (const r of this.recs) if (r.state === 'queued' && !this.runs.has(r.id)) r.resumeOnStart = true;
       const waits: Promise<unknown>[] = [];
       for (const [id, run] of this.runs) {
         const rec = this.find(id);
@@ -2582,6 +2992,7 @@ class Manager {
           rec.error = 'Interrupted when Deer closed.';
           continue;
         }
+        if (run.reason !== 'cancel' && !(run.reason === 'pause' && !run.resumeAfter)) rec.resumeOnStart = true;
         run.reason = 'quit';
         run.ac.abort();
         waits.push(this.whenSettled(id));
@@ -2606,6 +3017,33 @@ function settleSegments(f: FileState): void {
     f.ranges = false;
   }
   for (const seg of f.segments) if (seg.end >= 0) seg.received = Math.max(0, Math.min(seg.received, seg.end - seg.start));
+}
+
+/** A paused row Deer continues by itself, the person needed for nothing (RESUME-DESIGN.md G4; format.ts isWaiting()). */
+function waiting(r: Rec): boolean {
+  return r.state === 'paused' && !r.need && !!r.wait && r.wait.for !== 'address';
+}
+
+/**
+ * Under way for the quit prompt (runningCount()): running or waiting its turn, but not a network or server
+ * wait's automatic try still on its check (rec.trying) or queued for a slot (rec.wait): those are still
+ * the wait, which a quit never waits for (RESUME-DESIGN.md 6; review of Phase 4).
+ */
+function running(r: Rec): boolean {
+  return ACTIVE.includes(r.state) && !r.trying && !(r.state === 'queued' && r.wait && r.wait.for !== 'address');
+}
+
+/**
+ * After a crash (RESUME-DESIGN.md G4, before Phase 5's hash record): the last SUSPECT_TAIL below each
+ * segment's mark of a file download that was running may never have reached the disk, so it is given back
+ * to be fetched again (rec.suspect, which the history line of its next run reports).
+ */
+function suspectTail(r: Rec, now: number): void {
+  if (r.mode !== 'file' || !r.file || !Array.isArray(r.file.segments)) return;
+  const back = rewindTails(r.file.segments);
+  if (back <= 0) return;
+  r.received = savedBytes(r);
+  r.suspect = { at: now, bytes: back + (r.suspect?.bytes ?? 0) };
 }
 
 /** A row's names for preMatch() (RESUME-DESIGN.md 2.2): its file name and the server's. */

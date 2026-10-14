@@ -64,6 +64,18 @@
              under 1 MiB saved starts over without asking; a start again during a scheduled attempt
              attaches, one sent to a chosen folder does not; Resume during Keep partial starts nothing;
              a peek's click flies from the sheet
+  network    network, sleep and restarts (spikes/downloader/RESUME-DESIGN.md, Phase 4): a network that goes
+             away (/drop) gives Waiting for network with every count exact, tries 10 s then 30 s apart,
+             Try now continues it; Firefox offline only counts tries and continues once online; 503 for
+             90 s is Retrying, never Failed, a try asking once; Retry-After: 3600 stops at the first 503;
+             503 and dropped connections share one count, and 24 h after the first 503 it fails; a blocked
+             port, a redirect loop and a corrupted answer fail as before; sleep and wake (link-up or 10 s
+             later); Pause all ends a wait; after a restart what the quit stopped continues and what the
+             person paused stays paused (the setting off: both stay, the prompt says so, and a try caught
+             on its check continues by its wait); after a hard kill (run.py @@kill) the last 8 MiB below
+             each mark is fetched again and a try caught on its check still waits; a kill after a stream's
+             merge completes from the output (also with a part left), one before ffmpeg merges the parts
+             again, nothing fetched
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -108,6 +120,7 @@ TESTS = {
     'integrity': (300, True),
     'expiry': (300, True),
     'attach': (480, True),
+    'network': (900, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

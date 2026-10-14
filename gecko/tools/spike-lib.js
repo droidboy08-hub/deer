@@ -19,6 +19,8 @@
 //   await spike.modules('idm')          ask the runner which DLLs matching the text are loaded
 //   spike.run                           1 on the first start with this profile, 2 after a restart...
 //   spike.restart()                     restart in place (same profile); the script runs again with run+1
+//   spike.kill()                        a hard kill (no shutdown runs, as in a crash), then a start on the
+//                                       same profile by run.py; the script runs again with run+1
 //   spike.quit()
 // Never use OS focus or real input: other windows are open on this desktop.
 /* global Services, Cc, Ci, Cu, IOUtils, PathUtils, ChromeUtils */
@@ -66,6 +68,9 @@ window.spike = (() => {
       dump("[spike] log failed " + e + "\n");
     }
   };
+  // run.py follows this process by its pid: an in-place restart starts the new process through a short-lived
+  // launcher it may never see, so it would not be stopped at the end (or before a hard kill) otherwise.
+  if (first) write("@@pid " + Services.appinfo.processID);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (a) => (typeof a === "string" ? a : (() => { try { return JSON.stringify(a); } catch { return String(a); } })());
   const hwnd = () => {
@@ -198,6 +203,18 @@ window.spike = (() => {
     restart() {
       Services.prefs.savePrefFile(null);
       Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart);
+      return new Promise(() => {});
+    },
+
+    /**
+     * A hard kill (run.py terminates every runtime process: no shutdown, no quit observers, as in a crash)
+     * and a start again on the same profile. The script runs again in the new process with spike.run + 1.
+     */
+    async kill() {
+      // savePrefFile writes off the main thread: give it a moment, so the run count and the test's prefs are on disk.
+      Services.prefs.savePrefFile(null);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      write("@@kill " + Services.appinfo.processID);
       return new Promise(() => {});
     },
 

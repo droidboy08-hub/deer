@@ -4,6 +4,7 @@
 // a private window the private ones, a normal window the others (as Firefox does).
 import type { Browser } from '../../browser';
 import type { DownloadEvent, DownloadView, RefreshResult, StartOptions } from '../../../modules/downloads/types';
+import { isWaiting } from './format';
 
 const ORDER: Record<DownloadView['state'], number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
 
@@ -194,12 +195,13 @@ export class DownloadStore {
    * 6): on a Renewing link row it is Pause (the attempt stops, the bytes stay); on a Link expired row
    * Refresh address (Retry for a stream, whose renewal comes with Phase 6); on Waiting for link and Start
    * it again from its page, Open page; on File changed Resume, which only checks the address again (the
-   * panel moves focus to the row's choice instead). Resolves with Refresh address's outcome.
+   * panel moves focus to the row's choice instead); on Waiting for network and Retrying, Try now (start
+   * now: RESUME-DESIGN.md G4). Resolves with Refresh address's outcome.
    */
   primary(seen: DownloadView): Promise<RefreshResult['kind']> | null {
     const v = this.engine.get(seen.id) ?? seen;
     if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') this.run('pause', v.id);
-    else if (v.state === 'queued') this.run('start-now', v.id);
+    else if (v.state === 'queued' || isWaiting(v)) this.run('start-now', v.id);
     else if (v.state === 'completed' && !v.missing) this.run('show-in-folder', v.id);
     else if (v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)) this.run('open-page', v.id);
     else if (v.need?.kind === 'address' && v.canRenew) return this.refresh(v.id);

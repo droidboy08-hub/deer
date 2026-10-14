@@ -119,8 +119,12 @@ function proceed(b: Browser, kind: Kind): void {
   } else b.run('quit');
 }
 
-/** The prompt's words: private downloads are cancelled, the others pause and continue next time. */
-export function promptCopy(kind: Kind, count: number, priv: number): { title: string; body: string; go: string } {
+/**
+ * The prompt's words: private downloads are cancelled, the others pause and continue next time; with
+ * "Continue unfinished downloads when Deer starts" off (`continues` false), they pause and wait to be
+ * resumed from Downloads (RESUME-DESIGN.md G4; review of Phase 4).
+ */
+export function promptCopy(kind: Kind, count: number, priv: number, continues = true): { title: string; body: string; go: string } {
   const one = count === 1;
   if (kind === 'private') {
     return {
@@ -135,7 +139,9 @@ export function promptCopy(kind: Kind, count: number, priv: number): { title: st
   let body: string;
   if (priv >= count) body = `If you ${verb} now, ${one ? 'it is' : 'they are'} cancelled. Private downloads can’t continue later.`;
   else {
-    body = `If you ${verb} now, ${one ? 'it pauses and continues from where it stopped' : 'they pause and continue from where they stopped'} ${when}.`;
+    body = continues
+      ? `If you ${verb} now, ${one ? 'it pauses and continues from where it stopped' : 'they pause and continue from where they stopped'} ${when}.`
+      : `If you ${verb} now, ${one ? 'it pauses. Resume it' : 'they pause. Resume them'} from Downloads ${when}.`;
     if (priv) body += ` ${priv === 1 ? 'The private one is' : 'Private ones are'} cancelled.`;
   }
   return { title, body, go: kind === 'restart' ? 'Restart' : 'Quit' };
@@ -174,7 +180,7 @@ export class QuitPrompt {
     this.b.service('switcher')?.close?.();
     const layer = this.b.layer('downloads-prompt', PROMPT_Z);
     const scrim = el('div', { class: 'vd-scrim in' });
-    const { title, body, go: goLabel } = promptCopy(kind, count, priv);
+    const { title, body, go: goLabel } = promptCopy(kind, count, priv, this.b.settings.continueDownloadsOnStart !== false);
     const keep = el('button', { type: 'button', class: 'vd-btn accent vd-q-keep' }, 'Keep downloading');
     const go = el('button', { type: 'button', class: 'vd-btn vd-q-go' }, goLabel);
     const box = el('section', { class: 'vd-quit', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'vd-quit-title', 'aria-describedby': 'vd-quit-body' }, el('div', { class: 'vd-quit-body' }, el('h2', { id: 'vd-quit-title' }, title), el('p', { id: 'vd-quit-body' }, body), el('div', { class: 'vd-quit-acts' }, go, keep)));

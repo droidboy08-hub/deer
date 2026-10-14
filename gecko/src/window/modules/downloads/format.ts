@@ -95,7 +95,19 @@ export function host(url: string): string {
   }
 }
 
-export const isActive = (v: DownloadView): boolean => v.state === 'downloading' || v.state === 'starting' || v.state === 'queued';
+/**
+ * A paused row Deer continues by itself (spikes/downloader/RESUME-DESIGN.md G4): Waiting for network, Retrying,
+ * or stopped by the computer's sleep, with nothing needed from the person. Pause ends the wait.
+ */
+export const isWaiting = (v: DownloadView): boolean => v.state === 'paused' && !v.need && !!v.wait && v.wait.for !== 'address';
+/**
+ * Under way: downloading, starting, waiting its turn, or waiting to try again by itself (isWaiting: the ring
+ * stays shown and Pause all reaches it; RESUME-DESIGN.md 6). The engine's runningCount() never counts
+ * waits, so they never hold back a quit.
+ */
+export const isActive = (v: DownloadView): boolean => v.state === 'downloading' || v.state === 'starting' || v.state === 'queued' || isWaiting(v);
+/** A resume asking its address before it continues: Checking once that took 400 ms ('probing' with saved bytes until then). */
+export const isChecking = (v: DownloadView): boolean => v.state === 'downloading' && (v.phase === 'checking' || (v.phase === 'probing' && v.received > 0));
 export const isFinished = (v: DownloadView): boolean => v.state === 'completed' || v.state === 'failed' || v.state === 'cancelled';
 
 /** "Downloads" for the downloads folder itself; "Downloads › Video" or "D: › Films" elsewhere. */

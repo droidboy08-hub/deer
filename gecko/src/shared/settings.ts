@@ -32,6 +32,12 @@ export interface Settings {
   askWhereToSave: boolean;
   connections: number;
   speedLimitKBps: number;
+  /**
+   * Downloads a quit or a crash stopped continue by themselves when Deer starts, 10 s after the first
+   * window opens (spikes/downloader/RESUME-DESIGN.md G4; the owner's decision 5, on by default). Rows the
+   * person paused stay paused either way.
+   */
+  continueDownloadsOnStart: boolean;
   /** ffmpeg.exe for joining video and audio ('' = look beside the app, then for the copy Deer downloaded, then on PATH). Downloads module. */
   ffmpegPath: string;
 }
@@ -58,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askWhereToSave: false,
   connections: 8,
   speedLimitKBps: 0,
+  continueDownloadsOnStart: true,
   ffmpegPath: '',
 };
 

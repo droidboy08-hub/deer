@@ -19,7 +19,7 @@ import { runFfmpeg } from './ffmpeg';
 import { throttle } from './limiter';
 import {
   AbortedError, ChangedError, ConnectionRefusedError, DownloadError, HttpStatusError, NotTheFileError, ShortBodyError, backoff, isRetryable, open,
-  parseContentRange, refusedConnection, retryAfter, sleep, textStart,
+  parseContentRange, refusedConnection, retryAfter, sleep, stopsRun, textStart,
 } from './net';
 import { Writer, setSize, sizeOf } from './partfile';
 import { audioFor, isMaster, isPlaylist, ladder, parseMaster, parseMedia, type KeyRef, type MediaPlaylist, type MediaSegment } from './playlist';
@@ -60,6 +60,15 @@ export interface StreamState {
   tracks: StreamTrack[];
   /** When the tracks started again by themselves after the stream changed (ranged.ts silentRestart). */
   silent?: number[];
+  /**
+   * The merge crash window (RESUME-DESIGN.md G4, 5.3): 'merging' once the merge's output path was
+   * chosen, saved (flushed) before ffmpeg runs, until the row is saved completed. `mergeOut` is that
+   * output and `mergeBase` the base the track parts were named after (trackPart()), so a start after
+   * a crash can tell a finished merge (the output there, the parts gone) from one to run again.
+   */
+  phase?: 'merging';
+  mergeOut?: string;
+  mergeBase?: string;
 }
 
 export interface StreamEnv extends TransferEnv {
@@ -87,6 +96,8 @@ export class StreamTransfer {
   note = '';
   /** A changed stream may start its tracks again by itself; false for a row that already asks (see ranged.ts). */
   silentRestarts = true;
+  /** A wait's automatic try on its check (prepare()): a 429 or 5xx ends it at once (see ranged.ts waitTry). */
+  waitTry = false;
   private inflight = 0;
   /** Segments fetched but not yet written (they arrive out of order): bytes and media seconds. */
   private early = { bytes: 0, secs: 0 };
@@ -146,6 +157,14 @@ export class StreamTransfer {
   }
 
   // ---- preparing ----
+
+  /**
+   * Only what the merge needs (RESUME-DESIGN.md G4): a merge a quit or a crash cut short runs again from
+   * the parts on disk, without asking the stream's addresses (prepare()).
+   */
+  async loadMuxer(): Promise<void> {
+    this.muxer = await this.env.ffmpeg();
+  }
 
   /** Resolve a master playlist (or a manifest) to one rendition and its audio, then read the media playlists. */
   async prepare(signal: AbortSignal): Promise<void> {
@@ -282,9 +301,13 @@ export class StreamTransfer {
   /**
    * Turn the track files into the finished file. `place(ext, suffix)` returns a free path for the
    * download's name with that extension. Returns the main file's path. Without ffmpeg, or when it
-   * fails, the tracks are kept as they are and `note` says so.
+   * fails, the tracks are kept as they are and `note` says so. `before(out)` runs once the merge's
+   * output path is chosen and before ffmpeg starts (the engine saves the merge's phase: RESUME-DESIGN.md G4);
+   * `before(null)` once ffmpeg failed, before the tracks are moved as they are: from then on the output
+   * path is no proof of a finished merge (review of Phase 4: the engine's mergeLeft() reads a merge whose
+   * output is there as finished).
    */
-  async finish(partBase: string, place: (ext: string, suffix?: string) => string, signal: AbortSignal, onProgress: ((seconds: number) => void) | null = null): Promise<string> {
+  async finish(partBase: string, place: (ext: string, suffix?: string) => string, signal: AbortSignal, onProgress: ((seconds: number) => void) | null = null, before: ((out: string | null) => Promise<void>) | null = null): Promise<string> {
     const [main, audio] = this.state.tracks;
     const mainPart = trackPart(partBase, main);
     const audioPart = audio ? trackPart(partBase, audio) : '';
@@ -300,6 +323,7 @@ export class StreamTransfer {
       args.push('-c', 'copy');
       if (!webm) args.push('-movflags', '+faststart');
       args.push('-f', webm ? 'webm' : 'mp4', tmp);
+      if (before) await before(out);
       try {
         await runFfmpeg(ff, args, signal, onProgress);
         await IOUtils.move(tmp, out);
@@ -309,6 +333,7 @@ export class StreamTransfer {
       } catch (err) {
         await IOUtils.remove(tmp, { ignoreAbsent: true }).catch(() => undefined);
         if (signal.aborted) throw new AbortedError();
+        if (before) await before(null);
         // Keep what downloaded rather than throw it away over the container.
         this.note = audio ? 'Couldn’t join the video and its sound: saved as two files.' : 'Couldn’t repackage the video: saved as it came.';
         console.warn('Deer downloads: ffmpeg failed', String(err));
@@ -572,7 +597,8 @@ export class StreamTransfer {
             continue;
           }
         }
-        if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+        // The last connection: a server that asks for a long wait stops the run (net.ts serverStops()).
+        if (attempt >= ATTEMPTS || !isRetryable(err) || (stopsRun(err) && !mayYield?.(Infinity))) throw err;
         await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
     }
@@ -638,7 +664,7 @@ export class StreamTransfer {
         return text;
       } catch (err) {
         if (signal.aborted) throw new AbortedError();
-        if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+        if (attempt >= ATTEMPTS || !isRetryable(err) || stopsRun(err, this.waitTry)) throw err;
         await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
     }

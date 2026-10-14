@@ -54,7 +54,7 @@ import { nameFromDisposition } from './naming';
 import {
   AbortedError, AddressRefusedError, ChangedError, ChecksumError, ConnectionRefusedError, DiskError, DownloadError, HttpStatusError, NotTheFileError,
   REFUSED_STATUS, RETRYABLE_STATUS, Response, ShortBodyError, backoff, isRetryable, open, parseContentRange, refusal, refusedConnection,
-  retryAfter, sleep, textStart, textual, type Identity,
+  retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
 import { IN_FLIGHT, Writer, freeSpace, readAt, setSize, sizeOf } from './partfile';
 import {
@@ -224,6 +224,12 @@ export class FileTransfer {
    * Resume there only checks again, it never starts over (RESUME-DESIGN.md 3 G3).
    */
   silentRestarts = true;
+  /**
+   * The run is a network or server wait's automatic try and this is its check (RESUME-DESIGN.md G4,
+   * review of Phase 4): a 429 or 5xx ends the check at once (net.ts serverStops()), and the wait's own
+   * schedule spaces the tries. Set by the engine around the check only.
+   */
+  waitTry = false;
   private pending: Response | null = null;
   /** Segment -> the Writer currently filling it. */
   private writers = new Map<Segment, Writer>();
@@ -398,7 +404,7 @@ export class FileTransfer {
         await sleep(backoff(next === 'retry' ? 1 : attempt, wait) * 1000, signal);
         continue;
       }
-      if (attempt >= ATTEMPTS || !RETRYABLE_STATUS.has(res.status)) throw await refusal(res, wait);
+      if (attempt >= ATTEMPTS || !RETRYABLE_STATUS.has(res.status) || serverStops(res.status, wait, this.waitTry)) throw await refusal(res, wait);
       res.destroy();
       await sleep(backoff(attempt, wait) * 1000, signal);
     }
@@ -808,7 +814,8 @@ export class FileTransfer {
         if (next === 'retry') retried = true;
         else {
           if (refusedConnection(err) && conn.mayYield() && (!conn.accepted || failures >= ATTEMPTS)) throw new ConnectionRefusedError();
-          if (failures >= ATTEMPTS || !(isRetryable(err) || err instanceof RangeMismatchError)) throw err;
+          // The last connection: a server that asks for a long wait stops the run (net.ts serverStops()).
+          if (failures >= ATTEMPTS || !(isRetryable(err) || err instanceof RangeMismatchError) || (!conn.mayYield() && stopsRun(err))) throw err;
         }
         await sleep(backoff(next === 'retry' ? 1 : failures, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
@@ -951,7 +958,7 @@ export class FileTransfer {
           continue;
         }
         if (next === 'retry') retried = true;
-        else if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+        else if (attempt >= ATTEMPTS || !isRetryable(err) || stopsRun(err)) throw err;
         await sleep(backoff(next === 'retry' ? 1 : attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
     }

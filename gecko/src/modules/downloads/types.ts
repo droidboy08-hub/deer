@@ -14,8 +14,10 @@ export type NeedKind = 'address' | 'choice' | 'repair' | 'page';
 
 /**
  * What a paused row waits for, Deer acting by itself when it comes (RESUME-DESIGN.md 5.1). Phase 2 sets
- * 'address': the next automatic attempt to renew a Link expired row's address; 'network', 'server' and
- * 'sleep' come with Phase 4.
+ * 'address': the next automatic attempt to renew a Link expired row's address. Phase 4 (G4,
+ * downloads/waits.ts): 'network' (Waiting for network: the site could not be reached), 'server'
+ * (Retrying: the site answered 5xx or 429) and 'sleep' (the computer slept while it ran); each continues
+ * by itself at `nextAt`.
  */
 export type WaitFor = 'network' | 'server' | 'sleep' | 'address';
 
@@ -68,9 +70,12 @@ export interface DownloadView {
   state: DownloadState;
   /**
    * '' while transferring; 'probing' before the first byte; 'merging' while ffmpeg joins a stream;
-   * 'renewing' while Deer looks for a new address for it (Renewing link, RESUME-DESIGN.md 6).
+   * 'renewing' while Deer looks for a new address for it (Renewing link, RESUME-DESIGN.md 6);
+   * 'checking' while a download with saved bytes asks its address again before it continues
+   * (Checking, RESUME-DESIGN.md 6, Phase 4): reported only once that took 400 ms, so a quick resume
+   * never flickers ('probing' until then, with the saved bytes in `received`).
    */
-  phase: '' | 'probing' | 'merging' | 'renewing';
+  phase: '' | 'probing' | 'merging' | 'renewing' | 'checking';
   received: number;
   /** -1 when the server didn't say. For streams this is an estimate. */
   total: number;
@@ -114,11 +119,15 @@ export interface DownloadView {
    * changed (`evidence` says what differed, "was 24 MB, now 23 MB"). The saved bytes are kept either way.
    */
   need: { kind: NeedKind; status: number; evidence: string } | null;
-  /** A paused row Deer comes back to by itself: what for, how many attempts so far, when the next is (0: none planned). */
+  /**
+   * A paused row Deer comes back to by itself: what for, how many attempts so far, when the next is (0: none
+   * planned). With no `need`, a 'network', 'server' or 'sleep' wait is still under way for the person
+   * (format.ts isWaiting(): Waiting for network, Retrying), and Pause ends it.
+   */
   wait: { for: WaitFor; tries: number; nextAt: number } | null;
   /** When the next automatic attempt runs ("next try 14:05"), 0 when none is planned. */
   nextAt: number;
-  /** The HTTP status behind Link expired or Renewing link, 0 when there is none (an answer that was a page). */
+  /** The HTTP status behind Link expired, Renewing link or Retrying, 0 when there is none (an answer that was a page). */
   status: number;
   /** The row's last history lines, oldest first ("New link found", with when): every automatic fix leaves one. */
   history: { at: number; text: string }[];

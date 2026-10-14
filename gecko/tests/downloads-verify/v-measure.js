@@ -81,7 +81,8 @@ spike.main(async () => {
   eq("details captions", [$(".vd-d-title").textContent, /^8 of 8 active · Resumable$/.test($(".vd-d-cap").textContent), $(".vd-d-note").textContent], ["Connections", true, "Each block is one part of the file, fetched in parallel"]);
   eq("connection blocks", [b.root.querySelectorAll(".vd-segs > span").length, box($(".vd-segs > span")).h], [8, 16]);
   eq("facts", [...b.root.querySelectorAll(".vd-facts .k")].map((x) => x.textContent), ["Address", "Saved to", "From page", "Started"]);
-  eq("detail actions", [...b.root.querySelectorAll(".vd-d-btn")].map((x) => x.textContent), ["Pause", "Limit speed", "Show in folder", "Cancel"]);
+  // Visible buttons only: the "Use another address" form keeps its hidden "Use it and start over" (resume phase 2).
+  eq("detail actions", [...b.root.querySelectorAll(".vd-d-btn")].filter((x) => !x.closest("[hidden]")).map((x) => x.textContent), ["Pause", "Limit speed", "Show in folder", "Cancel"]);
   eq("Cancel is the danger button", cs($(".vd-d-btn.danger")).color, "rgb(255, 153, 164)");
   eq("detail button height", box($(".vd-d-btn")).h, 30);
   spike.press("Escape");

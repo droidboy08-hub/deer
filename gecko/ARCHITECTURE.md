@@ -383,7 +383,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 to 3 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 4 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -446,9 +446,36 @@ local look-alike type, so a contract change fails `tsc`.
   expired (Retry for a stream), Open page · Stop waiting for Waiting for link, Start over · Keep partial
   file for File changed, "N need attention" in the toolbar, From page as a button; the ring's 8 px dot
   and "Downloads, 1 needs attention" for rows that started needing the person this session
-  (`view.attention`), with a polite live region.
+  (`view.attention`), with a polite live region. Network, sleep and restarts (Phase 4, G4,
+  `downloads/waits.ts`): a run whose site can't be reached (`classify()` 'offline' or 'timeout': only
+  the Necko failures it lists; a blocked port, a redirect loop or a corrupted answer fail as before)
+  stops, once every connection has closed its writer, into `rec.wait` 'network' (Waiting for network:
+  tried again 10 s, 30 s, 1 min, 2 min, 5 min after each failure, then every 10 min, never failing by
+  itself; only counted while Firefox is offline); 5xx and 429 into 'server' (Retrying · in 40 s, never
+  before Retry-After, failed with today's sentence 24 h after the first 5xx or 429, `wait.serverSince`).
+  A Retry-After over a minute stops the run at once (`net.ts serverStops()`). A run that a wait started
+  carries its count on (`run.waited`; network and server failures share it) and starts it again after
+  8 MiB of progress or on Try now; while its check runs it keeps the wait on the record (`rec.trying`):
+  that check stops at the first 429 or 5xx, never holds a quit back, and a quit or a crash before it
+  passed leaves the row waiting. Firefox online again, a network link up or
+  changed, or a wake brings the next network try to 5 s (and gives an exhausted Link expired schedule
+  one attempt, at most once per 10 min); `sleep_notification` pauses what runs into wait 'sleep', which
+  queues again on link-up or 10 s after the wake, through Checking (phase 'checking', shown after
+  400 ms with the bar dimmed). Waiting rows count as active in the window (`format.ts isActive`: the
+  ring stays, Pause all reaches them) but never in `runningCount()`; their verb is Try now (`resume(id,
+  true)`), Pause ends the wait. A quit marks what it stops (`rec.resumeOnStart`): 10 s after the first
+  window, with "Continue unfinished downloads when Deer starts" on (Settings › Downloads, default on),
+  they queue again ("Continued after restart"); rows the person paused stay paused; waits always go on.
+  The store's `session.clean` is false (flushed) from start until shutdown's last save: after an unclean
+  session the rows that were running continue the same way, their last 8 MiB below each segment's mark
+  given back to be fetched again (`rec.suspect`, "Checked after Deer closed unexpectedly · 64 MB fetched
+  again"). A stream's merge saves `phase` 'merging', `mergeOut` and `mergeBase` (flushed) before ffmpeg
+  runs and keeps them until the row is saved completed (a failed ffmpeg ends them before the tracks are
+  moved as they are): at load, the output there (and no `.merge.part`) completes the row and removes the
+  parts left, otherwise parts there merge again without asking the stream's addresses. The tick counts at
+  most two ticks of active time, so slept time is not counted.
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach; perf and ytdlp-real on demand; the
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

@@ -51,6 +51,7 @@ const SCHEMA: Record<string, Spec> = {
   askWhereToSave: { kind: 'bool', def: DEFAULT_SETTINGS.askWhereToSave },
   connections: { kind: 'int', def: DEFAULT_SETTINGS.connections, min: 1, max: 32 },
   speedLimitKBps: { kind: 'int', def: DEFAULT_SETTINGS.speedLimitKBps, min: 0 },
+  continueDownloadsOnStart: { kind: 'bool', def: DEFAULT_SETTINGS.continueDownloadsOnStart },
   ffmpegPath: { kind: 'string', def: DEFAULT_SETTINGS.ffmpegPath },
 };
 

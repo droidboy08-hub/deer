@@ -105,6 +105,16 @@ Routes (GET):
   /onetime/<f>?k=KEY&name=N&rate=
                             <f> once per KEY (the first request, a 200 with Content-Disposition N); after that a
                             410 page: a one-time link, which the take-over leaves to Firefox
+  /net/<f>?k=KEY&rate=      <f> with Range and If-Range, from a network that can go away (Phase 4 of
+                            RESUME-DESIGN.md): while /drop holds KEY, every connection that asks for it is
+                            reset (an RST, no answer) and a transfer still running is cut the same way; while
+                            /busy holds KEY, it answers 503 (with Retry-After when /busy gave ra)
+  /drop?for=N&k=KEY         for N seconds (default 60), /net/ connections for KEY are refused (reset)
+  /busy?for=N&k=KEY&ra=S    for N seconds (default 90), /net/ for KEY answers 503 (Retry-After: S with ra)
+  /slow?for=N&k=KEY&ms=M    for N seconds (default 10), /net/ for KEY answers M ms late (default 1500): a resume's
+                            check that takes a while (Checking)
+  /loop/a                   a 302 to /loop/b and back, for ever (NS_ERROR_REDIRECT_LOOP) | /dupcl  a 200 with two Content-Length
+                            headers that disagree (NS_ERROR_CORRUPTED_CONTENT): failures no wait fixes (review of Phase 4)
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
                             (/reset leaves the flags and counts of /expire and /swap alone)
 
@@ -116,6 +126,8 @@ import base64
 import hashlib
 import json
 import os
+import socket
+import struct
 import sys
 import tempfile
 import threading
@@ -138,6 +150,11 @@ EDGE = {'n': 0}
 FLAP = {'n': 0}
 # /tail: its bytes from here on change once flagged.
 TAIL = 65536
+# /net: per key, until when its connections are reset (/drop) and until when it answers 503 (/busy, with
+# its Retry-After).
+DROP = {}
+BUSY = {}
+SLOW = {}
 EXPIRED_PAGE = ('<!doctype html><meta charset=utf-8><title>Sign in</title><main style="padding:120px 80px;font:16px Segoe UI">'
                 '<h1>This link has expired</h1><p>Sign in to download the file again.</p></main>')
 EXPIRED_XML = ('<?xml version="1.0" encoding="UTF-8"?>\n<Error><Code>AccessDenied</Code><Message>Request has expired</Message>'
@@ -327,6 +344,40 @@ class Handler(BaseHTTPRequestHandler):
             if q.get('f'):
                 out['sha256'] = self.digest(fixture(q['f']), 'tail' if q.get('tail') == '1' else 'swapped')
             return self.text(200, json.dumps(out), 'application/json')
+        if p == '/drop':
+            key = q.get('k', '')
+            with LOCK:
+                DROP[key] = time.time() + float(q.get('for', '60'))
+            return self.text(200, json.dumps({'drop': key, 'until': DROP[key]}), 'application/json')
+        if p == '/busy':
+            key = q.get('k', '')
+            with LOCK:
+                BUSY[key] = (time.time() + float(q.get('for', '90')), q.get('ra', ''))
+            return self.text(200, json.dumps({'busy': key, 'until': BUSY[key][0]}), 'application/json')
+        if p == '/slow':
+            key = q.get('k', '')
+            with LOCK:
+                SLOW[key] = (time.time() + float(q.get('for', '10')), float(q.get('ms', '1500')) / 1000)
+            return self.text(200, json.dumps({'slow': key, 'until': SLOW[key][0]}), 'application/json')
+        if p.startswith('/net/'):
+            return self.net(p[len('/net/'):], q, rate)
+        if p.startswith('/loop/'):
+            self.record(status=302)
+            self.send_response(302)
+            self.send_header('Location', '/loop/b' if p == '/loop/a' else '/loop/a')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        if p == '/dupcl':
+            self.record(status=200)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', '4096')
+            self.send_header('Content-Length', '9999')
+            self.end_headers()
+            self.wfile.write(b'x' * 4096)
+            self.close_connection = True
+            return
         if p == '/expired-page.html':
             self.record(status=200)
             return self.text(200, EXPIRED_PAGE)
@@ -917,9 +968,43 @@ class Handler(BaseHTTPRequestHandler):
             entry['sent'] = sent
             entry['secs'] = round(time.time() - t0, 3)
 
-    def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0):
+    def dropping(self, key):
+        with LOCK:
+            return time.time() < DROP.get(key, 0)
+
+    def reset(self):
+        """The connection goes away with a reset (an RST: SO_LINGER 0) and no answer, as when the network
+        drops: the socket is really closed once the handler's files are (finish())."""
+        self.close_connection = True
+        try:
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+            self.connection.close()
+        except OSError:
+            pass
+
+    def net(self, name, q, rate):
+        """/net/<f>: <f> while its network is there (see the docstring)."""
+        path = fixture(name)
+        if not path:
+            return self.text(404, 'not found')
+        key = q.get('k', '')
+        if self.dropping(key):
+            self.record(status=0, dropped=True)
+            return self.reset()
+        with LOCK:
+            busy = BUSY.get(key)
+            slow = SLOW.get(key)
+        if slow and time.time() < slow[0]:
+            time.sleep(slow[1])
+        if busy and time.time() < busy[0]:
+            self.record(status=503)
+            return self.text(503, 'busy', 'text/plain; charset=utf-8', headers=[('Retry-After', busy[1])] if busy[1] else ())
+        return self.send_file(path, rate, cut=lambda: self.dropping(key))
+
+    def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0, cut=None):
         """`path` with Range and If-Range (ETag size-mtime); with `until` (a time), a transfer still running
-        then is cut: the connection closes, as a signed address that expired mid-transfer."""
+        then is cut: the connection closes, as a signed address that expired mid-transfer. With `cut` (a
+        function), a transfer still running when it says so is reset (/net's /drop)."""
         size = os.path.getsize(path)
         etag = '"%x-%x"' % (size, int(os.path.getmtime(path)))
         start, end, status = 0, size - 1, 200
@@ -963,6 +1048,10 @@ class Handler(BaseHTTPRequestHandler):
                     if until and time.time() >= until:
                         entry['cut'] = True
                         self.close_connection = True
+                        break
+                    if cut and cut():
+                        entry['dropped'] = True
+                        self.reset()
                         break
                     b = f.read(min(chunk, length - sent))
                     if not b:
