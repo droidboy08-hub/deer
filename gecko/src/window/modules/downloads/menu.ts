@@ -233,7 +233,8 @@ function fallbackMenu(b: Browser, label: string, entries: MenuEntry[], place: Pl
   });
   // Context loss (blur, resize) closes the menu; the listeners go with it.
   window.addEventListener('blur', () => close('dismiss'), { signal: lost.signal });
-  window.addEventListener('resize', () => close('dismiss'), { signal: lost.signal });
+  // The window's own resize only (an in-process page's resize reaches the window too).
+  window.addEventListener('resize', (e) => e.target === window && close('dismiss'), { signal: lost.signal });
   if (opts.keyboard) {
     const first = items.findIndex((it) => !it.disabled);
     select(first >= 0 ? first : 0);

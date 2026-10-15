@@ -561,7 +561,11 @@ export function install(b: Browser): void {
   const instant = (): void => {
     if (view.isOpen) view.close('instant');
   };
-  window.addEventListener('resize', instant);
+  // Only the window's own resize: a page in an in-process browser (Home preloaded for the next new
+  // tab) sends its resize up through the chrome window, and the menu must not close for that.
+  window.addEventListener('resize', (e) => {
+    if (e.target === window) instant();
+  });
   window.addEventListener('deactivate', () => {
     if (view.closeOnBlur) instant();
   });
