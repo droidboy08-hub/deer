@@ -636,6 +636,8 @@ export class VideoUI {
       dashAudio: opt.dashAudio || undefined,
       ytdlpFormat: opt.ytdlpFormat || undefined,
       ytdlpExt: opt.ytdlpExt || undefined,
+      // RESUME-DESIGN.md 5.4 (Phase 8): the chosen formats as yt-dlp reported them, what a resume compares.
+      ytdlpFormats: opt.ytdlpFormats?.length ? opt.ytdlpFormats : undefined,
       audioOnly: opt.group === 'audio',
       quality: opt.label,
       bytes: opt.bytes || undefined,

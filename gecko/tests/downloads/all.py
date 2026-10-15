@@ -5,7 +5,20 @@
   restart    a download paused by a restart (the quit prompt confirmed) resumes from its segments; a paused
              download whose record is dirty with no seal and 3 MiB of zeros under its claims (what a power
              loss leaves): the zeros are found and fetched again (Phase 5)
-  ytdlp      YouTube and other sites through yt-dlp (a stand-in script): install prompt, picker, download, errors
+  ytdlp      YouTube and other sites through yt-dlp (a stand-in script): install prompt, picker, download, errors;
+             resuming (spikes/downloader/RESUME-DESIGN.md, Phase 8, on local pages): the picker's formats are recorded;
+             an unchanged resume asks yt-dlp again and continues the same format (--continue); a format that is gone
+             is re-picked by height, ext and kind and started over by itself (at most 1 MiB saved) or asked about
+             ("this quality is no longer offered"), the old parts kept aside until the new file is complete; another
+             filesize is File changed with the old parts kept; one format saved as the file itself is never
+             continued over another version; a refused download is Link expired, Retry and the schedule ask yt-dlp
+             again; the pill's Continue with another quality is File changed and Start over gets it; a page media file is renewed from yt-dlp's formats of its page before the page step (never for a
+             private one or a file that is not media); no cookie options are ever passed. From the review of Phase 8:
+             a format yt-dlp only estimates is compared by its estimate, bitrate and length (nothing to compare: asked
+             above 1 MiB); a refused check asks yt-dlp once; Cancel removes only the row's own parts; -J runs out of
+             sight are shared per page and two at a time, G1 step 2 six per site an hour; a selection the row's file
+             type can't hold (and the pill's other kind) is saved as a type that holds it; a gone sound is named as
+             the sound and follows the 1 MiB rule
   spa        a single-page site's next video (no reload): the old video's streams go, the new one is offered
   mark       the pill's download mark always answers: a picker for what the page loaded, or a note
   embed      an embedded player from another site whose CDN refuses any Referer but the player's:
@@ -165,7 +178,7 @@ TESTS = {
     'mark': (150, True),
     'embed': (150, True),
     'spa': (150, True),
-    'ytdlp': (240, True),
+    'ytdlp': (480, True),
     'streams': (240, True),
     'noffmpeg': (150, False),
     'faults': (200, True),

@@ -386,7 +386,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 to 7 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 8 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -615,6 +615,38 @@ local look-alike type, so a contract change fails `tsc`.
   opened from another since the last switch, close or move) the page is parked on about:blank, out of sight, until
   the next TabSelect, TabClose or TabMove, so a step never changes where the next Ctrl+clicked link opens; a row
   that asks for its page and was armed by Open page reads Waiting for link (Stop waiting).
+  yt-dlp (Phase 8, 2.7, 5.4, G1 step 2; `downloads/ytdlp.ts`): a yt-dlp row records its chosen formats when it starts
+  (`YtdlpState.formats`: id, height, fps, ext, audioOnly, filesize, bitrate per format of '137+140', from the picker's
+  -J run through `VideoOption.ytdlpFormats`; its first run downloads at once, as before). Every later run (Resume,
+  Retry, a restart's) asks yt-dlp again (`extract()`, -J as probe() runs it, never with cookies) before it continues
+  (Checking; `checkYtdlp()`): the same format id with the same reported filesize continues with --continue; a format
+  yt-dlp only estimates (no filesize: YouTube's HLS formats) is compared by its estimate (filesize_approx), bitrate and
+  the video's length (more than 1 s), recorded at the start too; one with nothing to compare is R7 (a fresh start
+  under 1 MiB saved, "Deer can't confirm it is the same file" above); a row from before Phase 8 has no record and
+  continues, as before, its record made then; another filesize is another file; a format id that is gone is re-picked by its kind (sound alone, picture alone,
+  both), ext and height, then the same fps and the nearest bitrate (`judge()`). What can't be continued (its files,
+  `partsOf()` over `ytdlpParts()`: "<stem>.f<id>.<ext>[.part]" for joined formats, "<name>.part" for one) starts again
+  by itself when at most 1 MiB of it is saved (at most twice in ten minutes), set aside as "<name>.old.part" (the names
+  saved, flushed, first) and removed once the new file is complete; otherwise File changed ("was 3.1 MB, now 2.7 MB",
+  "this quality is no longer offered"; a quality offered only in another ext or height always asks, saying what Start
+  over gets), its parts untouched and no Keep partial; Start over (`startOverYtdlp()`) sets those parts aside and
+  takes the formats the check found (what yt-dlp said within a minute is read again, not asked: `ytdlpSaid`). A
+  download yt-dlp is refused (HTTP Error 401/403/404/410/451: `YtdlpRefusedError`, yt-dlp's own sentence) with saved
+  parts is Link expired (Retry); its attempts (at once when the run had not just asked yt-dlp, then 2 min, 15 min, 1 h,
+  6 h; `ytdlpEpisode()`, Renewing link) ask yt-dlp again, which signs its addresses itself: the same formats queue the
+  row. The pill's Continue on a yt-dlp row resumes it for the same quality (its run re-picks) and makes it File changed
+  for another ("1080p is no longer offered"; Start over gets it, a format the two share continuing). A page media file (picked as a video, or a video or a song by its name or type, from a page that is not
+  the media itself) whose address expired is renewed from yt-dlp's formats of its page after its original address and
+  before the page step (`formatsOf()`, `ytdlpStep()`: https formats whose filesize is the file's, each proven; attach
+  'ytdlp', the row's own address kept, "New link found through yt-dlp"); never for a private download.
+  From the review of Phase 8: yt-dlp's -J of a page is shared (`extract()`: callers of one page join the run under
+  way; the steps out of sight read its answer for a minute and start at most two runs at once, holding no download
+  slot); G1 step 2 runs at most six times per site per hour (`ytdlpSites`, as the page step's decision 6), skipped
+  beyond; a selection the row's file type can't hold (H.264 for a WEBM row, a picture for a sound row: `containerFor()`)
+  always asks and its Start over renames the file for the type that holds it; a sound that is gone in a row with a
+  picture is named as the sound and follows the 1 MiB rule unless the file type can't hold its replacement; Cancel
+  removes only the row's own parts (`ownParts()`), never another row's of the same video; a check yt-dlp refuses is
+  the attempt at the failure (one -J, then the schedule).
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
   ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair, stream-expiry, resolve; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),

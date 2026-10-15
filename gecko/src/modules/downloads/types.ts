@@ -298,6 +298,8 @@ export interface StartOptions {
   /** yt-dlp: the format ('137+140') and the file's extension; the address is the page's. */
   ytdlpFormat?: string;
   ytdlpExt?: string;
+  /** yt-dlp: each chosen format as the picker's yt-dlp run reported it (RESUME-DESIGN.md 5.4, Phase 8), recorded at the start. */
+  ytdlpFormats?: YtdlpFormat[];
   /** HLS: the media playlist that was chosen, and a separate audio rendition when the stream has one. */
   variantUrl?: string;
   audioUrl?: string;
@@ -378,8 +380,38 @@ export interface VideoOption {
   /** yt-dlp: the format to ask for ('137+140') and the file's extension. */
   ytdlpFormat: string;
   ytdlpExt: string;
+  /** yt-dlp: each format of ytdlpFormat as yt-dlp reported it (RESUME-DESIGN.md 5.4, Phase 8), passed to the download. */
+  ytdlpFormats?: YtdlpFormat[];
   /** Streams: the quality's fingerprint (RESUME-DESIGN.md 5.3), passed to the download (StartOptions.rung). */
   rung?: StreamRung;
+}
+
+/**
+ * One yt-dlp format of a download as it was chosen (RESUME-DESIGN.md 5.4 YtdlpState: height, fps, filesize; Phase
+ * 8, downloads/ytdlp.ts formatOf()): yt-dlp's format_id, its height, fps and ext, whether it is sound alone
+ * (`audioOnly`) and whether it carries picture (`video`) and sound (`audio`), the exact size yt-dlp reported (0
+ * when it gave only an estimate) and its bitrate in kbit/s (abr for sound alone). A resume compares the filesize of
+ * the same id (2.7) and re-picks a format that is gone by its kind, ext and height, then the nearest bitrate.
+ * Review of Phase 8 (optional: records made before lack them): yt-dlp's estimate (`approx`, filesize_approx) and the
+ * video's length in s (`duration`), which a format with no exact size is compared by; its codecs (`vcodec`,
+ * `acodec`: '' for none), which tell the file types that can hold it; `guessed`: told from an older row's format
+ * string, never reported (compared by nothing).
+ */
+export interface YtdlpFormat {
+  id: string;
+  ext: string;
+  height: number;
+  fps: number;
+  audioOnly: boolean;
+  video: boolean;
+  audio: boolean;
+  filesize: number;
+  tbr: number;
+  approx?: number;
+  duration?: number;
+  vcodec?: string;
+  acodec?: string;
+  guessed?: boolean;
 }
 
 /**

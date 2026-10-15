@@ -55,7 +55,7 @@ TESTS = {
     'crosssite': (BUILDER, 120, True),
     'mark': (BUILDER, 150, True),
     'spa': (BUILDER, 150, True),
-    'ytdlp': (BUILDER, 240, True),
+    'ytdlp': (BUILDER, 480, True),
     'streams': (BUILDER, 240, True),
     'noffmpeg': (BUILDER, 150, False),
     'faults': (BUILDER, 200, True),

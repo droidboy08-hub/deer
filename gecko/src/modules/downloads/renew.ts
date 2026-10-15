@@ -107,9 +107,11 @@ export async function originalAddress(sub: Subject, list: string[], signal: Abor
  * another address…), 'page' (started again on its page: a click, Alt+click, the 'downloads' service;
  * Phase 3), 'link' (started again from an address with no page: Add link, Download copied link),
  * 'background' (found on its page opened out of sight: the page step, RESUME-DESIGN.md G1 step 3, Phase 7;
- * an automatic attempt, which the schedule counts like 'original').
+ * an automatic attempt, which the schedule counts like 'original'), 'ytdlp' (a page media file's address found
+ * among yt-dlp's formats of its page: G1 step 2, Phase 8; automatic as 'original', and like it the row's own
+ * address stays: yt-dlp's are signed for a while only).
  */
-export type AttachHow = 'original' | 'pasted' | 'page' | 'link' | 'background';
+export type AttachHow = 'original' | 'pasted' | 'page' | 'link' | 'background' | 'ytdlp';
 
 /**
  * A proven address becomes the download's (RESUME-DESIGN.md 5.2 address, G1 attach): the one it
@@ -120,7 +122,7 @@ export type AttachHow = 'original' | 'pasted' | 'page' | 'link' | 'background';
 export function adopt(s: FileState, found: Found, how: AttachHow, now = Date.now()): void {
   const prev = s.address ?? { obtainedAt: 0, expiresAt: 0, how: 'first', history: [] };
   const history = [{ url: s.url, finalUrl: s.finalUrl, at: prev.obtainedAt, how: prev.how }, ...prev.history].slice(0, HISTORY);
-  if (how !== 'original') s.url = found.url;
+  if (how !== 'original' && how !== 'ytdlp') s.url = found.url;
   s.finalUrl = found.finalUrl;
   s.chain = found.chain.slice(0, CHAIN);
   s.etag = found.etag;

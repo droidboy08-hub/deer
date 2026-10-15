@@ -176,6 +176,24 @@
 //     the real file over other bytes is File changed (another file of the same name may be listed first); every
 //     frame of the hidden tab is claimed as it attaches; the hidden page gets no saved logins; a window closing
 //     ends its step at once.
+//   - yt-dlp (RESUME-DESIGN.md 2.7, 5.4, G1 step 2; Phase 8; downloads/ytdlp.ts). A yt-dlp row records its chosen
+//     formats when it starts (height, fps, ext, audioOnly, filesize, from the picker); every later run asks yt-dlp
+//     again (-J, no cookies) before it continues (checkYtdlp(), Checking): the same format id with the same
+//     reported filesize continues with --continue; another filesize is another file, and a format that is gone is
+//     picked again by its kind, ext and height, then the nearest bitrate. What can't be continued starts again by
+//     itself with at most 1 MiB of it saved (its parts set aside), otherwise the row is File changed ("this quality
+//     is no longer offered" for a gone format), with no Keep partial; Start over sets those parts aside as
+//     "<name>.old.part", removed once the new file is complete. A refused download (HTTP Error 403...) with saved
+//     parts is Link expired, whose attempts of the schedule and Retry ask yt-dlp again (ytdlpEpisode(): yt-dlp
+//     signs its addresses again itself). A page media file whose address expired is renewed from yt-dlp's formats of
+//     its page (https, the file's exact filesize, each proven: ytdlpStep()), after its original address and before
+//     the page step; never for a private download.
+//     Review of Phase 8: a format yt-dlp only estimates (YouTube's HLS formats) is compared by its estimate, bitrate
+//     and the video's length (nothing to compare at all: R7, asked above 1 MiB saved); yt-dlp's -J of a page is
+//     shared by the rows of that page (ytdlp.ts extract()) and the steps out of sight run it two at a time, G1 step 2
+//     at most PER_SITE times per site per hour (ytdlpSites); a re-pick the row's file type can't hold, or the pill's
+//     quality of the other kind, renames the file for the type that holds it (setAsideYtdlp()); Cancel removes only
+//     the row's own parts (never another row's of the same video); a refused check is the attempt at the failure.
 //   - Private downloads are never written to disk lists and are dropped when the last private
 //     window closes (last-pb-context-exited), as Firefox does. Closing the last private window
 //     while one runs asks first (last-pb-context-exiting), and a quit cancels them (the prompt says so).
@@ -224,7 +242,10 @@ import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type T
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
 import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageJob, PageResolver, PageSeen, PageTarget, RefreshResult, RenewWithResult, StartOptions, StreamRung, VideoOption, WaitFor } from './downloads/types';
 import { CONTINUE_AFTER, FRESH_AFTER, SERVER_GIVE_UP, SLEEP_FALLBACK, SOON, WAKE_SETTLE, rewindTails, waitNext } from './downloads/waits';
-import { YtdlpTransfer, cancelToolsInstall, installTools, manifestFor, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
+import {
+  YtdlpTransfer, cancelToolsInstall, containerFor, extract, forgetHeard, formatsOf, installTools, judge, manifestFor, oldToolsDir, onToolsInstall, ownParts, partsOf, recorded, toolsDir, toolsInstallState,
+  toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpChoice, type YtdlpInfo, type YtdlpJudged, type YtdlpState,
+} from './downloads/ytdlp';
 
 declare global {
   interface VitreSysModules {
@@ -253,6 +274,8 @@ const FAST_LOOK = 1000;
 const FAST_WAIT = 5 * 60 * 1000;
 /** Link-up or wake does not bring an exhausted Link expired schedule's attempt within this long of the last one (G4). */
 const RENEW_ON_LINK = 10 * 60 * 1000;
+/** A yt-dlp row's run, or Start over, reads what yt-dlp -J said this recently instead of asking again (Phase 8). */
+const YTDLP_FRESH = 60 * 1000;
 const ACTIVE: DownloadState[] = ['starting', 'queued', 'downloading'];
 const FINISHED: DownloadState[] = ['completed', 'cancelled', 'failed'];
 const ORDER: Record<DownloadState, number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
@@ -448,7 +471,7 @@ type WaitState = { for: WaitFor; since: number; nextAt: number; tries: number; s
  * (RESUME-DESIGN.md 5.1). `identity`: the download was started again on its page (Phase 3), whose
  * requests (its page, cookies, container) Start over makes.
  */
-type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string; identity?: IdentityJSON; stream?: StreamCandidate };
+type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string; identity?: IdentityJSON; stream?: StreamCandidate; ytdlp?: YtdlpChoice };
 
 /**
  * A stream's other version for Start over (RESUME-DESIGN.md G2, Phase 6): the quality the person picked on
@@ -700,6 +723,21 @@ class Manager {
   /** Stream rows whose page step was put off by the per-site limit (when it may run), or saw a sign-in page (streamEpisode()). */
   private pageLater = new Map<string, number>();
   private pageSignIn = new Set<string>();
+  /**
+   * yt-dlp rows started from the picker with their formats recorded (Phase 8, 5.4): their first run downloads at
+   * once, as before; every later run asks yt-dlp again first (checkYtdlp()). In memory: a restart checks.
+   */
+  private ytdlpFresh = new Set<string>();
+  /**
+   * What yt-dlp's -J said for a row a moment ago (an attempt of the schedule, a check that asked the person):
+   * the run it queues, or Start over right after, reads it instead of asking again within YTDLP_FRESH.
+   */
+  private ytdlpSaid = new Map<string, { at: number; info: YtdlpInfo }>();
+  /**
+   * Review of Phase 8: at most PER_SITE yt-dlp runs per site per hour for G1 step 2 (ytdlpStep()), as for the page
+   * step (decision 6): yt-dlp loads the site's page from the person's address too. Tests may clear() it.
+   */
+  readonly ytdlpSites = new Budget();
   private firefoxList: any = null;
   private storePath = '';
   /** Firefox's own download folder: Deer's scratch (see the header). */
@@ -859,8 +897,9 @@ class Manager {
       // sleep wait (G4), which always continues after a restart: one a quit caught in a run it had started,
       // or between its tries, is due at the start, and so is a sleep's (the computer is awake now).
       if (r.wait) {
-        // A stream's Link expired has its schedule too (Phase 6: the stream renewal steps, streamEpisode()).
-        const renewable = (r.mode === 'file' && !!r.file) || (r.mode === 'stream' && !!r.stream);
+        // A stream's Link expired has its schedule too (Phase 6: the stream renewal steps, streamEpisode()), and a
+        // yt-dlp row's (Phase 8: yt-dlp asked again, ytdlpEpisode()).
+        const renewable = (r.mode === 'file' && !!r.file) || (r.mode === 'stream' && !!r.stream) || (r.mode === 'ytdlp' && !!r.ytdlp);
         if (r.state !== 'paused' || (r.wait.for === 'address' ? !renewable : r.mode === 'browser')) r.wait = undefined;
         else if (r.wait.for !== 'address' && (!r.wait.nextAt || r.wait.for === 'sleep')) r.wait = { ...r.wait, nextAt: now };
       }
@@ -1049,6 +1088,13 @@ class Manager {
       rec.mode = 'ytdlp';
       const ext = (opts.ytdlpExt || 'mp4').replace(/[^\w]/g, '') || 'mp4';
       rec.ytdlp = { pageUrl: url, format: opts.ytdlpFormat, ext, audioOnly: !!opts.audioOnly, expected: Number(opts.bytes) || 0 };
+      // RESUME-DESIGN.md 5.4 (Phase 8): the chosen formats as the picker's yt-dlp run reported them; the first run
+      // then downloads at once, as before (a start without them asks yt-dlp first: checkYtdlp()).
+      const chosen = (opts.ytdlpFormats ?? []).filter((f) => f && typeof f.id === 'string');
+      if (chosen.length && chosen.map((f) => f.id).join('+') === opts.ytdlpFormat) {
+        rec.ytdlp.formats = chosen.map((f) => ({ ...f }));
+        this.ytdlpFresh.add(rec.id);
+      }
       if (!opts.named) rec.filename = sanitize(`${rec.title || 'video'}.${ext}`);
       // RESUME-DESIGN.md G2: yt-dlp keeps its own stable key, 'ytdlp|<webpage_url>' (the offer's key).
       rec.streamKey = opts.streamKey || (opts.videoKey?.startsWith('ytdlp|') ? opts.videoKey : `ytdlp|${url}`);
@@ -1821,16 +1867,17 @@ class Manager {
   /**
    * What a stream transfer needs from its download: the file's env, ffmpeg, and yt-dlp's manifest when it is
    * installed (G2 step 3). Never for a private download (review of Phase 6): yt-dlp would ask the site from
-   * outside the private session, on the automatic schedule too.
+   * outside the private session, on the automatic schedule too. `background` (review of Phase 8): the attempt of
+   * the schedule (streamEpisode()), whose yt-dlp waits its turn like the other steps out of sight (ytdlp.ts extract()).
    */
-  private streamEnv(rec: Rec, run?: Run): StreamEnv {
+  private streamEnv(rec: Rec, run?: Run, background = false): StreamEnv {
     const page = rec.identity.pageUrl;
     return {
       ...this.env(rec, run ?? null),
       ffmpeg: () => this.ffmpeg(),
       ...(rec.identity.isPrivate
         ? {}
-        : { ytdlpManifest: (rung: StreamRung | undefined, audioOnly: boolean, signal: AbortSignal) => (page && /^https?:/i.test(page) && ytdlpTools() ? manifestFor(page, rung ?? rungFromQuality(rec.quality), audioOnly, signal) : Promise.resolve(null)) }),
+        : { ytdlpManifest: (rung: StreamRung | undefined, audioOnly: boolean, signal: AbortSignal) => (page && /^https?:/i.test(page) && ytdlpTools() ? manifestFor(page, rung ?? rungFromQuality(rec.quality), audioOnly, signal, background) : Promise.resolve(null)) }),
     };
   }
 
@@ -1861,12 +1908,29 @@ class Manager {
   private async runYtdlp(rec: Rec, run: Run): Promise<void> {
     if (!rec.ytdlp) throw new DownloadError('This download lost its video details.');
     const env = this.env(rec, run);
+    // A run with saved parts shows them while its check runs, and its counts go on from them (Phase 8).
     const transfer = new YtdlpTransfer(rec.ytdlp, { onBytes: env.onBytes, ffmpeg: () => this.ffmpeg(), connections: env.connections });
+    transfer.received = rec.received;
+    // A File changed row is only checked again here, never started over (RESUME-DESIGN.md 3 G3).
+    transfer.silentRestarts = rec.need?.kind !== 'choice';
     run.transfer = transfer;
     if (!rec.path) {
       if (!(await this.confirmPath(rec))) throw new SaveDeclined();
       await this.reserve(rec);
     }
+    // RESUME-DESIGN.md 2.7 (Phase 8): every run but the first of a start from the picker asks yt-dlp again and
+    // compares before it continues (Checking); what it found may change the formats asked for (checkYtdlp()).
+    if (!this.ytdlpFresh.delete(rec.id)) {
+      this.setPhase(run, savedBytes(rec) > 0 ? 'checking' : 'probing');
+      this.touch(rec);
+      await this.checkYtdlp(rec, run, transfer);
+      run.phase = '';
+    }
+    // yt-dlp answered for the same video: the row no longer needs the person or waits.
+    rec.need = undefined;
+    rec.wait = undefined;
+    rec.trying = undefined;
+    rec.catcher = undefined;
     this.touch(rec);
     this.save(true);
     const merging = setInterval(() => {
@@ -1881,6 +1945,289 @@ class Manager {
       clearInterval(merging);
     }
     rec.total = transfer.received || rec.total;
+  }
+
+  /**
+   * A yt-dlp row's check before it continues (RESUME-DESIGN.md 2.7, 3 G3; Phase 8). yt-dlp is asked again (-J, as
+   * probe() asks it, no cookies; what it said a moment ago for an attempt of the schedule stands in: ytdlpFormats())
+   * and judge() compares the formats recorded at the start: the same id with the same reported filesize continues
+   * with --continue (the record takes a size yt-dlp only reports now). What can't be continued (another filesize:
+   * another file; a gone format's replacement by kind, ext and height) starts again by itself when at most
+   * ASK_ABOVE of it is saved, at most twice in ten minutes (the owner's decision 1), its parts set aside as
+   * "<name>.old.part" until the new file is complete (decision 2); otherwise ChangedError: File changed, the parts
+   * untouched and the new version kept for Start over (transfer.candidate). A quality offered only in another ext or
+   * height, and a row that already asks, always ask. Keep partial is never offered (view(): no `keep`).
+   * Review of Phase 8: a format yt-dlp only estimates is compared by its estimate, bitrate and the video's length, and
+   * one with nothing to compare is R7 (the same 1 MiB rule, then "Deer can’t confirm it is the same file"); a
+   * selection the row's file type can't hold always asks, and its Start over renames the file (setAsideYtdlp()).
+   */
+  private async checkYtdlp(rec: Rec, run: Run, t: YtdlpTransfer): Promise<void> {
+    const y = rec.ytdlp as YtdlpState;
+    // Asked before yt-dlp answers (review of Phase 8): a check yt-dlp refuses is the attempt at the failure too, so
+    // stopped() plans the schedule's next instead of asking again at once.
+    t.checked = true;
+    const info = await this.ytdlpFormats(rec, run.ac.signal);
+    const ids = y.format.split('+').filter(Boolean);
+    const saved = await this.ytdlpPartsOf(rec, ids);
+    // What the parts hold now is what this run continues from (yt-dlp's own counts take over as it goes).
+    t.received = saved.bytes;
+    const j = judge(recorded(y, rec.quality), y, info);
+    if (!j.drop.length) {
+      y.formats = j.formats;
+      return;
+    }
+    const stake = await this.ytdlpPartsOf(rec, j.drop);
+    if (!j.none && !j.other && t.silentRestarts) {
+      // Nothing of what can't be continued is saved: no restart is counted.
+      const log = stake.bytes > 0 ? silentRestart(y.silent, stake.bytes) : (y.silent ?? []);
+      if (log && (await this.setAsideYtdlp(rec, j, stake.files))) {
+        if (stake.bytes > 0) y.silent = log;
+        // A history line when saved parts were set aside (RESUME-DESIGN.md 6); with none, nothing was started over.
+        if (stake.files.length) this.event(rec, ytdlpRestarted(j));
+        t.received = Math.max(0, saved.bytes - stake.bytes);
+        rec.received = t.received;
+        return;
+      }
+    }
+    // File changed: the version found is kept for Start over, and what yt-dlp said with it (Start over reads it).
+    t.candidate = j.none ? undefined : choiceOf(j);
+    this.ytdlpSaid.set(rec.id, { at: Date.now(), info });
+    throw new ChangedError(j.evidence || UNSURE);
+  }
+
+  /**
+   * What yt-dlp -J says of a yt-dlp row's page now (Phase 8): what it said within YTDLP_FRESH (used once), else asked
+   * again; a run under way for the page (another row's) is joined (review of Phase 8: ytdlp.ts extract()).
+   */
+  private async ytdlpFormats(rec: Rec, signal: AbortSignal): Promise<YtdlpInfo> {
+    const said = this.ytdlpSaid.get(rec.id);
+    this.ytdlpSaid.delete(rec.id);
+    const now = Date.now();
+    if (said && now - said.at < YTDLP_FRESH && said.at <= now) return said.info;
+    return extract((rec.ytdlp as YtdlpState).pageUrl, signal);
+  }
+
+  /** Tests (review of Phase 8): forget what yt-dlp said of every page, so a section sees a step ask itself. */
+  forgetYtdlpAnswers(): void {
+    forgetHeard();
+    this.ytdlpSaid.clear();
+  }
+
+  /** A yt-dlp row's saved files of formats `ids` (ytdlp.ts partsOf(), as its current selection names them) and their bytes (yt-dlp's notes not counted). */
+  private async ytdlpPartsOf(rec: Rec, ids: string[]): Promise<{ files: string[]; bytes: number }> {
+    const y = rec.ytdlp;
+    if (!y || !rec.path || !ids.length) return { files: [], bytes: 0 };
+    const all = await ytdlpParts(rec.path);
+    const joined = y.format.includes('+');
+    const files = [...new Set(ids.flatMap((id) => partsOf(all, rec.path, id, joined)))];
+    let bytes = 0;
+    for (const f of files) if (!/\.ytdl$/i.test(f)) bytes += Math.max(0, await sizeOf(f));
+    return { files, bytes };
+  }
+
+  /**
+   * The formats a yt-dlp row can't continue are set aside, and it asks for `choice` from then on (Phase 8; the
+   * owner's decision 2): each of their files (`files`) moves to "<name>.old.part" ("<name>.old (n).part" when that
+   * name is another file: oldPartFor()), the names reaching the store (flushed) before anything moves. They go once
+   * the new file is complete (complete(): dropOldParts()) or with the row (removeParts()). False, with nothing moved
+   * and the formats as they were, when a file can't be moved (another program has it open). The state object is
+   * changed in place: it is the running transfer's.
+   * Review of Phase 8: a choice saved as another file type (`ext`: containerFor(), the pill's quality of the other
+   * kind, a re-pick the row's type can't hold) renames the row's file for it: "<stem>.<ext>", or the next free name;
+   * yt-dlp names each format's parts by the stem, so with another stem every part is set aside.
+   */
+  private async setAsideYtdlp(rec: Rec, choice: { format: string; formats?: YtdlpState['formats']; ext?: string; audioOnly?: boolean }, files: string[]): Promise<boolean> {
+    const y = rec.ytdlp;
+    if (!y) return false;
+    const ext = (choice.ext ?? '').replace(/[^\w]/g, '') || y.ext;
+    let path = rec.path;
+    if (ext.toLowerCase() !== y.ext.toLowerCase()) {
+      const dir = PathUtils.parent(rec.path) ?? rec.dir;
+      path = uniquePath(dir, `${PathUtils.filename(rec.path).replace(/\.[^.]*$/, '')}.${ext}`, (p) => this.taken(p, rec.id));
+      if (stem(path) !== stem(rec.path)) files = [...new Set([...files, ...(await this.ytdlpPartsOf(rec, y.format.split('+').filter(Boolean))).files])];
+    }
+    const moves: Array<[string, string]> = [];
+    for (const p of files) moves.push([p, this.oldPartFor(rec, /\.part$/i.test(p) ? p : `${p}.part`, moves.map(([, old]) => old))]);
+    rec.oldParts = [...new Set([...(rec.oldParts ?? []), ...moves.map(([, old]) => old)])];
+    if (moves.length) await this.save(true);
+    const moved: Array<[string, string]> = [];
+    try {
+      for (const [p, old] of moves) {
+        // Only a part this row set aside before is replaced (oldPartFor never names another file).
+        if (existsSync(old)) fileFor(old).remove(false);
+        fileFor(p).moveTo(null, PathUtils.filename(old));
+        moved.push([p, old]);
+      }
+    } catch (e) {
+      console.warn('Deer downloads: the old parts could not be set aside; nothing was started over', String(e));
+      for (const [p, old] of moved.reverse()) {
+        try {
+          fileFor(old).moveTo(null, PathUtils.filename(p));
+        } catch {
+          /* it stays recorded and goes with the row */
+        }
+      }
+      const still = (rec.oldParts ?? []).filter((p) => existsSync(p));
+      rec.oldParts = still.length ? still : undefined;
+      await this.save(true);
+      return false;
+    }
+    y.format = choice.format;
+    y.formats = choice.formats;
+    y.ext = ext;
+    if (choice.audioOnly !== undefined) y.audioOnly = choice.audioOnly;
+    if (path !== rec.path) {
+      rec.path = path;
+      rec.filename = PathUtils.filename(path);
+    }
+    const sum = (choice.formats ?? []).reduce((n, f) => n + (f.filesize || 0), 0);
+    if (sum > 0) y.expected = sum;
+    await this.save(true);
+    return true;
+  }
+
+  /**
+   * One attempt of the schedule for a yt-dlp row that is Link expired (Phase 8: RESUME-DESIGN.md 3.0 "episode",
+   * 2.7), outside any run (Renewing link, no download slot): yt-dlp signs its addresses again itself, so the
+   * attempt is -J again and judge(). The same formats queue the row (what yt-dlp said is read by its run's check;
+   * counted like a failed attempt until the run saves a byte: renewTries); what can't be continued starts again by
+   * itself with at most ASK_ABOVE of it saved, or makes the row File changed; yt-dlp finding nothing counts the
+   * attempt and plans the next (renew.ts nextTry()). Review of Phase 8: a step out of sight, so its -J waits its
+   * turn (two at a time: ytdlp.ts extract()) and reads what yt-dlp said of the page within YTDLP_FRESH (the rows of
+   * one page ask once); Renewing link meanwhile.
+   */
+  private async ytdlpEpisode(rec: Rec): Promise<void> {
+    if (rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.deciding.has(rec.id) || this.quitting) return;
+    const y = rec.ytdlp;
+    if (!y || !rec.path) {
+      rec.wait = undefined;
+      return;
+    }
+    const ac = new AbortController();
+    this.renewing.set(rec.id, ac);
+    this.touch(rec);
+    let info: YtdlpInfo | null = null;
+    let err: unknown = null;
+    try {
+      info = await extract(y.pageUrl, ac.signal, { maxAge: YTDLP_FRESH, background: true });
+    } catch (e) {
+      err = e;
+      if (!ac.signal.aborted && !(e instanceof DownloadError)) console.warn('Deer downloads: asking yt-dlp again failed', String(e));
+    } finally {
+      if (this.renewing.get(rec.id) === ac) this.renewing.delete(rec.id);
+    }
+    // Retry, Cancel, Pause or a quit came first: theirs is the last word.
+    if (ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || !rec.wait || rec.ytdlp !== y) {
+      this.touch(rec);
+      this.armWaits();
+      return;
+    }
+    const now = Date.now();
+    if (info) {
+      const j = judge(recorded(y, rec.quality), y, info);
+      const stake = j.drop.length ? await this.ytdlpPartsOf(rec, j.drop) : { files: [], bytes: 0 };
+      if (!this.recs.includes(rec) || rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.deciding.has(rec.id)) return;
+      let queue = !j.drop.length;
+      if (!queue && !j.none && !j.other) {
+        const log = stake.bytes > 0 ? silentRestart(y.silent, stake.bytes) : (y.silent ?? []);
+        if (log) {
+          // Resume waits while the parts are set aside (resume(): deciding); Cancel or Remove meanwhile wins.
+          this.deciding.add(rec.id);
+          let aside = false;
+          try {
+            aside = await this.setAsideYtdlp(rec, j, stake.files);
+          } finally {
+            this.deciding.delete(rec.id);
+          }
+          // Pause (the wait ended), Cancel or Remove meanwhile: theirs is the last word.
+          if (!this.recs.includes(rec) || rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id)) return;
+          if (aside) {
+            if (stake.bytes > 0) y.silent = log;
+            if (stake.files.length) this.event(rec, ytdlpRestarted(j));
+            rec.received = Math.max(0, rec.received - stake.bytes);
+            queue = true;
+          }
+        }
+      }
+      if (queue) {
+        if (!j.drop.length) y.formats = j.formats;
+        // Its run reads what yt-dlp just said instead of asking again.
+        this.ytdlpSaid.set(rec.id, { at: now, info });
+        rec.renewTries = rec.wait.tries + 1;
+        rec.need = undefined;
+        rec.wait = undefined;
+        rec.error = '';
+        this.renewFailed.delete(rec.id);
+        rec.state = 'queued';
+        rec.queuedAt = queueStamp();
+        this.touch(rec);
+        this.save(true);
+        this.pump();
+        return;
+      }
+      this.ytdlpSaid.set(rec.id, { at: now, info });
+      rec.need = { kind: 'choice', since: now, evidence: j.evidence || UNSURE, candidate: j.none ? undefined : ytdlpCandidate(y, choiceOf(j)) };
+      rec.wait = undefined;
+      this.touch(rec);
+      this.save(true);
+      return;
+    }
+    this.renewFailed.set(rec.id, now);
+    const status = classify(err).status;
+    const tries = rec.wait.tries + 1;
+    rec.wait = { ...rec.wait, tries, nextAt: nextTry(tries, now), status: status || rec.wait.status, step: undefined };
+    if (status && rec.need) rec.need.status = status;
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /**
+   * RESUME-DESIGN.md G1 step 2 (Phase 8): yt-dlp may give a page media file's fresh address (ytdlpDue()). Its
+   * formats of the download's page (ytdlp.ts formatsOf(): https, the file's exact filesize; no cookies) are each
+   * proven against the saved bytes with the row's own identity (proof.ts proveAddress()): the first SAME is the
+   * address found. Another file of that size, a refusal or a page leads to the next; never File changed (a format
+   * of the same size nominates nothing more). Null when nothing was the file.
+   * Review of Phase 8: a step out of sight: its -J waits its turn and the files of one page share it (ytdlp.ts
+   * extract()); a run it starts counts in the site's budget (ytdlpSites: PER_SITE an hour, as the page step's,
+   * decision 6), and with the budget spent the step is skipped (the page step, with its own, comes next).
+   */
+  private async ytdlpStep(rec: Rec, signal: AbortSignal): Promise<Found | null> {
+    const s = rec.file;
+    if (!s || !this.ytdlpDue(rec)) return null;
+    const site = siteKey(rec.identity.pageUrl);
+    const mayRun = (): boolean => {
+      if (this.ytdlpSites.freeAt(site)) return false;
+      this.ytdlpSites.use(site);
+      return true;
+    };
+    const urls = await formatsOf(rec.identity.pageUrl, s.total, signal, mayRun);
+    if (!urls.length) return null;
+    const part = `${rec.path}.part`;
+    const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, part), saved: savedBytes(rec) };
+    for (const url of urls) {
+      if (signal.aborted) throw new AbortedError();
+      try {
+        const c = await proveAddress(ctx, part, s.segments, rec.id, url, signal);
+        if (c.verdict === 'same') return c.found;
+      } catch {
+        if (signal.aborted) throw new AbortedError();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Whether yt-dlp may look for a file row's address (RESUME-DESIGN.md G1 step 2, Phase 8): yt-dlp is installed, the
+   * row is a page media file (picked as a video, or a video or a song by its name or type, whose page is a page and
+   * not the media itself) of known length with saved bytes, and it is not private: yt-dlp would ask the site from
+   * outside the private session (as for a stream's manifest, Phase 6), so private rows never use it.
+   */
+  private ytdlpDue(rec: Rec): boolean {
+    const page = rec.identity.pageUrl;
+    if (rec.mode !== 'file' || rec.identity.isPrivate || this.quitting || !rec.file?.probed || !rec.path || !(rec.file.total > 0)) return false;
+    if (!/^https?:\/\//i.test(page) || page === rec.url || MEDIA_URL.test(page)) return false;
+    const media = !!rec.videoKey || ['video', 'music'].includes(categoryOf(rec.filename, rec.mime || rec.file.contentType || ''));
+    return media && !!ytdlpTools();
   }
 
   /** Rename the finished .part into place; if something took the name meanwhile, take the next free one. */
@@ -2152,7 +2499,7 @@ class Manager {
       rec.state = 'paused';
       rec.wait = { for: 'sleep', since: now, tries: 0, nextAt: now + SLEEP_FALLBACK };
     } else if (run.reason === 'cancel' || (err instanceof AbortedError && !run.reason)) this.markCancelled(rec);
-    else if ((kind === 'refused' || kind === 'not-file') && (rec.mode === 'file' || rec.mode === 'stream') && savedBytes(rec) > 0) {
+    else if ((kind === 'refused' || kind === 'not-file') && (rec.mode === 'file' || rec.mode === 'stream' || rec.mode === 'ytdlp') && savedBytes(rec) > 0) {
       // RESUME-DESIGN.md 3.0: the address no longer gives the file, and the run's renewal hook found
       // no new one (the attempt at the failure). Nothing saved is lost: the row pauses as Link expired
       // and Retry tries the address again. A file row is also tried again by itself 2 min, 15 min, 1 h
@@ -2173,26 +2520,32 @@ class Manager {
         // the attempt at the failure (streamEpisode(), at once) unless the run's own check already ran them, or
         // the run was the one an attempt queued and saved nothing (attached: never an attempt and a run taking
         // turns for ever); then the schedule, as for a file. Inside a run only the same media playlist is read again.
-        const done = attached || (run.transfer instanceof StreamTransfer && run.transfer.renewTried);
+        // Phase 8: a yt-dlp row the same way, its attempt asking yt-dlp again (ytdlpEpisode()), unless the run's
+        // check just did.
+        const done = attached || (run.transfer instanceof StreamTransfer && run.transfer.renewTried) || (run.transfer instanceof YtdlpTransfer && run.transfer.checked);
         rec.wait = done ? { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status } : { for: 'address', since: now, tries: 0, nextAt: now, status };
       }
       // Phase 7 (RESUME-DESIGN.md 3.0 "at the failure", G1 step 3, G2 step 4): the attempt at the failure goes on
       // with the background page step at once (step 'page': the run already asked the cheaper steps), when it
       // applies to the row (the setting, a page, a window, not within its 30 minutes). Never for a run an attempt
-      // queued that saved nothing: its page step just ran. Otherwise the schedule is as before.
-      if (!attached && rec.wait.nextAt !== now && this.pageDue(rec, now)) rec.wait = { ...rec.wait, nextAt: now, step: 'page' };
+      // queued that saved nothing: its page step just ran. Otherwise the schedule is as before. Phase 8 (G1 step 2):
+      // the rest of that attempt begins with yt-dlp's formats of a page media file's page (ytdlpDue()), so it runs
+      // at once when either step applies.
+      if (!attached && rec.wait.nextAt !== now && (this.pageDue(rec, now) || this.ytdlpDue(rec))) rec.wait = { ...rec.wait, nextAt: now, step: 'page' };
     } else if (kind === 'changed' && rec.mode === 'stream' && run.transfer instanceof StreamTransfer && this.restartStream(rec, run.transfer)) {
       // A stream found changed inside its run (a proof beside the download, a playlist read again, a piece's
       // bytes) with at most 1 MiB saved starts again by itself, as one found at its check does (3 G3, the
       // owner's decision 1; review of Phase 6): restartStream() queued it.
-    } else if (kind === 'changed' && (rec.mode === 'file' || rec.mode === 'stream')) {
+    } else if (kind === 'changed' && (rec.mode === 'file' || rec.mode === 'stream' || rec.mode === 'ytdlp')) {
       // The file on the site is another one (3 G3): stop with the .part untouched and ask. A renewal
       // that found the other version keeps its address for Start over (need.candidate); so does the pill's
-      // Continue whose page gave another stream (its addresses were put back: hls.ts prepare()).
+      // Continue whose page gave another stream (its addresses were put back: hls.ts prepare()), and a yt-dlp
+      // row's check its formats (Phase 8).
       rec.state = 'paused';
       rec.error = '';
       const candidate = err instanceof ChangedError ? err.candidate : undefined;
-      rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: candidate ?? (run.transfer instanceof StreamTransfer ? this.streamCandidate(rec, run.transfer) : undefined) };
+      const other = run.transfer instanceof StreamTransfer ? this.streamCandidate(rec, run.transfer) : run.transfer instanceof YtdlpTransfer && run.transfer.candidate && rec.ytdlp ? ytdlpCandidate(rec.ytdlp, run.transfer.candidate) : undefined;
+      rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: candidate ?? other };
       rec.wait = undefined;
     } else if ((kind === 'offline' || kind === 'timeout' || kind === 'server') && (rec.mode === 'file' || rec.mode === 'stream') && this.waitAgain(rec, run, kind === 'server' ? 'server' : 'network', status, err)) {
       // RESUME-DESIGN.md G4: Waiting for network or Retrying; nothing is lost and Deer tries again by itself.
@@ -2294,9 +2647,19 @@ class Manager {
   private removeParts(rec: Rec): void {
     if (!rec.path || rec.mode === 'browser') return;
     if (rec.mode === 'ytdlp') {
-      ytdlpParts(rec.path).then((parts) => {
-        for (const p of parts) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+      // Review of Phase 8: only this row's own parts (ytdlp.ts ownParts(): its formats', its joining's), never another
+      // row's of the same video ("<stem>.f137.mp4.part" of its MP4 beside this M4A's "<stem>.m4a.part"): what another
+      // row of the same folder still working on its file claims stays (a finished one's parts are gone).
+      const path = rec.path;
+      const format = rec.ytdlp?.format ?? '';
+      const dir = (PathUtils.parent(path) ?? '').toLowerCase();
+      const others = this.recs.filter((r) => r !== rec && r.mode === 'ytdlp' && !!r.ytdlp && !!r.path && r.state !== 'completed' && (PathUtils.parent(r.path) ?? '').toLowerCase() === dir);
+      void ytdlpParts(path).then((all) => {
+        const theirs = new Set(others.flatMap((r) => [...ownParts(all, r.path, r.ytdlp?.format ?? ''), ...(r.oldParts ?? [])]).map((p) => p.toLowerCase()));
+        for (const p of ownParts(all, path, format)) if (!theirs.has(p.toLowerCase())) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
       });
+      // Phase 8: the parts its check or Start over set aside ("<name>.old.part") go too.
+      this.dropOldParts(rec);
       return;
     }
     const parts =
@@ -2364,6 +2727,8 @@ class Manager {
     // and the original address is asked again even right after a renewal failed (review of Phase 2).
     this.stopRenewing(id);
     this.renewFailed.delete(id);
+    // Phase 8: a yt-dlp row's Resume or Retry asks yt-dlp again (a File changed row's proof runs again: 3 G3).
+    this.ytdlpSaid.delete(id);
     rec.wait = undefined;
     rec.renewTries = undefined;
     rec.resumeOnStart = undefined;
@@ -2449,6 +2814,21 @@ class Manager {
   private async startAfresh(id: string, url: string, quiet: NeedCandidate | null): Promise<void> {
     const rec = this.find(id);
     if (!rec) return;
+    if (rec.mode === 'ytdlp') {
+      // Phase 8: a yt-dlp row's File changed takes the formats its check found (startOverYtdlp()).
+      if (url || quiet || rec.state !== 'paused' || rec.need?.kind !== 'choice' || this.runs.has(id) || this.deciding.has(id) || !rec.path) return;
+      this.stopRenewing(id);
+      this.renewFailed.delete(id);
+      rec.renewTries = undefined;
+      this.deciding.add(id);
+      try {
+        await this.startOverYtdlp(rec);
+      } finally {
+        this.deciding.delete(id);
+      }
+      this.pump();
+      return;
+    }
     // With `url` (Use another address…, "Use it and start over"): a paused file row, from that address.
     const ready = (): boolean =>
       this.recs.includes(rec) && rec.state === 'paused' && (url || quiet ? rec.mode === 'file' : rec.need?.kind === 'choice') && !this.runs.has(rec.id) && (rec.mode === 'file' || rec.mode === 'stream') && !!rec.path;
@@ -2542,6 +2922,44 @@ class Manager {
   }
 
   /**
+   * Start over for a yt-dlp row (RESUME-DESIGN.md 3 G3, the owner's decision 2; Phase 8): the version File changed
+   * kept (need.candidate.ytdlp: the formats to ask for, and those whose saved parts can't be continued; without one,
+   * every part and the same formats) is taken. Those parts are set aside as "<name>.old.part" until the new file is
+   * complete (setAsideYtdlp(): their names written, flushed, first; a part another program holds open stops it and
+   * the row says why); a format that is the same continues from its parts. The row queues, and its run's check reads
+   * what yt-dlp said a moment ago (ytdlpSaid) or asks again. A decision: the silent restarts' count starts again.
+   */
+  private async startOverYtdlp(rec: Rec): Promise<void> {
+    const y = rec.ytdlp;
+    if (!y) return;
+    const c = rec.need?.candidate?.ytdlp;
+    const ids = y.format.split('+').filter(Boolean);
+    const stake = await this.ytdlpPartsOf(rec, c ? c.drop : ids);
+    if (!this.recs.includes(rec) || rec.state !== 'paused' || rec.need?.kind !== 'choice' || this.runs.has(rec.id)) return;
+    if (!(await this.setAsideYtdlp(rec, c ?? { format: y.format, formats: y.formats }, stake.files))) {
+      if (rec.need) rec.need = { ...rec.need, evidence: 'another program has the saved part open; close it and try again' };
+      this.touch(rec);
+      await this.save(true);
+      return;
+    }
+    // Cancelled or removed meanwhile: theirs is the last word (the parts set aside go with the row).
+    if (!this.recs.includes(rec) || rec.state !== 'paused') return;
+    if (c?.quality) rec.quality = c.quality;
+    y.silent = undefined;
+    if (!hasRoom(rec.dir, rec.total > 0 ? rec.total : 0)) this.dropOldParts(rec);
+    const kept = await this.ytdlpPartsOf(rec, y.format.split('+').filter(Boolean));
+    rec.catcher = undefined;
+    rec.need = undefined;
+    rec.wait = undefined;
+    rec.error = '';
+    rec.received = kept.bytes;
+    rec.state = 'queued';
+    rec.queuedAt = queueStamp();
+    this.touch(rec);
+    await this.save(true);
+  }
+
+  /**
    * Where Start over sets `part` aside: "<name>.old.part", or "<name>.old (n).part" when that name is
    * another file or another download's (taken()). A name this row set aside before is its own and is
    * reused; `planned` are names this Start over already picked.
@@ -2592,6 +3010,8 @@ class Manager {
   private removeRec(id: string): void {
     this.stopRenewing(id);
     this.renewFailed.delete(id);
+    this.ytdlpFresh.delete(id);
+    this.ytdlpSaid.delete(id);
     this.fixing.get(id)?.ac.abort();
     // The hash record goes with the row (5.7), a finished file's too (never the file).
     const gone = this.find(id);
@@ -2829,9 +3249,14 @@ class Manager {
    * for its page (need 'page'), and the per-site limit puts the next attempt off until the site may have a
    * page again. A wait with step 'page' is the rest of the attempt at the failure: the page step only, and
    * the count stays.
+   * Phase 8 (G1 step 2): between the two, a page media file's address is looked for among yt-dlp's formats of its
+   * page (ytdlpStep(), when yt-dlp is installed); its SAME attaches ('ytdlp', the row's own address and identity
+   * kept). Step 'page' then means the rest of the attempt at the failure: the yt-dlp step, then the page step.
    */
   private async episode(rec: Rec): Promise<void> {
     if (rec.mode === 'stream') return this.streamEpisode(rec);
+    // Phase 8: a yt-dlp row's attempt asks yt-dlp again (it signs its addresses itself).
+    if (rec.mode === 'ytdlp') return this.ytdlpEpisode(rec);
     const s = rec.file;
     if (rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.quitting) return;
     if (!s || rec.mode !== 'file' || !rec.path) {
@@ -2845,6 +3270,7 @@ class Manager {
     const pageOnly = rec.wait.step === 'page';
     let out: Outcome | null = null;
     let page: PageOutcome | null = null;
+    let viaYtdlp: Found | null = null;
     try {
       const part = `${rec.path}.part`;
       if (pageOnly) out = { verdict: 'failed', status: rec.wait.status ?? 0 };
@@ -2853,7 +3279,9 @@ class Manager {
         const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, part), saved: savedBytes(rec) };
         out = list.length ? await originalAddress({ ctx, partPath: part, segments: s.segments, seed: rec.id }, list, ac.signal) : { verdict: 'failed', status: 0 };
       }
-      if (out.verdict === 'failed') page = await this.pageStep(rec, ac.signal);
+      // G1 step 2 (Phase 8): yt-dlp's formats of the page, after the original address and before the page step.
+      if (out.verdict === 'failed') viaYtdlp = await this.ytdlpStep(rec, ac.signal);
+      if (out.verdict === 'failed' && !viaYtdlp) page = await this.pageStep(rec, ac.signal);
     } catch (e) {
       // Counted as an attempt that found nothing, so an overdue wait never fires again at once.
       if (!ac.signal.aborted) {
@@ -2874,6 +3302,12 @@ class Manager {
       // Counted like a failed attempt until the run it queues saves a byte (renewTries).
       rec.renewTries = rec.wait.tries + 1;
       this.attach(rec, out.found, 'original');
+      return;
+    }
+    if (viaYtdlp) {
+      // Found among yt-dlp's formats of its page (G1 step 2): counted as above; the row's own address stays.
+      rec.renewTries = rec.wait.tries + (pageOnly ? 0 : 1);
+      this.attach(rec, viaYtdlp, 'ytdlp');
       return;
     }
     if (page?.kind === 'same') {
@@ -3155,7 +3589,7 @@ class Manager {
     const table = await this.tableOf(rec);
     const copy: StreamState = JSON.parse(JSON.stringify(s));
     // G2 step 4 (Phase 7): outside a run, the steps end with the page opened out of sight (pageStreams()).
-    const env = this.streamEnv(rec);
+    const env = this.streamEnv(rec, undefined, true);
     if (this.pageDue(rec)) env.pageStreams = (format, duration, own, signal) => this.pageStreams(rec, format, duration, own, signal);
     this.pageLater.delete(rec.id);
     this.pageSignIn.delete(rec.id);
@@ -3268,7 +3702,8 @@ class Manager {
   private attach(rec: Rec, found: Found, how: AttachHow, identity?: IdentityJSON, from?: { origin: { x: number; y: number } | null; browserId: number }): void {
     if (!rec.file) return;
     adopt(rec.file, found, how);
-    if (how !== 'original') {
+    // 'ytdlp' (Phase 8) is automatic like 'original': the row keeps its own address and identity.
+    if (how !== 'original' && how !== 'ytdlp') {
       rec.url = found.url;
       if (identity) rec.identity = identity;
       if (how !== 'background') rec.renewTries = undefined;
@@ -3278,7 +3713,7 @@ class Manager {
     rec.catcher = undefined;
     rec.error = '';
     this.renewFailed.delete(rec.id);
-    this.event(rec, how === 'pasted' || how === 'link' ? 'Continued from another address' : how === 'page' ? 'Continued from its page' : how === 'background' ? 'New link found on its page' : 'New link found');
+    this.event(rec, how === 'pasted' || how === 'link' ? 'Continued from another address' : how === 'page' ? 'Continued from its page' : how === 'background' ? 'New link found on its page' : how === 'ytdlp' ? 'New link found through yt-dlp' : 'New link found');
     rec.state = 'queued';
     rec.queuedAt = queueStamp();
     if (from) this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
@@ -3363,7 +3798,8 @@ class Manager {
     rec.catcher = undefined;
     // A stream (Phase 6): its renewal steps at once (streamEpisode()); found nothing, its page opens, where the
     // pill's Continue picks it up (RESUME-DESIGN.md G2 manual fallback: Refresh address opens the page).
-    if ((rec.mode === 'file' && rec.file && rec.path) || (rec.mode === 'stream' && rec.stream && rec.path)) {
+    // Phase 8: a yt-dlp row asks yt-dlp again (ytdlpEpisode()), then its page opens, where the pill's Continue finds it.
+    if ((rec.mode === 'file' && rec.file && rec.path) || (rec.mode === 'stream' && rec.stream && rec.path) || (rec.mode === 'ytdlp' && rec.ytdlp && rec.path)) {
       rec.wait = { for: 'address', since: Date.now(), tries: 0, nextAt: 0, status: rec.need.status };
       await this.episode(rec);
       // Pause (or Cancel, Remove) stopped the attempt: theirs is the last word. So did the download
@@ -3375,7 +3811,7 @@ class Manager {
     if (!this.recs.includes(rec)) return out('busy');
     if (rec.state !== 'paused' || !need) return out('renewed');
     if (need.kind === 'choice') return out('changed');
-    if (need.kind !== 'address' && !(need.kind === 'page' && (rec.mode === 'file' || rec.mode === 'stream'))) return out('busy');
+    if (need.kind !== 'address' && !(need.kind === 'page' && (rec.mode === 'file' || rec.mode === 'stream' || rec.mode === 'ytdlp'))) return out('busy');
     return out(rec.identity.pageUrl ? 'page' : 'none');
   }
 
@@ -3413,8 +3849,9 @@ class Manager {
    * follows the row by it from then on) and the identity its media is asked with: its container and privacy
    * must be the row's (RESUME-DESIGN.md 2.1; review of Phase 6: a tab in another container continued the
    * row). The row's own addresses stay in `prior` until the proof says SAME; another stream puts them back
-   * (hls.ts prepare()) and is never started again by itself. A yt-dlp row resumes with its own format (Phase 8
-   * re-picks formats).
+   * (hls.ts prepare()) and is never started again by itself. A yt-dlp row (Phase 8) of the same quality resumes: its
+   * run asks yt-dlp again and re-picks a format that is gone (checkYtdlp()); another quality (its own is no longer
+   * offered) makes it File changed, that option's formats kept for Start over.
    */
   renewWith(id: string, opt: VideoOption, from: { videoKey?: string; identity?: Partial<IdentityJSON> } = {}): RenewWithResult {
     const rec = this.find(id);
@@ -3422,8 +3859,31 @@ class Manager {
     const who = from.identity;
     if (who && ((who.userContextId !== undefined && (who.userContextId || 0) !== (rec.identity.userContextId || 0)) || (who.isPrivate !== undefined && !!who.isPrivate !== !!rec.identity.isPrivate))) return 'busy';
     if (rec.mode === 'ytdlp') {
-      if (opt.mode !== 'ytdlp' || (rec.ytdlp && opt.ytdlpFormat && opt.ytdlpFormat !== rec.ytdlp.format)) return 'busy';
+      const y = rec.ytdlp;
+      if (opt.mode !== 'ytdlp' || !y || !opt.ytdlpFormat) return 'busy';
       if (from.videoKey) rec.videoKey = from.videoKey;
+      if (!sameYtdlpQuality(rec, y, opt)) {
+        // Another quality than the row's: File changed, Start over gets it. The saved parts of formats it no longer
+        // asks for are set aside then; one it still asks for (the same sound) continues, its size checked by the run.
+        this.stopRenewing(id);
+        rec.state = 'paused';
+        rec.error = '';
+        rec.wait = undefined;
+        rec.catcher = undefined;
+        const audioOnly = opt.group === 'audio';
+        const formats = opt.ytdlpFormats?.length ? opt.ytdlpFormats : recorded({ ...y, format: opt.ytdlpFormat, ext: opt.ytdlpExt || y.ext, audioOnly, formats: undefined }, opt.label);
+        const keep = opt.ytdlpFormat.split('+');
+        const same = opt.ytdlpFormat.includes('+') === y.format.includes('+');
+        const drop = y.format.split('+').filter((f) => f && !(same && keep.includes(f)));
+        // Review of Phase 8: saved as a file type that holds it (the row's when it can, else the one it is offered
+        // in: an H.264 quality for a WEBM row, a picture for a sound row), and of its kind; Start over renames the file.
+        const ext = containerFor(y.ext, formats, opt.ytdlpFormat.includes('+'));
+        rec.need = { kind: 'choice', since: Date.now(), evidence: `${rec.quality || 'its quality'} is no longer offered`, candidate: ytdlpCandidate(y, { format: opt.ytdlpFormat, formats, drop, quality: opt.label, ext, audioOnly }) };
+        this.touch(rec);
+        this.settle(rec);
+        this.save(true);
+        return 'changed';
+      }
       this.resume(id);
       return 'continued';
     }
@@ -4799,9 +5259,13 @@ function pastedIdentity(id: IdentityJSON): IdentityJSON {
   return new Identity({ pageUrl: id.pageUrl, userContextId: id.userContextId, isPrivate: id.isPrivate, withOrigin: false, referrerPolicy: 'no-referrer', firstParty: true }).toJSON();
 }
 
-/** Bytes certainly in the download's part files: the file's segments, or the stream's written tracks. */
+/**
+ * Bytes certainly in the download's part files: the file's segments, or the stream's written tracks; a yt-dlp row's
+ * as yt-dlp last counted them (Phase 8; its check reads the files themselves: checkYtdlp()).
+ */
 function savedBytes(rec: Rec): number {
   if (rec.mode === 'stream') return (rec.stream?.tracks ?? []).reduce((n, t) => n + (t.bytes || 0), 0);
+  if (rec.mode === 'ytdlp') return rec.received || 0;
   return (rec.file?.segments ?? []).reduce((n, s) => n + (s.received || 0), 0);
 }
 
@@ -4851,6 +5315,43 @@ function sameQuality(rec: Rec, opt: VideoOption): boolean {
   if (mine && theirs) return mine === theirs;
   if (rec.quality) return rec.quality === opt.label;
   return true;
+}
+
+/**
+ * The pill's option is a yt-dlp row's quality (Phase 8; sameQuality() for a stream): any sound option for a sound
+ * row; otherwise the height of its picture, from its recorded formats or its label ("1080p"), else the same label.
+ * The run's check then re-picks a format that is gone (checkYtdlp()).
+ */
+function sameYtdlpQuality(rec: Rec, y: YtdlpState, opt: VideoOption): boolean {
+  if ((opt.group === 'audio') !== !!y.audioOnly) return false;
+  if (y.audioOnly) return true;
+  const mine = y.formats?.find((f) => !f.audioOnly && f.height > 0)?.height || Number(/^(\d{3,4})p/.exec(rec.quality || '')?.[1] || 0);
+  if (mine && opt.height) return mine === opt.height;
+  if (rec.quality) return rec.quality === opt.label;
+  return true;
+}
+
+/** A yt-dlp row's other version, kept on File changed for Start over (need.candidate; Phase 8): its page and the formats to ask for. */
+function ytdlpCandidate(y: YtdlpState, choice: YtdlpChoice): NeedCandidate {
+  const total = choice.formats.reduce((n, f) => n + (f.filesize || 0), 0);
+  return { url: y.pageUrl, finalUrl: y.pageUrl, total: total || -1, etag: '', lastModified: '', contentType: '', ytdlp: choice };
+}
+
+/**
+ * The history line of a yt-dlp row whose formats that could not be continued started again by themselves (Phase 8;
+ * RESUME-DESIGN.md 6: every automatic fix leaves one): all of it, or only its picture or its sound (the other part
+ * continued). Review of Phase 8: the sound is never described by the picture's quality ("Started the sound over: the
+ * site offers it as another format now"); a format Deer could not confirm (R7) says so.
+ */
+function ytdlpRestarted(j: YtdlpJudged): string {
+  const why =
+    j.why === 'gone' ? (j.part === 'sound' ? 'the site offers it as another format now' : `the site offers ${j.label || 'this quality'} as another format now`) : j.why === 'unsure' ? UNSURE : 'the file on the site changed';
+  return j.part === 'all' ? `Started over: ${why}` : `Started the ${j.part} over: ${why}`;
+}
+
+/** What a check's verdict keeps for Start over (need.candidate.ytdlp; Phase 8, review: with its file type and kind). */
+function choiceOf(j: YtdlpJudged): YtdlpChoice {
+  return { format: j.format, formats: j.formats, drop: j.drop, quality: j.label, ext: j.ext, audioOnly: j.audioOnly };
 }
 
 /** "2:41", "1:02:03" (Keep partial's note for a stream: "Kept 2:41 of 4:05"). */
