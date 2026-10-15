@@ -30,6 +30,10 @@
 //   keepPartial(id) / decide(id, 'start-over' | 'keep-partial')
 //                                  File changed: the unbroken beginning kept as "<stem> (partial).<ext>"
 //                                  (a completed row), or Start over (startOver(id))
+//   renewWith(id, option, from?)   the pill's "Continue · 62%" on a page opened again (RESUME-DESIGN.md G2,
+//                                  Phase 6): a stream row found by its stable key continues from the page's
+//                                  fresh addresses for the same quality; another quality makes it File changed.
+//                                  RenewWithResult (types.ts)
 //   checkFile(id) / repair(id) / restoreOriginal(id) / downloadAgain(id)
 //                                  a completed row (RESUME-DESIGN.md 4.2, 4.3, Phase 5): Check file hashes it
 //                                  again against its block record (Damaged: view.need 'repair'; Changed after
@@ -141,6 +145,18 @@
 //     written), Restore original, Changed after download (modified after it finished: never damage); after an
 //     unclean session the files finished in it are checked by themselves. If the store and its .bak are both
 //     lost, the rows come back from the journals.
+//   - Streams (RESUME-DESIGN.md G2, 2.6, 4.1-4.3; Phase 6; downloads/hls.ts, downloads/table.ts). Every
+//     segment written leaves a line in the stream's segment table (<profile>/vitre-downloads/<id>.stream.jsonl,
+//     in memory for a private download). A resume checks the saved parts against it (a part cut short is cut at
+//     its last good segment; a damaged segment is fetched again, checked and written back in place) and proves
+//     the written segments against the playlists read now (the duration, the place mapped by media sequence or
+//     time, the init segment, the last written segment fetched again), continuing at the next sequence. When a
+//     playlist or segment refuses, the same media playlist is read again inside the run; the master playlist
+//     or manifest (the same rung re-picked by its fingerprint, DASH representations by id then attributes) and
+//     yt-dlp's manifest are the attempt at the failure, outside any run (streamEpisode()), and then the
+//     schedule, as for a file. A resume with every segment written goes straight to the merge. Keep partial
+//     file merges the written segments; Repair runs a finished stream again against its table. The pill on
+//     the page opened again finds the row by its stable key (rec.streamKey) and continues it (renewWith()).
 //   - Private downloads are never written to disk lists and are dropped when the last private
 //     window closes (last-pb-context-exited), as Firefox does. Closing the last private window
 //     while one runs asks first (last-pb-context-exiting), and a quit cancels them (the prompt says so).
@@ -163,12 +179,14 @@ import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { clearInterval, clearTimeout, setInterval, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { findFfmpeg, forgetFfmpeg } from './downloads/ffmpeg';
 import { cancelFfmpegInstall, ffmpegInstallDir, ffmpegInstallState, installFfmpeg, oldFolder, onFfmpegInstall, type FfmpegInstallState } from './downloads/ffmpeg-install';
-import { DRM_MESSAGE, StreamTransfer, streamEstimate, streamFills, trackPart, type StreamState } from './downloads/hls';
+import { DRM_MESSAGE, StreamTransfer, allWritten, keptSecs, streamEstimate, streamFills, trackPart, type StreamEnv, type StreamState } from './downloads/hls';
 import { RateLimiter } from './downloads/limiter';
 import { MediaWatch } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
 import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from './downloads/attach';
 import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
+import { streamKeyOf } from './downloads/streamkey';
+import { StreamTable, rungFromQuality } from './downloads/table';
 import { checkFinished, damagedFills, editedSince, mediaCheck, repairFinished, restoreFinished, siteCompare, statOf, type RepairOutcome } from './downloads/finished';
 import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, type Header } from './downloads/ledger';
 import { AbortedError, ChangedError, DiskError, DownloadError, HttpStatusError, Identity, classify, describeError } from './downloads/net';
@@ -180,9 +198,9 @@ import { asPolicy, readReferrerInfo } from './downloads/referrer';
 import { hashWanted, mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
 import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
-import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, StartOptions, WaitFor } from './downloads/types';
+import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, RenewWithResult, StartOptions, StreamRung, VideoOption, WaitFor } from './downloads/types';
 import { CONTINUE_AFTER, FRESH_AFTER, SERVER_GIVE_UP, SLEEP_FALLBACK, SOON, WAKE_SETTLE, rewindTails, waitNext } from './downloads/waits';
-import { YtdlpTransfer, cancelToolsInstall, installTools, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
+import { YtdlpTransfer, cancelToolsInstall, installTools, manifestFor, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
 
 declare global {
   interface VitreSysModules {
@@ -358,6 +376,12 @@ interface Rec {
   check?: CheckState;
   /** Repair or Restore original was writing the file when it began (saved): a crash then has it checked at the next start (4.3). */
   repairing?: number;
+  /**
+   * A stream's stable key (RESUME-DESIGN.md G2, 5.1; Phase 6, downloads/streamkey.ts): the page's origin and
+   * path, the rounded duration and the title ('ytdlp|<webpage_url>' for yt-dlp). The pill on the page opened
+   * again finds the row by it and continues it (renewWith()).
+   */
+  streamKey?: string;
 }
 
 /**
@@ -392,7 +416,13 @@ type WaitState = { for: WaitFor; since: number; nextAt: number; tries: number; s
  * (RESUME-DESIGN.md 5.1). `identity`: the download was started again on its page (Phase 3), whose
  * requests (its page, cookies, container) Start over makes.
  */
-type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string; identity?: IdentityJSON };
+type NeedCandidate = { url: string; finalUrl: string; total: number; etag: string; lastModified: string; contentType: string; identity?: IdentityJSON; stream?: StreamCandidate };
+
+/**
+ * A stream's other version for Start over (RESUME-DESIGN.md G2, Phase 6): the quality the person picked on
+ * the page opened again when theirs is no longer offered (renewWith()), its addresses and fingerprint.
+ */
+type StreamCandidate = { sourceUrl: string; variantUrl: string; audioUrl: string; dashVideo: string; dashAudio: string; audioOnly: boolean; quality: string; rung?: StreamRung; bytes: number };
 
 /** Why a finished file was blocked, as the row says it. */
 const BLOCKED: Record<Exclude<Verdict, 'safe'>, string> = {
@@ -565,6 +595,8 @@ class Manager {
   hooks: { beforeMerge?: (id: string) => Promise<void>; afterMerge?: (id: string) => Promise<void>; beforePlace?: (id: string) => Promise<void> } = {};
   /** Block hash records by row (RESUME-DESIGN.md 4.1, Phase 5), read from their journals when first needed. */
   private ledgers = new Map<string, Ledger>();
+  /** Streams' segment tables by row (RESUME-DESIGN.md 4.1 "Streams", 5.7; Phase 6), read from their journals when first needed. */
+  private tables = new Map<string, StreamTable>();
   /** A row's seal in progress (seal()): its next run waits for it. */
   private sealing = new Map<string, Promise<void>>();
   /** Completed rows Check file is reading (Checking), and the ones Repair or Restore original is fixing (Repairing). */
@@ -705,6 +737,8 @@ class Manager {
             // mark, RESUME-DESIGN.md 4.2: inspect()); one without keeps the suspect tail of Phase 4.
             if (r.state === 'downloading') {
               if (r.mode === 'file' && r.file?.dirty && r.journal && existsSync(r.journal)) r.suspect = { at: now, bytes: 0 };
+              // Phase 6 (4.2): a stream is checked against its segment table, every segment, when it continues.
+              else if (r.mode === 'stream' && r.stream?.tracks.some((t) => t.done > 0)) r.suspect = { at: now, bytes: 0 };
               else suspectTail(r, now);
             }
           }
@@ -736,7 +770,9 @@ class Manager {
       // sleep wait (G4), which always continues after a restart: one a quit caught in a run it had started,
       // or between its tries, is due at the start, and so is a sleep's (the computer is awake now).
       if (r.wait) {
-        if (r.state !== 'paused' || (r.wait.for === 'address' ? r.mode !== 'file' || !r.file : r.mode === 'browser')) r.wait = undefined;
+        // A stream's Link expired has its schedule too (Phase 6: the stream renewal steps, streamEpisode()).
+        const renewable = (r.mode === 'file' && !!r.file) || (r.mode === 'stream' && !!r.stream);
+        if (r.state !== 'paused' || (r.wait.for === 'address' ? !renewable : r.mode === 'browser')) r.wait = undefined;
         else if (r.wait.for !== 'address' && (!r.wait.nextAt || r.wait.for === 'sleep')) r.wait = { ...r.wait, nextAt: now };
       }
       r.identity = new Identity(r.identity ?? {}).toJSON();
@@ -925,9 +961,14 @@ class Manager {
       const ext = (opts.ytdlpExt || 'mp4').replace(/[^\w]/g, '') || 'mp4';
       rec.ytdlp = { pageUrl: url, format: opts.ytdlpFormat, ext, audioOnly: !!opts.audioOnly, expected: Number(opts.bytes) || 0 };
       if (!opts.named) rec.filename = sanitize(`${rec.title || 'video'}.${ext}`);
+      // RESUME-DESIGN.md G2: yt-dlp keeps its own stable key, 'ytdlp|<webpage_url>' (the offer's key).
+      rec.streamKey = opts.streamKey || (opts.videoKey?.startsWith('ytdlp|') ? opts.videoKey : `ytdlp|${url}`);
     } else if (mode !== 'file') {
       rec.mode = 'stream';
-      rec.stream = StreamTransfer.fresh(url, { format: mode, variantUrl: opts.variantUrl, audioUrl: opts.audioUrl, dashVideo: opts.dashVideo, dashAudio: opts.dashAudio, audioOnly: opts.audioOnly, bytes: opts.bytes });
+      // Phase 6 (5.3): the picker's rung, so a master read again picks the same quality; the stable key the
+      // pill on the page opened again finds the row by (G2; set after the first prepare when not given).
+      rec.stream = StreamTransfer.fresh(url, { format: mode, variantUrl: opts.variantUrl, audioUrl: opts.audioUrl, dashVideo: opts.dashVideo, dashAudio: opts.dashAudio, audioOnly: opts.audioOnly, bytes: opts.bytes, rung: opts.rung });
+      if (opts.streamKey) rec.streamKey = opts.streamKey;
       rec.identity.withOrigin = true;
       if (!opts.named) rec.filename = sanitize(`${rec.title || streamTitle(url)}${opts.audioOnly ? '.m4a' : '.mp4'}`);
     } else if (!opts.filename && rec.title && (opts.videoKey || !extOf(rec.filename))) {
@@ -1484,6 +1525,12 @@ class Manager {
       void l.journal.remove();
     } else if (rec.journal) IOUtils.remove(rec.journal, { ignoreAbsent: true }).catch(() => undefined);
     rec.journal = undefined;
+    // A stream's segment table goes the same way (Phase 6).
+    const t = this.tables.get(rec.id);
+    this.tables.delete(rec.id);
+    if (t) void t.journal.remove();
+    else if (rec.stream?.journal) IOUtils.remove(rec.stream.journal, { ignoreAbsent: true }).catch(() => undefined);
+    if (rec.stream) rec.stream.journal = undefined;
   }
 
   /**
@@ -1543,16 +1590,30 @@ class Manager {
   private async runStream(rec: Rec, run: Run): Promise<void> {
     const state = rec.stream ?? StreamTransfer.fresh(rec.url);
     rec.stream = state;
-    const transfer = new StreamTransfer(state, { ...this.env(rec, run), ffmpeg: () => this.ffmpeg() });
+    // RESUME-DESIGN.md 5.8: an older row's quality ("1080p") stands in for the rung a master read again picks by.
+    if (!state.rung && state.format !== 'dash') state.rung = rungFromQuality(rec.quality);
+    const transfer = new StreamTransfer(state, this.streamEnv(rec));
     transfer.silentRestarts = rec.need?.kind !== 'choice';
+    // Review of Phase 6: a resume at unchanged addresses proves what it wrote beside the download (nothing is
+    // written before the proof passes); a File changed row's Resume proves first, as it only checks again.
+    transfer.lazyProof = rec.need?.kind !== 'choice';
     run.transfer = transfer;
+    // RESUME-DESIGN.md 4.1, 5.7 (Phase 6): the segment table, read from its journal or begun.
+    transfer.table = await this.tableOf(rec);
+    // 4.2: after an unclean session every written segment is checked against the table (load(): rec.suspect).
+    transfer.deep = !!rec.suspect;
     // G4, the merge crash window: a merge a quit or a crash cut short, with every segment in its part,
     // runs again at once: the parts are the whole download, so the stream's addresses are not asked.
+    // G2 (Phase 6): so does a resume where every segment is already written: an expired playlist never
+    // blocks bytes already on disk.
     const parted = state.mergeBase || (rec.path ? stem(rec.path) : '');
-    const remerge = state.phase === 'merging' && !!parted && state.tracks.length > 0 && state.tracks.every((t) => t.count > 0 && t.done >= t.count && existsSync(trackPart(parted, t)));
+    const inParts = !!parted && state.tracks.length > 0 && state.tracks.every((t) => t.count > 0 && t.done >= t.count && existsSync(trackPart(parted, t)));
+    const remerge = inParts && (state.phase === 'merging' || allWritten(state));
     let base = parted;
     if (remerge) {
       rec.trying = undefined;
+      rec.need = undefined;
+      rec.wait = undefined;
       await transfer.loadMuxer();
     } else {
       this.setPhase(run, savedBytes(rec) > 0 ? 'checking' : 'probing');
@@ -1560,12 +1621,24 @@ class Manager {
       // A wait's try ends its check at the first 429 or 5xx (review of Phase 4; see runFile()).
       transfer.waitTry = !!rec.trying;
       try {
-        await transfer.prepare(run.ac.signal);
+        // Phase 6: a resume checks its saved parts against the table and proves its written segments
+        // against the playlists read now (RESUME-DESIGN.md 2.6), renewing them when they refuse (G2).
+        await transfer.prepare(run.ac.signal, rec.path ? stem(rec.path) : '');
       } finally {
         transfer.waitTry = false;
+        this.takeEvents(rec, transfer);
       }
+      // The pill's Continue (renewWith()): the page's addresses proved the same stream, so they are the row's now.
+      if (transfer.renewed) rec.url = state.sourceUrl;
       rec.need = undefined;
+      rec.wait = undefined;
       rec.trying = undefined;
+      if (rec.suspect) {
+        this.event(rec, 'Checked after Deer closed unexpectedly');
+        rec.suspect = undefined;
+      }
+      // G2: the stable key the pill on the page opened again finds the row by, once the duration is known.
+      if (!rec.streamKey && rec.identity.pageUrl) rec.streamKey = streamKeyOf(rec.identity.pageUrl, state.duration, rec.title) || undefined;
       run.phase = '';
       if (!rec.path) {
         if (!rec.named) rec.filename = rec.filename.replace(/\.(mp4|m4a|ts|aac|webm|weba)$/i, '') + transfer.expectedExtension();
@@ -1592,7 +1665,49 @@ class Manager {
     rec.note = transfer.note;
     rec.path = out;
     rec.filename = PathUtils.filename(out);
+    // 4.2: what ffmpeg said while joining stays in the history (the console has all of it).
+    if (transfer.merged.said) this.event(rec, `Joined · ffmpeg reported: ${transfer.merged.said.split(/\r?\n/)[0].slice(0, 160)}`);
     if (this.hooks.afterMerge) await this.hooks.afterMerge(rec.id);
+  }
+
+  /**
+   * What a stream transfer needs from its download: the file's env, ffmpeg, and yt-dlp's manifest when it is
+   * installed (G2 step 3). Never for a private download (review of Phase 6): yt-dlp would ask the site from
+   * outside the private session, on the automatic schedule too.
+   */
+  private streamEnv(rec: Rec, run?: Run): StreamEnv {
+    const page = rec.identity.pageUrl;
+    return {
+      ...this.env(rec, run ?? null),
+      ffmpeg: () => this.ffmpeg(),
+      ...(rec.identity.isPrivate
+        ? {}
+        : { ytdlpManifest: (rung: StreamRung | undefined, audioOnly: boolean, signal: AbortSignal) => (page && /^https?:/i.test(page) && ytdlpTools() ? manifestFor(page, rung ?? rungFromQuality(rec.quality), audioOnly, signal) : Promise.resolve(null)) }),
+    };
+  }
+
+  /** The stream's segment table (RESUME-DESIGN.md 4.1, 5.7): in memory, read from its journal, or begun (a private download's stays in memory). */
+  private async tableOf(rec: Rec): Promise<StreamTable | null> {
+    const s = rec.stream;
+    if (!s) return null;
+    const have = this.tables.get(rec.id);
+    if (have) return have;
+    const read = s.journal ? await StreamTable.open(s.journal) : null;
+    const again = this.tables.get(rec.id);
+    if (again) return again;
+    let t = read;
+    if (!t) {
+      const path = rec.identity.isPrivate ? '' : PathUtils.join(this.journalDir, `${rec.id}.stream.jsonl`);
+      t = StreamTable.create(path);
+      s.journal = path || undefined;
+    }
+    this.tables.set(rec.id, t);
+    return t;
+  }
+
+  /** The history lines a stream transfer left (RESUME-DESIGN.md 6: every automatic fix leaves one). */
+  private takeEvents(rec: Rec, t: StreamTransfer): void {
+    for (const text of t.events.splice(0)) this.event(rec, text);
   }
 
   private async runYtdlp(rec: Rec, run: Run): Promise<void> {
@@ -1862,6 +1977,7 @@ class Manager {
       return;
     }
     if (run.transfer) rec.received = run.transfer.received;
+    if (run.transfer instanceof StreamTransfer) this.takeEvents(rec, run.transfer);
     // A run that saved bytes ends what an attach left of the schedule (renewTries).
     if (savedBytes(rec) > (run.saved0 ?? 0)) rec.renewTries = undefined;
     const { kind, status } = classify(err);
@@ -1892,23 +2008,38 @@ class Manager {
       // RESUME-DESIGN.md 3.0: the address no longer gives the file, and the run's renewal hook found
       // no new one (the attempt at the failure). Nothing saved is lost: the row pauses as Link expired
       // and Retry tries the address again. A file row is also tried again by itself 2 min, 15 min, 1 h
-      // and 6 h after the failure (renew.ts; a stream's renewal comes with Phase 6). With nothing
+      // and 6 h after the failure (renew.ts; a stream by its own renewal steps, Phase 6). With nothing
       // saved it fails as before. A run an attempt of the schedule queued, that failed before it
       // saved a byte, carries on that schedule instead of starting it again (renewTries; review of
       // Phase 2: a host that passes the proof but refuses the transfer was asked every 2 minutes).
       const now = Date.now();
+      const attached = rec.renewTries !== undefined;
       const tries = rec.renewTries ?? 1;
       rec.renewTries = undefined;
       rec.state = 'paused';
       rec.error = '';
       rec.need = { kind: 'address', since: now, status };
-      rec.wait = rec.mode === 'file' ? { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status } : undefined;
+      if (rec.mode === 'file') rec.wait = { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status };
+      else {
+        // Phase 6 (RESUME-DESIGN.md 3.0, G2): a stream's renewal steps (the master read again, yt-dlp) run as
+        // the attempt at the failure (streamEpisode(), at once) unless the run's own check already ran them, or
+        // the run was the one an attempt queued and saved nothing (attached: never an attempt and a run taking
+        // turns for ever); then the schedule, as for a file. Inside a run only the same media playlist is read again.
+        const done = attached || (run.transfer instanceof StreamTransfer && run.transfer.renewTried);
+        rec.wait = done ? { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status } : { for: 'address', since: now, tries: 0, nextAt: now, status };
+      }
+    } else if (kind === 'changed' && rec.mode === 'stream' && run.transfer instanceof StreamTransfer && this.restartStream(rec, run.transfer)) {
+      // A stream found changed inside its run (a proof beside the download, a playlist read again, a piece's
+      // bytes) with at most 1 MiB saved starts again by itself, as one found at its check does (3 G3, the
+      // owner's decision 1; review of Phase 6): restartStream() queued it.
     } else if (kind === 'changed' && (rec.mode === 'file' || rec.mode === 'stream')) {
       // The file on the site is another one (3 G3): stop with the .part untouched and ask. A renewal
-      // that found the other version keeps its address for Start over (need.candidate).
+      // that found the other version keeps its address for Start over (need.candidate); so does the pill's
+      // Continue whose page gave another stream (its addresses were put back: hls.ts prepare()).
       rec.state = 'paused';
       rec.error = '';
-      rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: err instanceof ChangedError ? err.candidate : undefined };
+      const candidate = err instanceof ChangedError ? err.candidate : undefined;
+      rec.need = { kind: 'choice', since: Date.now(), evidence: err instanceof ChangedError ? err.evidence : '', candidate: candidate ?? (run.transfer instanceof StreamTransfer ? this.streamCandidate(rec, run.transfer) : undefined) };
       rec.wait = undefined;
     } else if ((kind === 'offline' || kind === 'timeout' || kind === 'server') && (rec.mode === 'file' || rec.mode === 'stream') && this.waitAgain(rec, run, kind === 'server' ? 'server' : 'network', status, err)) {
       // RESUME-DESIGN.md G4: Waiting for network or Retrying; nothing is lost and Deer tries again by itself.
@@ -1996,7 +2127,7 @@ class Manager {
     if (rec.need?.kind === 'repair') rec.need = undefined;
     if (rec.stream) {
       const s = rec.stream;
-      rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
+      rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected, rung: s.rung });
     }
     rec.received = 0;
     rec.path = '';
@@ -2016,7 +2147,7 @@ class Manager {
       return;
     }
     const parts =
-      rec.mode === 'stream' && rec.stream ? [...rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)), `${stem(rec.path)}.merge.part`] : [`${rec.path}.part`];
+      rec.mode === 'stream' && rec.stream ? [...rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)), `${stem(rec.path)}.merge.part`, `${stem(rec.path)}.keep.part`] : [`${rec.path}.part`];
     // Its block hashing may hold the .part open a moment (Phase 5): the removal waits for a seal still
     // running and tries again for a while.
     if (rec.mode === 'file') void (this.sealing.get(rec.id) ?? Promise.resolve()).then(() => removeSoon(parts[0]));
@@ -2221,12 +2352,20 @@ class Manager {
       // A fresh start at the stored address; the path (and so the name) stays this row's.
       if (rec.mode === 'stream' && rec.stream) {
         const s = rec.stream;
-        rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
+        // Phase 6: the quality the person picked on the page opened again (renewWith()), when theirs is gone.
+        const c = cand?.stream;
+        rec.stream = c
+          ? StreamTransfer.fresh(c.sourceUrl, { format: s.format, variantUrl: c.variantUrl, audioUrl: c.audioUrl, dashVideo: c.dashVideo, dashAudio: c.dashAudio, audioOnly: c.audioOnly, bytes: c.bytes, rung: c.rung })
+          : StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected, rung: s.rung });
+        if (c) {
+          rec.url = c.sourceUrl;
+          rec.quality = c.quality || rec.quality;
+        }
       } else rec.file = FileTransfer.fresh(url || cand?.url || rec.file?.url || rec.url);
       if (url) {
         rec.url = url;
         rec.identity = pastedIdentity(rec.identity);
-      } else if (rec.mode === 'file' && cand?.identity) {
+      } else if (rec.mode === 'file' && cand?.identity && !cand.stream) {
         // Found by a start again on the page (Phase 3): its address, asked as that start asked it.
         rec.url = cand.url;
         rec.identity = cand.identity;
@@ -2464,7 +2603,7 @@ class Manager {
   }
 
   /** Everything a transfer needs from its download. */
-  private env(rec: Rec, _run: Run): TransferEnv {
+  private env(rec: Rec, _run: Run | null): TransferEnv {
     const own = new RateLimiter(() => rec.limitKBps || 0);
     return {
       identity: new Identity(rec.identity),
@@ -2533,6 +2672,7 @@ class Manager {
    * nothing found counts the attempt and plans the next (wait.tries, renew.ts nextTry()).
    */
   private async episode(rec: Rec): Promise<void> {
+    if (rec.mode === 'stream') return this.streamEpisode(rec);
     const s = rec.file;
     if (rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.quitting) return;
     if (!s || rec.mode !== 'file' || !rec.path) {
@@ -2594,6 +2734,114 @@ class Manager {
     }
     this.touch(rec);
     this.save(true);
+  }
+
+  /**
+   * A stream's attempt of the schedule, outside any run (RESUME-DESIGN.md 3.0, G2; Phase 6): the stream's
+   * renewal steps (its media playlist, the master playlist or manifest read again with the same rung, yt-dlp's
+   * manifest) and the proof (2.6) against the saved segments, on a copy of the stream's state, while the row
+   * stays paused (Renewing link) and holds no download slot. SAME takes the copy (its fresh addresses) and the
+   * row continues at its next sequence; CHANGED makes it File changed (its saved parts untouched); nothing
+   * found counts the attempt and plans the next (wait.tries, renew.ts nextTry()). The checks of the saved parts
+   * (a part cut short, damaged segments fetched again) count either way.
+   */
+  private async streamEpisode(rec: Rec): Promise<void> {
+    if (rec.state !== 'paused' || !rec.wait || this.runs.has(rec.id) || this.renewing.has(rec.id) || this.deciding.has(rec.id) || this.quitting) return;
+    const s = rec.stream;
+    if (!s || !rec.path || !s.tracks.length) {
+      rec.wait = undefined;
+      return;
+    }
+    const ac = new AbortController();
+    this.renewing.set(rec.id, ac);
+    this.touch(rec);
+    // The table first: a row from before Phase 6 begins one, whose path the copy must carry.
+    const table = await this.tableOf(rec);
+    const copy: StreamState = JSON.parse(JSON.stringify(s));
+    const t = new StreamTransfer(copy, this.streamEnv(rec));
+    t.silentRestarts = false;
+    t.table = table;
+    let verdict: 'same' | 'changed' | 'failed' = 'failed';
+    let err: unknown = null;
+    try {
+      await t.prepare(ac.signal, stem(rec.path));
+      verdict = 'same';
+    } catch (e) {
+      err = e;
+      verdict = classify(e).kind === 'changed' ? 'changed' : 'failed';
+      if (!ac.signal.aborted && verdict === 'failed' && !(e instanceof HttpStatusError) && !(e instanceof DownloadError)) console.warn('Deer downloads: renewing the stream failed', String(e));
+    } finally {
+      if (this.renewing.get(rec.id) === ac) this.renewing.delete(rec.id);
+    }
+    // Retry, Cancel, Pause or a quit came first: theirs is the last word.
+    if (ac.signal.aborted || !this.recs.includes(rec) || rec.state !== 'paused' || !rec.wait || rec.stream !== s) {
+      this.touch(rec);
+      this.armWaits();
+      return;
+    }
+    this.takeEvents(rec, t);
+    // The checks of the saved parts (a part cut back, a track started again) count whatever was found.
+    rec.stream = copy;
+    const now = Date.now();
+    if (verdict === 'same') {
+      if (t.renewed) rec.url = copy.sourceUrl;
+      // Counted like a failed attempt until the run it queues saves a byte (renewTries).
+      rec.renewTries = rec.wait.tries + 1;
+      rec.need = undefined;
+      rec.wait = undefined;
+      rec.error = '';
+      this.renewFailed.delete(rec.id);
+      rec.state = 'queued';
+      rec.queuedAt = queueStamp();
+      this.touch(rec);
+      this.save(true);
+      this.pump();
+      return;
+    }
+    if (verdict === 'changed') {
+      rec.need = { kind: 'choice', since: now, evidence: err instanceof ChangedError ? err.evidence : UNSURE, candidate: this.streamCandidate(rec, t) };
+      rec.wait = undefined;
+    } else {
+      this.renewFailed.set(rec.id, now);
+      const status = classify(err).status;
+      const tries = rec.wait.tries + 1;
+      rec.wait = { ...rec.wait, tries, nextAt: nextTry(tries, now), status: status || rec.wait.status };
+      if (status && rec.need) rec.need.status = status;
+    }
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /**
+   * A stream found changed inside its run (review of Phase 6: such changes always asked) starts again by itself
+   * when at most 1 MiB is saved, at most twice in ten minutes (3 G3, the owner's decision 1; ranged.ts
+   * silentRestart()); never a row that already asks, nor the pill's Continue (its addresses are the page's):
+   * its tracks start from their first segment (runTrack() empties the parts and begins the table again) and the
+   * row queues. False when the row asks instead.
+   */
+  private restartStream(rec: Rec, t: StreamTransfer): boolean {
+    const s = rec.stream;
+    if (!s || rec.need?.kind === 'choice' || t.candidate || t.renewed) return false;
+    const log = silentRestart(s.silent, savedBytes(rec), t.silentRestarts);
+    if (!log) return false;
+    s.silent = log;
+    for (const tr of s.tracks) Object.assign(tr, { done: 0, bytes: 0, initBytes: 0, secs: 0, nextSeq: undefined, lastDur: undefined, lastHash: undefined, initHash: undefined });
+    s.proven = undefined;
+    rec.received = 0;
+    rec.error = '';
+    rec.need = undefined;
+    rec.wait = undefined;
+    rec.state = 'queued';
+    rec.queuedAt = queueStamp();
+    return true;
+  }
+
+  /** The pill's Continue whose page gave another stream (hls.ts `candidate`): its addresses, kept for Start over (need.candidate). */
+  private streamCandidate(rec: Rec, t: StreamTransfer): NeedCandidate | undefined {
+    const c = t.candidate;
+    const s = rec.stream;
+    if (!c || !s) return undefined;
+    return { url: c.sourceUrl, finalUrl: c.sourceUrl, total: -1, etag: '', lastModified: '', contentType: '', stream: { ...c, audioOnly: s.audioOnly, quality: rec.quality, rung: s.rung, bytes: s.expected ?? 0 } };
   }
 
   /**
@@ -2698,7 +2946,9 @@ class Manager {
     this.renewFailed.delete(id);
     rec.renewTries = undefined;
     rec.catcher = undefined;
-    if (rec.mode === 'file' && rec.file && rec.path) {
+    // A stream (Phase 6): its renewal steps at once (streamEpisode()); found nothing, its page opens, where the
+    // pill's Continue picks it up (RESUME-DESIGN.md G2 manual fallback: Refresh address opens the page).
+    if ((rec.mode === 'file' && rec.file && rec.path) || (rec.mode === 'stream' && rec.stream && rec.path)) {
       rec.wait = { for: 'address', since: Date.now(), tries: 0, nextAt: 0, status: rec.need.status };
       await this.episode(rec);
       // Pause (or Cancel, Remove) stopped the attempt: theirs is the last word. So did the download
@@ -2735,6 +2985,78 @@ class Manager {
     rec.catcher = undefined;
     this.touch(rec);
     this.save(true);
+  }
+
+  /**
+   * The pill's "Continue · 62%" on the page opened again (RESUME-DESIGN.md G2 manual fallback, Phase 6): a
+   * stream row the pill found by its stable key (streamKey) continues from the page's fresh addresses for the
+   * same quality (`opt`, an option of the page's offer). The addresses are replaced and the row queues; its
+   * run reads them, keeps what was written and proves it (2.6): the same stream continues at its next
+   * sequence, another one is File changed. Another quality than the row's (its own is no longer offered) makes
+   * the row File changed at once, that quality kept for Start over. `from`: the page's offer key (the pill
+   * follows the row by it from then on) and the identity its media is asked with: its container and privacy
+   * must be the row's (RESUME-DESIGN.md 2.1; review of Phase 6: a tab in another container continued the
+   * row). The row's own addresses stay in `prior` until the proof says SAME; another stream puts them back
+   * (hls.ts prepare()) and is never started again by itself. A yt-dlp row resumes with its own format (Phase 8
+   * re-picks formats).
+   */
+  renewWith(id: string, opt: VideoOption, from: { videoKey?: string; identity?: Partial<IdentityJSON> } = {}): RenewWithResult {
+    const rec = this.find(id);
+    if (!rec || this.runs.has(id) || this.deciding.has(id) || !(rec.state === 'paused' || rec.state === 'failed')) return 'busy';
+    const who = from.identity;
+    if (who && ((who.userContextId !== undefined && (who.userContextId || 0) !== (rec.identity.userContextId || 0)) || (who.isPrivate !== undefined && !!who.isPrivate !== !!rec.identity.isPrivate))) return 'busy';
+    if (rec.mode === 'ytdlp') {
+      if (opt.mode !== 'ytdlp' || (rec.ytdlp && opt.ytdlpFormat && opt.ytdlpFormat !== rec.ytdlp.format)) return 'busy';
+      if (from.videoKey) rec.videoKey = from.videoKey;
+      this.resume(id);
+      return 'continued';
+    }
+    const s = rec.stream;
+    if (rec.mode !== 'stream' || !s || !rec.path || savedBytes(rec) <= 0 || opt.mode !== (s.format ?? 'hls') || !/^https?:\/\//i.test(opt.url)) return 'busy';
+    this.stopRenewing(id);
+    this.renewFailed.delete(id);
+    rec.renewTries = undefined;
+    rec.resumeOnStart = undefined;
+    if (from.videoKey) rec.videoKey = from.videoKey;
+    rec.error = '';
+    rec.wait = undefined;
+    rec.catcher = undefined;
+    if (!sameQuality(rec, opt)) {
+      rec.state = 'paused';
+      rec.need = {
+        kind: 'choice',
+        since: Date.now(),
+        evidence: `${rec.quality || 'its quality'} is no longer offered`,
+        candidate: { url: opt.url, finalUrl: opt.url, total: -1, etag: '', lastModified: '', contentType: '', stream: { sourceUrl: opt.url, variantUrl: opt.variantUrl, audioUrl: opt.audioUrl, dashVideo: opt.dashVideo, dashAudio: opt.dashAudio, audioOnly: opt.group === 'audio', quality: opt.label, rung: opt.rung, bytes: opt.bytes } },
+      };
+      this.touch(rec);
+      this.settle(rec);
+      this.save(true);
+      return 'changed';
+    }
+    // The row's own addresses until the proof decides (an earlier Continue not yet proven keeps the first ones).
+    s.prior ??= { sourceUrl: s.sourceUrl, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo ?? '', dashAudio: s.dashAudio ?? '', urls: s.tracks.map((t) => t.url) };
+    s.sourceUrl = opt.url;
+    if (s.format === 'dash') {
+      s.dashVideo = opt.dashVideo || s.dashVideo;
+      s.dashAudio = opt.dashAudio || s.dashAudio;
+    } else {
+      // With the row's fingerprint the rung is picked again from the page's master (hls.ts prepareHls()).
+      s.variantUrl = opt.variantUrl || '';
+      s.audioUrl = opt.audioUrl || '';
+    }
+    s.rung ??= opt.rung;
+    s.renew = true;
+    s.proven = undefined;
+    if (from.identity?.requestPage !== undefined) rec.identity = new Identity({ ...rec.identity, requestPage: from.identity.requestPage || undefined }).toJSON();
+    rec.need = undefined;
+    this.event(rec, 'Continued from its page');
+    rec.state = 'queued';
+    rec.queuedAt = queueStamp();
+    this.touch(rec);
+    this.save(true);
+    this.pump();
+    return 'continued';
   }
 
   /** Open page, From page: the download's page, its container and privacy, and whether the window arms the row once it is open. */
@@ -2901,6 +3223,7 @@ class Manager {
    */
   async keepPartial(id: string): Promise<void> {
     const rec = this.find(id);
+    if (rec?.mode === 'stream') return this.keepStream(rec);
     const ready = (): boolean => !!rec && this.recs.includes(rec) && rec.state === 'paused' && rec.need?.kind === 'choice' && rec.mode === 'file' && !!rec.file && !!rec.path && !this.runs.has(rec.id);
     if (!rec || !ready() || this.deciding.has(id) || !rec.file) return;
     const part = `${rec.path}.part`;
@@ -2961,6 +3284,58 @@ class Manager {
       // complete() is done, which waits for Safe Browsing: as a paused row with no need, Resume or Space
       // then started the whole download again under the kept file's name, on a row that ended Completed
       // (review of Phase 3).
+      await this.complete(rec);
+    } finally {
+      this.deciding.delete(id);
+    }
+  }
+
+  /**
+   * Keep partial file for a stream (RESUME-DESIGN.md 3 G3, the owner's decision 3; Phase 6): its written
+   * segments merged with ffmpeg, cut to the shorter track (hls.ts keepPartial()), as "<stem> (partial).mp4";
+   * the decision reaches the disk first, and the track parts go once the file is made. The row is completed
+   * with a note ("Kept 2:41 of 4:05"), through Safe Browsing and the Mark of the Web (complete()). Its
+   * segment table goes: the kept file is not the stream it describes (a Repair would fetch the whole video).
+   */
+  private async keepStream(rec: Rec): Promise<void> {
+    const id = rec.id;
+    const ready = (): boolean => this.recs.includes(rec) && rec.state === 'paused' && rec.need?.kind === 'choice' && rec.mode === 'stream' && !!rec.stream && !!rec.path && !this.runs.has(id);
+    if (!ready() || this.deciding.has(id) || !rec.stream) return;
+    const kept = keptSecs(rec.stream);
+    if (!(kept.secs > 0)) return;
+    this.stopRenewing(id);
+    this.deciding.add(id);
+    const ac = new AbortController();
+    try {
+      const base = stem(rec.path);
+      const target = uniquePath(rec.dir, partialName(rec.filename), (p) => this.taken(p, rec.id));
+      this.event(rec, 'Keeping the partial video');
+      await this.save(true);
+      const t = new StreamTransfer(rec.stream, this.streamEnv(rec));
+      let got: { path: string; secs: number };
+      try {
+        got = await t.keepPartial(base, target, ac.signal);
+      } catch (e) {
+        console.warn('Deer downloads: the partial video could not be kept', String(e));
+        if (rec.need) rec.need = { ...rec.need, evidence: 'the saved video could not be joined; try again' };
+        this.touch(rec);
+        await this.save(true);
+        return;
+      }
+      if (!ready()) {
+        await IOUtils.remove(got.path, { ignoreAbsent: true }).catch(() => undefined);
+        return;
+      }
+      const s = rec.stream;
+      for (const tr of s.tracks) await IOUtils.remove(trackPart(base, tr), { ignoreAbsent: true }).catch(() => undefined);
+      this.dropLedger(rec);
+      rec.path = got.path;
+      rec.filename = PathUtils.filename(got.path);
+      rec.need = undefined;
+      rec.wait = undefined;
+      rec.catcher = undefined;
+      rec.note = `Kept ${clock(got.secs)}${kept.of > got.secs ? ` of ${clock(kept.of)}` : ''}`;
+      this.event(rec, 'Partial file kept');
       await this.complete(rec);
     } finally {
       this.deciding.delete(id);
@@ -3172,8 +3547,12 @@ class Manager {
     this.flush();
     if (now - this.lastSave > SAVE_EVERY && this.runs.size) {
       this.save(now - this.lastFlushed > FLUSH_EVERY);
-      // The block lines hashed meanwhile reach the journal (a seal flushes them to the disk).
-      for (const [id, run] of this.runs) if (run.transfer instanceof FileTransfer) void this.ledgers.get(id)?.journal.flush();
+      // The block lines hashed meanwhile reach the journal (a seal flushes them to the disk); a stream's table
+      // lines too (its stop flushes them to the disk: hls.ts runTrack()).
+      for (const [id, run] of this.runs) {
+        if (run.transfer instanceof FileTransfer) void this.ledgers.get(id)?.journal.flush();
+        else if (run.transfer instanceof StreamTransfer) void run.transfer.table?.flush();
+      }
     }
     if (!this.runs.size && this.ticker) {
       clearInterval(this.ticker);
@@ -3234,8 +3613,10 @@ class Manager {
     const need = (r.state === 'paused' && !pausing && r.need) || (r.state === 'completed' && r.need?.kind === 'repair' && !edited) ? (r.need ?? null) : null;
     const damaged = need?.kind === 'repair' && !!r.check?.bad.length;
     const fills = damaged && r.check ? damagedFills(r.total > 0 ? r.total : (r.final?.size ?? 0), r.check.bad, r.check.bs) : r.mode === 'stream' && r.stream ? streamFills(r.stream) : r.file ? fileFills(r.file) : [];
-    // Keep partial file (3 G3): the unbroken beginning, for a one-file File changed row.
+    // Keep partial file (3 G3): the unbroken beginning, for a one-file File changed row; a stream's written
+    // segments, cut to the shorter track (Phase 6: "Keeps 2:41 of 4:05").
     const kept = need?.kind === 'choice' && r.mode === 'file' && r.file && r.path ? unbroken(r.file.segments) : 0;
+    const keptStream = need?.kind === 'choice' && r.mode === 'stream' && r.stream && r.path ? keptSecs(r.stream) : null;
     return {
       id: r.id,
       url: r.url,
@@ -3268,6 +3649,7 @@ class Manager {
       queuePos: r.state === 'queued' ? queued.indexOf(r) + 1 : 0,
       engine: r.mode === 'browser' ? 'browser' : 'vitre',
       isPrivate: r.identity.isPrivate,
+      userContextId: r.identity.userContextId || 0,
       blocked: r.state === 'failed' ? (r.blocked ?? '') : '',
       keepable: r.state === 'failed' && !!r.quarantine,
       need: need ? { kind: need.kind, status: need.status ?? 0, evidence: need.evidence ?? '' } : null,
@@ -3279,7 +3661,13 @@ class Manager {
       canRenew: r.mode === 'file' && !!r.file?.probed && !!r.path,
       // The ring's dot (RESUME-DESIGN.md 6): only rows that started needing the person in this session.
       attention: !!need && need.since >= this.session.startedAt,
-      keep: kept > 0 ? { bytes: kept, name: partialName(r.filename), older: !!r.oldParts?.length } : null,
+      keep:
+        kept > 0
+          ? { bytes: kept, name: partialName(r.filename), older: !!r.oldParts?.length }
+          : keptStream && keptStream.secs > 0
+            ? { bytes: savedBytes(r), name: partialName(r.filename), older: !!r.oldParts?.length, secs: keptStream.secs, of: keptStream.of }
+            : null,
+      streamKey: r.streamKey ?? '',
       check:
         r.state === 'completed' && (r.check || edited)
           ? {
@@ -3391,6 +3779,12 @@ class Manager {
     const rec = this.find(id);
     if (!rec || rec.state !== 'completed' || !rec.path || this.fixing.has(id) || this.checking.has(id) || !existsSync(rec.path)) return;
     if (rec.mode !== 'file' || !rec.file) {
+      // Phase 6 (4.3): a merged stream with its segment table is repaired by running the stream again, every
+      // segment checked against the table; without one, Download again (4.4).
+      if (rec.mode === 'stream' && rec.stream?.journal && (restore || rec.need?.kind === 'repair')) {
+        await this.repairStream(rec, restore);
+        return;
+      }
       if (rec.need?.kind === 'repair') this.downloadAgain(id);
       return;
     }
@@ -3507,6 +3901,101 @@ class Manager {
     }
   }
 
+  /**
+   * A finished merged stream repaired (RESUME-DESIGN.md 4.3, Phase 6): its bytes were re-muxed, so they can't
+   * be traced back to segments; the stream is run again on a copy of its state (the renewal steps when its
+   * addresses refuse), every segment and the init segment checked against the old table before it is written
+   * (hls.ts `expect`), merged into "<stem>.repair.<ext>" and moved over the file. Any segment that differs is
+   * the site's video changed: Repair refuses (Download again). A file changed after it finished is never
+   * written over (`restore`: Restore original, chosen, does that), and the file is looked at again before the
+   * move. Repairing meanwhile, with what it fetches. Review of Phase 6: the stream must be the one that finished,
+   * every line of the table matched (a shorter playlist whose segments all matched "repaired" a 24 s video into
+   * 12 s): the same count, the length within 1 s and the init (hls.ts sameAsFinished()), and every track wrote
+   * every line before the file is replaced. A table that does not hold every segment (a row begun before
+   * Phase 6, lines a crash kept from the journal) is no record: Download again, never "changed".
+   */
+  private async repairStream(rec: Rec, restore: boolean): Promise<void> {
+    const id = rec.id;
+    const s = rec.stream;
+    const old = s?.journal ? (this.tables.get(id) ?? (await StreamTable.open(s.journal))) : null;
+    if (!s || !old || !wholeTable(old, s) || !rec.path) {
+      if (rec.need?.kind === 'repair') this.downloadAgain(id);
+      return;
+    }
+    const st = await statOf(rec.path);
+    if (!st) return;
+    const edited = (at: { mtime: number }): boolean => editedSince(at.mtime, rec.final, rec.finishedAt);
+    if (!restore && edited(st)) {
+      rec.check = { ...(rec.check ?? { at: 0, ok: false, bad: [], bs: 0, badBytes: 0, unlocated: false, media: '', site: '' as const, status: 0 }), at: Date.now(), ok: false, edited: true, changedAt: st.mtime };
+      if (rec.need?.kind === 'repair') rec.need = undefined;
+      this.event(rec, 'Repair stopped: the file was changed after download');
+      this.touch(rec);
+      this.save(true);
+      return;
+    }
+    const ac = new AbortController();
+    const parts = s.tracks.reduce((n, t) => n + (t.count || 0), 0);
+    this.fixing.set(id, { parts, bytes: rec.final?.size ?? rec.total, ac });
+    this.touch(rec);
+    const base = `${stem(rec.path)}.repair`;
+    const copy: StreamState = JSON.parse(JSON.stringify(s));
+    copy.tracks = copy.tracks.map((t) => ({ ...t, done: 0, bytes: 0, initBytes: 0, secs: 0, nextSeq: undefined, lastDur: undefined, lastHash: undefined, initHash: undefined, sealedAt: undefined }));
+    Object.assign(copy, { phase: undefined, mergeOut: undefined, mergeBase: undefined, proven: undefined, renew: false, journal: undefined });
+    const t = new StreamTransfer(copy, this.streamEnv(rec));
+    t.expect = old;
+    let site: CheckState['site'] = '';
+    let status = 0;
+    const made: string[] = [];
+    try {
+      rec.repairing = Date.now();
+      await this.save(true);
+      await t.prepare(ac.signal, '');
+      await t.download(base, ac.signal);
+      // Every line matched: each track wrote as many segments as the finished one had, and its init.
+      if (!copy.tracks.every((tr, k) => tr.done === old.lines(k).length && (tr.initHash ?? '') === (old.head(k)?.init ?? ''))) throw new ChangedError('the video on the site is different now');
+      const out = await t.finish(base, (ext, suffix = '') => {
+        const p = `${base}${suffix}${ext}`;
+        made.push(p);
+        return p;
+      }, ac.signal);
+      if (t.note || extOf(out) !== extOf(rec.path)) throw new DownloadError('The repaired video could not be joined as it was.');
+      const now = await statOf(rec.path);
+      if (!now || (!restore && edited(now))) {
+        if (now) {
+          rec.check = { ...(rec.check ?? { at: 0, ok: false, bad: [], bs: 0, badBytes: 0, unlocated: false, media: '', site: '' as const, status: 0 }), at: Date.now(), ok: false, edited: true, changedAt: now.mtime };
+          this.event(rec, 'Repair stopped: the file was changed after download');
+        }
+        return;
+      }
+      await IOUtils.move(out, rec.path);
+      await platform.markOfTheWeb(rec.path, rec.url, rec.identity.pageUrl, rec.identity.isPrivate, asPolicy(rec.identity.referrerPolicy));
+      await this.stamp(rec);
+      rec.sha256 = (await IOUtils.computeHexDigest(rec.path, 'sha256').catch(() => '')) || undefined;
+      rec.total = rec.received = rec.final?.size ?? rec.total;
+      rec.need = undefined;
+      rec.check = { at: Date.now(), ok: true, bad: [], bs: 0, badBytes: 0, unlocated: false, edited: false, changedAt: 0, media: '', site: '', status: 0 };
+      this.event(rec, restore ? 'Original restored: every part checked against its record' : 'Repaired: the video was fetched again, every part checked against its record');
+    } catch (e) {
+      if (ac.signal.aborted) return;
+      const { kind, status: st2 } = classify(e);
+      site = kind === 'changed' ? 'changed' : kind === 'refused' || kind === 'not-file' ? 'expired' : 'unreachable';
+      status = st2;
+      if (kind !== 'changed') console.warn('Deer downloads: the stream repair failed', String(e));
+    } finally {
+      this.fixing.delete(id);
+      rec.repairing = undefined;
+      for (const tr of copy.tracks) await IOUtils.remove(trackPart(base, tr), { ignoreAbsent: true }).catch(() => undefined);
+      for (const p of [...made, `${base}.merge.part`]) if (p !== rec.path) await IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+      if (site && this.recs.includes(rec)) {
+        rec.check = { ...(rec.check ?? { at: Date.now(), ok: false, bad: [], bs: 0, badBytes: 0, unlocated: false, edited: false, changedAt: 0, media: '' }), site, status };
+        const what = restore ? 'Restore' : 'Repair';
+        this.event(rec, site === 'changed' ? `${what} stopped: the video on the site is different now` : site === 'expired' ? `${what} stopped: the link stopped working` : `${what} stopped: the site could not be reached`);
+      }
+      this.touch(rec);
+      this.save(true);
+    }
+  }
+
   /** Restore original (Changed after download, RESUME-DESIGN.md 4.4, 6): only when the person chooses it. */
   restoreOriginal(id: string): Promise<void> {
     return this.repair(id, true);
@@ -3524,7 +4013,7 @@ class Manager {
       if (rec.mode === 'ytdlp' && rec.ytdlp) return this.start(rec.ytdlp.pageUrl, { ...base, mode: 'ytdlp', ytdlpFormat: rec.ytdlp.format, ytdlpExt: rec.ytdlp.ext, audioOnly: rec.ytdlp.audioOnly });
       if (rec.mode === 'stream' && rec.stream) {
         const st = rec.stream;
-        return this.start(st.sourceUrl, { ...base, mode: st.format, variantUrl: st.variantUrl, audioUrl: st.audioUrl, dashVideo: st.dashVideo, dashAudio: st.dashAudio, audioOnly: st.audioOnly, bytes: st.expected });
+        return this.start(st.sourceUrl, { ...base, mode: st.format, variantUrl: st.variantUrl, audioUrl: st.audioUrl, dashVideo: st.dashVideo, dashAudio: st.dashAudio, audioOnly: st.audioOnly, bytes: st.expected, rung: st.rung, streamKey: rec.streamKey });
       }
       return this.start(rec.url, { ...base, mode: 'file' });
     } catch (e) {
@@ -3569,7 +4058,8 @@ class Manager {
       return [];
     }
     const out: Rec[] = [];
-    for (const path of names.filter((p) => /\.jsonl$/i.test(p)).sort()) {
+    // A stream's segment table (<id>.stream.jsonl, Phase 6) is not a file's record: its row can't be rebuilt from it.
+    for (const path of names.filter((p) => /\.jsonl$/i.test(p) && !/\.stream\.jsonl$/i.test(p)).sort()) {
       const l = await Ledger.open(path).catch(() => null);
       if (!l || !l.header.id || !l.header.url) continue;
       const h = l.header;
@@ -3906,6 +4396,47 @@ async function removeSoon(path: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
+}
+
+/**
+ * The pill's option is the row's quality (RESUME-DESIGN.md G2): an audio-only row takes any audio option (its
+ * own rendition or variant is picked again from the page's master by its fingerprint); a video by its height
+ * when both have one, else the same label ("1080p"), else the same height. Review of Phase 6: a label alone
+ * ("M4A" or "AAC", which depends on ffmpeg) called the same quality gone.
+ */
+function sameQuality(rec: Rec, opt: VideoOption): boolean {
+  const s = rec.stream;
+  if ((opt.group === 'audio') !== !!s?.audioOnly) return false;
+  if (s?.audioOnly) return true;
+  const mine = s?.rung?.height || Number(/^(\d{3,4})p/.exec(rec.quality || '')?.[1] || 0);
+  const theirs = opt.rung?.height || opt.height;
+  if (mine && theirs) return mine === theirs;
+  if (rec.quality) return rec.quality === opt.label;
+  return true;
+}
+
+/** "2:41", "1:02:03" (Keep partial's note for a stream: "Kept 2:41 of 4:05"). */
+function clock(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/**
+ * A finished stream's segment table holds a line for every segment of every track, in order (RESUME-DESIGN.md
+ * 4.3): what Repair checks the stream against. A row begun before Phase 6, or one whose last lines never
+ * reached the journal, holds fewer: no record (review of Phase 6).
+ */
+function wholeTable(t: StreamTable, s: StreamState): boolean {
+  return (
+    s.tracks.length > 0 &&
+    s.tracks.every((tr, k) => {
+      const lines = t.lines(k);
+      return tr.count > 0 && lines.length === tr.count && lines.every((l, i) => l.i === i);
+    })
+  );
 }
 
 function streamPartsExist(p: string): boolean {

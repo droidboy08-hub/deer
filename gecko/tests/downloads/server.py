@@ -131,6 +131,46 @@ Routes (GET):
                             that mints a new signed address on every request (review of Phase 5)
   /loop/a                   a 302 to /loop/b and back, for ever (NS_ERROR_REDIRECT_LOOP) | /dupcl  a 200 with two Content-Length
                             headers that disagree (NS_ERROR_CORRUPTED_CONTENT): failures no wait fixes (review of Phase 4)
+  Streams that expire or change (Phase 6 of RESUME-DESIGN.md; K is the test's key, segments are numbered from 0):
+  /vod-sign/K/master.m3u8[?mt=T]
+                            the HLS master (hls/master.m3u8) whose variant addresses carry a token minted on every
+                            read: K/<tok>/v360/index.m3u8. Without mt it never expires (a stable master); with mt
+                            (a master token /vod-page.html minted) it answers 403 once that token died
+  /vod-sign/K/<tok>/<rend>/<file>
+                            the variant playlist, its segments and its key (hls/<rend>/...) while <tok> lives; then 403
+                            "Request has expired" (the variant and segment tokens expire together)
+  /vod-expire?k=K           every token minted for K so far dies (variant, segment and master tokens)
+  /vod-page.html?k=K&only=H a video page (the VIDEO template, title "Molten...") whose player fetched the master
+                            /vod-sign/K/master.m3u8?mt=<a fresh master token>; with only=180 the master offers only
+                            that rendition (the page's 360p is no longer offered)
+  /vod-reenc/K/<path>       /fx/<path> (hls/v360/...); once /flag?k=K the TS segments are other bytes of the same
+                            size (every byte XOR 0xA5 but the 0x47 sync bytes): the same count, re-encoded
+  /dash-rename/K/<path>     /fx/<path> (dash/...); once /flag?k=K the manifest names its representations v360 and a96
+                            instead of 0 and 1 (their segment addresses follow, through $RepresentationID$), and the
+                            old addresses answer 404
+  /vod-html/K/<N>/<path>    /fx/<path> (hls/v360/...) whose segment N always answers 200 with a web page
+  From the review of Phase 6:
+  /vod-trap?k=K&from=N      /vod-sign/K: the tokens minted so far answer their variant playlist once more and then
+                            403, and their segments N and later 403 at once; tokens minted after the trap give
+                            re-encoded segments (every byte XOR 0xA5 but the 0x47 sync bytes), the same count and
+                            durations (a proof of one playlist must never stand for another)
+  /dash-rename/K/<path>     (above) once /flag?k=K-reenc too, the renamed video chunks are other bytes (XOR 0xA5
+                            after their first 8): renamed AND re-encoded
+  /vod-trunc/K/<path>       /fx/<path> (hls/v360/...); once /flag?k=K a media playlist lists only its first 6
+                            segments (a shorter playlist of the same first segments): Repair must refuse it
+  /vod-init/K/<path>        /fx/<path> (hlsfmp4/...); once /flag?k=K the init segments answer 404; segments hold
+  /vod-asign/K/master.m3u8  the fMP4 master (hlsfmp4) whose variant AND audio rendition carry a token minted on every
+                            read: K/<tok>/<video|audio>/<file> while the token lives (/vod-expire?k=K), then 403;
+                            audio segments hold
+  /vod-br/K/index.m3u8?be=stable|flap|edge  and  /vod-br/K/all.ts?be=
+                            HLS byte ranges (EXT-X-BYTERANGE) over one file, the 12 360p segments joined. be=stable:
+                            one ETag; flap: two backends taking turns, each with its own ETag and Last-Modified;
+                            edge: a new ETag on every answer, one Last-Modified. If-Range is honoured against the
+                            answering backend's validators (else a 200 with the whole file). Once /flag?k=K: other
+                            bytes (XOR 0xA5 but the sync bytes) under other validators. A range that starts in
+                            segment N holds (/vod-hold)
+  /vod-hold?k=K&from=N      segments N and later of K's routes above wait until the hold changes (from=-1: none;
+                            at most 90 s), so a test pauses a stream at a known segment
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
                             (/reset leaves the flags and counts of /expire and /swap alone)
 
@@ -142,6 +182,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import socket
 import struct
 import sys
@@ -176,6 +217,10 @@ MINTED = {'n': 0}
 DROP = {}
 BUSY = {}
 SLOW = {}
+# The stream routes of Phase 6: tokens by name ({'k', 'dead', 'only'}), the count that names them, and each key's
+# hold (segments from this number on wait; -1: none).
+VOD = {'tokens': {}, 'n': 0, 'hold': {}, 'trap': {}, 'br': {}}
+RENAMED = {'0': 'v360', '1': 'a96'}
 EXPIRED_PAGE = ('<!doctype html><meta charset=utf-8><title>Sign in</title><main style="padding:120px 80px;font:16px Segoe UI">'
                 '<h1>This link has expired</h1><p>Sign in to download the file again.</p></main>')
 EXPIRED_XML = ('<?xml version="1.0" encoding="UTF-8"?>\n<Error><Code>AccessDenied</Code><Message>Request has expired</Message>'
@@ -380,6 +425,43 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 SLOW[key] = (time.time() + float(q.get('for', '10')), float(q.get('ms', '1500')) / 1000)
             return self.text(200, json.dumps({'slow': key, 'until': SLOW[key][0]}), 'application/json')
+        if p == '/vod-hold':
+            with LOCK:
+                VOD['hold'][q.get('k', '')] = int(q.get('from', '-1'))
+            return self.text(200, '{}', 'application/json')
+        if p == '/vod-expire':
+            key = q.get('k', '')
+            with LOCK:
+                for t in VOD['tokens'].values():
+                    if t['k'] == key:
+                        t['dead'] = True
+            return self.text(200, '{}', 'application/json')
+        if p == '/vod-page.html':
+            key = q.get('k', 'vod')
+            mt = self.vod_token(key, q.get('only', ''))
+            self.record()
+            script = "fetch('/vod-sign/%s/master.m3u8?mt=%s').then(r=>r.text())" % (key, mt)
+            return self.text(200, VIDEO.replace('%STYLE%', STYLE).replace('%SCRIPT%', script).replace('%SRC%', 'src="/media/clip"'))
+        if p.startswith('/vod-sign/'):
+            return self.vod_sign(p[len('/vod-sign/'):], q, rate)
+        if p.startswith('/vod-reenc/'):
+            return self.vod_reenc(p[len('/vod-reenc/'):], rate)
+        if p.startswith('/dash-rename/'):
+            return self.dash_rename(p[len('/dash-rename/'):], rate)
+        if p.startswith('/vod-html/'):
+            return self.vod_html(p[len('/vod-html/'):], rate)
+        if p == '/vod-trap':
+            with LOCK:
+                VOD['trap'][q.get('k', '')] = {'from': int(q.get('from', '6')), 'at': VOD['n'], 'reads': {}}
+            return self.text(200, '{}', 'application/json')
+        if p.startswith('/vod-trunc/'):
+            return self.vod_trunc(p[len('/vod-trunc/'):], rate)
+        if p.startswith('/vod-init/'):
+            return self.vod_init(p[len('/vod-init/'):], rate)
+        if p.startswith('/vod-asign/'):
+            return self.vod_asign(p[len('/vod-asign/'):], rate)
+        if p.startswith('/vod-br/'):
+            return self.vod_br(p[len('/vod-br/'):], q)
         if p.startswith('/net/'):
             return self.net(p[len('/net/'):], q, rate)
         if p.startswith('/loop/'):
@@ -1099,6 +1181,333 @@ class Handler(BaseHTTPRequestHandler):
             entry['secs'] = round(time.time() - t0, 3)
             if sent_to:
                 sent_to(sent)
+
+    # ---- streams that expire or change (Phase 6) ----
+
+    def vod_token(self, key, only=''):
+        with LOCK:
+            VOD['n'] += 1
+            tok = 't%d' % VOD['n']
+            VOD['tokens'][tok] = {'k': key, 'dead': False, 'only': only}
+        return tok
+
+    def vod_alive(self, tok, key):
+        with LOCK:
+            t = VOD['tokens'].get(tok)
+            return bool(t) and t['k'] == key and not t['dead']
+
+    def vod_hold(self, key, index):
+        """A segment at or after the key's hold waits while it holds (at most 90 s)."""
+        t0 = time.time()
+        while time.time() - t0 < 90:
+            with LOCK:
+                hold = VOD['hold'].get(key, -1)
+            if hold < 0 or index < hold:
+                return
+            time.sleep(0.05)
+
+    def vod_playlist(self, path):
+        self.record(status=200)
+        with open(path, encoding='utf-8') as f:
+            return self.text(200, f.read(), MIME['.m3u8'])
+
+    def vod_sign(self, rest, q, rate):
+        """/vod-sign/K/master.m3u8 and /vod-sign/K/<tok>/<rend>/<file> (see the docstring)."""
+        parts = rest.split('/')
+        key = parts[0]
+        if len(parts) == 2 and parts[1] == 'master.m3u8':
+            only = ''
+            mt = q.get('mt')
+            if mt is not None:
+                if not self.vod_alive(mt, key):
+                    self.record(status=403, expired='master')
+                    return self.text(403, EXPIRED_XML, 'application/xml')
+                with LOCK:
+                    only = VOD['tokens'][mt]['only']
+            tok = self.vod_token(key)
+            out = []
+            skip = False
+            with open(fixture('hls/master.m3u8'), encoding='utf-8') as f:
+                for line in f.read().splitlines():
+                    if line.startswith('#EXT-X-STREAM-INF') and only and ('x%s,' % only) not in line:
+                        skip = True
+                        continue
+                    if skip:
+                        skip = False
+                        continue
+                    out.append('%s/%s' % (tok, line) if line and not line.startswith('#') else line)
+            self.record(status=200, master=tok)
+            return self.text(200, '\n'.join(out) + '\n', MIME['.m3u8'])
+        if len(parts) != 4:
+            return self.text(404, 'not found')
+        _, tok, rend, name = parts
+        path = fixture('hls/%s/%s' % (rend, name))
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        m = re.match(r'seg(\d+)\.ts$', name)
+        if m:
+            self.vod_hold(key, int(m.group(1)))
+        if not self.vod_alive(tok, key):
+            self.record(status=403, expired=tok)
+            return self.text(403, EXPIRED_XML, 'application/xml')
+        with LOCK:
+            trap = VOD['trap'].get(key)
+        if trap is not None:
+            n_tok = int(tok[1:]) if tok[1:].isdigit() else 0
+            if n_tok <= trap['at']:
+                # A token from before the trap: its playlist once more, then 403; its later segments 403.
+                if name.endswith('.m3u8'):
+                    with LOCK:
+                        seen = trap['reads'].get(tok, 0)
+                        trap['reads'][tok] = seen + 1
+                    if seen >= 1:
+                        self.record(status=403, expired=tok)
+                        return self.text(403, EXPIRED_XML, 'application/xml')
+                elif m and int(m.group(1)) >= trap['from']:
+                    self.record(status=403, expired=tok)
+                    return self.text(403, EXPIRED_XML, 'application/xml')
+            elif m:
+                return self.send_reenc(path)
+        if name.endswith('.m3u8'):
+            return self.vod_playlist(path)
+        return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+
+    def send_reenc(self, path, keep=0):
+        """A TS segment re-encoded: the same size, every byte XOR 0xA5 but the 0x47 sync bytes (with `keep`, the
+        first `keep` bytes as they are and all others swapped: an fMP4 chunk)."""
+        with open(path, 'rb') as f:
+            raw = f.read()
+        if keep:
+            data = raw[:keep] + raw[keep:].translate(XOR)
+        else:
+            data = bytes(b if i % 188 == 0 else b ^ 0xA5 for i, b in enumerate(raw))
+        entry = self.record(status=200, reenc=True, start=0, end=len(data) - 1)
+        self.text(200, data, MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+        entry['sent'] = len(data)
+        return None
+
+    def vod_reenc(self, rest, rate):
+        """/vod-reenc/K/<path>: the stream, re-encoded once K is flagged (other bytes, the same count)."""
+        key, _, sub = rest.partition('/')
+        path = fixture(sub)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        if path.endswith('.m3u8'):
+            return self.vod_playlist(path)
+        m = re.search(r'seg(\d+)\.ts$', path)
+        if m:
+            self.vod_hold(key, int(m.group(1)))
+        with LOCK:
+            changed = key in FLAGS
+        if not changed or not path.endswith('.ts'):
+            return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+        with open(path, 'rb') as f:
+            raw = f.read()
+        data = bytes(b if i % 188 == 0 else b ^ 0xA5 for i, b in enumerate(raw))
+        entry = self.record(status=200, reenc=True, start=0, end=len(data) - 1)
+        self.text(200, data, MIME['.ts'])
+        entry['sent'] = len(data)
+        return None
+
+    def dash_rename(self, rest, rate):
+        """/dash-rename/K/<path>: the DASH stream whose representations are renamed once K is flagged."""
+        key, _, sub = rest.partition('/')
+        with LOCK:
+            renamed = key in FLAGS
+        name = sub
+        if renamed:
+            if re.search(r'stream[01][-.]', sub):
+                self.record(status=404, renamed=True)
+                return self.text(404, 'not found')
+            for old, new in RENAMED.items():
+                name = name.replace('stream%s' % new, 'stream%s' % old)
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        if path.endswith('.mpd'):
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+            if renamed:
+                for old, new in RENAMED.items():
+                    text = text.replace('<Representation id="%s"' % old, '<Representation id="%s"' % new)
+            self.record(status=200, renamed=renamed)
+            return self.text(200, text, MIME['.mpd'])
+        m = re.search(r'chunk-stream\w+-(\d+)\.m4s$', path)
+        if m:
+            self.vod_hold(key, int(m.group(1)) - 1)
+        with LOCK:
+            now = key in FLAGS
+            reenc = (key + '-reenc') in FLAGS
+        if now and not renamed and re.search(r'stream[01][-.]', sub):
+            # Renamed while this request waited: its old address answers 404 now.
+            self.record(status=404, renamed=True)
+            return self.text(404, 'not found')
+        if now and reenc and re.search(r'chunk-streamv360-\d+\.m4s$', sub):
+            return self.send_reenc(path, keep=8)
+        return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+
+    def vod_html(self, rest, rate):
+        """/vod-html/K/<N>/<path>: segment N answers with a web page."""
+        key, _, more = rest.partition('/')
+        bad, _, sub = more.partition('/')
+        path = fixture(sub)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        if path.endswith('.m3u8'):
+            return self.vod_playlist(path)
+        m = re.search(r'seg(\d+)\.ts$', path)
+        if m:
+            self.vod_hold(key, int(m.group(1)))
+            if bad.isdigit() and int(m.group(1)) == int(bad):
+                self.record(status=200, page=True)
+                return self.text(200, EXPIRED_PAGE)
+        return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+
+    def vod_trunc(self, rest, rate):
+        """/vod-trunc/K/<path>: once K is flagged, a media playlist lists only its first 6 segments."""
+        key, _, sub = rest.partition('/')
+        path = fixture(sub)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            short = key in FLAGS
+        if path.endswith('.m3u8'):
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+            if short:
+                out, n = [], 0
+                for line in text.splitlines():
+                    if line.startswith('#EXTINF') and n >= 6:
+                        break
+                    if line and not line.startswith('#'):
+                        n += 1
+                    out.append(line)
+                text = '\n'.join(out) + '\n#EXT-X-ENDLIST\n'
+            self.record(status=200, short=short)
+            return self.text(200, text, MIME['.m3u8'])
+        return self.send_file(path, rate, ctype=MIME.get(os.path.splitext(path)[1], 'application/octet-stream'))
+
+    def vod_init(self, rest, rate):
+        """/vod-init/K/<path>: the fMP4 stream whose init segments answer 404 once K is flagged."""
+        key, _, sub = rest.partition('/')
+        path = fixture(sub)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        m = re.search(r'video/seg(\d+)\.m4s$', sub)
+        if m:
+            self.vod_hold(key, int(m.group(1)))
+        with LOCK:
+            gone = key in FLAGS
+        if gone and re.search(r'init_\d\.mp4$', sub):
+            self.record(status=404, init=True)
+            return self.text(404, 'not found')
+        if path.endswith('.m3u8'):
+            return self.vod_playlist(path)
+        return self.send_file(path, rate, ctype='video/mp4')
+
+    def vod_asign(self, rest, rate):
+        """/vod-asign/K/master.m3u8 and /vod-asign/K/<tok>/<video|audio>/<file> (see the docstring)."""
+        parts = rest.split('/')
+        key = parts[0]
+        if len(parts) == 2 and parts[1] == 'master.m3u8':
+            tok = self.vod_token(key)
+            with open(fixture('hlsfmp4/master.m3u8'), encoding='utf-8') as f:
+                text = f.read()
+            text = text.replace('URI="audio/', 'URI="%s/audio/' % tok)
+            text = '\n'.join(('%s/%s' % (tok, line) if line and not line.startswith('#') else line) for line in text.splitlines()) + '\n'
+            self.record(status=200, master=tok)
+            return self.text(200, text, MIME['.m3u8'])
+        if len(parts) != 4:
+            return self.text(404, 'not found')
+        _, tok, rend, name = parts
+        path = fixture('hlsfmp4/%s/%s' % (rend, name))
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        m = re.match(r'seg(\d+)\.m4s$', name)
+        if m and rend == 'audio':
+            self.vod_hold(key, int(m.group(1)))
+        if not self.vod_alive(tok, key):
+            self.record(status=403, expired=tok)
+            return self.text(403, EXPIRED_XML, 'application/xml')
+        if name.endswith('.m3u8'):
+            return self.vod_playlist(path)
+        return self.send_file(path, rate, ctype='video/mp4')
+
+    def vod_br(self, rest, q):
+        """/vod-br/K/index.m3u8 and /vod-br/K/all.ts (see the docstring)."""
+        key, _, name = rest.partition('/')
+        be = q.get('be', 'stable')
+        segs = []
+        for i in range(12):
+            with open(fixture('hls/v360/seg%03d.ts' % i), 'rb') as f:
+                segs.append(f.read())
+        if name == 'index.m3u8':
+            lines = ['#EXTM3U', '#EXT-X-VERSION:4', '#EXT-X-TARGETDURATION:2', '#EXT-X-MEDIA-SEQUENCE:0', '#EXT-X-PLAYLIST-TYPE:VOD']
+            off = 0
+            for s in segs:
+                lines += ['#EXTINF:2.000000,', '#EXT-X-BYTERANGE:%d@%d' % (len(s), off), 'all.ts?be=' + be]
+                off += len(s)
+            lines.append('#EXT-X-ENDLIST')
+            self.record(status=200)
+            return self.text(200, '\n'.join(lines) + '\n', MIME['.m3u8'])
+        if name != 'all.ts':
+            return self.text(404, 'not found')
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            # A range that starts in segment N waits while N is held; what it gets is decided after.
+            start_at = int(rng[6:].partition('-')[0] or 0)
+            first, off = 0, 0
+            for i, s in enumerate(segs):
+                if off + len(s) > start_at:
+                    first = i
+                    break
+                off += len(s)
+            self.vod_hold(key, first)
+        with LOCK:
+            swapped = key in FLAGS
+            n = VOD['br'][key] = VOD['br'].get(key, 0) + 1
+        data = b''.join(segs)
+        if swapped:
+            data = bytes(b if i % 188 == 0 else b ^ 0xA5 for i, b in enumerate(data))
+        size = len(data)
+        mark = 'X' if swapped else ''
+        if be == 'flap':
+            backend = 'A' if n % 2 else 'B'
+            etag, lm = '"%s%s-%x"' % (mark, backend, size), LM[backend == 'B']
+        elif be == 'edge':
+            backend, etag, lm = '', '"%sE%d"' % (mark, n), LM[swapped]
+        else:
+            backend, etag, lm = '', '"%sS-%x"' % (mark, size), LM[swapped]
+        start, end, status = 0, size - 1, 200
+        if rng.startswith('bytes='):
+            a, _, b = rng[6:].partition('-')
+            if_range = self.headers.get('If-Range')
+            if if_range is None or if_range == etag or if_range == lm:
+                start = int(a) if a else 0
+                end = min(size - 1, int(b)) if b else size - 1
+                status = 206
+        body = data[start:end + 1]
+        entry = self.record(status=status, start=start, end=end, etag=etag, backend=backend, swapped=swapped)
+        self.send_response(status)
+        self.send_header('Content-Type', 'video/mp2t')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('ETag', etag)
+        self.send_header('Last-Modified', lm)
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Cache-Control', 'no-store')
+        if status == 206:
+            self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, end, size))
+        self.end_headers()
+        self.wfile.write(body)
+        entry['sent'] = len(body)
+        return None
 
     def dropping(self, key):
         with LOCK:

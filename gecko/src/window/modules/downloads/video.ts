@@ -17,6 +17,14 @@
 // pill says "Start song.mp3 again on this page. Deer continues from 62%." with Stop waiting. When the
 // start continues the row ('attached'), it flies to the ring like a new download and the note says
 // "Continuing song.mp3 from 62%".
+//
+// Continuing a stream on its page opened again (RESUME-DESIGN.md G2 manual fallback, Phase 6): a stream row
+// that stopped (Link expired, paused, File changed) is found by its stable key (streamkey.ts: the page, the
+// rounded duration, the title; yt-dlp's 'ytdlp|<webpage_url>'), where the offer's own key changes with the
+// session and the signed address. The pill then shows "Continue · 62%", which calls the engine's
+// renewWith() with the same quality from the page's offer: the row continues from the fresh addresses (its
+// proof decides). When that quality is no longer offered the picker opens saying so ("1080p is no longer
+// offered"), and picking another quality turns the row into File changed (the panel then shows its choice).
 import type { Browser, PageSource } from '../../browser';
 import { el } from '../../dom';
 import * as fx from '../../firefox';
@@ -33,8 +41,9 @@ import type { Ring } from './ring';
 import type { DownloadStore } from './store';
 import { leaveElementFullscreen } from './system';
 import { ytdlpFirst } from '../../../modules/downloads/sites';
+import { streamKeyOf } from '../../../modules/downloads/streamkey';
 
-type PillMode = 'found' | 'downloading' | 'paused' | 'saved' | 'protected' | 'live';
+type PillMode = 'found' | 'downloading' | 'paused' | 'saved' | 'protected' | 'live' | 'continue';
 
 interface Target {
   tabId: number;
@@ -44,6 +53,8 @@ interface Target {
 
 const reduced = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SPRING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+/** The labels the picker gives its audio-only options (a stopped audio row continues with any of them). */
+const AUDIO_QUALITY = /^(M4A|AAC|WEBA|MP3|OPUS)$/i;
 /** Sites whose terms often forbid saving: a one-line reminder on the first download from each. */
 const TERMS_HOSTS = /(^|\.)(youtube\.com|youtu\.be|googlevideo\.com|facebook\.com|fbcdn\.net|instagram\.com|tiktok\.com|x\.com|twitter\.com|vimeo\.com|twitch\.tv|reddit\.com|dailymotion\.com|soundcloud\.com|netflix\.com)$/i;
 const TERMS_PREF = 'vitre.downloads.termsSeen';
@@ -426,7 +437,25 @@ export class VideoUI {
     const dl = this.store.byVideo(offer.key);
     if (dl && (f.isActive(dl) || dl.state === 'paused')) return { mode: dl.state === 'paused' ? 'paused' : 'downloading', dl };
     if (dl && dl.state === 'completed' && Date.now() - dl.finishedAt < 6000) return { mode: 'saved', dl };
+    // RESUME-DESIGN.md G2 (Phase 6): the same video's stream row that stopped, found by its stable key, in this
+    // tab's container (2.1; review of Phase 6).
+    const old = offer.state === 'ok' ? this.store.byStream(this.streamKeyFor(offer), this.containerOf()) : undefined;
+    if (old) return { mode: 'continue', dl: old };
     return { mode: offer.state === 'ok' ? 'found' : null };
+  }
+
+  /** The container (userContextId) of the pill's tab. */
+  private containerOf(): number {
+    const t = this.target();
+    return (t ? this.b.tab(t.tabId)?.node.userContextId : 0) || 0;
+  }
+
+  /** The offer's stable key (streamkey.ts): yt-dlp's own, else the page, the rounded duration and the title. */
+  private streamKeyFor(offer: VideoOffer): string {
+    if (offer.key.startsWith('ytdlp|')) return offer.key;
+    const t = this.target();
+    const page = t ? (this.b.tab(t.tabId)?.url ?? '') : '';
+    return streamKeyOf(page, offer.duration, offer.title);
   }
 
   /** The pill's state, for tests. */
@@ -468,6 +497,15 @@ export class VideoUI {
         main.setAttribute('aria-label', `Download this video${opt ? `, ${opt.label}` : ''}`);
         main.setAttribute('aria-expanded', String(this.picker.isOpen));
         setTip(main, 'Download this video', 'Ctrl+Shift+D');
+      }
+    } else if (mode === 'continue' && dl) {
+      // "Continue · 62%" (RESUME-DESIGN.md G2): the stopped row of this video, continued from the page.
+      const pct = f.percent(dl);
+      f.setText(q('.q'), `${pct}%`);
+      const main = q('button');
+      if (main) {
+        main.setAttribute('aria-label', `Continue downloading this video, ${pct} percent saved`);
+        setTip(main, `Continue ${dl.filename}`, '');
       }
     } else if ((mode === 'downloading' || mode === 'paused') && dl) {
       const pct = f.percent(dl);
@@ -575,6 +613,8 @@ export class VideoUI {
         const opt = offer.options.find((o) => o.id === offer.suggested) ?? offer.options[0];
         if (opt) this.download(t, offer, opt, center(this.pillRect()));
       } else this.picker.toggle(t, offer, e.detail === 0);
+    } else if (this.mode === 'continue' && dl) {
+      this.continueOld(t, offer, dl, e.detail === 0);
     } else if ((this.mode === 'downloading' || this.mode === 'paused') && dl) {
       // The engine's state now, not the copy a frame behind (a quick second click resumes).
       if (target.closest('.vd-pill-small')) this.store.run((this.store.engine.get(dl.id) ?? dl).state === 'paused' ? 'resume' : 'pause', dl.id);
@@ -600,6 +640,9 @@ export class VideoUI {
       quality: opt.label,
       bytes: opt.bytes || undefined,
       videoKey: offer.key,
+      // RESUME-DESIGN.md 5.3, G2 (Phase 6): the quality's fingerprint and the stable key the pill finds the row by.
+      rung: opt.rung,
+      streamKey: opt.mode === 'file' ? undefined : this.streamKeyFor(offer) || undefined,
       title: offer.title,
       pageUrl: tab?.url ?? '',
       browserId: t.browserId,
@@ -623,6 +666,45 @@ export class VideoUI {
       }
       this.renderPill();
     }
+  }
+
+  /**
+   * "Continue · 62%" (RESUME-DESIGN.md G2 manual fallback): the stopped row continues with the same quality
+   * from the page's offer; when that quality is no longer offered, the picker says so and its choice goes to
+   * the row (another quality: File changed).
+   */
+  private continueOld(t: Target, offer: VideoOffer, dl: DownloadView, keyboard: boolean): void {
+    // The row's quality on the page now: its label ("1080p"); an audio row any audio option (its label, M4A or
+    // AAC, depends on ffmpeg); a video the option of its height (review of Phase 6). The engine then picks the
+    // row's own rung again from the page's master by its fingerprint.
+    const height = Number(/^(\d{3,4})p/.exec(dl.quality || '')?.[1] || 0);
+    const opt =
+      (dl.quality ? offer.options.find((o) => o.label === dl.quality) : undefined) ??
+      (AUDIO_QUALITY.test(dl.quality) ? offer.options.find((o) => o.group === 'audio') : height ? offer.options.find((o) => o.group === 'video' && o.height === height) : undefined);
+    if (!opt) {
+      this.picker.open(t, offer, keyboard, null, dl);
+      return;
+    }
+    this.renewWith(t, offer, dl, opt);
+  }
+
+  /**
+   * The engine's renewWith() for the pill's Continue, or the picker's choice for a row whose quality is gone,
+   * asked as this tab asks (its container and privacy: the engine refuses another's; RESUME-DESIGN.md 2.1).
+   */
+  renewWith(t: Target, offer: VideoOffer, dl: DownloadView, opt: VideoOption): void {
+    const tab = this.b.tab(t.tabId);
+    const r = this.store.engine.renewWith(dl.id, opt, { videoKey: offer.key, identity: { userContextId: tab?.node.userContextId ?? 0, isPrivate: this.b.isPrivate, ...(offer.requestPage ? { requestPage: offer.requestPage } : {}) } });
+    if (r === 'continued') {
+      if (t.video.id >= 0) this.pin(t, offer.key, 'download');
+      const words = `Continuing ${dl.filename} from ${f.percent(dl)}%`;
+      this.ring.announce(words);
+      this.note(words, '');
+    } else if (r === 'changed') {
+      // File changed: the row asks (Start over with the new file, Keep partial file) in the panel.
+      this.panel.choose(dl.id);
+    }
+    this.renderPill();
   }
 
   private pin(t: Target, key: string, why: 'download' | 'hold'): void {
@@ -693,6 +775,11 @@ export class VideoUI {
         this.note(`Start ${name} again on this page.`, pct > 0 ? `Deer continues from ${pct}%.` : 'Deer continues from where it stopped.', 20000, { label: 'Stop waiting', run: () => engine.stopWaiting(id) })
       );
     } else if (v?.need?.kind === 'page') requestAnimationFrame(() => this.note(`Start ${name} again on this page.`, ''));
+    // A stream's Link expired (RESUME-DESIGN.md G2 manual fallback, Phase 6): the pill on its video continues it.
+    else if (v?.stream && v.need?.kind === 'address') {
+      const pct = f.percent(v);
+      requestAnimationFrame(() => this.note(`Press Continue on the video to go on with ${name}.`, pct > 0 ? `Deer continues from ${pct}%.` : '', 20000));
+    }
     return true;
   }
 
@@ -861,6 +948,8 @@ class Picker {
   private dir = '';
   private unEsc: (() => void) | null = null;
   private unFocus: (() => void) | null = null;
+  /** The stopped row the pill's Continue opened the picker for: its quality is no longer offered (G2). */
+  private continuing: DownloadView | null = null;
 
   constructor(
     private b: Browser,
@@ -881,10 +970,11 @@ class Picker {
     else this.open(t, offer, keyboard);
   }
 
-  open(t: Target, offer: VideoOffer, keyboard: boolean, barAnchor?: DOMRect | null): void {
+  open(t: Target, offer: VideoOffer, keyboard: boolean, barAnchor?: DOMRect | null, continuing: DownloadView | null = null): void {
     this.close(false);
     this.target = t;
     this.offer = offer;
+    this.continuing = continuing;
     this.chosen = offer.suggested || offer.options[0]?.id || '';
     this.dir = '';
     if (t.video.id >= 0) this.ui.hold(t);
@@ -982,8 +1072,11 @@ class Picker {
     if (videos.length) opts.append(el('div', { class: 'vd-group' }, `Video · ${videos[0].container}`), ...videos.map(row));
     if (audios.length) opts.append(el('div', { class: 'vd-group' }, 'Audio only'), ...audios.map(row));
     const terms = TERMS_HOSTS.test(offer.host) && !termsSeen(offer.host) ? el('div', { class: 'vd-terms' }, TERMS_LINE) : null;
+    // RESUME-DESIGN.md G2: the stopped row's quality is gone from the page ("1080p is no longer offered").
+    const gone = this.continuing ? el('div', { class: 'vd-terms vd-gone', role: 'status' }, `${this.continuing.quality || 'Its quality'} is no longer offered`) : null;
     body.append(
       el('div', { class: 'vd-pick-head' }, thumb, el('div', { class: 'vd-pick-text' }, el('span', { class: 'vd-pick-title' }, offer.title || 'Video'), el('span', { class: 'vd-pick-sub' }, sub))),
+      ...(gone ? [gone] : []),
       opts,
       el('div', { class: 'vd-pick-sep' }),
       el('div', { class: 'vd-saveto' }, el('span', { class: 'k' }, 'Save to'), el('span', { class: 'v' }), el('button', { type: 'button', class: 'vd-change' }, 'Change')),
@@ -1063,8 +1156,11 @@ class Picker {
     if (!t || !offer || !opt || !this.el) return;
     const r = (this.el.querySelector('.vd-go') as HTMLElement).getBoundingClientRect();
     const dir = this.dir || undefined;
+    const continuing = this.continuing;
     this.close(false);
-    this.ui.download(t, offer, opt, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, dir);
+    // The pill's Continue for a row whose quality is gone: the choice goes to that row (G2: File changed).
+    if (continuing) this.ui.renewWith(t, offer, continuing, opt);
+    else this.ui.download(t, offer, opt, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, dir);
   }
 
   /** A still of the video as it is now (a compositor snapshot of the page), drawn 64x36. */
@@ -1115,6 +1211,9 @@ function faceOf(mode: PillMode): Node[] {
       ];
     case 'saved':
       return [el('div', { class: 'vd-pill-note saved' }, node(ic.saved), el('span', { class: 'b' }, 'Saved'), el('span', { class: 'div' }), el('button', { type: 'button', class: 'vd-pill-open' }, 'Open'))];
+    case 'continue':
+      // RESUME-DESIGN.md G2 (Phase 6): "Continue · 62%".
+      return [el('button', { type: 'button', class: 'vd-pill-main vd-pill-continue' }, node(ic.play(14)), 'Continue', el('span', { class: 'div' }), el('span', { class: 'q' }))];
     case 'protected':
       return [el('div', { class: 'vd-pill-note', role: 'status' }, node(ic.lock), el('span', {}, 'Protected video'))];
     case 'live':

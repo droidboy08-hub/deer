@@ -676,7 +676,13 @@ export class Panel {
     const evidence = choice && v.need?.evidence ? `${v.need.evidence[0].toUpperCase()}${v.need.evidence.slice(1)}. ` : '';
     // The partial file an earlier Start over set aside goes with Keep partial too: the line says so
     // (review of Phase 3).
-    const keeps = choice && v.keep ? ` Keep partial saves the first ${f.bytes(v.keep.bytes)} as ${v.keep.name}${v.keep.older ? ' and deletes the partial file an earlier Start over set aside' : ''}.` : '';
+    // A stream (Phase 6): its written segments, cut to the shorter track: "Keeps 2:41 of 4:05".
+    const keeps =
+      choice && v.keep
+        ? v.stream && v.keep.secs
+          ? ` Keep partial file: Keeps ${f.duration(v.keep.secs) || '0:00'}${v.keep.of ? ` of ${f.duration(v.keep.of)}` : ''} as ${v.keep.name}${v.keep.older ? ' and deletes the parts an earlier Start over set aside' : ''}.`
+          : ` Keep partial saves the first ${f.bytes(v.keep.bytes)} as ${v.keep.name}${v.keep.older ? ' and deletes the partial file an earlier Start over set aside' : ''}.`
+        : '';
     f.setText(
       e.note,
       choice
@@ -1089,7 +1095,7 @@ function primaryOf(v: DownloadView): [string, string, string] {
   if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') return ['pause', 'Pause', ic.pause(14)];
   if (v.state === 'queued') return ['now', 'Start now', ic.play(14)];
   // RESUME-DESIGN.md 6: Waiting for link and Start it again from its page open the page; Link expired
-  // refreshes the address (a stream retries: its renewal comes with Phase 6).
+  // refreshes the address (a stream retries: Retry runs its renewal steps, Phase 6).
   if (v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)) return ['open-page', 'Open page', ic.open];
   if (v.need?.kind === 'address') return v.canRenew ? ['refresh', 'Refresh address', ic.retry] : ['retry', 'Retry', ic.retry];
   if (v.need?.kind === 'choice') return ['choose', 'Choose', ic.chevron];
@@ -1134,7 +1140,7 @@ function damagedCaption(v: DownloadView): string {
   return `${f.damagedParts(c.bad)} (${f.bytes(c.badBytes)}). Repair fetches only ${c.bad === 1 ? 'that part' : 'those parts'} again.`;
 }
 
-/** "Use another address…" is for a one-file download Deer moves itself (streams renew with Phase 6). */
+/** "Use another address…" is for a one-file download Deer moves itself (a stream renews by its steps and from its page: Phase 6). */
 function canUseAddress(v: DownloadView): boolean {
   return v.engine === 'vitre' && !v.stream;
 }
@@ -1168,7 +1174,7 @@ function detailActions(v: DownloadView): [string, string, string][] {
   if (v.state === 'failed' && v.keepable) return [['keep', 'Keep file', ''], ['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' || v.state === 'cancelled') return [['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   // RESUME-DESIGN.md 6 (Phase 3). Link expired: Refresh address · Use another address… · Open page · Show
-  // in folder · Cancel (a stream retries instead: its renewal comes with Phase 6; Copy address stays in
+  // in folder · Cancel (a stream retries instead: Retry runs its renewal steps, Phase 6; Copy address stays in
   // the row's menu). While an attempt runs (Renewing link) Pause comes first: it stops that attempt and
   // the ones planned. Waiting for link: Open page · Stop waiting · Use another address… · Cancel. File
   // changed: Start over with the new file · Keep partial file · Show in folder. Start it again from its

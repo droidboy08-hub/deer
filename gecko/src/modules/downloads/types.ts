@@ -112,6 +112,12 @@ export interface DownloadView {
   /** Who moves the bytes: Deer's engine, or Firefox for blob:, data:, POST answers and extensions. */
   engine: 'vitre' | 'browser';
   isPrivate: boolean;
+  /**
+   * The container (Firefox's userContextId, 0 for none) the download's requests are made in. The pill on a page
+   * opened again continues a stream row only from a tab in the same container (RESUME-DESIGN.md 2.1; review of
+   * Phase 6).
+   */
+  userContextId: number;
   /** Safe Browsing blocked the finished file ('' when it did not): the row's error says why. */
   blocked: '' | 'dangerous' | 'uncommon' | 'unwanted';
   /** The blocked file waits aside and may be kept anyway (engine keep(id)). */
@@ -150,11 +156,18 @@ export interface DownloadView {
   /**
    * File changed (need 'choice') on a one-file download: what Keep partial file saves, the unbroken
    * beginning from byte 0, and the name it takes ("song (partial).mp3"; RESUME-DESIGN.md 3 G3). Null
-   * when there is nothing to keep, or for streams (Phase 6). `older`: an earlier Start over set a
-   * partial file aside ("<name>.old.part"), which Keep partial deletes too, as the row says (review of
-   * Phase 3).
+   * when there is nothing to keep. `older`: an earlier Start over set a partial file aside
+   * ("<name>.old.part"), which Keep partial deletes too, as the row says (review of Phase 3). A stream
+   * (Phase 6): its written segments merged, cut to the shorter track: `secs` of `of` seconds ("Keeps 2:41
+   * of 4:05"); `bytes` is what is written.
    */
-  keep: { bytes: number; name: string; older: boolean } | null;
+  keep: { bytes: number; name: string; older: boolean; secs?: number; of?: number } | null;
+  /**
+   * A stream's stable key (RESUME-DESIGN.md G2, 5.1; Phase 6, streamkey.ts): the page's origin and path,
+   * the rounded duration and the title; 'ytdlp|<webpage_url>' for yt-dlp. The pill on the page opened
+   * again finds this row by it (videoKey changes with the session and the signed address). '' otherwise.
+   */
+  streamKey: string;
   /**
    * A finished file's last Check file (RESUME-DESIGN.md 4.2, 6; Phase 5), null when it was never checked.
    * `bad` damaged parts (`badBytes`): Damaged (need 'repair'); `unlocated`: its checksum no longer
@@ -229,6 +242,10 @@ export interface StartOptions {
   /** The picker's size estimate, shown until the stream's own measurements take over. */
   bytes?: number;
   videoKey?: string;
+  /** Streams: the chosen quality's fingerprint (RESUME-DESIGN.md 5.3), so a master read again re-picks it. */
+  rung?: StreamRung;
+  /** Streams: the stable key the pill finds the row by on the page opened again (streamkey.ts; G2). */
+  streamKey?: string;
   dir?: string;
   /** Ask where to save this one (Save link as…), whatever the setting says. */
   saveAs?: boolean;
@@ -293,7 +310,39 @@ export interface VideoOption {
   /** yt-dlp: the format to ask for ('137+140') and the file's extension. */
   ytdlpFormat: string;
   ytdlpExt: string;
+  /** Streams: the quality's fingerprint (RESUME-DESIGN.md 5.3), passed to the download (StartOptions.rung). */
+  rung?: StreamRung;
 }
+
+/**
+ * A stream's quality by its fingerprint (RESUME-DESIGN.md 5.3 rung; Phase 6, table.ts): what re-picks the
+ * same quality in a master playlist or a manifest read again. HLS: the variant's height, width, bandwidth,
+ * average bandwidth, codecs and audioOnly, and its audio rendition's GROUP-ID, language and name. DASH: the
+ * representation's id, kind, mime, codecs, height and bandwidth (and its language for audio).
+ */
+export interface StreamRung {
+  height?: number;
+  width?: number;
+  bandwidth?: number;
+  average?: number;
+  codecs?: string;
+  audioOnly?: boolean;
+  audioGroup?: string;
+  audioLang?: string;
+  audioName?: string;
+  id?: string;
+  kind?: 'video' | 'audio';
+  mime?: string;
+  /** DASH: the audio representation that plays with the video. */
+  audio?: StreamRung;
+}
+
+/**
+ * What the pill's Continue did (engine renewWith(), RESUME-DESIGN.md G2 manual fallback): 'continued', the
+ * old row continues from the page's fresh addresses (its proof runs as it starts); 'changed', another
+ * quality was chosen than the row's, which is now File changed; 'busy', the row can't be continued now.
+ */
+export type RenewWithResult = 'continued' | 'changed' | 'busy';
 
 export interface VideoOffer {
   state: 'ok' | 'protected' | 'live' | 'none';

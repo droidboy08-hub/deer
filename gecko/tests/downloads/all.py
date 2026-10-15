@@ -14,7 +14,10 @@
   takeover   a real link click (Content-Disposition, cookie, Referer) taken over from Firefox's list;
              <a download>; Alt+click; Mark of the Web; Firefox's scratch folder stays empty
   streams    HLS (TS + AES-128), fMP4 HLS with separate audio, DASH (video + audio joined), all
-             through ffmpeg from the settings path; the picker; the download mark
+             through ffmpeg from the settings path; the picker; the download mark; a segment refused with 403
+             fetched from a refreshed playlist (/token); Phase 6: each finished stream's segment table (a line
+             per segment hashed as the fixture's, the init segment's hash), and a merged stream damaged on disk
+             repaired by running it again against that table
   noffmpeg   the "ffmpeg not found" state: picker line, two files kept, settings page
   faults     a disk write error mid-download (a locked byte range): stops at once, reads as a disk
              problem, keeps the bytes on disk, resumes intact; it seals the block hash record (Phase 5), every
@@ -98,6 +101,21 @@
              leaves the file as it was, and one whose every block moved restores it; Remove or Cancel during
              a seal leaves no journal; Pause and Cancel before the rename are honoured; an older file's site
              compare keeps to 2 of 3 windows and the 5% rule
+  stream-expiry streams that expire or change (spikes/downloader/RESUME-DESIGN.md, Phase 6, G2): a variant token
+             that expired during a pause: the master is read again and the download continues at the next
+             sequence (nothing written fetched again but the proof's one segment; the segment table's lines
+             hash as the fixture's segments); the same count re-encoded is File changed, and Keep partial file
+             merges the written segments ("Keeps 0:14 of 0:24"); renamed DASH representations continue; a
+             segment that is a web page is never written (Link expired); a damaged middle segment: only it is
+             fetched again; a stream whose every segment is written joins without asking its expired
+             addresses; "Continue · N%" on the pill of the page opened again continues the row, and picking
+             another quality when the row's is no longer offered makes it File changed. From the review of
+             Phase 6: Repair refuses a shorter playlist; a DASH representation renamed mid-run continues only
+             when its bytes prove it (renamed and re-encoded is File changed); a proof never stands for another
+             playlist; byte ranges on farms whose validators differ complete, a swapped file is caught by its
+             bytes; a refused init is never answered with a media segment; an audio rendition renews; a crash's
+             saved place and lagging table lines; Continue never crosses containers; a refused first start
+             asks three times and runs no yt-dlp
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -144,6 +162,7 @@ TESTS = {
     'attach': (480, True),
     'network': (900, True),
     'repair': (600, True),
+    'stream-expiry': (900, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

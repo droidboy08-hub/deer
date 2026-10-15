@@ -31,7 +31,7 @@ import { clearTimeout, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { deerFolder, fetchText, oldFolder, sha256 } from './ffmpeg-install';
 import { AbortedError, DownloadError } from './net';
 import { fileFor } from './partfile';
-import type { VideoOffer, VideoOption } from './types';
+import type { StreamRung, VideoOffer, VideoOption } from './types';
 
 const YTDLP_RELEASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/';
 const DENO_RELEASE = 'https://github.com/denoland/deno/releases/latest/download/';
@@ -173,6 +173,8 @@ interface Format {
   protocol?: string;
   language?: string;
   format_note?: string;
+  /** HLS or DASH formats: the master playlist or manifest the format comes from. */
+  manifest_url?: string;
 }
 
 const has = (c?: string): boolean => !!c && c !== 'none';
@@ -252,6 +254,30 @@ export async function probe(pageUrl: string, base: VideoOffer, muxer: boolean, f
   const videos = options.filter((o) => o.group === 'video');
   const suggested = (videos.find((o) => o.height && o.height <= fit) ?? videos[videos.length - 1] ?? options[0]).id;
   return { ...offer, state: 'ok', options, suggested };
+}
+
+/**
+ * RESUME-DESIGN.md G2 step 3 (Phase 6): a stream download's page asked through yt-dlp for a fresh manifest of
+ * the same quality: the manifest_url of an HLS or DASH format of the same height (an audio-only one for an
+ * audio download), without cookies (ytdlp.ts header). Null when yt-dlp is not installed, finds nothing, or
+ * has no such format; the stream's own proof then decides whether what it found is the same video.
+ */
+export async function manifestFor(pageUrl: string, rung: StreamRung | undefined, audioOnly: boolean, signal: AbortSignal): Promise<{ url: string; format: 'hls' | 'dash' } | null> {
+  if (!ytdlpTools() || !/^https?:/i.test(pageUrl)) return null;
+  const r = await run(['-J', '--no-warnings', pageUrl], { signal, timeoutMs: 60000 }).catch(() => null);
+  if (!r || r.code !== 0) return null;
+  let info: any;
+  try {
+    info = JSON.parse(r.stdout);
+  } catch {
+    return null;
+  }
+  const formats: Format[] = Array.isArray(info?.formats) ? info.formats : [];
+  const streams = formats.filter((f) => !f.has_drm && typeof f.manifest_url === 'string' && /^https?:/i.test(f.manifest_url) && /^(m3u8|m3u8_native|http_dash_segments)$/.test(String(f.protocol)));
+  const want = audioOnly ? streams.filter((f) => !has(f.vcodec)) : streams.filter((f) => has(f.vcodec) && (!rung?.height || f.height === rung.height));
+  const pick = want.sort((a, b) => Math.abs((a.tbr || 0) * 1000 - (rung?.bandwidth || 0)) - Math.abs((b.tbr || 0) * 1000 - (rung?.bandwidth || 0)))[0];
+  if (!pick?.manifest_url) return null;
+  return { url: pick.manifest_url, format: /dash/.test(String(pick.protocol)) ? 'dash' : 'hls' };
 }
 
 // ---- downloading ----

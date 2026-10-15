@@ -4,6 +4,7 @@
 // a private window the private ones, a normal window the others (as Firefox does).
 import type { Browser } from '../../browser';
 import type { DownloadEvent, DownloadView, RefreshResult, StartOptions } from '../../../modules/downloads/types';
+import { sameStream } from '../../../modules/downloads/streamkey';
 import { isDamaged, isWaiting } from './format';
 
 const ORDER: Record<DownloadView['state'], number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
@@ -97,6 +98,22 @@ export class DownloadStore {
     if (!key) return undefined;
     let best: DownloadView | undefined;
     for (const v of this.items.values()) if (v.videoKey === key && (!best || v.startedAt > best.startedAt)) best = v;
+    return best;
+  }
+
+  /**
+   * The stream row the pill on a page opened again can continue (RESUME-DESIGN.md G2 manual fallback, Phase 6):
+   * found by its stable key (streamkey.ts), in the tab's container (`userContextId`; 2.1, review of Phase 6:
+   * another container's tab continued the row; this window's rows already share its privacy), paused or
+   * failed with saved bytes, not running; the newest.
+   */
+  byStream(key: string, userContextId: number): DownloadView | undefined {
+    if (!key) return undefined;
+    let best: DownloadView | undefined;
+    for (const v of this.items.values()) {
+      if (!v.stream || !sameStream(v.streamKey, key) || (v.userContextId || 0) !== (userContextId || 0) || !(v.state === 'paused' || v.state === 'failed') || !(v.received > 0)) continue;
+      if (!best || v.startedAt > best.startedAt) best = v;
+    }
     return best;
   }
 
@@ -199,7 +216,7 @@ export class DownloadStore {
    * engine's state now, not this window's copy (which catches up a frame later): a quick second
    * press (Space Space) is then Resume, not a second Pause. None of them destroys bytes (RESUME-DESIGN.md
    * 6): on a Renewing link row it is Pause (the attempt stops, the bytes stay); on a Link expired row
-   * Refresh address (Retry for a stream, whose renewal comes with Phase 6); on Waiting for link and Start
+   * Refresh address (Retry for a stream, which runs its renewal steps: Phase 6); on Waiting for link and Start
    * it again from its page, Open page; on File changed Resume, which only checks the address again (the
    * panel moves focus to the row's choice instead); on Waiting for network and Retrying, Try now (start
    * now: RESUME-DESIGN.md G4). A Damaged file (Phase 5): Repair (Download again once the site's file

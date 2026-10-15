@@ -386,7 +386,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 to 5 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 6 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -526,9 +526,61 @@ local look-alike type, so a contract change fails `tsc`.
   mark until the check after the next start. After an unclean session the files finished in it (and a
   repair a crash cut) are checked by themselves, and a finished file whose record was never kept gets it; if the store and its `.bak` are both
   lost the rows come back from the journals. With ffmpeg, Check file also reads a video or song through
-  (`ffmpeg -v error -i f -map 0 -c copy -f null -`; `runFfmpeg` returns its stderr tail).
+  (`ffmpeg -v error -i f -map 0 -c copy -f null -`; `runFfmpeg` returns its stderr tail). Streams (Phase 6,
+  G2, `downloads/hls.ts`, `downloads/table.ts`, `downloads/streamkey.ts`): every segment written leaves a line
+  {i, seq, off, len, h, d} in `<profile>/vitre-downloads/<id>.stream.jsonl` (h: SHA-256 of the segment as
+  written, decrypted and unwrapped, cut to 128 bits; a header per track with its MEDIA-SEQUENCE base, init
+  segment hash, key addresses and rung; in memory for a private download; removed with the row; never a row of
+  `fromJournals()`). A segment is media by its first bytes (TS sync at 0 and 188, MP4 boxes, WebM, ADTS, ID3);
+  a page or JSON is never written. A resume checks the saved parts against the table first (a part shorter than
+  recorded is cut at the end of its last good segment, no longer started from zero; the last 2 and 2 placed
+  segments, every one when the part was modified after its writer closed or after an unclean session; a
+  damaged segment is fetched again, checked against its line and written back at its offset), then proves the
+  written segments against the playlists read now (streamProof: the duration within 1 s; the place mapped by
+  media sequence while the MEDIA-SEQUENCE base holds, otherwise by time, the cumulative EXTINF within 0.05 s
+  and the neighbouring duration agreeing, never by position; the init segment hashing as before; the last
+  written segment fetched again hashing to its line, unless a damaged one just did or a proof over the same
+  segments at the same addresses passed within a minute) and continues at the next sequence; another stream is
+  File changed (at most 1 MiB written: started again by itself, as before, also when the change is found inside
+  the run). Where a track continues comes from the table's last line below its saved count (a crash or a disk
+  error could save the next segment's place with the count before it), and segments counted beyond the last
+  line are fetched again. A resume at unchanged addresses runs the network part of the proof beside the download:
+  only the next segment is fetched meanwhile and nothing is written before it passes. Renewal: inside a run a
+  refused segment, key or a page where a segment should be reads the same media playlist again, taken only when
+  it is the same stream (the same numbering, count and durations; a DASH representation by its id, or renamed
+  and then proven) and, once the track wrote segments, its last written segment asked at the new address hashes
+  to its line (a segment takes the fresh key address even when its own did not change; a refused init is looked
+  up as the init, never as a media segment); a resume, and the attempt at a run's failure outside any run (engine
+  `streamEpisode()`, Renewing link, no slot; then the schedule 2 min, 15 min, 1 h, 6 h as for a file), read the
+  master playlist or manifest again and re-pick the same rung by its fingerprint (`rung`: HLS audioOnly, height
+  plus codecs, the nearest bandwidth within 10%, its audio by GROUP-ID, language and name, a sound track of its
+  own keeping them; an audio-only download of the master's own audio rendition by that rendition; passed from
+  the picker through `StartOptions.rung`; an older row's quality "1080p" stands in, and with no fingerprint at
+  all the step finds nothing rather than File changed; DASH representations by id, then kind, mime, codecs
+  prefix, height and the nearest bandwidth), then yt-dlp's manifest_url for the same height when yt-dlp is
+  installed (never for a private download, nor before the stream has its tracks); on the same stream the tracks
+  take the new addresses. A resume whose every segment is written goes straight to the merge (an expired
+  playlist never blocks bytes on disk). One-file pieces (DASH SegmentBase, HLS byte ranges) carry If-Range; an
+  answer under another validator decides nothing by itself (2.4 R6): the last written piece of the file, asked
+  again without If-Range, must hash to its line (else File changed), then the new validator is taken; two such
+  answers in 10 minutes and Last-Modified is sent instead, one more and no If-Range.
+  The merge keeps what ffmpeg said (history, console) and checks the output's length against the stream's
+  (within 2% or 2 s; the note says when not). Keep partial file on a stream merges the written segments, cut to
+  the shorter written track ("Keeps 2:41 of 4:05"; a track not yet begun is left out), as "(partial).mp4"
+  (without ffmpeg each written track as it came, the sound as "(partial) (audio)"); a finished stream is repaired
+  by running it again on a copy: the same count of segments per track as its table holds, the length within
+  1 s and the init it had, every segment and init segment checked against the table before it is written, every
+  line matched before the file is replaced (any difference: Repair refuses; a table that does not hold every
+  segment is no record: Download again). The pill on the
+  page opened again finds a stopped stream row by its stable key (page origin and path, rounded duration,
+  title; yt-dlp's 'ytdlp|<webpage_url>'), in the tab's own container, and shows "Continue · 62%", which calls
+  `renewWith()` with the same quality from the page's offer (the engine refuses another container or privacy;
+  the rung is picked again from the page's master; the row's own addresses come back when its proof finds
+  another stream, which is then File changed, never started again by itself); when that quality is gone the picker says "1080p is no
+  longer offered" and another quality makes the row File changed (Start over then gets that quality). A stream's
+  Link expired keeps Retry (its renewal steps); Refresh address runs them, then opens the page.
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair; perf and ytdlp-real on demand; the
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair, stream-expiry; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

@@ -22,6 +22,7 @@ import { dashAudio, dashContainer, dashLadder, parseMpd } from './dash';
 import { extOf, isOpaque } from './naming';
 import { HttpStatusError, Identity, fetchText, open, parseContentRange } from './net';
 import { audioFor, isMaster, isPlaylist, ladder, parseMaster, parseMedia } from './playlist';
+import { renditionRung, repRung, rungOf } from './table';
 import type { MediaNotice, PageVideo, VideoOffer, VideoOption } from './types';
 import { probe, ytdlpFirst, ytdlpTools } from './ytdlp';
 
@@ -480,18 +481,21 @@ export class MediaWatch {
       for (const v of rungs) {
         // BANDWIDTH already counts the audio rendition a variant plays with.
         const bytes = info.duration ? Math.round(((v.average || v.bandwidth) / 8) * info.duration) : 0;
+        // RESUME-DESIGN.md 5.3 (Phase 6): each quality's fingerprint goes with the download (StartOptions.rung).
         if (v.audioOnly) {
-          info.options.push(option({ id: `a${v.bandwidth}`, group: 'audio', label: info.fmp4 || muxer ? 'M4A' : 'AAC', detail: `${Math.round(v.bandwidth / 1000)} kbps`, bytes, url, mode: 'hls', variantUrl: v.url, needsMux: !info.fmp4 }));
+          info.options.push(option({ id: `a${v.bandwidth}`, group: 'audio', label: info.fmp4 || muxer ? 'M4A' : 'AAC', detail: `${Math.round(v.bandwidth / 1000)} kbps`, bytes, url, mode: 'hls', variantUrl: v.url, needsMux: !info.fmp4, rung: rungOf(v, null) }));
         } else {
-          const audio = audioFor(master, v)?.url ?? '';
+          const rendition = audioFor(master, v);
+          const audio = rendition?.url ?? '';
           const label = v.height ? `${v.height}p` : `${Math.round(v.bandwidth / 1000)} kbps`;
-          info.options.push(option({ id: `v${v.height}-${v.bandwidth}`, group: 'video', label, detail: v.height >= 2160 ? '4K' : '', container, bytes, height: v.height, url, mode: 'hls', variantUrl: v.url, audioUrl: audio, needsMux: !!audio || !info.fmp4 }));
+          info.options.push(option({ id: `v${v.height}-${v.bandwidth}`, group: 'video', label, detail: v.height >= 2160 ? '4K' : '', container, bytes, height: v.height, url, mode: 'hls', variantUrl: v.url, audioUrl: audio, needsMux: !!audio || !info.fmp4, rung: rungOf(v, rendition) }));
         }
       }
       // Audio that lives in its own rendition can be saved on its own too.
       if (!info.options.some((o) => o.group === 'audio')) {
         const audio = master.renditions.find((r) => r.type === 'AUDIO' && r.url && r.isDefault) ?? master.renditions.find((r) => r.type === 'AUDIO' && r.url);
-        if (audio) info.options.push(option({ id: 'audio', group: 'audio', label: info.fmp4 || muxer ? 'M4A' : 'AAC', detail: audio.name || audio.language || '', url, mode: 'hls', variantUrl: audio.url, needsMux: !info.fmp4 }));
+        // Its fingerprint too (review of Phase 6: without it a master read again could never find it).
+        if (audio) info.options.push(option({ id: 'audio', group: 'audio', label: info.fmp4 || muxer ? 'M4A' : 'AAC', detail: audio.name || audio.language || '', url, mode: 'hls', variantUrl: audio.url, needsMux: !info.fmp4, rung: renditionRung(audio) }));
       }
     } else {
       const media = parseMedia(text, url);
@@ -515,11 +519,11 @@ export class MediaWatch {
       for (const v of dashLadder(mpd)) {
         const bytes = mpd.duration ? Math.round(((v.bandwidth + (audio?.bandwidth ?? 0)) / 8) * mpd.duration) : 0;
         const label = v.height ? `${v.height}p` : `${Math.round(v.bandwidth / 1000)} kbps`;
-        info.options.push(option({ id: `d${v.id}`, group: 'video', label, detail: v.height >= 2160 ? '4K' : '', container: dashContainer(v), bytes, height: v.height, url, mode: 'dash', dashVideo: v.id, dashAudio: audio?.id ?? '', needsMux: !!audio }));
+        info.options.push(option({ id: `d${v.id}`, group: 'video', label, detail: v.height >= 2160 ? '4K' : '', container: dashContainer(v), bytes, height: v.height, url, mode: 'dash', dashVideo: v.id, dashAudio: audio?.id ?? '', needsMux: !!audio, rung: { ...repRung(v), ...(audio ? { audio: repRung(audio) } : {}) } }));
       }
       if (audio) {
         const bytes = mpd.duration ? Math.round((audio.bandwidth / 8) * mpd.duration) : 0;
-        info.options.push(option({ id: `da${audio.id}`, group: 'audio', label: dashContainer(audio) === 'WEBM' ? 'WEBA' : 'M4A', detail: audio.bandwidth ? `${Math.round(audio.bandwidth / 1000)} kbps` : '', bytes, url, mode: 'dash', dashAudio: audio.id }));
+        info.options.push(option({ id: `da${audio.id}`, group: 'audio', label: dashContainer(audio) === 'WEBM' ? 'WEBA' : 'M4A', detail: audio.bandwidth ? `${Math.round(audio.bandwidth / 1000)} kbps` : '', bytes, url, mode: 'dash', dashAudio: audio.id, rung: repRung(audio) }));
       }
     }
     void muxer;

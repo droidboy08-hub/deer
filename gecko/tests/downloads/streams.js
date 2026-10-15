@@ -6,7 +6,14 @@
 //   4. a crawling segment raced by a second request; 5. an expired segment address (403) fetched
 //      again from a refreshed playlist (matched by media sequence);
 //   6. Ctrl+Shift+D on a DASH page opens the picker with the DASH ladder.
-/* global spike, Services, IOUtils, PathUtils, gBrowser, DL */
+// Phase 6 of spikes/downloader/RESUME-DESIGN.md (4.1, 4.3; the expiry cases are in stream-expiry.js):
+//   7. the segment table: the stream of 5 kept a line {i, seq, off, len, h, d} per segment in
+//      <profile>/vitre-downloads/<id>.stream.jsonl, its hashes those of the fixture's segments, and the fMP4
+//      stream of 2 its init segment's hash in each track's header;
+//   8. a finished merged stream damaged on disk (a byte flipped, its modified time kept): Check file finds it
+//      Damaged; Repair runs the stream again, every segment checked against the table, and puts the file back
+//      (its SHA-256 as when it finished), with no part files left.
+/* global spike, Services, Cc, Ci, IOUtils, PathUtils, gBrowser, DL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 
 spike.main(async () => {
@@ -100,6 +107,58 @@ spike.main(async () => {
   check("a segment refused with 403 is fetched again from a refreshed playlist", d6.state === "completed" && lists >= 2 && refused >= 1, { state: d6.state, error: d6.error, playlists: lists, refused });
   const p6 = await DL.probe(d6.path);
   check("the refreshed stream is complete (24 s)", Math.abs(Number(p6?.format?.duration) - 24) < 1, p6?.format?.duration);
+
+  // ---- 7. the segment table (RESUME-DESIGN.md 4.1, 5.7) ----
+  const h128 = async (bytes) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)).subarray(0, 16), (x) => x.toString(16).padStart(2, "0")).join("");
+  const rec = (id) => engine.recs.find((r) => r.id === id);
+  const journal = async (id) => (await IOUtils.readUTF8(rec(id).stream.journal)).split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  {
+    const lines = (await journal(id6)).filter((l) => l.k === 0 && typeof l.h === "string");
+    let off = 0;
+    let ok = lines.length === 12;
+    for (const [i, l] of lines.sort((a, b) => a.i - b.i).entries()) {
+      const bytes = await IOUtils.read(PathUtils.join(DL.fix, "hls", "v360", `seg${String(i).padStart(3, "0")}.ts`));
+      if (l.i !== i || l.seq !== i || l.off !== off || l.len !== bytes.length || l.d !== 2 || l.h !== (await h128(bytes))) ok = false;
+      off += bytes.length;
+    }
+    check("the finished stream keeps a segment table line {i, seq, off, len, h, d} per segment, hashed as the fixture's", ok && rec(id6).stream.journal.endsWith(`${id6}.stream.jsonl`), lines.map((l) => [l.i, l.seq, l.off, l.len]));
+    const heads = (await journal(id2)).filter((l) => l.deer === 1 && l.stream === 1);
+    const init = await h128(await IOUtils.read(PathUtils.join(DL.fix, "hlsfmp4", "video", "init_0.mp4")));
+    check("an fMP4 stream's track header keeps its init segment's hash", (await journal(id2)).some((l) => l.k === 0 && l.init === init) && heads.length >= 2, heads.map((h) => [h.k, h.init]));
+  }
+
+  // ---- 8. a finished merged stream repaired by running it again (RESUME-DESIGN.md 4.3) ----
+  {
+    await waitFor(() => !!rec(id6)?.sha256 && !!rec(id6)?.final, { timeout: 20000, what: "the finished stream's SHA-256" });
+    const path = d6.path;
+    const sha = rec(id6).sha256;
+    const keep = (await IOUtils.stat(path)).lastModified;
+    const at = Math.floor((await IOUtils.stat(path)).size / 2);
+    const byte = (await IOUtils.read(path, { offset: at, maxBytes: 1 }))[0];
+    const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+    file.initWithPath(path);
+    const s = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
+    s.init(file, 0x02, 0o644, 0);
+    s.QueryInterface(Ci.nsISeekableStream).seek(Ci.nsISeekableStream.NS_SEEK_SET, at);
+    const out = Cc["@mozilla.org/binaryoutputstream;1"].createInstance(Ci.nsIBinaryOutputStream);
+    out.setOutputStream(s);
+    out.writeByteArray([byte ^ 0xff]);
+    out.close();
+    await IOUtils.setModificationTime(path, keep);
+    await engine.checkFile(id6);
+    const damaged = await waitFor(() => (engine.get(id6).phase === "" && engine.get(id6).need?.kind === "repair" ? engine.get(id6) : null), { timeout: 30000, what: "Damaged" });
+    check("Check file finds the damaged merged stream (Damaged)", damaged.state === "completed" && damaged.need?.kind === "repair", [damaged.state, damaged.need, damaged.check]);
+    await DL.reset();
+    const repairing = engine.repair(id6);
+    await waitFor(() => engine.get(id6).phase === "repairing", { timeout: 5000, what: "Repairing" });
+    await repairing;
+    const v = engine.get(id6);
+    const asked = (await DL.stats()).requests.filter((r) => r.path.includes("/token/fx/hls/v360/seg") && r.status === 200).length;
+    const events = (rec(id6).events ?? []).map((e) => e.text);
+    log("repair", { need: v.need, check: v.check, asked, events });
+    check("Repair runs the stream again, every segment checked, and puts the file back as it finished", !v.need && v.check?.ok && (await DL.sha256(path)) === sha && asked >= 12 && events.some((t) => /Repaired/.test(t)), { need: v.need, check: v.check, asked, events });
+    check("no repair parts are left", !(await DL.files()).some((f) => /\.repair|\.part$/.test(f)), await DL.files());
+  }
 
   // ---- 6. Ctrl+Shift+D on a DASH page ----
   await DL.open(DL.base + "/video-dash.html", { settle: 1500 });
