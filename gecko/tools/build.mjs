@@ -17,6 +17,8 @@
 //   src/pages/<name>/*.ts               -> pages/<name>/*.js        one IIFE per top-level .ts file
 //   src/pages/<name>/<anything else>    -> pages/<name>/...         copied
 //   src/skin/**, src/locales/**         -> skin/**, locales/**      copied
+//   src/workers/*.js                    -> workers/*.js             copied: ChromeWorker scripts (a worker
+//                                          made from a blob: address does not load)
 //
 // __DEER_VERSION__ in any bundle is replaced by "version" in gecko/package.json (Settings › About
 // shows it when no installed deer-version.json says otherwise; src/modules/VitreUpdater.sys.ts).
@@ -164,7 +166,7 @@ const isScript = (f) => f.endsWith('.ts') && !f.endsWith('.d.ts');
 function copyStatic() {
   mkdirSync(OUT, { recursive: true });
   cpSync(join(SRC, 'chrome.manifest'), join(OUT, 'chrome.manifest'));
-  for (const dir of ['skin', 'locales']) {
+  for (const dir of ['skin', 'locales', 'workers']) {
     if (!existsSync(join(SRC, dir))) continue;
     rmSync(join(OUT, dir), { recursive: true, force: true });
     cpSync(join(SRC, dir), join(OUT, dir), { recursive: true });

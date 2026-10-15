@@ -36,8 +36,11 @@
 //     any other the quit stopped, while one whose automatic try was still on its check at the quit (it never
 //     held the quit back) comes back waiting and continues by its wait, the setting off;
 //   - run 4, after a hard kill: the last session read as unclean; the row that was running comes back with
-//     the last 8 MiB below each segment's mark given back, continues by itself, fetches those again (bytes
-//     corrupted there, as writes the disk never got, are replaced: sha256 equal) and says so in its history;
+//     its marks and its block hash record, still marked dirty (Phase 5 replaced the blanket 8 MiB tail:
+//     RESUME-DESIGN.md 4.2), continues by itself, checks its saved part against the record (what each
+//     segment claims above its last hashed block given back, the blocks hashed since the last seal hashed
+//     again), fetches the damaged blocks again (bytes corrupted below each mark, as writes the disk never
+//     got, are replaced: sha256 equal) and says so in its history;
 //     a try the kill caught on its check comes back waiting (no suspect tail) and continues by its wait;
 //   - run 5, a hard kill between a stream's merge and the save that completes it: completed from the output
 //     at the start, nothing fetched again;
@@ -218,12 +221,13 @@ spike.main(async () => {
     log("the try the kill caught", early, "ms after the start:", w0?.state, JSON.stringify(w0?.wait), "marked", !!w0?.resumeOnStart, "suspect", JSON.stringify(w0?.suspect));
     if (early < 4000) check("the try the kill caught on its check comes back waiting (its wait given back), not marked to continue, no suspect tail (it wrote nothing)", w0?.state === "paused" && w0.wait?.for === "server" && w0.wait.tries >= 1 && !w0.resumeOnStart && !w0.suspect, { state: w0?.state, wait: w0?.wait, flag: w0?.resumeOnStart, suspect: w0?.suspect });
     const r = rec(k);
-    const back = marks.reduce((n, [, got]) => n + Math.min(got, TAIL), 0);
     const now = r?.file?.segments.map((s) => [s.start, s.received]);
-    const rewound = marks.every(([start, got]) => now?.some(([s, g]) => s === start && g === Math.max(0, got - TAIL)));
-    check("the row that was running comes back paused, marked to continue, the last 8 MiB below each segment's mark given back (suspect)", r?.state === "paused" && !!r.resumeOnStart && r.suspect?.bytes === back && rewound, { state: r?.state, flag: r?.resumeOnStart, suspect: r?.suspect, back, marks, now });
+    const same = marks.every(([start, got]) => now?.some(([s, g]) => s === start && g === got));
+    // Phase 5 (RESUME-DESIGN.md 4.2): with its block hash record the row keeps its marks at the start; the
+    // hash rules decide what is fetched again when it continues (no blanket 8 MiB tail).
+    check("the row that was running comes back paused, marked to continue, with its marks, its record and its dirty mark (the hash rules decide when it continues)", r?.state === "paused" && !!r.resumeOnStart && r.file?.dirty === true && !!r.journal && r.suspect?.bytes === 0 && same, { state: r?.state, flag: r?.resumeOnStart, dirty: r?.file?.dirty, journal: r?.journal, suspect: r?.suspect, marks, now });
     // What a crash can leave: under the marks, bytes the disk never got. The last MiB below each mark is
-    // made other bytes; only a refetch of the suspect tails puts the file right.
+    // made other bytes; only the hash rules' refetch puts the file right.
     const part = r.path + ".part";
     const junk = new Uint8Array(MiB).fill(0x5a);
     for (const [start, got] of marks) if (got >= MiB) writeAt(part, start + got - MiB, junk);
@@ -232,16 +236,28 @@ spike.main(async () => {
     const done = await DL.until(k, ["completed", "failed"], { timeout: 120000, what: "the killed download to continue and complete" });
     const at = (rec(k).events ?? []).find((e) => e.text === "Continued after restart")?.at - engine.loadedAt;
     check("it continues by itself about 10 s after the start (Continued after restart)", at >= 9500 && at <= 14000, at);
-    check("it completes intact: the corrupted tails were fetched again (sha256 equal)", done.state === "completed" && (await DL.sha256(done.path)) === big.sha256, [done.state, done.error]);
+    check("it completes intact: the corrupted bytes were found and fetched again (sha256 equal)", done.state === "completed" && (await DL.sha256(done.path)) === big.sha256, [done.state, done.error]);
     const reqs = await since("/net/big");
     const fetched = sentAfterProbe(reqs);
-    const kept = marks.reduce((n, [, got]) => n + Math.max(0, got - TAIL), 0);
-    const starts = marks.filter(([, got]) => got > 0).every(([start, got]) => reqs.some((q) => q.status === 206 && q.start === start + Math.max(0, got - TAIL)));
-    check("only what was missing and the suspect tails were fetched again, each segment from 8 MiB below its mark", fetched === big.size - kept && starts, { fetched, expected: big.size - kept, ranges: reqs.map((q) => `${q.status} ${q.range}`) });
+    // Besides what was missing: in each segment the block holding the corrupted MiB below its mark and the
+    // part of a block above its last hashed one (at most 2 MiB a segment, at least the corrupted MiB);
+    // each segment's refetch starts at a block boundary within 2 MiB below its mark.
+    const missing = big.size - marks.reduce((n, [, got]) => n + got, 0);
+    const junked = marks.filter(([, got]) => got >= MiB);
+    const starts = junked.every(([start, got]) => reqs.some((q) => q.status === 206 && q.start % MiB === 0 && q.start <= start + got - MiB && q.start >= start + got - 2 * MiB));
+    check("only what was missing and the damaged blocks below each mark were fetched again (Phase 5: not 8 MiB a segment)", fetched >= missing + junked.length * MiB && fetched <= missing + junked.length * 2 * MiB && starts, { fetched, missing, ranges: reqs.map((q) => `${q.status} ${q.range}`) });
     const line = (done.history ?? []).map((h) => h.text).find((t) => t.startsWith("Checked after Deer closed unexpectedly"));
     check("its history says so: Checked after Deer closed unexpectedly · N fetched again", !!line && / · \d+(\.\d)? MB fetched again$/.test(line), done.history);
     const d2 = await DL.until(t2, ["completed", "failed"], { timeout: 60000, what: "the try the kill caught to complete" });
     check("... and the try the kill caught completes intact", d2.state === "completed" && (await DL.sha256(d2.path)) === medium.sha256, [d2.state, d2.error]);
+    // Review of Phase 5: the paused row whose stop seal could not flush (run 3) is checked as after a crash.
+    const { u } = saved();
+    const ur = rec(u);
+    check("a paused row whose last seal could not flush, in the session that ended uncleanly, is marked to be checked as after a crash (dirty), and stays paused", ur?.state === "paused" && ur.file?.dirty === true && !ur.resumeOnStart, { state: ur?.state, dirty: ur?.file?.dirty, unflushed: ur?.file?.unflushed });
+    engine.resume(u);
+    const ud = await DL.until(u, ["completed", "failed"], { timeout: 90000, what: "the unflushed row" });
+    check("... Resume checks it so (Checked after Deer closed unexpectedly) and it completes intact", ud.state === "completed" && (await DL.sha256(ud.path)) === medium.sha256 && events(u).some((t) => t.startsWith("Checked after Deer closed unexpectedly")), { state: ud.state, events: events(u) });
+    engine.remove(u);
     await showRow(k);
     await spike.capture("network-6-after-kill");
     await hidePanel();
@@ -276,6 +292,17 @@ spike.main(async () => {
     settings.set({ continueDownloadsOnStart: true });
     engine.cancel(c);
     engine.cancel(pausedId);
+    // Review of Phase 5: a download the person paused whose stop seal could not flush its .part (the worker
+    // broken, a network drive): the record says so (file.unflushed), and after this session ends uncleanly
+    // the row is checked as after a crash (run 4).
+    const u = engine.start(`${DL.base}/blob/medium?rate=1024`, { filename: "unflushed.bin", named: true });
+    await DL.until(u, ["downloading"], { test: (v) => v.received > 6 * MiB && !v.phase, timeout: 60000, what: "6 MiB" });
+    engine.pause(u);
+    await DL.until(u, ["paused"], { timeout: 10000 });
+    await waitFor(() => !engine.sealing.has(u) && rec(u).file.dirty === false, { timeout: 15000, what: "the pause's seal" });
+    rec(u).file.unflushed = Date.now();
+    await engine.save(true);
+    remember({ u });
     // A hard kill while a download runs on 4 connections, 18 MiB or more in each segment, and while a
     // Retrying row's try hangs on its check (its answers come 5 min late).
     settings.set({ connections: 4 });

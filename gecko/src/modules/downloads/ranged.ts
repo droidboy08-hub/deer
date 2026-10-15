@@ -47,6 +47,28 @@
 //     other saved bytes were not compared (review of Phase 2: a file that changed after its first 64 KiB
 //     completed mixed). A file of at most 64 KiB is probed one byte short, so a server that answers a
 //     Range over a whole file with a 200 still ranges it.
+//
+// The block hash record (RESUME-DESIGN.md section 4, Phase 5; ledger.ts):
+//   - plan() and claim() cut segments at multiples of the block size, so each block sits inside one
+//     segment (4.1); older, unaligned segments still work;
+//   - each writer.close() hashes what newly lies wholly under the certain bytes (Ledger.pump()); the run
+//     drains the hashing before it verifies the file only when released blocks must hash to their old
+//     values (or a checksum did not match), and otherwise the blocks still unhashed at the finish are
+//     hashed from the finished file (review of Phase 5: the finish held fast downloads at 100%);
+//   - a block released for fetching again must hash to its old value: otherwise the file on the site
+//     changed, and the run stops with its claims on that block given back (G3; Ledger.mismatch);
+//   - a disk error makes the block that holds the failed write suspect: the segment claims up to that
+//     block's start only (4.2);
+//   - a server checksum that does not match at the end (4.3) is no longer a whole download again: the
+//     blocks are checked locally and the bad ones fetched again; when every block matches its record, the
+//     network delivered wrong bytes, so the windows are proven and each block is compared with the server
+//     and replaced where it differs (fromServer()). Only when that does not make it match does it fail as
+//     before;
+//   - with the record, the windows the proof compares are hashed block heads, against their recorded head
+//     hashes (proof.ts Heads): local damage is never taken for another file;
+//   - the completion check (2.5) stops a file only when the site's bytes differ; anything it can't
+//     compare (a refused address, a page, no network) lets it complete as before (review of Phase 5);
+//   - a silent restart and a checksum that did not match forget the block hashes with the bytes.
 import { NetUtil } from 'resource://gre/modules/NetUtil.sys.mjs';
 import { expiredAt, expiresAt } from './expiry';
 import { throttle, type RateLimiter } from './limiter';
@@ -56,9 +78,10 @@ import {
   REFUSED_STATUS, RETRYABLE_STATUS, Response, ShortBodyError, backoff, isRetryable, open, parseContentRange, refusal, refusedConnection,
   retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
-import { IN_FLIGHT, Writer, freeSpace, readAt, setSize, sizeOf } from './partfile';
+import { blockSize, hashBytes, sha256Hex, type Ledger } from './ledger';
+import { Writer, freeSpace, readAt, setSize, sizeOf, writeAt } from './partfile';
 import {
-  ASK_ABOVE, UNSURE, WINDOW, compareWindows, differs, digestOf, enough, headerChange, judge, notFile, readKind, sizeText, totalOf, validatorsDiffer,
+  ASK_ABOVE, UNSURE, WINDOW, compareWindows, differs, digestOf, enough, fetchRange, headerChange, judge, notFile, readKind, sizeText, totalOf, validatorsDiffer,
   windows, type Kind, type ProofCtx,
 } from './proof';
 import type { RenewWhy, Renewed } from './renew';
@@ -88,6 +111,8 @@ const UNSTABLE_WINDOW = 10 * 60 * 1000;
 /** With etagUnstable or dateUnstable, one window is compared every this many bytes or this long (R6). */
 const SPOT_BYTES = 256 * 1024 * 1024;
 const SPOT_MS = 5 * 60 * 1000;
+/** While streaming, the block hashing is looked at every this many bytes too (besides writer.close() and the tick). */
+const HASH_EVERY = 4 * 1024 * 1024;
 
 class RangeIgnoredError extends Error {}
 class RangeMismatchError extends Error {
@@ -169,6 +194,20 @@ export interface FileState {
   dateUnstable?: boolean;
   /** When a Last-Modified that did not hold over the same bytes was proven (kept for UNSTABLE_WINDOW). */
   redated?: number[];
+  /**
+   * RESUME-DESIGN.md 4.1, 5.2 (Phase 5): a run may have written bytes no seal covers yet. Set (and saved,
+   * flushed) before a run writes; a clean stop drains the hashing, seals and clears it. Still set at the
+   * next start: the unclean-session rules of 4.2 decide what is trusted.
+   */
+  dirty?: boolean;
+  /**
+   * When the last clean stop's seal began, if it could not flush the .part (review of Phase 5): its bytes
+   * may still have been in the cache when that session ended. If it ended uncleanly, the row is checked as
+   * after a crash (the dirty mark is set again at the next start).
+   */
+  unflushed?: number;
+  /** What reading block 0 back said the download is (4.1), when no Content-Type says it. */
+  kind?: 'text' | 'binary';
 }
 
 export interface ProbeInfo {
@@ -230,6 +269,21 @@ export class FileTransfer {
    * schedule spaces the tries. Set by the engine around the check only.
    */
   waitTry = false;
+  /**
+   * The download's block hash record (RESUME-DESIGN.md 4.1, Phase 5; ledger.ts), set by the engine once the
+   * file's length and path are known. Null: no record (a length never known), as before Phase 5.
+   */
+  ledger: Ledger | null = null;
+  /** The whole file's SHA-256 (hex), when verify() computed it for the server's checksum (reused at completion). */
+  sha256 = '';
+  /** Blocks fromServer() replaced (the history line). */
+  fixedFromServer = 0;
+  /** A digest mismatch is repaired at most once per run (4.3). */
+  private digestRounds = 0;
+  /** Bytes taken since the hashing was last looked at while streaming (HASH_EVERY). */
+  private sinceHash = 0;
+  /** Stops a running ranged transfer with an error (a released block that hashed to another value). */
+  private halt: ((err: unknown) => void) | null = null;
   private pending: Response | null = null;
   /** Segment -> the Writer currently filling it. */
   private writers = new Map<Segment, Writer>();
@@ -289,13 +343,16 @@ export class FileTransfer {
   provable(): Segment[] {
     return this.state.segments.map((seg) => {
       const w = this.writers.get(seg);
-      return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.backlog - IN_FLIGHT) : seg.received };
+      // The writer took seg.received - written before it began; of its own bytes, only the settled ones are
+      // certainly in the file. Review of Phase 5: once a write failed its copier closes the pipe, whose
+      // backlog then reads 0, so the backlog no longer says what never arrived (Writer.settled).
+      return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.written + w.settled) : seg.received };
     });
   }
 
   /** What a proof of this download reads (proof.ts): the record, its identity, its kind, the saved bytes. */
   proofCtx(): ProofCtx {
-    return { state: this.state, identity: this.env.identity, kind: this.k, saved: this.saved, sockets: this.sockets };
+    return { state: this.state, identity: this.env.identity, kind: this.k, saved: this.saved, sockets: this.sockets, heads: this.ledger };
   }
 
   /** The first answer, kept for a single-stream download; dropped when the download waits in the queue. */
@@ -441,8 +498,17 @@ export class FileTransfer {
     const n = Math.min(WINDOW, first.received);
     if (n > asked) return false;
     const theirs = await res.head(n);
+    if (theirs.length < n) return false;
+    // With the record (Phase 5), block 0's head hash is the reference: damage in the .part is never
+    // taken for another file (the local checks find it).
+    const recorded = this.ledger?.head(0, n);
+    if (recorded) {
+      if ((await sha256Hex(theirs)) === recorded) return true;
+      if (textStart(theirs) && this.k.kind === 'binary') return new NotTheFileError(res.header('content-type'));
+      return new ChangedError('its first bytes are different');
+    }
     const ours = await readAt(partPath, 0, n);
-    if (theirs.length < n || !ours || ours.length < n) return false;
+    if (!ours || ours.length < n) return false;
     if (textStart(theirs) && !textStart(ours)) return new NotTheFileError(res.header('content-type'));
     return differs(theirs, ours) ? new ChangedError('its first bytes are different') : true;
   }
@@ -556,7 +622,7 @@ export class FileTransfer {
     const s = this.state;
     if (!partPath) return because;
     const segs = this.provable();
-    const planned = windows(segs, this.env.seed ?? s.url);
+    const planned = windows(segs, this.env.seed ?? s.url, this.ledger);
     if (!planned.length) return this.saved > ASK_ABOVE || ++this.unproven > PROOF_GUARD ? because : null;
     if (this.proofs >= PROOF_GUARD) return because;
     this.proofs++;
@@ -607,7 +673,7 @@ export class FileTransfer {
     if (this.sinceSpot < SPOT_BYTES && Date.now() - this.spotAt < SPOT_MS) return Promise.resolve();
     this.sinceSpot = 0;
     this.spotAt = Date.now();
-    const wins = windows(this.provable(), this.env.seed ?? this.state.url);
+    const wins = windows(this.provable(), this.env.seed ?? this.state.url, this.ledger);
     if (!wins.length) return Promise.resolve();
     const win = wins[this.spots++ % wins.length];
     const spot = (async () => {
@@ -632,8 +698,11 @@ export class FileTransfer {
     const log = silentRestart(s.silent, this.saved, this.silentRestarts);
     if (!log) return false;
     this.dropPending();
-    Object.assign(s, { silent: log, restarts: (s.restarts || 0) + 1, probed: false, segments: [], etag: '', lastModified: '', digest: null, contentType: '', typeGuessed: false, dispositionName: '', allowFresh: true });
+    Object.assign(s, { silent: log, restarts: (s.restarts || 0) + 1, probed: false, segments: [], etag: '', lastModified: '', digest: null, contentType: '', typeGuessed: false, dispositionName: '', allowFresh: true, kind: undefined });
     this.k = { kind: '', sure: false };
+    // Review of Phase 5: the block hashes described the old file; the new one's bytes are hashed afresh
+    // (a hash kept made the new file's completion check fail against the old head, every time).
+    this.ledger?.forget('restarted');
     return true;
   }
 
@@ -645,7 +714,9 @@ export class FileTransfer {
     const s = this.state;
     if (s.segments.length) return;
     if (s.ranges && s.total > 0) {
-      const size = Math.ceil(s.total / this.connections());
+      // Cut at multiples of the block size, so each block sits inside one segment (RESUME-DESIGN.md 4.1).
+      const bs = blockSize(s.total);
+      const size = Math.ceil(Math.ceil(s.total / this.connections()) / bs) * bs;
       for (let start = 0; start < s.total; start += size) s.segments.push({ start, end: Math.min(s.total, start + size), received: 0 });
     } else {
       s.segments = [{ start: 0, end: s.total >= 0 ? s.total : -1, received: 0 }];
@@ -664,8 +735,21 @@ export class FileTransfer {
         if (this.state.total === 0) return;
         if (this.state.ranges && this.state.total > 0) await this.runRanged(partPath, signal);
         else await this.runSingle(partPath, signal);
+        // A released block fetched again must hash to its old value before the file counts as complete
+        // (4.3: otherwise the file on the site changed), so with released blocks the hashing is drained
+        // here. Review of Phase 5: otherwise the finish no longer waits for it: above about 700 MB/s it fell
+        // behind and held a finished download at 100% for seconds; the blocks not hashed yet are hashed
+        // from the finished file right after (VitreDownloads finishRecord()). Pause and Cancel still stop it.
+        if (this.ledger?.expect.size) await untilAborted(this.ledger.drain(), signal);
+        if (signal.aborted) throw new AbortedError();
+        if (this.ledger?.mismatch) throw this.ledger.mismatch;
+        await this.completionCheck(partPath, signal);
       } catch (err) {
         if (signal.aborted) throw new AbortedError();
+        if (err instanceof ChangedError && this.ledger?.mismatch === err && this.ledger.mismatchBlock >= 0) {
+          // Its claims on that block go: the other file's bytes there are never kept as this one's.
+          this.state.segments = this.ledger.release(this.state.segments, [this.ledger.mismatchBlock], 'changed');
+        }
         if (err instanceof RangeIgnoredError) {
           // The server stopped honouring Range: the single stream from the start. The segments stay:
           // the saved bytes are kept until the new answer proves to start with them (runSingle).
@@ -690,7 +774,7 @@ export class FileTransfer {
         }
         throw err;
       }
-      await this.verify(partPath);
+      if ((await this.verify(partPath, signal)) === 'again') continue;
       return;
     }
   }
@@ -730,6 +814,12 @@ export class FileTransfer {
     const n = this.connections();
     // Connections still taking segments; a refused one may step aside only while another remains.
     let alive = n;
+    // A released block that hashed to another value stops every connection (4.3: Ledger.mismatch).
+    this.halt = (err): void => {
+      if (fatal === null) fatal = err;
+      stop.abort();
+    };
+    if (this.ledger) this.ledger.onMismatch = (err) => this.halt?.(err);
     const worker = async (lane: number): Promise<void> => {
       const conn = { accepted: false, mayYield: () => alive > 1, lane };
       try {
@@ -758,21 +848,41 @@ export class FileTransfer {
       await Promise.all(Array.from({ length: n }, (_, i) => worker(i)));
     } finally {
       signal.removeEventListener('abort', relay);
+      this.halt = null;
+      if (this.ledger) this.ledger.onMismatch = null;
     }
     if (signal.aborted) throw new AbortedError();
     if (fatal !== null) throw fatal;
     if (this.state.segments.some((s) => remaining(s) > 0)) throw new DownloadError('Some parts of the file didn’t arrive.');
   }
 
-  /** The next segment nobody is fetching, or half of the busiest one. */
+  /**
+   * The next segment nobody is fetching, or half of the busiest one. The cut is a multiple of the block
+   * size, nearest the middle, with at least MIN_STEAL on both sides (RESUME-DESIGN.md 4.1); a segment with
+   * no such cut is not split.
+   */
   private claim(owned: Set<Segment>): Segment | null {
     const segs = this.state.segments;
     const free = segs.find((s) => !owned.has(s) && remaining(s) > 0);
     if (free) return free;
+    const bs = blockSize(this.state.total);
+    const cutOf = (s: Segment): number => {
+      const from = s.start + s.received;
+      const mid = from + Math.floor(remaining(s) / 2);
+      const down = Math.floor(mid / bs) * bs;
+      for (const c of mid - down <= bs / 2 ? [down, down + bs] : [down + bs, down]) if (c - from >= MIN_STEAL && s.end - c >= MIN_STEAL) return c;
+      return -1;
+    };
     let best: Segment | null = null;
-    for (const s of owned) if (remaining(s) >= 2 * MIN_STEAL && (!best || remaining(s) > remaining(best))) best = s;
-    if (!best) return null;
-    const cut = best.start + best.received + Math.floor(remaining(best) / 2);
+    let cut = -1;
+    for (const s of owned) {
+      if (remaining(s) < 2 * MIN_STEAL || (best && remaining(s) <= remaining(best))) continue;
+      const c = cutOf(s);
+      if (c < 0) continue;
+      best = s;
+      cut = c;
+    }
+    if (!best || cut < 0) return null;
     const piece = { start: cut, end: best.end, received: 0 };
     best.end = cut;
     segs.splice(segs.indexOf(best) + 1, 0, piece);
@@ -893,6 +1003,12 @@ export class FileTransfer {
         seg.received += n;
         this.sinceSpot += n;
         this.env.onBytes(n);
+        // A fast transfer has its blocks hashed while it runs, not all at its end (4.1); a very fast one has
+        // its hashing wait instead (ledger.ts HOLD_ABOVE: took() measures how fast it goes).
+        if (this.ledger && (this.sinceHash += n) >= HASH_EVERY) {
+          this.ledger.took(this.sinceHash);
+          this.sinceHash = 0;
+        }
         // Asked for exactly this much: let the response end by itself, so the connection is kept
         // alive for the next segment. After a split the answer runs past the new end: cut it.
         if (seg.end >= 0 && remaining(seg) <= 0) return seg.end === askedEnd ? undefined : STOP;
@@ -911,9 +1027,16 @@ export class FileTransfer {
       } catch (err) {
         // The disk refused a write: keep what certainly reached the file, refetch the rest.
         seg.received = base + Math.min(seg.received - base, writer.durable);
+        // RESUME-DESIGN.md 4.2: the block holding the failed write is suspect: the claim stops at its start.
+        if (this.ledger) {
+          const bs = this.ledger.bs;
+          seg.received = Math.max(0, Math.min(seg.received, Math.floor((seg.start + seg.received) / bs) * bs - seg.start));
+        }
         failure = err;
       }
       this.writers.delete(seg);
+      // What newly lies wholly under the certain bytes is hashed (4.1).
+      this.ledger?.pump();
     }
     if (failure) throw failure;
     if (seg.end >= 0 && remaining(seg) > 0) throw new ShortBodyError();
@@ -1023,6 +1146,8 @@ export class FileTransfer {
         throw new DiskError(Cr.NS_ERROR_FILE_ACCESS_DENIED);
       }
       s.segments = [seg];
+      // Its record described the bytes this answer replaced: they are hashed again from the new ones.
+      this.ledger?.forget('replaced');
       s.total = seg.end;
       s.etag = said.etag;
       s.lastModified = said.lastModified;
@@ -1036,8 +1161,12 @@ export class FileTransfer {
     }
   }
 
-  /** Every byte landed, the file is the promised length, and it matches any checksum the server gave. */
-  private async verify(partPath: string): Promise<void> {
+  /**
+   * Every byte landed, the file is the promised length, and it matches any checksum the server gave.
+   * 'again': a checksum that did not match found bad blocks in the .part, released to be fetched again
+   * (RESUME-DESIGN.md 4.3).
+   */
+  private async verify(partPath: string, signal: AbortSignal): Promise<'ok' | 'again'> {
     const s = this.state;
     // Every segment complete and together the whole file: a stretch that never arrived (zeros under a
     // file sized to its total) is never completed, whatever the file's size says (review of Phase 1).
@@ -1050,15 +1179,119 @@ export class FileTransfer {
     }
     if (s.digest) {
       // md5 through nsICryptoHash: IOUtils.computeHexDigest is not known to take it (RESUME-DESIGN.md 1).
-      const hex = s.digest.alg === 'md5' ? await md5Hex(partPath) : await IOUtils.computeHexDigest(partPath, s.digest.alg);
-      if (hex !== base64ToHex(s.digest.value)) {
-        // The bytes are known bad: a Retry starts over (and may empty the .part).
+      const alg = s.digest.alg;
+      const digest = (): Promise<string> => (alg === 'md5' ? md5Hex(partPath) : IOUtils.computeHexDigest(partPath, alg));
+      const want = base64ToHex(s.digest.value);
+      let hex = await digest();
+      if (hex !== want && this.ledger && s.ranges && this.digestRounds++ < 1) {
+        // RESUME-DESIGN.md 4.3: the blocks are checked against the record first; bad ones are fetched again.
+        // The finish does not wait for the hashing (download()): what is still unhashed is hashed now.
+        await untilAborted(this.ledger.drain(), signal);
+        if (this.ledger.mismatch) throw this.ledger.mismatch;
+        const bad = await this.ledger.verify(partPath, [...this.ledger.blocks.keys()]);
+        if (bad.length) {
+          s.segments = this.ledger.release(s.segments, bad, 'checksum');
+          return 'again';
+        }
+        // Every block matches its record: the network delivered wrong bytes. Proven, then compared with
+        // the server block by block, and replaced where it differs.
+        if ((await this.fromServer(partPath, signal)) > 0) hex = await digest();
+      }
+      if (hex !== want) {
+        // The bytes are known bad: a Retry starts over (and may empty the .part), and their block hashes
+        // go with them (review of Phase 5: kept, they made the new bytes read as damaged or changed).
         s.segments = [];
         s.allowFresh = true;
+        this.ledger?.forget('checksum');
         throw new ChecksumError();
       }
+      if (alg === 'sha256') this.sha256 = hex;
     }
+    return 'ok';
   }
+
+  /**
+   * The completion check (RESUME-DESIGN.md 2.5, Phase 5): with no strong validator (no ETag, a weak one, or one
+   * that did not hold: If-Range could not keep another version out) and no server checksum, the file is
+   * compared with the site before it counts as complete: the first block of each third of the file (where a
+   * plan of 3 segments starts) and the last block, one 64 KiB window each, against their recorded head
+   * hashes (or the saved bytes). Another file stops it (ChangedError: File changed, nothing renamed).
+   * Review of Phase 5: anything else is "not compared" and the file completes as it did before Phase 5: a
+   * window that can't be compared, an address that refuses (a link valid for one download, or one that
+   * expired with the last byte), a page, the network gone. Each window is asked once: an address that
+   * refuses is not asked again for a check that can only stop the download.
+   */
+  private async completionCheck(partPath: string, signal: AbortSignal): Promise<void> {
+    const s = this.state;
+    const strong = !!s.etag && !s.etag.startsWith('W/') && !s.etagUnstable;
+    if (strong || s.digest || !s.ranges || !(s.total > 0)) return;
+    const bs = blockSize(s.total);
+    const last = Math.floor((s.total - 1) / bs);
+    const blocks = [...new Set([0, Math.floor(s.total / 3 / bs), Math.floor((2 * s.total) / 3 / bs), last])];
+    const wins = blocks.map((b): [number, number] => [b * bs, Math.min(s.total, b * bs + Math.min(WINDOW, bs))]);
+    let r: Awaited<ReturnType<typeof compareWindows>>;
+    try {
+      r = await compareWindows(this.proofCtx(), s.finalUrl, wins, partPath, signal, s.total, 1);
+    } catch (err) {
+      if (signal.aborted) throw new AbortedError();
+      return;
+    }
+    if (r.verdict === 'whole') r.res.destroy();
+    else if (r.verdict === 'same') r.res?.destroy();
+    if (r.verdict === 'changed') throw r.err;
+  }
+
+  /**
+   * RESUME-DESIGN.md 4.3, a server checksum that does not match while every block matches its record: the
+   * windows are proven first (another file stops it: ChangedError), then each block is asked for with
+   * If-Range, compared in memory with its record and written in place only where it differs (its new hash
+   * recorded). Returns how many blocks were replaced.
+   */
+  private async fromServer(partPath: string, signal: AbortSignal): Promise<number> {
+    const l = this.ledger;
+    const s = this.state;
+    if (!l) return 0;
+    const wins = windows(this.provable(), this.env.seed ?? s.url, l);
+    const proof = await compareWindows(this.proofCtx(), s.finalUrl, wins, partPath, signal, s.total);
+    if (proof.verdict === 'changed') throw proof.err;
+    if (proof.verdict === 'whole') proof.res.destroy();
+    else if (proof.verdict === 'same') proof.res?.destroy();
+    if (proof.verdict !== 'same') return 0;
+    let fixed = 0;
+    for (let b = 0; b < l.count(); b++) {
+      const [a, e] = l.span(b);
+      const bytes = await fetchRange(this.proofCtx(), s.finalUrl, a, e, signal, this.ifRange());
+      const got = await hashBytes(bytes);
+      if (got.h === l.blocks.get(b)?.h) continue;
+      await writeAt(partPath, a, bytes);
+      l.put(b, { h: got.h, w: got.w, a: Date.now() });
+      fixed++;
+    }
+    this.fixedFromServer += fixed;
+    return fixed;
+  }
+}
+
+/**
+ * `work` (the block hashing draining, which can't be stopped) awaited until it is done or `signal` aborts:
+ * Pause and Cancel never wait for it (review of Phase 5). AbortedError when aborted.
+ */
+export function untilAborted(work: Promise<void>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(new AbortedError());
+  return new Promise((resolve, reject) => {
+    const stop = (): void => reject(new AbortedError());
+    signal.addEventListener('abort', stop, { once: true });
+    work.then(
+      () => {
+        signal.removeEventListener('abort', stop);
+        resolve();
+      },
+      (err: unknown) => {
+        signal.removeEventListener('abort', stop);
+        reject(err);
+      }
+    );
+  });
 }
 
 function base64ToHex(b64: string): string {

@@ -27,7 +27,8 @@ spike.main(async () => {
     await waitFor(() => !t.loading && /youtube\.com/.test(t.browser.currentURI.host) && /watch/.test(t.browser.currentURI.spec), { timeout: 30000, what: "load of " + url });
     await sleep(2500);
   };
-  const fakeLog = PathUtils.join(PathUtils.tempDir, "vitre-fake-ytdlp.log");
+  // This run's own log (the runner gives each run one, so a concurrent run never removes it; fake_ytdlp.py).
+  const fakeLog = Services.env.get("VITRE_FAKE_YTDLP_LOG") || PathUtils.join(PathUtils.tempDir, "vitre-fake-ytdlp.log");
   await IOUtils.remove(fakeLog, { ignoreAbsent: true });
   Services.prefs.setStringPref("vitre.tools.installDir", PathUtils.join(PathUtils.tempDir, "vitre-no-tools-here"));
 

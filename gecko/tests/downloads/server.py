@@ -113,6 +113,22 @@ Routes (GET):
   /busy?for=N&k=KEY&ra=S    for N seconds (default 90), /net/ for KEY answers 503 (Retry-After: S with ra)
   /slow?for=N&k=KEY&ms=M    for N seconds (default 10), /net/ for KEY answers M ms late (default 1500): a resume's
                             check that takes a while (Checking)
+  /corrupt-once/<f>?k=KEY&block=N&bs=B&rate=
+                            <f> with Range and If-Range (a strong ETag) and its Repr-Digest (sha-256 of the true
+                            file) on every answer; the first answer per KEY whose bytes cover block N (of B bytes,
+                            default 1 MiB) has one byte of that block wrong (the middle one, XOR 0xFF): a network
+                            that delivered wrong bytes once (Phase 5 of RESUME-DESIGN.md, 4.3)
+  /vary/<f>?val=none|lm|weak|etag&k=KEY&rate=&rate0=&full=1&size=N&swap=KEY2
+                            <f> with Range, If-Range honoured for the validators sent (review of Phase 5): val picks
+                            them (none: neither an ETag nor a Last-Modified; lm: Last-Modified only; weak: a weak
+                            ETag and Last-Modified; etag: a strong ETag); rate0 (KB/s) throttles the answers that
+                            start at byte 0 instead of rate (one segment faster than the others); size=N serves
+                            the first N bytes as a file of N bytes. Once /flag?k=KEY was asked, or with full=1 once
+                            the bytes sent for KEY covered the whole file (a link that allows one full download),
+                            every request answers 403 "Request has expired"; once /flag?k=KEY2 was asked (swap),
+                            other bytes of the same size (XOR 0xA5) under other validators
+  /vsign/<f>?k=KEY&...      a 302 to /vary/<f> with a fresh key (KEY-<n>) and the rest of the query: a redirector
+                            that mints a new signed address on every request (review of Phase 5)
   /loop/a                   a 302 to /loop/b and back, for ever (NS_ERROR_REDIRECT_LOOP) | /dupcl  a 200 with two Content-Length
                             headers that disagree (NS_ERROR_CORRUPTED_CONTENT): failures no wait fixes (review of Phase 4)
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
@@ -150,6 +166,11 @@ EDGE = {'n': 0}
 FLAP = {'n': 0}
 # /tail: its bytes from here on change once flagged.
 TAIL = 65536
+# /corrupt-once: the keys whose one wrong block was already sent.
+CORRUPTED = set()
+# /vary: per key, the [start, end) stretches already sent (full=1); /vsign's count of addresses minted.
+SERVED = {}
+MINTED = {'n': 0}
 # /net: per key, until when its connections are reset (/drop) and until when it answers 503 (/busy, with
 # its Retry-After).
 DROP = {}
@@ -387,6 +408,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.swap(p[len('/swap/'):], q, rate)
         if p.startswith('/morph/'):
             return self.morph(p[len('/morph/'):], q, rate)
+        if p.startswith('/corrupt-once/'):
+            return self.corrupt_once(p[len('/corrupt-once/'):], q, rate)
+        if p.startswith('/vary/'):
+            return self.vary(p[len('/vary/'):], q, rate)
+        if p.startswith('/vsign/'):
+            return self.vsign(p[len('/vsign/'):], q)
         if p.startswith('/sign/'):
             return self.sign(p[len('/sign/'):], q, once=False)
         if p.startswith('/signed-once/'):
@@ -489,8 +516,9 @@ class Handler(BaseHTTPRequestHandler):
         self.text(404, 'not found')
 
     def digest(self, path, kind):
-        """md5 (base64, as Content-MD5 carries it) or the sha256 of the swapped bytes (hex; 'tail': swapped
-        from TAIL on, as /tail sends them), once per file."""
+        """md5 (base64, as Content-MD5 carries it), the sha256 of the file (base64, as Repr-Digest carries it:
+        'sha256') or the sha256 of the swapped bytes (hex; 'tail': swapped from TAIL on, as /tail sends them),
+        once per file."""
         with LOCK:
             hit = DIGESTS.get((path, kind))
         if hit:
@@ -500,8 +528,8 @@ class Handler(BaseHTTPRequestHandler):
             if kind == 'tail':
                 h.update(f.read(TAIL))
             for b in iter(lambda: f.read(1 << 20), b''):
-                h.update(b if kind == 'md5' else b.translate(XOR))
-        out = base64.b64encode(h.digest()).decode() if kind == 'md5' else h.hexdigest()
+                h.update(b if kind in ('md5', 'sha256') else b.translate(XOR))
+        out = base64.b64encode(h.digest()).decode() if kind in ('md5', 'sha256') else h.hexdigest()
         with LOCK:
             DIGESTS[(path, kind)] = out
         return out
@@ -603,6 +631,104 @@ class Handler(BaseHTTPRequestHandler):
         headers.append(('Content-Length', str(end - start + 1)))
         xor = 0xA5 if flagged and q.get('xor') == '1' else 0
         return self.send_part(path, status, start, end, 0 if flagged else rate, headers, xor=xor)
+
+    def corrupt_once(self, name, q, rate):
+        """/corrupt-once/<f>: see the docstring. The wrong byte is only in the bytes sent, never in the file."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        size = os.path.getsize(path)
+        bs = int(q.get('bs', str(1 << 20)))
+        block = int(q.get('block', '0'))
+        etag = '"C-%x"' % size
+        headers = [('Accept-Ranges', 'bytes'), ('ETag', etag), ('Repr-Digest', 'sha-256=:%s:' % self.digest(path, 'sha256'))]
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes=') and self.headers.get('If-Range') in (None, etag):
+            a, _, b = rng[6:].partition('-')
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            status = 206
+            headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        at = block * bs + min(bs, size - block * bs) // 2
+        flip = -1
+        with LOCK:
+            key = q.get('k', name)
+            if key not in CORRUPTED and start <= at <= end:
+                CORRUPTED.add(key)
+                flip = at
+        return self.send_part(path, status, start, end, rate, headers, flip=flip, corrupted=flip >= 0)
+
+    def vary(self, name, q, rate):
+        """/vary/<f>: see the docstring (review of Phase 5)."""
+        path = fixture(name)
+        if not path:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        size = os.path.getsize(path)
+        if q.get('size'):
+            size = min(size, int(q['size']))
+        key = q.get('k', name)
+        with LOCK:
+            covered, top = 0, 0
+            for a, b in sorted(SERVED.get(key, [])):
+                if b > top:
+                    covered += b - max(a, top)
+                    top = b
+            refused = key in FLAGS or (q.get('full') == '1' and covered >= size)
+            swapped = bool(q.get('swap')) and q['swap'] in FLAGS
+        if refused:
+            self.record(status=403, expired='vary')
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        val = q.get('val', 'etag')
+        tag = ('B' if swapped else 'A') + '-%x' % size
+        etag = {'etag': '"%s"' % tag, 'weak': 'W/"%s"' % tag}.get(val, '')
+        lm = LM[swapped] if val in ('lm', 'weak') else ''
+        headers = [('Accept-Ranges', 'bytes')]
+        if etag:
+            headers.append(('ETag', etag))
+        if lm:
+            headers.append(('Last-Modified', lm))
+        start, end, status = 0, size - 1, 200
+        rng = self.headers.get('Range', '')
+        if rng.startswith('bytes='):
+            if_range = self.headers.get('If-Range')
+            if if_range is None or (if_range == etag and not etag.startswith('W/')) or (lm and if_range == lm):
+                a, _, b = rng[6:].partition('-')
+                start = int(a) if a else max(0, size - int(b))
+                end = min(size - 1, int(b)) if (a and b) else size - 1
+                status = 206
+                headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
+        headers.append(('Content-Length', str(end - start + 1)))
+        if start == 0 and q.get('rate0'):
+            rate = float(q['rate0']) * 1024
+
+        def sent(n):
+            with LOCK:
+                SERVED.setdefault(key, []).append((start, start + n))
+
+        return self.send_part(path, status, start, end, rate, headers, xor=0xA5 if swapped else 0, sent_to=sent, swapped=swapped)
+
+    def vsign(self, name, q):
+        """/vsign/<f>: a 302 to /vary/<f> under a fresh key (see the docstring)."""
+        from urllib.parse import urlencode
+        if not fixture(name):
+            self.record(status=404)
+            return self.text(404, 'not found')
+        with LOCK:
+            MINTED['n'] += 1
+            n = MINTED['n']
+        rest = [(k, v) for k, v in q.items() if k != 'k']
+        where = '/vary/%s?%s' % (name, urlencode([('k', '%s-%d' % (q.get('k', name), n))] + rest))
+        self.record(status=302, location=where)
+        self.send_response(302)
+        self.send_header('Location', where)
+        self.send_header('Content-Length', '0')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        return None
 
     def token(self, name, ttl, uses, rate):
         """A fresh /signed/ address for fixture `name`: valid for ttl seconds (0: no limit) and/or uses requests."""
@@ -930,10 +1056,11 @@ class Handler(BaseHTTPRequestHandler):
             entry['sent'] = sent
             entry['secs'] = round(time.time() - t0, 3)
 
-    def send_part(self, path, status, start, end, rate, headers, xor=0, cut=0, xor_from=0, **extra):
-        """Bytes start..end of `path` (swapped when `xor`, from file offset `xor_from` on), with the headers
-        given; logged like send_file (with `extra` in the log entry). With `cut`, only that many bytes are
-        sent and the connection closes."""
+    def send_part(self, path, status, start, end, rate, headers, xor=0, cut=0, xor_from=0, flip=-1, sent_to=None, **extra):
+        """Bytes start..end of `path` (swapped when `xor`, from file offset `xor_from` on; the byte at file
+        offset `flip` XOR 0xFF), with the headers given; logged like send_file (with `extra` in the log
+        entry). With `cut`, only that many bytes are sent and the connection closes. `sent_to(n)` is told
+        how many bytes went out, however the answer ended."""
         length = end - start + 1
         entry = self.record(status=status, start=start, end=end, **extra)
         self.send_response(status)
@@ -958,6 +1085,9 @@ class Handler(BaseHTTPRequestHandler):
                     if xor:
                         keep = max(0, min(len(b), xor_from - (start + sent)))
                         b = b[:keep] + b[keep:].translate(XOR)
+                    if 0 <= flip - (start + sent) < len(b):
+                        i = flip - (start + sent)
+                        b = b[:i] + bytes([b[i] ^ 0xFF]) + b[i + 1:]
                     self.wfile.write(b)
                     sent += len(b)
                     if rate:
@@ -967,6 +1097,8 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             entry['sent'] = sent
             entry['secs'] = round(time.time() - t0, 3)
+            if sent_to:
+                sent_to(sent)
 
     def dropping(self, key):
         with LOCK:

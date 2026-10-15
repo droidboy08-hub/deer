@@ -3,6 +3,11 @@
 // when (2.5). Until the block hash record exists (Phase 5) the saved bytes themselves are the
 // reference: they are read back from the .part through partfile readAt().
 //
+// Once the block hash record exists (Phase 5, ledger.ts), its recorded head hashes are the reference
+// (RESUME-DESIGN.md 1, "How bytes are compared"): the windows are the heads of hashed blocks, and a
+// window's SHA-256 is compared with the head hash recorded for that block (Heads), so damage in the
+// .part is never taken for another file. Without a record the saved bytes are read back as before.
+//
 // Two users:
 //   - ranged.ts, at the download's own address: judge() on the resume probe (whose answer carries
 //     window 0) and on a change mid-download; compareWindows() when only headers said it changed (R6);
@@ -11,7 +16,7 @@
 //     other windows only when R3 or R5 does not settle it (about 256 KiB at most).
 // Nothing here changes the download's state.
 import {
-  AbortedError, AddressRefusedError, ChangedError, HttpStatusError, NotTheFileError, Response, ShortBodyError, backoff, isRetryable, open,
+  AbortedError, AddressRefusedError, ChangedError, DownloadError, HttpStatusError, NotTheFileError, Response, ShortBodyError, backoff, isRetryable, open,
   pageLike, parseContentRange, refusal, retryAfter, sleep, textStart, textual, type Identity,
 } from './net';
 import { nameFromDisposition } from './naming';
@@ -27,6 +32,10 @@ export const ASK_ABOVE = 1024 * 1024;
 export const TINY = 64 * 1024;
 /** One window (2.5); also the saved bytes a new single-stream answer must start with. */
 export const WINDOW = 64 * 1024;
+/** SHA-256 of bytes, hex (crypto.subtle: off the main thread; Phase 5 spike (b)). */
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>)), (x) => x.toString(16).padStart(2, '0')).join('');
+}
 /** At most this many windows per candidate: about 256 KiB (2.5). */
 const BUDGET = 4;
 const ATTEMPTS = 3;
@@ -40,6 +49,19 @@ export interface Kind {
   sure: boolean;
 }
 
+/**
+ * The block hash record as the proof reads it (RESUME-DESIGN.md 2.4 R4, 4.1; ledger.ts Ledger): the block
+ * size, the hashed blocks, and a hashed block's head hash for a window that is exactly its head.
+ */
+export interface Heads {
+  bs: number;
+  total: number;
+  blocks: Map<number, unknown>;
+  head(from: number, to: number): string | undefined;
+  /** False: bytes with no recorded head are never read back to compare (a finished file's damaged blocks). */
+  local?: boolean;
+}
+
 /** Everything a proof reads: the record, whose requests these are, and what is saved. */
 export interface ProofCtx {
   state: FileState;
@@ -49,6 +71,8 @@ export interface ProofCtx {
   saved: number;
   /** Connections the answers came over (tests). */
   sockets?: Set<string>;
+  /** The block hash record, once there is one: windows are compared with its head hashes (Phase 5). */
+  heads?: Heads | null;
 }
 
 /** What a new address answered, kept for adopting it (renew.ts adopt()) or for Start over. */
@@ -153,6 +177,8 @@ export function headerChange(evidence: string, res: Response, sent = ''): Change
 export async function readKind(s: FileState, partPath: string): Promise<Kind> {
   const type = s.contentType ?? '';
   if (type) return { kind: textual(type) ? 'text' : 'binary', sure: !s.typeGuessed };
+  // What reading block 0 back said (Phase 5, 4.1): a sniff, never sure.
+  if (s.kind) return { kind: s.kind, sure: false };
   const first = s.segments[0];
   if (!partPath || !first || first.start !== 0 || first.received <= 0) return { kind: '', sure: false };
   const head = await readAt(partPath, 0, Math.min(64, first.received));
@@ -221,10 +247,19 @@ function fnv(text: string): number {
  * still counts, so a download paused early (a few KiB in each of 8 segments) is never proven by
  * window 0 alone (see enough()). Before the hash record the saved bytes stand in for its head hashes.
  */
-export function windows(segments: Segment[], seed: string): Array<[number, number]> {
+export function windows(segments: Segment[], seed: string, heads: Heads | null = null): Array<[number, number]> {
   const segs = segments.filter((x) => x.received > 0).sort((a, b) => a.start - b.start);
   const out: Array<[number, number]> = [];
   if (!segs.length) return out;
+  if (heads?.blocks.size) {
+    // Review of Phase 5: hashed blocks in too few stretches (one segment ran ahead while every other one
+    // holds less than a block) never make a proof (enough()), so a renewed link of the same file read as
+    // File changed. The record's windows are used when they make one; otherwise the windows over the saved
+    // bytes below, as before Phase 5 (a window that is exactly a hashed block's head is still compared with
+    // its recorded hash: compareWindows()). Without local bytes to read (`local` false) only the record's.
+    const rec = recordWindows(segs, seed, heads);
+    if (heads.local === false || (rec.length && enough(segs, rec))) return rec;
+  } else if (heads?.local === false) return out;
   const end = (x: Segment): number => x.start + x.received;
   /** The parts of [from, to) no window covers yet, in order. */
   const gaps = (from: number, to: number): Array<[number, number]> => {
@@ -273,6 +308,47 @@ export function windows(segments: Segment[], seed: string): Array<[number, numbe
 }
 
 /**
+ * windows() once the block hash record exists (RESUME-DESIGN.md 2.5 with 4.1): the heads of hashed blocks
+ * that lie wholly under the saved bytes, in the same order: block 0; the newest hashed block below the
+ * lowest unfinished frontier; one placed by the seed; the median segment's first hashed block when there
+ * are more than 8 segments; then, until there are 3 windows over min(3, stretches) stretches, the first
+ * hashed block of a stretch not sampled yet. Each window is [block start, + min(WINDOW, block length)): the head ledger.ts records.
+ */
+function recordWindows(segs: Segment[], seed: string, heads: Heads): Array<[number, number]> {
+  const bs = heads.bs;
+  const end = (x: Segment): number => x.start + x.received;
+  const span = (b: number): [number, number] => [b * bs, Math.min(heads.total, b * bs + Math.min(WINDOW, Math.min(bs, heads.total - b * bs)))];
+  const hashedIn = (x: Segment): number[] => {
+    const out: number[] = [];
+    for (let b = Math.ceil(x.start / bs); b * bs < end(x); b++) if (heads.blocks.has(b) && Math.min(heads.total, (b + 1) * bs) <= end(x)) out.push(b);
+    return out;
+  };
+  const picked: number[] = [];
+  const add = (b: number | undefined): boolean => {
+    if (b === undefined || picked.length >= BUDGET || picked.includes(b)) return false;
+    picked.push(b);
+    return true;
+  };
+  const sampled = (x: Segment): boolean => picked.some((b) => b * bs >= x.start && b * bs < end(x));
+  if (heads.blocks.has(0)) add(0);
+  const open = segs.filter((x) => x.end < 0 || end(x) < x.end);
+  for (const x of open.length ? open : [segs[segs.length - 1]]) {
+    const inX = hashedIn(x);
+    if (add(inX[inX.length - 1])) break;
+  }
+  const all = segs.flatMap(hashedIn);
+  if (all.length) add(all[fnv(seed || 'deer') % all.length]);
+  if (segs.length > 8) add(hashedIn(segs[Math.floor(segs.length / 2)])[0]);
+  const want = Math.min(3, segs.filter((x) => hashedIn(x).length).length);
+  while (picked.length < BUDGET && (picked.length < 3 || segs.filter(sampled).length < want)) {
+    const rest = segs.filter((x) => !sampled(x) && hashedIn(x).length);
+    const next = rest.length ? hashedIn(rest[Math.floor(rest.length / 2)])[0] : all.find((b) => !picked.includes(b));
+    if (!add(next)) break;
+  }
+  return picked.map(span);
+}
+
+/**
  * Do these windows, all compared and equal, make a proof (review of Phase 2)? Every saved byte, or at
  * least 3 windows over at least min(3, stretches) stretches (RESUME-DESIGN.md 2.5: 3 or 4 windows for a
  * new address or a header difference). One window over a download paused early let another file of
@@ -294,11 +370,55 @@ export function differs(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
+ * The bytes [from, to) at `url` in memory (Range, with If-Range when `validator`): a block Repair or the
+ * server compare fetches again (RESUME-DESIGN.md 4.3). A 200 to If-Range is the file changing
+ * (ChangedError); a 200 to a plain Range, a range that starts elsewhere or a short body can't be used
+ * (DownloadError). A refused address or a page throws as the probe would. Lane 0, the probe's retries.
+ */
+export async function fetchRange(c: ProofCtx, url: string, from: number, to: number, signal: AbortSignal, validator = ''): Promise<Uint8Array> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const extra: Record<string, string> = { Range: `bytes=${from}-${to - 1}` };
+      if (validator) extra['If-Range'] = validator;
+      const res = await open(url, c.identity, extra, signal, { lane: 0 });
+      c.sockets?.add(res.socket);
+      if (res.status !== 200 && res.status !== 206) throw await refusal(res, retryAfter(res));
+      const type = res.header('content-type');
+      if (notFile(c.kind, type)) {
+        res.destroy();
+        throw new NotTheFileError(type);
+      }
+      if (res.status === 200) {
+        res.destroy();
+        if (validator) throw new ChangedError('the site sent the whole file again');
+        throw new DownloadError('The site no longer sends parts of the file.');
+      }
+      const cr = parseContentRange(res.header('content-range'));
+      if (!cr || cr.start !== from) {
+        res.destroy();
+        throw new DownloadError('The server sent a different part of the file than was asked for.');
+      }
+      if (cr.total >= 0 && c.state.total >= 0 && cr.total !== c.state.total) {
+        res.destroy();
+        throw new ChangedError(`was ${sizeText(c.state.total)}, now ${sizeText(cr.total)}`);
+      }
+      const bytes = await res.bytes({ max: to - from });
+      if (bytes.length < to - from) throw new ShortBodyError();
+      return bytes;
+    } catch (err) {
+      if (signal.aborted) throw new AbortedError();
+      if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+      await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
+    }
+  }
+}
+
+/**
  * One window at `url` with Range and no If-Range: its bytes and the file's total from a 206; a 200
  * unread (the address no longer takes ranges); null when the answer can't be compared (416, another
  * range). A refused address or a page throws, as the probe would. Lane 0, the probe's retries.
  */
-export async function fetchWindow(c: ProofCtx, url: string, from: number, to: number, signal: AbortSignal): Promise<Response | { res: Response; bytes: Uint8Array; total: number } | null> {
+export async function fetchWindow(c: ProofCtx, url: string, from: number, to: number, signal: AbortSignal, attempts = ATTEMPTS): Promise<Response | { res: Response; bytes: Uint8Array; total: number } | null> {
   for (let attempt = 1; ; attempt++) {
     try {
       const res = await open(url, c.identity, { Range: `bytes=${from}-${to - 1}` }, signal, { lane: 0 });
@@ -326,7 +446,7 @@ export async function fetchWindow(c: ProofCtx, url: string, from: number, to: nu
       return { res, bytes, total: cr.total };
     } catch (err) {
       if (signal.aborted) throw new AbortedError();
-      if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+      if (attempt >= attempts || !isRetryable(err)) throw err;
       await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
     }
   }
@@ -340,19 +460,28 @@ export type Compared =
   | { verdict: 'unknown'; compared: number };
 
 /**
- * R4 (RESUME-DESIGN.md 2.4): the windows asked for at `url`, each against the saved bytes. 'same' when
+ * R4 (RESUME-DESIGN.md 2.4): the windows asked for at `url`, each against the saved bytes, or against the
+ * recorded head hash of its block once the record exists (Phase 5; c.heads). 'same' when
  * all are equal at the same `total` (-1: not known), with the last answer; 'changed' when one differs
  * or the total does; 'whole' for a 200 (the address no longer takes ranges: handed back unread);
- * 'unknown' when one can't be compared. A refused address or a page throws (fetchWindow()).
+ * 'unknown' when one can't be compared. A refused address or a page throws (fetchWindow()). `attempts`:
+ * how many times a window is asked before its error is thrown (the completion check asks once).
  */
-export async function compareWindows(c: ProofCtx, url: string, wins: Array<[number, number]>, partPath: string, signal: AbortSignal, total: number): Promise<Compared> {
+export async function compareWindows(c: ProofCtx, url: string, wins: Array<[number, number]>, partPath: string, signal: AbortSignal, total: number, attempts = ATTEMPTS): Promise<Compared> {
   let last: Response | null = null;
   let compared = 0;
   for (const [from, to] of wins) {
-    const got = await fetchWindow(c, url, from, to, signal);
+    const got = await fetchWindow(c, url, from, to, signal, attempts);
     if (!got) return { verdict: 'unknown', compared };
     if (got instanceof Response) return { verdict: 'whole', res: got };
     if (got.total >= 0 && total >= 0 && got.total !== total) return { verdict: 'changed', err: new ChangedError(`was ${sizeText(total)}, now ${sizeText(got.total)}`) };
+    const recorded = c.heads?.head(from, to);
+    if (recorded) {
+      if ((await sha256Hex(got.bytes)) !== recorded) return { verdict: 'changed', err: new ChangedError(from === 0 ? 'its first bytes are different' : `its bytes at ${sizeText(from)} are different`) };
+      compared++;
+      last = got.res;
+      continue;
+    }
     const ours = await readAt(partPath, from, to - from);
     if (!ours || ours.length !== got.bytes.length) return { verdict: 'unknown', compared };
     if (differs(got.bytes, ours)) return { verdict: 'changed', err: new ChangedError(from === 0 ? 'its first bytes are different' : `its bytes at ${sizeText(from)} are different`) };
@@ -436,8 +565,17 @@ export async function proveAddress(c: ProofCtx, partPath: string, segments: Segm
   if (first && partPath && (answer.status === 200 || cr?.start === 0)) {
     const n = Math.min(WINDOW, first.received);
     const bytes = await answer.head(n);
-    const ours = await readAt(partPath, 0, n);
-    if (bytes.length >= n && ours && ours.length === n) {
+    // With the record (Phase 5), block 0's head hash is the reference; when the saved bytes may not be
+    // read back instead (Repair proves with the good blocks only, `local` false) nothing is compared here.
+    const recorded = c.heads?.head(0, n);
+    const ours = recorded || c.heads?.local === false ? null : await readAt(partPath, 0, n);
+    if (bytes.length >= n && recorded) {
+      if ((await sha256Hex(bytes)) !== recorded) {
+        if (textStart(bytes) && c.kind.kind === 'binary') return { verdict: 'refused', status: 0, page: true, total };
+        return { verdict: 'changed', found, evidence: 'its first bytes are different' };
+      }
+      firstSame = true;
+    } else if (bytes.length >= n && ours && ours.length === n) {
       // A page where the saved bytes are not one (R1): an expiry page that slipped past its type.
       if (textStart(bytes) && !textStart(ours)) return { verdict: 'refused', status: 0, page: true, total };
       if (differs(bytes, ours)) return { verdict: 'changed', found, evidence: 'its first bytes are different' };
@@ -450,7 +588,7 @@ export async function proveAddress(c: ProofCtx, partPath: string, segments: Segm
   // R7: no ranges, so no windows; only an equal strong ETag (another host) with window 0 still says so.
   if (!found.ranges) return strong && firstSame ? { verdict: 'same', found } : { verdict: 'unknown', found };
   // R4: the other windows at the new final address; with window 0 they must make a proof (enough()).
-  const planned = windows(segments, seed);
+  const planned = windows(segments, seed, c.heads);
   const wins = planned.filter(([a]) => !(firstSame && a === 0));
   let r: Compared;
   try {

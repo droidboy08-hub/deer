@@ -6,7 +6,9 @@ Answers like yt-dlp for what Vitre asks:
                                  M4A and Opus audio; a URL containing "unavailable" fails like yt-dlp
   -f <fmt> -o <path> ... <url>   prints --progress-template lines for each format, [Merger] when
                                  joining, then writes <path>; a URL containing "slow" takes ~6 s
-Every call is recorded in %TEMP%\\vitre-fake-ytdlp.log (one JSON line per call).
+Every call is recorded in the file VITRE_FAKE_YTDLP_LOG names (one JSON line per call): the runners give each
+run its own (tests/downloads/all.py, tests/downloads-verify/all.py), so two runs at the same time never share
+it; %TEMP%\\vitre-fake-ytdlp.log when it is not set.
 """
 import json
 import os
@@ -15,7 +17,7 @@ import tempfile
 import time
 
 args = sys.argv[1:]
-with open(os.path.join(tempfile.gettempdir(), 'vitre-fake-ytdlp.log'), 'a', encoding='utf-8') as f:
+with open(os.environ.get('VITRE_FAKE_YTDLP_LOG') or os.path.join(tempfile.gettempdir(), 'vitre-fake-ytdlp.log'), 'a', encoding='utf-8') as f:
     f.write(json.dumps(args) + '\n')
 
 

@@ -128,6 +128,8 @@ def main():
                    '--app', a.app, '--timeout', str(timeout), '--out', out,
                    '--env', 'VITRE_DL_PORT=%d' % a.port, '--env', 'VITRE_DL_FIX=' + fix, '--env', 'VITRE_DL_DIR=' + dl,
                    '--env', 'VITRE_DL_PY=' + PY, '--env', 'VITRE_DLV_EDGE=%d' % (a.port + 1), '--env', 'VITRE_DL_LOCK=' + os.path.join(ROOT, 'spikes', 'downloader', 'verify', 'lock_region.py'),
+                   # The stand-in yt-dlp's call log, this run's own (a concurrent run of the builder's runner removed a shared one).
+                   '--env', 'VITRE_FAKE_YTDLP_LOG=' + os.path.join(DATA, 'fake-ytdlp-%s.log' % name),
                    '--pref', 'vitre.downloadsFolder=' + dl,
                    '--pref', 'media.gmp-manager.updateEnabled=false', '--pref', 'media.gmp-manager.url=http://127.0.0.1:9/none']
             if with_ff and manifest.get('ffmpeg'):

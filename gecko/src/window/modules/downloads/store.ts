@@ -4,7 +4,7 @@
 // a private window the private ones, a normal window the others (as Firefox does).
 import type { Browser } from '../../browser';
 import type { DownloadEvent, DownloadView, RefreshResult, StartOptions } from '../../../modules/downloads/types';
-import { isWaiting } from './format';
+import { isDamaged, isWaiting } from './format';
 
 const ORDER: Record<DownloadView['state'], number> = { downloading: 0, starting: 0, queued: 1, paused: 2, failed: 2, completed: 3, cancelled: 3 };
 
@@ -13,11 +13,13 @@ export type AttachedEvent = Extract<DownloadEvent, { kind: 'attached' }>;
 /**
  * What a row's verbs run (RESUME-DESIGN.md 6, wiring). Phase 3: refresh-address (a renewal attempt, then
  * the page opened and the row armed), stop-waiting, open-page (Open page, From page: this window opens it,
- * through the opener index.ts sets), keep-partial; use-address is the panel's own field.
+ * through the opener index.ts sets), keep-partial; use-address is the panel's own field. Phase 5, on a
+ * completed row: check (Check file), repair (Damaged), restore (Restore original, Changed after download:
+ * only when chosen), download-again (a new row for the same download; Repair refused: the site's file changed).
  */
 export type Command =
   | 'pause' | 'resume' | 'start-now' | 'cancel' | 'remove' | 'open' | 'show-in-folder' | 'copy-address' | 'keep' | 'start-over'
-  | 'refresh-address' | 'stop-waiting' | 'open-page' | 'keep-partial';
+  | 'refresh-address' | 'stop-waiting' | 'open-page' | 'keep-partial' | 'check' | 'repair' | 'restore' | 'download-again';
 
 export class DownloadStore {
   private items = new Map<string, DownloadView>();
@@ -162,6 +164,10 @@ export class DownloadStore {
       case 'refresh-address': void this.refresh(id); break;
       case 'stop-waiting': e.stopWaiting(id); break;
       case 'open-page': this.openPage(id); break;
+      case 'check': void e.checkFile(id); break;
+      case 'repair': void e.repair(id); break;
+      case 'restore': void e.restoreOriginal(id); break;
+      case 'download-again': e.downloadAgain(id); break;
     }
   }
 
@@ -196,11 +202,13 @@ export class DownloadStore {
    * Refresh address (Retry for a stream, whose renewal comes with Phase 6); on Waiting for link and Start
    * it again from its page, Open page; on File changed Resume, which only checks the address again (the
    * panel moves focus to the row's choice instead); on Waiting for network and Retrying, Try now (start
-   * now: RESUME-DESIGN.md G4). Resolves with Refresh address's outcome.
+   * now: RESUME-DESIGN.md G4). A Damaged file (Phase 5): Repair (Download again once the site's file
+   * changed); while it is repaired or checked, Show in folder. Resolves with Refresh address's outcome.
    */
   primary(seen: DownloadView): Promise<RefreshResult['kind']> | null {
     const v = this.engine.get(seen.id) ?? seen;
-    if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') this.run('pause', v.id);
+    if (isDamaged(v) && !v.phase) this.run(v.check?.site === 'changed' ? 'download-again' : 'repair', v.id);
+    else if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') this.run('pause', v.id);
     else if (v.state === 'queued' || isWaiting(v)) this.run('start-now', v.id);
     else if (v.state === 'completed' && !v.missing) this.run('show-in-folder', v.id);
     else if (v.need?.kind === 'page' || (v.need?.kind === 'address' && v.armed)) this.run('open-page', v.id);

@@ -8,7 +8,8 @@ export type DownloadState = 'starting' | 'queued' | 'downloading' | 'paused' | '
 /**
  * Why a paused row waits for the person (spikes/downloader/RESUME-DESIGN.md 5.1). Phase 1 sets
  * 'address' (Link expired) and 'choice' (File changed); Phase 3 'page' (a download Firefox moved,
- * which only its page can start again: Start it again from its page); 'repair' comes with Phase 5.
+ * which only its page can start again: Start it again from its page); Phase 5 'repair', on a completed
+ * row: Damaged (Check file found damaged parts, or its whole-file checksum no longer matches).
  */
 export type NeedKind = 'address' | 'choice' | 'repair' | 'page';
 
@@ -73,9 +74,11 @@ export interface DownloadView {
    * 'renewing' while Deer looks for a new address for it (Renewing link, RESUME-DESIGN.md 6);
    * 'checking' while a download with saved bytes asks its address again before it continues
    * (Checking, RESUME-DESIGN.md 6, Phase 4): reported only once that took 400 ms, so a quick resume
-   * never flickers ('probing' until then, with the saved bytes in `received`).
+   * never flickers ('probing' until then, with the saved bytes in `received`). On a completed row
+   * (Phase 5): 'checking' while Check file runs, 'repairing' while Repair or Restore original fetches
+   * damaged parts again (Repairing, `repair`).
    */
-  phase: '' | 'probing' | 'merging' | 'renewing' | 'checking';
+  phase: '' | 'probing' | 'merging' | 'renewing' | 'checking' | 'repairing';
   received: number;
   /** -1 when the server didn't say. For streams this is an estimate. */
   total: number;
@@ -152,6 +155,17 @@ export interface DownloadView {
    * Phase 3).
    */
   keep: { bytes: number; name: string; older: boolean } | null;
+  /**
+   * A finished file's last Check file (RESUME-DESIGN.md 4.2, 6; Phase 5), null when it was never checked.
+   * `bad` damaged parts (`badBytes`): Damaged (need 'repair'); `unlocated`: its checksum no longer
+   * matches and nothing says where (Repair compares it with the site); `edited`: modified after it
+   * finished (`changedAt`), Changed after download, never damage; `media`: what ffmpeg found wrong in it;
+   * `site`: what the last Repair found at the site ('changed': another file, Repair refused; 'expired':
+   * the link no longer works; 'unreachable').
+   */
+  check: { at: number; ok: boolean; bad: number; badBytes: number; unlocated: boolean; edited: boolean; changedAt: number; media: string; site: '' | 'changed' | 'expired' | 'unreachable'; status: number } | null;
+  /** Repairing (RESUME-DESIGN.md 6): how many damaged parts are fetched again, and their size. */
+  repair: { parts: number; bytes: number } | null;
 }
 
 /**

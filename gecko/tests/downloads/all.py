@@ -2,7 +2,9 @@
 
   engine     256 MiB on 8 connections (sha256), sockets per lane, pause/resume with If-Range,
              speed limit, panel and ring captures
-  restart    a download paused by a restart (the quit prompt confirmed) resumes from its segments
+  restart    a download paused by a restart (the quit prompt confirmed) resumes from its segments; a paused
+             download whose record is dirty with no seal and 3 MiB of zeros under its claims (what a power
+             loss leaves): the zeros are found and fetched again (Phase 5)
   ytdlp      YouTube and other sites through yt-dlp (a stand-in script): install prompt, picker, download, errors
   spa        a single-page site's next video (no reload): the old video's streams go, the new one is offered
   mark       the pill's download mark always answers: a picker for what the page loaded, or a note
@@ -15,7 +17,8 @@
              through ffmpeg from the settings path; the picker; the download mark
   noffmpeg   the "ffmpeg not found" state: picker line, two files kept, settings page
   faults     a disk write error mid-download (a locked byte range): stops at once, reads as a disk
-             problem, keeps the bytes on disk, resumes intact
+             problem, keeps the bytes on disk, resumes intact; it seals the block hash record (Phase 5), every
+             hash it kept matches the .part, and the finished file keeps its record and SHA-256
   drm        a ClearKey page is protected: no offer, "Protected video" pill, DRM HLS/DASH refused
   ui         every surface against the boards (panel states, popover, ring menu, pill states,
              picker, live, quit prompt); the rows that need the person (Link expired, Waiting for link,
@@ -36,7 +39,8 @@
              dropped ETags; Content-MD5; an HLS segment that is a page is never written, and an
              encrypted stream a CDN labels text/html completes; Start over keeps "<name>.old.part" and never
              touches another file of that name or a .part it can't move; restarts: a corrupt store
-             loads from its .bak, a bad record loads settled, two unreadable copies are set aside;
+             loads from its .bak, a bad record loads settled, two unreadable copies are set aside (and the
+             rows come back from their block hash records' journals, Phase 5);
              the control: an unchanged resume makes as many requests as before
   expiry     same-file proof and renewal (spikes/downloader/RESUME-DESIGN.md, Phase 2): a signed address
              that expired during a pause is renewed from its original address before the first request
@@ -72,10 +76,28 @@
              port, a redirect loop and a corrupted answer fail as before; sleep and wake (link-up or 10 s
              later); Pause all ends a wait; after a restart what the quit stopped continues and what the
              person paused stays paused (the setting off: both stay, the prompt says so, and a try caught
-             on its check continues by its wait); after a hard kill (run.py @@kill) the last 8 MiB below
-             each mark is fetched again and a try caught on its check still waits; a kill after a stream's
+             on its check continues by its wait); after a hard kill (run.py @@kill) the download with its
+             block hash record is checked against it (Phase 5: claims above the last hashed block given back,
+             the blocks hashed since the last seal hashed again), so only the damaged blocks below each mark are
+             fetched again, and a try caught on its check still waits; a kill after a stream's
              merge completes from the output (also with a part left), one before ffmpeg merges the parts
              again, nothing fetched
+  repair     the block hash record (spikes/downloader/RESUME-DESIGN.md, Phase 5): a download keeps its record in
+             the profile and a pause seals it; bytes another program changed in block k during a pause: only
+             block k is fetched again; a .part deleted during a pause starts over, saying so; one block the
+             network delivered wrong (/corrupt-once, Repr-Digest): only that block is replaced; silent damage in
+             a finished file: Check file finds 1 damaged part (Damaged), Space is Repair, which fetches 1 range
+             and the sha256 equals the fixture; the site's file changed: Repair refuses; a file modified after
+             it finished is Changed after download (never Damaged) and Restore original puts it back only when
+             chosen; Check file on an intact file finds nothing; a journal with a torn last line is read
+             without it. From the review of Phase 5: a link valid for one full download (no strong validator)
+             completes; a small file that changed while it downloaded completes with the new file; a renewed
+             link of a download whose first segment ran ahead continues; Repair never writes over a file
+             edited after it was found Damaged; a repair cut short (a quit, a crash) is checked again, never
+             "Changed after download"; Keep partial then Check file finds nothing; a refused Restore original
+             leaves the file as it was, and one whose every block moved restores it; Remove or Cancel during
+             a seal leaves no journal; Pause and Cancel before the rename are honoured; an older file's site
+             compare keeps to 2 of 3 windows and the 5% rule
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -121,6 +143,7 @@ TESTS = {
     'expiry': (300, True),
     'attach': (480, True),
     'network': (900, True),
+    'repair': (600, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.
@@ -172,6 +195,8 @@ def main():
                    '--app', a.app, '--timeout', str(timeout), '--out', out,
                    '--env', 'VITRE_DL_PORT=%d' % a.port, '--env', 'VITRE_DL_FIX=' + fix, '--env', 'VITRE_DL_DIR=' + dl,
                    '--env', 'VITRE_DL_PY=' + PY, '--env', 'VITRE_DL_LOCK=' + os.path.join(ROOT, 'spikes', 'downloader', 'verify', 'lock_region.py'),
+                   # The stand-in yt-dlp's call log, this run's own (a concurrent run of the other runner removed a shared one).
+                   '--env', 'VITRE_FAKE_YTDLP_LOG=' + os.path.join(DATA, 'fake-ytdlp-%s.log' % name),
                    '--pref', 'vitre.downloadsFolder=' + dl,
                    # Widevine is never fetched in tests (Firefox would download its CDM on a request).
                    '--pref', 'media.gmp-manager.updateEnabled=false', '--pref', 'media.gmp-manager.url=http://127.0.0.1:9/none']

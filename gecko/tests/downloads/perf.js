@@ -2,6 +2,7 @@
 //   A  network only: 8 throttled channels whose bytes are discarded
 //   B  disk only: 256 MiB written through pipe + async copier at 8 offsets
 //   C  the engine (network + disk)
+//   D  the engine with no speed limit at the server (MB/s on this machine)
 // Lag is measured with a system-scope timer (Timer.sys.mjs), not a window timer.
 /* global spike, Services, Cc, Ci, ChromeUtils, IOUtils, PathUtils, DL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
@@ -108,5 +109,16 @@ spike.main(async () => {
     const id = DL.engine.start(`${DL.base}/blob/big?rate=8192`, { filename: "engine.bin", named: true });
     const v = await DL.until(id, ["completed", "failed"], { timeout: 120000 });
     log("C engine", { state: v.state, secs: (Date.now() - t0) / 1000, ...stop() });
+  }
+
+  // D: the engine with no speed limit at the server (throughput on this machine: MB/s), the same file.
+  {
+    await DL.reset();
+    const stop = lagMeter();
+    const t0 = Date.now();
+    const id = DL.engine.start(`${DL.base}/blob/big?rate=0`, { filename: "engine-fast.bin", named: true });
+    const v = await DL.until(id, ["completed", "failed"], { timeout: 120000 });
+    const secs = (Date.now() - t0) / 1000;
+    log("D engine, no limit", { state: v.state, secs, mbps: Math.round((DL.manifest["big.bin"].size / 1048576 / secs) * 10) / 10, ...stop() });
   }
 });

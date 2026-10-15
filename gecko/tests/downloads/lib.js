@@ -33,6 +33,19 @@ window.DL = (() => {
     async stats() {
       return (await fetch(base + "/stats", { cache: "no-store" })).json();
     },
+    /**
+     * stats() once every body transfer the server logged has recorded how many bytes it sent (`sent`, written
+     * after its last pacing pause, so a read right after a download completes can miss it), at most `wait` ms
+     * (review of Phase 5: byte-count checks raced the server when a download finished quickly).
+     */
+    async settledStats(wait = 3000) {
+      const until = Date.now() + wait;
+      for (;;) {
+        const st = await api.stats();
+        if (Date.now() > until || st.requests.every((r) => r.start === undefined || r.sent !== undefined)) return st;
+        await sleep(50);
+      }
+    },
     async reset() {
       await fetch(base + "/reset", { cache: "no-store" });
     },

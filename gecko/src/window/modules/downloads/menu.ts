@@ -45,6 +45,8 @@ const GLYPHS: Record<string, string> = {
   remove: ic.remove,
   link: ic.link,
   opentab: ic.open,
+  // Check file (RESUME-DESIGN.md 6, Phase 5).
+  verify: ic.check,
 };
 
 let current: { close: (how: 'dismiss' | 'activate') => void } | null = null;

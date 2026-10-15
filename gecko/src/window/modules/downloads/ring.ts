@@ -300,7 +300,8 @@ class Popover {
     const active = views.filter((v) => f.isActive(v) && !f.isWaiting(v));
     const rate = active.reduce((n, v) => n + v.speed, 0);
     // Not "All done" while rows wait for the person (RESUME-DESIGN.md 6).
-    const attention = views.filter((v) => v.state === 'paused' && !!v.need).length;
+    // A Damaged file needs the person too (Phase 5).
+    const attention = views.filter((v) => (v.state === 'paused' && !!v.need) || f.isDamaged(v)).length;
     const under = [active.length ? `${active.length} active${rate > 0 ? ` · ${f.speed(rate)}` : ''}` : '', waiting ? `${waiting} waiting` : ''].filter(Boolean).join(' · ');
     f.setText(elm.querySelector('.vd-pop-sum'), under || (attention ? needAttention(attention) : views.length ? 'All done' : 'Nothing yet'));
     const pick = views.slice(0, 3);
@@ -355,10 +356,11 @@ class Popover {
     btn.addEventListener('click', () => {
       const v = this.store.get(id);
       if (!v) return;
-      // A File changed row's choice is made in the panel (RESUME-DESIGN.md 6: no destructive verb here).
-      if (v.need?.kind === 'choice') {
+      // A File changed row's choice is made in the panel (RESUME-DESIGN.md 6: no destructive verb here), and
+      // so is a Changed after download row's Restore original (Phase 5).
+      if (v.need?.kind === 'choice' || f.isEdited(v)) {
         this.close(false);
-        this.panel.choose(id);
+        this.panel.choose(id, f.isEdited(v) ? 'restore' : 'start-over');
         return;
       }
       // Refresh address that finds nothing and has no page to open: the panel's address field.
@@ -389,7 +391,11 @@ class Popover {
     // Renewing link: Pause; Link expired: Refresh address; Waiting for link and Start it again from its
     // page: Open page; as store.primary() runs them (RESUME-DESIGN.md 6).
     const [k, label, icon] =
-      v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing'
+      f.isDamaged(v) && !v.phase
+        ? v.check?.site === 'changed' ? ['d', 'Download again', ic.retry] : ['h', 'Repair', ic.retry]
+        : f.isEdited(v) && !v.phase
+          ? ['s', 'Restore original', ic.chevron]
+      : v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing'
         ? ['p', 'Pause', ic.pause(12)]
         : v.state === 'queued'
           ? ['n', 'Start now', ic.play(12)]
@@ -440,11 +446,17 @@ function needWords(v: DownloadView): string {
   if (v.need?.kind === 'address') return v.armed ? 'Waiting for link' : 'Link expired';
   if (v.need?.kind === 'choice') return 'File changed';
   if (v.need?.kind === 'page') return 'Start it again from its page';
+  if (v.need?.kind === 'repair') return 'Damaged';
   return 'Needs attention';
 }
 
 function meta(v: DownloadView): string {
   const of = v.total > 0 ? `${f.bytes(v.received)} of ${f.bytes(v.total)}` : f.bytes(v.received);
+  // A finished file (RESUME-DESIGN.md 6, Phase 5): Repairing, Checking, Damaged, Changed after download.
+  if (v.state === 'completed' && !v.missing && v.phase === 'repairing') return 'Repairing';
+  if (v.state === 'completed' && !v.missing && v.phase === 'checking') return [f.bytes(v.total), 'Checking'].filter(Boolean).join(' · ');
+  if (f.isDamaged(v)) return [f.bytes(v.total), 'Damaged'].filter(Boolean).join(' · ');
+  if (f.isEdited(v)) return 'Changed after download';
   if (v.state === 'completed') return v.missing ? 'Moved or deleted' : [f.bytes(v.total), 'Completed'].filter(Boolean).join(' · ');
   if (v.state === 'failed') return v.error || 'Failed';
   if (v.state === 'queued') return 'Queued';

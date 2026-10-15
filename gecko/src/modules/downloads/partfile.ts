@@ -66,6 +66,19 @@ export async function readAt(path: string, offset: number, length: number): Prom
   }
 }
 
+/**
+ * Write `bytes` in place at `offset` of an existing file and wait until they are in it (Repair, and a block
+ * the server compare replaced: RESUME-DESIGN.md 4.3). Throws DiskError.
+ */
+export async function writeAt(path: string, offset: number, bytes: Uint8Array): Promise<void> {
+  const w = new Writer(path, offset);
+  try {
+    w.writeBytes(bytes);
+  } finally {
+    await w.close();
+  }
+}
+
 export function existsSync(path: string): boolean {
   try {
     return fileFor(path).exists();
@@ -183,6 +196,17 @@ export class Writer {
     } catch {
       return 0;
     }
+  }
+
+  /**
+   * Of the bytes handed to this writer, those certainly in the file now, less the chunk the copier may
+   * still be writing (IN_FLIGHT): what may be read back while it runs (ranged.ts provable(), the block
+   * hashing). After a failed write (or a pipe the copier closed) it stays at what had left the pipe when
+   * last looked at, never what the closed pipe no longer reports (review of Phase 5).
+   */
+  get settled(): number {
+    this.look();
+    return Math.max(0, Math.min(this.written, this.drained) - IN_FLIGHT);
   }
 
   /** Bytes that are certainly in the file now (a lower bound). */

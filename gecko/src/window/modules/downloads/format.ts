@@ -109,6 +109,23 @@ export const isActive = (v: DownloadView): boolean => v.state === 'downloading' 
 /** A resume asking its address before it continues: Checking once that took 400 ms ('probing' with saved bytes until then). */
 export const isChecking = (v: DownloadView): boolean => v.state === 'downloading' && (v.phase === 'checking' || (v.phase === 'probing' && v.received > 0));
 export const isFinished = (v: DownloadView): boolean => v.state === 'completed' || v.state === 'failed' || v.state === 'cancelled';
+/**
+ * Changed after download (4.2): modified after it finished; never damage, Restore original only when chosen.
+ * It wins over Damaged (review of Phase 5: Space on a Damaged row the person had since edited was Repair).
+ */
+export const isEdited = (v: DownloadView): boolean => v.state === 'completed' && !v.missing && !!v.check?.edited;
+/** Damaged (RESUME-DESIGN.md 6, Phase 5): a finished file Check file found damaged parts in; Repair fixes it. */
+export const isDamaged = (v: DownloadView): boolean => v.state === 'completed' && !v.missing && v.need?.kind === 'repair' && !isEdited(v);
+
+/** "14 Oct, 09:12" (RESUME-DESIGN.md 6: "This file was changed on 14 Oct, 09:12"). */
+export function day(ms: number): string {
+  return `${new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${clock(ms)}`;
+}
+
+/** "1 damaged part", "3 damaged parts". */
+export function damagedParts(n: number): string {
+  return `${n} damaged ${n === 1 ? 'part' : 'parts'}`;
+}
 
 /** "Downloads" for the downloads folder itself; "Downloads › Video" or "D: › Films" elsewhere. */
 export function folderLabel(dir: string, base: string): string {

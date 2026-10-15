@@ -45,10 +45,33 @@ async function sha256(path: string): Promise<string> {
 }
 
 /**
- * What Safe Browsing says about a finished download. 'safe' when protection is off, the service
- * is missing, or anything goes wrong (as Firefox: a failed check never blocks).
+ * Would reputationOf() read the file for its SHA-256 (download protection and its remote lookup on, a
+ * program-like name)? The engine then computes the hash first and hands it over (RESUME-DESIGN.md 4.1).
  */
-export async function reputationOf(o: { url: string; pageUrl: string; policy: ReferrerPolicy; path: string; size: number }): Promise<Verdict> {
+export function hashWanted(path: string): boolean {
+  try {
+    if (!Services.prefs.getBoolPref('browser.safebrowsing.downloads.enabled', true)) return false;
+    if (!Services.prefs.getBoolPref('browser.safebrowsing.downloads.remote.enabled', true)) return false;
+    return !!service().isBinary(PathUtils.filename(path));
+  } catch {
+    return true;
+  }
+}
+
+/** A hex SHA-256 as the raw 32-byte string queryReputation wants. */
+function rawOf(hex: string): string {
+  let out = '';
+  for (let i = 0; i + 1 < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+  return out;
+}
+
+/**
+ * What Safe Browsing says about a finished download. 'safe' when protection is off, the service
+ * is missing, or anything goes wrong (as Firefox: a failed check never blocks). `sha256`: the file's
+ * SHA-256 (hex) the engine already computed at completion (RESUME-DESIGN.md 4.1), so the file is not
+ * read again here.
+ */
+export async function reputationOf(o: { url: string; pageUrl: string; policy: ReferrerPolicy; path: string; size: number; sha256?: string }): Promise<Verdict> {
   try {
     if (!Services.prefs.getBoolPref('browser.safebrowsing.downloads.enabled', true)) return 'safe';
     const svc = service();
@@ -61,7 +84,7 @@ export async function reputationOf(o: { url: string; pageUrl: string; policy: Re
     }
     // The hash only travels in the remote lookup (browser.safebrowsing.downloads.remote.enabled).
     const remote = Services.prefs.getBoolPref('browser.safebrowsing.downloads.remote.enabled', true);
-    const hash = binary && remote ? await sha256(o.path) : '';
+    const hash = binary && remote ? (o.sha256 && /^[0-9a-f]{64}$/.test(o.sha256) ? rawOf(o.sha256) : await sha256(o.path)) : '';
     let referrerInfo: any = null;
     if (/^https?:/i.test(o.pageUrl)) {
       const page = Services.io.newURI(o.pageUrl);

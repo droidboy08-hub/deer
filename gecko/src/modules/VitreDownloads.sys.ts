@@ -30,10 +30,17 @@
 //   keepPartial(id) / decide(id, 'start-over' | 'keep-partial')
 //                                  File changed: the unbroken beginning kept as "<stem> (partial).<ext>"
 //                                  (a completed row), or Start over (startOver(id))
+//   checkFile(id) / repair(id) / restoreOriginal(id) / downloadAgain(id)
+//                                  a completed row (RESUME-DESIGN.md 4.2, 4.3, Phase 5): Check file hashes it
+//                                  again against its block record (Damaged: view.need 'repair'; Changed after
+//                                  download: view.check.edited); Repair fetches only the damaged parts again;
+//                                  Restore original puts an edited file back; Download again is a new row
 //   hooks.beforeMerge(id) / hooks.afterMerge(id)
 //                                  tests only: awaited once a stream's merge phase is saved and before ffmpeg
 //                                  runs / between the merge and the save that completes the row (the merge
 //                                  crash window, RESUME-DESIGN.md G4)
+//   hooks.beforePlace(id)          tests only: awaited once a one-file download's final seal is done, before
+//                                  its .part is renamed (a Pause or Cancel then still stops it)
 //   media                          MediaWatch: notice(browserId), subscribe(fn), offer(...), eme(...)
 //   ffmpeg()                       FfmpegInfo (settings path, bundled copy, the downloaded copy, PATH; or 'none')
 //   installFfmpeg(), ffmpegInstall(), onFfmpegInstall(fn), cancelFfmpegInstall()
@@ -114,9 +121,26 @@
 //     downloads when Deer starts" is on (the default, G4); rows the person paused stay paused, and
 //     waiting rows always continue. The store's session is unclean until the last save at quit: after
 //     a crash, the rows that were running continue the same way and fetch again the last 8 MiB below
-//     each segment's mark (rec.suspect; Phase 5's hash record replaces this rule). A stream's merge
-//     saves its phase and output path (flushed) before ffmpeg runs: after a crash an output in place
-//     completes the row (the parts left go), or the parts are merged again.
+//     each segment's mark (rec.suspect), unless the download has its block hash record (Phase 5, below).
+//     A stream's merge saves its phase and output path (flushed) before ffmpeg runs: after a crash an
+//     output in place completes the row (the parts left go), or the parts are merged again.
+//   - The block hash record (RESUME-DESIGN.md section 4, 5.7; Phase 5; downloads/ledger.ts, finished.ts).
+//     A one-file download of known length keeps <profile>/vitre-downloads/<id>.jsonl (in memory only for a
+//     private one): every block of the .part is hashed once it is certainly written. A run marks the file
+//     dirty (saved, flushed) before it writes; a seal (the .part flushed through FlushFileBuffers when it
+//     can be, a seal line, a flushed save) runs every 30 s or 256 MiB, before the final rename and at every
+//     stop, and a clean stop drains the hashing, seals and clears the mark. Every resume checks its saved
+//     part first (inspect(), Checking): the last 2 hashed blocks below each frontier and 2 placed by the id;
+//     every block when the .part was modified while nothing ran; after an unclean stop (still dirty), what
+//     each segment claims above its last hashed block is given back and the blocks hashed since the last
+//     seal (2 minutes before it when the flush was not proven) are checked again. Bad blocks are released
+//     (the split saved, flushed, before anything is fetched) and fetched again, and must hash to their old
+//     value (otherwise File changed). A missing .part starts over, saying so. A finished file keeps its record
+//     as <id>.done.jsonl with its SHA-256, computed once (checked against a server checksum, reused by Safe
+//     Browsing). Check file, Repair (only the damaged blocks, each checked against the record before it is
+//     written), Restore original, Changed after download (modified after it finished: never damage); after an
+//     unclean session the files finished in it are checked by themselves. If the store and its .bak are both
+//     lost, the rows come back from the journals.
 //   - Private downloads are never written to disk lists and are dropped when the last private
 //     window closes (last-pb-context-exited), as Firefox does. Closing the last private window
 //     while one runs asks first (last-pb-context-exiting), and a quit cancels them (the prompt says so).
@@ -145,12 +169,15 @@ import { MediaWatch } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
 import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from './downloads/attach';
 import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
+import { checkFinished, damagedFills, editedSince, mediaCheck, repairFinished, restoreFinished, siteCompare, statOf, type RepairOutcome } from './downloads/finished';
+import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, type Header } from './downloads/ledger';
 import { AbortedError, ChangedError, DiskError, DownloadError, HttpStatusError, Identity, classify, describeError } from './downloads/net';
 import { existsSync, fileFor, setSize, sizeOf } from './downloads/partfile';
+import type { Segment } from './downloads/ranged';
 import * as platform from './downloads/platform';
-import { ASK_ABOVE, UNSURE, proveAddress, readKind, sizeText, type Candidate, type Found } from './downloads/proof';
+import { ASK_ABOVE, UNSURE, compareWindows, proveAddress, readKind, sizeText, windows, type Candidate, type Found } from './downloads/proof';
 import { asPolicy, readReferrerInfo } from './downloads/referrer';
-import { mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
+import { hashWanted, mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
 import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
 import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, StartOptions, WaitFor } from './downloads/types';
@@ -179,6 +206,9 @@ const WAIT_GRACE = 5000;
 const CATCH_FOR = 30 * 60 * 1000;
 /** Checking shows only once a resume's check took this long, so a quick resume never flickers (RESUME-DESIGN.md 6). */
 const CHECKING_AFTER = 400;
+/** A finished file's hashing waits this long first, and then while a download goes very fast (whileFast()), at most FAST_WAIT. */
+const FAST_LOOK = 1000;
+const FAST_WAIT = 5 * 60 * 1000;
 /** Link-up or wake does not bring an exhausted Link expired schedule's attempt within this long of the last one (G4). */
 const RENEW_ON_LINK = 10 * 60 * 1000;
 const ACTIVE: DownloadState[] = ['starting', 'queued', 'downloading'];
@@ -314,7 +344,41 @@ interface Rec {
    * next run that passes its check says so in the history and clears it.
    */
   suspect?: { at: number; bytes: number };
+  /**
+   * The block hash record's journal (RESUME-DESIGN.md 5.7, Phase 5): <profile>/vitre-downloads/<id>.jsonl,
+   * <id>.done.jsonl once the file is finished. Absent for a private download (its record stays in memory),
+   * for a length never known, and for rows from before Phase 5.
+   */
+  journal?: string;
+  /** The finished file's SHA-256 (hex), computed once at completion (RESUME-DESIGN.md 4.1). */
+  sha256?: string;
+  /** Its size and modified time once it finished (after the Mark of the Web): a later one is Changed after download (4.2). */
+  final?: { size: number; mtime: number };
+  /** The last Check file and what Repair found (RESUME-DESIGN.md 5.1 check). */
+  check?: CheckState;
+  /** Repair or Restore original was writing the file when it began (saved): a crash then has it checked at the next start (4.3). */
+  repairing?: number;
 }
+
+/**
+ * A finished file's last Check file (RESUME-DESIGN.md 4.2, Phase 5): `bad` damaged blocks of size `bs`;
+ * `unlocated`, its checksum no longer matches and no record says where; `edited`, modified after it
+ * finished (`changedAt`); `media`, what ffmpeg found wrong; `site` and `status`, what the last Repair
+ * found at the site (another file, a link that stopped working, no answer).
+ */
+type CheckState = {
+  at: number;
+  ok: boolean;
+  bad: number[];
+  bs: number;
+  badBytes: number;
+  unlocated: boolean;
+  edited: boolean;
+  changedAt: number;
+  media: string;
+  site: '' | 'changed' | 'expired' | 'unreachable';
+  status: number;
+};
 
 /**
  * A paused row's wait (Rec.wait; RESUME-DESIGN.md 5.1). `since`: when the wait began (a network and a
@@ -365,6 +429,8 @@ interface Run {
   resumeAfter?: boolean;
   /** Bytes saved when the run started: a run that ends with more made progress (renewTries). */
   saved0?: number;
+  /** rec.netBytes at the run's last seal (a seal every SEAL_BYTES, RESUME-DESIGN.md 4.1). */
+  sealBytes?: number;
 }
 
 /**
@@ -493,9 +559,21 @@ class Manager {
   private continueTimer: any = null;
   /**
    * Test hooks (never set in the product): beforeMerge(id) runs once a stream's merge phase is saved, before
-   * ffmpeg; afterMerge(id) between the merge and the save that completes the row (network.js).
+   * ffmpeg; afterMerge(id) between the merge and the save that completes the row (network.js); beforePlace(id)
+   * once a one-file download's final seal is done, before its .part is renamed (repair.js).
    */
-  hooks: { beforeMerge?: (id: string) => Promise<void>; afterMerge?: (id: string) => Promise<void> } = {};
+  hooks: { beforeMerge?: (id: string) => Promise<void>; afterMerge?: (id: string) => Promise<void>; beforePlace?: (id: string) => Promise<void> } = {};
+  /** Block hash records by row (RESUME-DESIGN.md 4.1, Phase 5), read from their journals when first needed. */
+  private ledgers = new Map<string, Ledger>();
+  /** A row's seal in progress (seal()): its next run waits for it. */
+  private sealing = new Map<string, Promise<void>>();
+  /** Completed rows Check file is reading (Checking), and the ones Repair or Restore original is fixing (Repairing). */
+  private checking = new Set<string>();
+  private fixing = new Map<string, { parts: number; bytes: number; ac: AbortController }>();
+  /** Where the journals live: <profile>/vitre-downloads (5.7). */
+  private journalDir = '';
+  /** When the session the store was written by began: after a crash, files finished in it are checked (4.2). */
+  private prevStartedAt = 0;
   private global = new RateLimiter(() => Number(settings().speedLimitKBps) || 0);
   private started = false;
   private quitting = false;
@@ -518,6 +596,8 @@ class Manager {
     this.ready = (async () => {
       this.storePath = PathUtils.join(PathUtils.profileDir, 'vitre-downloads.json');
       this.scratch = PathUtils.join(PathUtils.profileDir, 'vitre-download-scratch');
+      this.journalDir = PathUtils.join(PathUtils.profileDir, 'vitre-downloads');
+      await IOUtils.makeDirectory(this.journalDir, { ignoreExisting: true, createAncestors: true }).catch(() => undefined);
       await this.load();
       this.installLifecycle();
       this.loadedAt = Date.now();
@@ -534,6 +614,9 @@ class Manager {
       }
       // What a quit or a crash stopped continues once the first window has had its moment (G4).
       this.continueTimer = setTimeout(() => this.continueAfterStart(), CONTINUE_AFTER);
+      // RESUME-DESIGN.md 4.2: after an unclean exit the files finished in that session are checked, and so is
+      // a repair a crash cut short: once the first window has had its moment too.
+      setTimeout(() => void this.checkAfterStart().catch(() => undefined), CONTINUE_AFTER);
       try {
         this.media.install();
       } catch (e) {
@@ -578,10 +661,19 @@ class Manager {
         await IOUtils.move(path, path + '.corrupt').catch(() => undefined);
       }
     }
+    // RESUME-DESIGN.md 5.7: the store and its .bak both lost: the rows come back from the journals.
+    if (!saved) {
+      const items = await this.fromJournals();
+      if (items.length) {
+        console.warn('Deer downloads: the download list and its backup were lost; rows were rebuilt from the hash records');
+        saved = { version: STORE_VERSION, items };
+      }
+    }
     // RESUME-DESIGN.md G4: a session ends clean only with shutdown()'s last save; a store that says
     // otherwise was left by a crash or a power loss. A version 1 store never said: taken as clean.
     const unclean = (saved as { session?: { clean?: unknown } } | null)?.session?.clean === false;
     this.prevClean = !unclean;
+    this.prevStartedAt = Number((saved as { session?: { startedAt?: unknown } } | null)?.session?.startedAt) || 0;
     const now = Date.now();
     for (const r of saved?.items ?? []) {
       if (!r?.id || !r.url || typeof r.url !== 'string') continue;
@@ -609,11 +701,19 @@ class Manager {
           // what it was writing may never have reached the disk (its suspect tail, fetched again).
           if (unclean) {
             r.resumeOnStart = true;
-            if (r.state === 'downloading') suspectTail(r, now);
+            // Phase 5: a download with its block hash record is judged by it when it continues (its dirty
+            // mark, RESUME-DESIGN.md 4.2: inspect()); one without keeps the suspect tail of Phase 4.
+            if (r.state === 'downloading') {
+              if (r.mode === 'file' && r.file?.dirty && r.journal && existsSync(r.journal)) r.suspect = { at: now, bytes: 0 };
+              else suspectTail(r, now);
+            }
           }
           r.state = 'paused';
         }
       }
+      // Review of Phase 5 (RESUME-DESIGN.md 4.2): a row whose last stop could not flush its .part, in the session
+      // that ended uncleanly, may hold bytes the disk never got under its claims: it is checked as after a crash.
+      if (unclean && r.mode === 'file' && r.file?.unflushed && r.file.unflushed >= this.prevStartedAt && r.journal) r.file.dirty = true;
       r.trying = undefined;
       // G4, the merge crash window: a stream whose merge had begun (runStream()).
       if (r.mode === 'stream' && r.stream?.phase === 'merging' && !FINISHED.includes(r.state)) this.mergeLeft(r);
@@ -1154,6 +1254,8 @@ class Manager {
   }
 
   private async runFile(rec: Rec, run: Run): Promise<void> {
+    // The seal of the row's last stop is done first (it may still be draining its hashing: seal()).
+    await this.sealing.get(rec.id);
     // A taken-over download starts with the transfer its probe made (same identity, same counters).
     const transfer = this.warm.get(rec.id) ?? new FileTransfer(rec.file ?? FileTransfer.fresh(rec.url), this.env(rec, run));
     this.warm.delete(rec.id);
@@ -1161,10 +1263,13 @@ class Manager {
     run.transfer = transfer;
     // A File changed row is only checked again here, never started over (RESUME-DESIGN.md 3 G3).
     transfer.silentRestarts = rec.need?.kind !== 'choice';
+    let ledger: Ledger | null = null;
     if (!transfer.state.probed || transfer.received > 0) {
       // With saved bytes this is Checking (RESUME-DESIGN.md 6): the saved part and the link, before anything is fetched.
       this.setPhase(run, transfer.received > 0 ? 'checking' : 'probing');
       this.touch(rec);
+      // Phase 5 (RESUME-DESIGN.md 4.2): the saved part against its block hash record, before the link is asked.
+      if (transfer.received > 0 && rec.path) ledger = await this.inspect(rec, transfer);
       // A wait's try ends its check at the first 429 or 5xx: the wait spaces the tries (review of Phase 4).
       transfer.waitTry = !!rec.trying;
       try {
@@ -1194,14 +1299,245 @@ class Manager {
       if (!(await this.confirmPath(rec))) throw new SaveDeclined();
       await this.reserve(rec);
     }
+    const part = `${rec.path}.part`;
+    // The block hash record (RESUME-DESIGN.md 4.1), once the length and the path are known.
+    ledger = await this.recordFor(rec, transfer, ledger, run.ac.signal);
+    transfer.ledger = ledger;
+    if (ledger) {
+      ledger.attach(part, () => transfer.provable());
+      ledger.onKind = (kind) => {
+        transfer.state.kind ??= kind;
+      };
+      // 4.1: until a clean stop seals, the .part may hold bytes no seal covers (saved, flushed, before a byte is written).
+      transfer.state.dirty = true;
+      transfer.state.unflushed = undefined;
+      run.sealBytes = rec.netBytes;
+    }
     this.touch(rec);
     this.save(true);
-    const part = `${rec.path}.part`;
     // A new answer checked in "<part>.new" by a run that never ended (a crash) is left over: it goes
     // before this run, which writes its own if it needs one (review of Phase 1).
     await IOUtils.remove(`${part}.new`, { ignoreAbsent: true }).catch(() => undefined);
     await transfer.download(part, run.ac.signal);
+    // 4.1: a seal before the final rename (the hashing still behind is done from the finished file:
+    // finishRecord()). The blocks being hashed are let finish first: their reads hold the .part open.
+    if (ledger) {
+      await ledger.quiet();
+      await this.seal(rec, transfer, 'final');
+    }
+    await this.hooks.beforePlace?.(rec.id);
+    // Review of Phase 5: a Pause or Cancel that came while the run finished stops it here, before the rename,
+    // as one during the transfer does (the row stays paused at 100%, or is cancelled).
+    if (run.ac.signal.aborted) throw new AbortedError();
+    if (transfer.fixedFromServer) this.event(rec, `The checksum did not match: ${damagedParts(transfer.fixedFromServer)} fetched again`);
+    if (transfer.sha256) rec.sha256 = transfer.sha256;
     await this.placeFinished(rec, part);
+  }
+
+  /**
+   * Every resume's check of the saved part (RESUME-DESIGN.md 4.2, Phase 5), before its address is asked;
+   * returns the record (null when there is none: Phase 4's rules stand). A missing .part starts over (a
+   * history line says so; nothing is left to protect, so nothing asks). Then, against the block hash record:
+   *   - after an unclean stop (file.dirty still set): what each segment claims above its last hashed block
+   *     is given back, and the blocks hashed after the last seal are hashed again (when the seal could not
+   *     flush the .part, those hashed in the UNFLUSHED_MARGIN before it too);
+   *   - a .part modified more than MTIME_SLACK after its last seal while nothing ran: every block (another
+   *     program changed it), and what no hashed block covers is given back as after an unclean stop;
+   *   - always: the last 2 hashed blocks below each frontier and 2 placed by the download's id.
+   * Bad blocks are released (their segment split around them) and the new segments saved, flushed, before
+   * anything is fetched; they are fetched again by the run and must hash to their old value (4.3).
+   */
+  private async inspect(rec: Rec, t: FileTransfer): Promise<Ledger | null> {
+    const s = t.state;
+    const part = `${rec.path}.part`;
+    const st = await statOf(part);
+    const l = await this.ledgerOf(rec);
+    if (!st) {
+      // 4.2: the saved part was moved or deleted. It starts over (the probe is a first one again).
+      this.event(rec, 'Started over: the saved part was moved or deleted');
+      s.segments = [];
+      s.allowFresh = true;
+      s.dirty = false;
+      rec.received = 0;
+      rec.suspect = undefined;
+      this.dropLedger(rec);
+      await this.save(true);
+      return null;
+    }
+    if (!l || l.total !== s.total || l.bs !== blockSize(s.total)) return null;
+    t.ledger = l;
+    const before = savedBytes(rec);
+    // Never claims past the file's end (openPart() does the same).
+    for (const seg of s.segments) seg.received = Math.max(0, Math.min(seg.received, st.size - seg.start));
+    const bad = new Set<number>();
+    let why: '' | 'crash' | 'other' = '';
+    if (s.dirty) {
+      why = 'crash';
+      l.rewind(s.segments);
+      const since = l.seal ? l.seal.t - (l.seal.f ? 0 : UNFLUSHED_MARGIN) : 0;
+      for (const b of await l.verify(part, l.newer(since))) bad.add(b);
+    } else if (l.seal && st.mtime > l.seal.t + MTIME_SLACK) {
+      why = 'other';
+      // What no hashed block covers can't be checked (the part of a block below each frontier): fetched again too.
+      l.rewind(s.segments);
+      for (const b of await l.verify(part, [...l.blocks.keys()])) bad.add(b);
+    }
+    for (const b of await l.verify(part, l.spot(s.segments, rec.id))) bad.add(b);
+    // A repair a crash cut short (a repair line with no repaired line after it): those blocks too.
+    if (l.pendingRepair.length) for (const b of await l.verify(part, l.pendingRepair)) bad.add(b);
+    // Hashed blocks no longer under the claims keep their hashes as what the bytes fetched again must be.
+    l.retain(s.segments, why === 'crash' ? 'unclean' : 'gone');
+    if (bad.size) s.segments = l.release(s.segments, [...bad]);
+    const again = before - s.segments.reduce((n, seg) => n + seg.received, 0);
+    rec.received = savedBytes(rec);
+    if (why === 'crash') this.event(rec, `Checked after Deer closed unexpectedly · ${again > 0 ? `${sizeText(again)} fetched again` : 'nothing was lost'}`);
+    else if (why === 'other' && bad.size) this.event(rec, `The saved part was changed by another program · ${sizeText(again)} fetched again`);
+    else if (bad.size) this.event(rec, `${damagedParts(bad.size)} in the saved part · ${sizeText(again)} fetched again`);
+    rec.suspect = undefined;
+    // 4.3: the split is saved, flushed, before anything is fetched.
+    if (again > 0 || why) {
+      await l.journal.flush(true);
+      await this.save(true);
+    }
+    return l;
+  }
+
+  /**
+   * The download's block hash record for this run (RESUME-DESIGN.md 4.1, 5.8): the one it has, kept when it
+   * still fits the file; otherwise a new one once the length is known. A partial download from before the
+   * record (saved bytes, no record) gets one only after a second window matched the site (the resume probe
+   * compared window 0), so a part that is already damaged or mixed never becomes the reference; another
+   * file there stops the run (File changed). A length never known has no record, as before Phase 5.
+   */
+  private async recordFor(rec: Rec, t: FileTransfer, have: Ledger | null, signal: AbortSignal): Promise<Ledger | null> {
+    const s = t.state;
+    if (rec.mode !== 'file' || !rec.path || !(s.total > 0)) return null;
+    const bs = blockSize(s.total);
+    const l = have ?? (await this.ledgerOf(rec));
+    if (l && l.total === s.total && l.bs === bs) return l;
+    const saved = s.segments.reduce((n, seg) => n + seg.received, 0);
+    if (saved > 0 && s.ranges) {
+      const part = `${rec.path}.part`;
+      const wins = windows(t.provable(), rec.id).filter(([a]) => a !== 0).slice(0, 1);
+      if (wins.length) {
+        // Review of Phase 5: only other bytes at the site stop the run; a window that can't be asked (a
+        // refusal, a page, the network) only means no record is made yet, and the run goes on as before.
+        let r: Awaited<ReturnType<typeof compareWindows>>;
+        try {
+          r = await compareWindows(t.proofCtx(), s.finalUrl, wins, part, signal, s.total, 1);
+        } catch {
+          if (signal.aborted) throw new AbortedError();
+          return null;
+        }
+        if (r.verdict === 'whole') r.res.destroy();
+        else if (r.verdict === 'same') r.res?.destroy();
+        if (r.verdict === 'changed') throw r.err;
+        if (r.verdict !== 'same') return null;
+      }
+    } else if (saved > 0) return null;
+    const header: Header = {
+      deer: 1,
+      id: rec.id,
+      path: rec.path,
+      url: rec.url,
+      identity: rec.identity,
+      total: s.total,
+      bs,
+      ct: s.contentType ?? '',
+      name: s.dispositionName ?? '',
+      etag: s.etag,
+      lm: s.lastModified,
+      t: Date.now(),
+    };
+    if (l) {
+      // Another length (a silent restart, a new start): the record starts again.
+      l.reset(header);
+      return l;
+    }
+    const path = rec.identity.isPrivate ? '' : PathUtils.join(this.journalDir, `${rec.id}.jsonl`);
+    const made = Ledger.create(path, header);
+    rec.journal = path || undefined;
+    this.ledgers.set(rec.id, made);
+    return made;
+  }
+
+  /** The row's block hash record: in memory, or read from its journal (null when it has none). */
+  private async ledgerOf(rec: Rec): Promise<Ledger | null> {
+    const have = this.ledgers.get(rec.id);
+    if (have) return have;
+    if (!rec.journal) return null;
+    const l = await Ledger.open(rec.journal);
+    if (!l) return null;
+    // Another read may have finished first.
+    const again = this.ledgers.get(rec.id);
+    if (again) return again;
+    this.ledgers.set(rec.id, l);
+    return l;
+  }
+
+  /** The record goes with what it describes (Cancel, Remove, Start over, a .part that went missing: 5.7). */
+  private dropLedger(rec: Rec): void {
+    const l = this.ledgers.get(rec.id);
+    this.ledgers.delete(rec.id);
+    if (l) {
+      l.detach();
+      void l.journal.remove();
+    } else if (rec.journal) IOUtils.remove(rec.journal, { ignoreAbsent: true }).catch(() => undefined);
+    rec.journal = undefined;
+  }
+
+  /**
+   * A seal (RESUME-DESIGN.md 4.1): the .part flushed to the disk when that can be done (ledger.ts
+   * flushPart()), a seal line with the coverage (flushed), and a flushed save. 'timer': every SEAL_EVERY or
+   * SEAL_BYTES of a run (the bytes certainly in the .part); 'final': before the final rename; 'stop': any
+   * stop (pause, quit, sleep, a disk error, a failure), which drains the hashing first and clears the dirty
+   * mark. One at a time per row; the row's next run waits for it. Review of Phase 5:
+   *   - the seal's time is taken before the flush starts, so a block hashed while it runs counts as newer
+   *     than the seal (its bytes may be younger than the flush: ledger.ts sealed());
+   *   - a seal whose record was dropped meanwhile (Remove, Cancel, Start over) writes nothing more;
+   *   - a stop whose flush could not be done says so on the record (file.unflushed): when the session it
+   *     ran in ends uncleanly, the row is checked as after a crash (load());
+   *   - 'final' neither drains the hashing nor flushes, and leaves the store's flushed save to complete()
+   *     right after the rename: the finish no longer waits for them (above about 700 MB/s they held a
+   *     finished download at 100% for seconds; the save alone added 15 ms to every download). The blocks
+   *     still unhashed are hashed from the finished file (finishRecord()), whose record is what Check file
+   *     and the check after an unclean exit read, so the flush is not needed for correctness
+   *     (RESUME-DESIGN.md 1, durability).
+   */
+  private seal(rec: Rec, t: FileTransfer | null, why: 'stop' | 'final' | 'timer'): Promise<void> {
+    const l = this.ledgers.get(rec.id);
+    if (!l || !rec.file || !rec.path) return Promise.resolve();
+    l.sealedAt = Date.now();
+    const prev = this.sealing.get(rec.id) ?? Promise.resolve();
+    const ours = (): boolean => this.ledgers.get(rec.id) === l && this.recs.includes(rec);
+    const job = prev
+      .then(async () => {
+        if (!ours()) return;
+        const part = `${rec.path}.part`;
+        // A stop's seal hashes what its run left behind under the exact segments (every writer is closed).
+        if (why === 'stop' && existsSync(part)) l.use(part, () => rec.file?.segments ?? []);
+        if (why === 'stop') await l.drain();
+        if (why === 'stop') l.detach();
+        if (!ours()) return;
+        const segs = t && why === 'timer' ? t.provable() : (rec.file?.segments ?? []);
+        const cov = segs.filter((seg) => seg.received > 0).map((seg): [number, number] => [seg.start, seg.received]);
+        const at = Date.now();
+        const flushed = why !== 'final' && existsSync(part) ? await flushPart(part) : false;
+        if (!ours()) return;
+        await l.sealed(cov, flushed, at);
+        if (why === 'stop' && rec.file) {
+          rec.file.dirty = false;
+          rec.file.unflushed = flushed ? undefined : at;
+        }
+        // 'final': complete() saves, flushed, right after the rename.
+        if (why !== 'final') await this.save(true);
+      })
+      .catch((e: unknown) => console.warn('Deer downloads: a seal failed', String(e)));
+    this.sealing.set(rec.id, job);
+    void job.then(() => {
+      if (this.sealing.get(rec.id) === job) this.sealing.delete(rec.id);
+    });
+    return job;
   }
 
   private async runStream(rec: Rec, run: Run): Promise<void> {
@@ -1340,7 +1676,12 @@ class Manager {
       } catch {
         /* keep the counted bytes */
       }
-      const verdict = await reputationOf({ url: rec.url, pageUrl: rec.identity.pageUrl, policy: asPolicy(rec.identity.referrerPolicy), path: rec.path, size });
+      // RESUME-DESIGN.md 4.1: the whole file's SHA-256, computed once (off the main thread): ranged.ts verify()
+      // already has it when the server gave a SHA-256. Safe Browsing reuses it; it is computed here, before
+      // the verdict, only when Safe Browsing would read the file for it (as it did before); otherwise right
+      // after the row reads Completed (finishRecord()), so finishing takes no longer than before.
+      if (!rec.sha256 && hashWanted(rec.path)) rec.sha256 = (await IOUtils.computeHexDigest(rec.path, 'sha256').catch(() => '')) || undefined;
+      const verdict = await reputationOf({ url: rec.url, pageUrl: rec.identity.pageUrl, policy: asPolicy(rec.identity.referrerPolicy), path: rec.path, size, sha256: rec.sha256 });
       if (!this.recs.includes(rec) || rec.state === 'cancelled') return;
       if (verdict !== 'safe') {
         await this.block(rec, verdict);
@@ -1365,9 +1706,83 @@ class Manager {
     // Firefox writes it for the downloads it moves (mirrored ones) before they are moved here; a move
     // to another volume may drop the stream, so it is written again.
     if (rec.path) await platform.markOfTheWeb(rec.path, rec.url, rec.identity.pageUrl, rec.identity.isPrivate, asPolicy(rec.identity.referrerPolicy));
+    // 4.1, 4.2: what the file is when it finished (a later modified time is Changed after download).
+    await this.stamp(rec);
+    if (rec.file) rec.file.dirty = false;
+    this.ledgers.get(rec.id)?.detach();
     this.touch(rec);
     this.settle(rec);
     this.save(true);
+    void this.finishRecord(rec).catch((e: unknown) => console.warn('Deer downloads: the finished file could not be recorded', String(e)));
+  }
+
+  /**
+   * After a file finished (RESUME-DESIGN.md 4.1): its whole SHA-256 when it is not known yet, and its block
+   * record kept as <id>.done.jsonl with it. A file moved or changed meanwhile keeps neither. Review of Phase 5:
+   * the blocks the run had not hashed yet (the finish no longer waits for the hashing) are hashed here, from
+   * the finished file, before the record is kept; ones read from a file that changed meanwhile are dropped.
+   * Also run after the start for a finished row whose record was never kept (a quit or a crash came first).
+   */
+  private async finishRecord(rec: Rec): Promise<void> {
+    const path = rec.path;
+    const final = rec.final;
+    if (!path || rec.state !== 'completed') return;
+    // Reading the whole file back competes with a download that runs very fast (a queue of local or LAN
+    // downloads: the next one starts as this one finishes), so this waits a moment, and while one does.
+    await this.whileFast();
+    if (!this.recs.includes(rec) || rec.path !== path || rec.state !== 'completed') return;
+    const l = rec.mode === 'file' ? await this.ledgerOf(rec) : null;
+    const ours = (): boolean => this.recs.includes(rec) && rec.path === path && rec.state === 'completed' && (!l || this.ledgers.get(rec.id) === l);
+    let fresh: number[] = [];
+    if (l && final && l.total === final.size && l.blocks.size < l.count() && !l.fin) {
+      const had = new Set(l.blocks.keys());
+      l.use(path, () => [{ start: 0, end: l.total, received: l.total }]);
+      await l.drain();
+      l.detach();
+      fresh = [...l.blocks.keys()].filter((b) => !had.has(b));
+    }
+    const drop = (): void => {
+      // What was hashed from a file that changed meanwhile describes that file, not the download.
+      if (l && this.ledgers.get(rec.id) === l) l.unhash(fresh, 'changed');
+    };
+    if (!rec.sha256) {
+      const hex = await IOUtils.computeHexDigest(path, 'sha256').catch(() => '');
+      const now = await statOf(path);
+      if (!ours() || !hex || !now || !final || now.mtime !== final.mtime || now.size !== final.size) return drop();
+      rec.sha256 = hex;
+    } else if (fresh.length) {
+      const now = await statOf(path);
+      if (!ours() || !now || !final || now.mtime !== final.mtime || now.size !== final.size) return drop();
+    }
+    if (!ours()) return;
+    if (l && final && rec.journal && !rec.journal.endsWith('.done.jsonl')) {
+      const done = rec.journal.replace(/\.jsonl$/, '.done.jsonl');
+      await l.finish({ sha256: rec.sha256 ?? '', size: final.size, mtime: final.mtime, path, t: Date.now() }, done);
+      if (rec.journal) rec.journal = done;
+    } else if (l && final && !rec.journal) {
+      // A private download: its record stays in memory.
+      await l.finish({ sha256: rec.sha256 ?? '', size: final.size, mtime: final.mtime, path, t: Date.now() }, '');
+    }
+    this.touch(rec);
+    this.save(true);
+  }
+
+  /**
+   * Review of Phase 5: resolves once no download takes bytes faster than the hashing's hold rate (ledger.ts
+   * fast()), looked at FAST_LOOK after the call and then every FAST_LOOK, for at most FAST_WAIT. A finished
+   * file's hashing ran beside the next download of a queue and slowed it by up to a half at 1 GB/s.
+   */
+  private async whileFast(): Promise<void> {
+    const until = Date.now() + FAST_WAIT;
+    do {
+      await new Promise((r) => setTimeout(r, FAST_LOOK));
+    } while (!this.quitting && Date.now() < until && [...this.runs.values()].some((run) => run.transfer instanceof FileTransfer && !!run.transfer.ledger?.fast()));
+  }
+
+  /** The finished file's size and modified time as it is now (Rec.final: Changed after download is later than this). */
+  private async stamp(rec: Rec): Promise<void> {
+    const st = rec.path ? await statOf(rec.path) : null;
+    rec.final = st ?? undefined;
   }
 
   /** The partial files Start over kept aside go (the new file completed, or the row was cancelled or removed). */
@@ -1426,8 +1841,10 @@ class Manager {
       /* keep the counts */
     }
     await platform.markOfTheWeb(target, rec.url, rec.identity.pageUrl, rec.identity.isPrivate, asPolicy(rec.identity.referrerPolicy));
+    await this.stamp(rec);
     this.touch(rec);
     this.save(true);
+    void this.finishRecord(rec).catch((e: unknown) => console.warn('Deer downloads: the finished file could not be recorded', String(e)));
   }
 
   /** A blocked file waiting aside goes for good (Retry, Remove). */
@@ -1500,6 +1917,11 @@ class Manager {
       rec.error = kind === 'not-file' && rec.file?.guarded ? 'Start this download again from its page.' : describeError(err);
       if (!(err instanceof DownloadError) && !(err instanceof DiskError)) console.warn('Deer downloads: failed', rec.url, String(err));
     }
+    // RESUME-DESIGN.md 4.1: a stop with every writer closed (a pause, the quit, sleep, a disk error, any
+    // failure) drains the hashing, seals and clears the dirty mark; Cancel removed the record with the part.
+    const l = this.ledgers.get(rec.id);
+    if (l && rec.state !== 'cancelled' && rec.file) void this.seal(rec, null, 'stop');
+    else l?.detach();
     this.touch(rec);
     this.settle(rec);
     this.save(true);
@@ -1566,6 +1988,12 @@ class Manager {
   private rewind(rec: Rec): void {
     rec.file = null;
     rec.suspect = undefined;
+    // The block hash record and what was known of the finished file go with the bytes (5.7).
+    this.dropLedger(rec);
+    rec.sha256 = undefined;
+    rec.final = undefined;
+    rec.check = undefined;
+    if (rec.need?.kind === 'repair') rec.need = undefined;
     if (rec.stream) {
       const s = rec.stream;
       rec.stream = StreamTransfer.fresh(s.sourceUrl, { format: s.format, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, audioOnly: s.audioOnly, bytes: s.expected });
@@ -1589,7 +2017,12 @@ class Manager {
     }
     const parts =
       rec.mode === 'stream' && rec.stream ? [...rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)), `${stem(rec.path)}.merge.part`] : [`${rec.path}.part`];
-    for (const p of parts) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    // Its block hashing may hold the .part open a moment (Phase 5): the removal waits for a seal still
+    // running and tries again for a while.
+    if (rec.mode === 'file') void (this.sealing.get(rec.id) ?? Promise.resolve()).then(() => removeSoon(parts[0]));
+    else for (const p of parts) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    // RESUME-DESIGN.md 5.7: a stream's spill folder ("<part>.d", hls.ts) was left behind before.
+    if (rec.mode === 'stream') for (const p of parts) IOUtils.remove(`${p}.d`, { recursive: true, ignoreAbsent: true }).catch(() => undefined);
     // What Phase 1 adds next to them: a new single-stream answer being checked, and Start over's old partial.
     if (rec.mode === 'file') IOUtils.remove(`${rec.path}.part.new`, { ignoreAbsent: true }).catch(() => undefined);
     this.dropOldParts(rec);
@@ -1744,6 +2177,10 @@ class Manager {
     // The address a renewal or a start again found for the new file (need.candidate): no new lookup.
     const cand = url ? undefined : (quiet ?? rec.need?.candidate);
     try {
+      // The last stop's seal is done first: its hashing holds the .part open (Phase 5).
+      await this.sealing.get(id);
+      // RESUME-DESIGN.md 4.3, 5.7: the decision reaches the record first (flushed); the record then starts again.
+      await (await this.ledgerOf(rec))?.decision('restart');
       const parts = (rec.mode === 'stream' && rec.stream ? rec.stream.tracks.map((t) => trackPart(stem(rec.path), t)) : [`${rec.path}.part`]).filter((p) => existsSync(p));
       const before = rec.oldParts ?? [];
       const moves: Array<[string, string]> = [];
@@ -1780,6 +2217,7 @@ class Manager {
         return;
       }
       if (!hasRoom(rec.dir, rec.total > 0 ? rec.total : 0)) this.dropOldParts(rec);
+      this.dropLedger(rec);
       // A fresh start at the stored address; the path (and so the name) stays this row's.
       if (rec.mode === 'stream' && rec.stream) {
         const s = rec.stream;
@@ -1862,6 +2300,10 @@ class Manager {
   private removeRec(id: string): void {
     this.stopRenewing(id);
     this.renewFailed.delete(id);
+    this.fixing.get(id)?.ac.abort();
+    // The hash record goes with the row (5.7), a finished file's too (never the file).
+    const gone = this.find(id);
+    if (gone) this.dropLedger(gone);
     this.recs = this.recs.filter((r) => r.id !== id);
     this.dirty.delete(id);
     this.emit({ kind: 'removed', ids: [id] });
@@ -1871,7 +2313,12 @@ class Manager {
   clearFinished(isPrivate?: boolean): void {
     const gone = this.recs.filter((r) => FINISHED.includes(r.state) && (isPrivate === undefined || r.identity.isPrivate === isPrivate)).map((r) => r.id);
     if (!gone.length) return;
-    for (const r of this.recs) if (gone.includes(r.id)) this.dropQuarantine(r);
+    for (const r of this.recs) {
+      if (!gone.includes(r.id)) continue;
+      this.dropQuarantine(r);
+      this.fixing.get(r.id)?.ac.abort();
+      this.dropLedger(r);
+    }
     this.recs = this.recs.filter((r) => !gone.includes(r.id));
     this.emit({ kind: 'removed', ids: gone });
     this.save(true);
@@ -2461,10 +2908,14 @@ class Manager {
     if (bytes <= 0 || !ready() || this.deciding.has(id)) return;
     this.stopRenewing(id);
     this.deciding.add(id);
+    // The last stop's seal is done first: its hashing holds the .part open (Phase 5).
+    await this.sealing.get(id);
     const total = rec.total > 0 ? rec.total : rec.file.total;
     try {
       const target = uniquePath(rec.dir, partialName(rec.filename), (p) => this.taken(p, rec.id));
       rec.keeping = target;
+      // RESUME-DESIGN.md 5.7: the decision reaches the record first (flushed).
+      await (await this.ledgerOf(rec))?.decision('keep');
       await this.save(true);
       if (!ready()) {
         rec.keeping = undefined;
@@ -2704,10 +3155,26 @@ class Manager {
         rec.activeMs += dt;
         rec.peak = Math.max(rec.peak, run.speed);
       }
+      // RESUME-DESIGN.md 4.1: the hashing is looked at on a timer too, and a run seals every SEAL_EVERY or SEAL_BYTES.
+      const t = run.transfer;
+      const l = t instanceof FileTransfer ? t.ledger : null;
+      if (l && t instanceof FileTransfer && rec.state === 'downloading' && !run.reason) {
+        l.pump();
+        // Not once every byte is in: the seal before the final rename comes next. The bytes never bring one
+        // sooner than SEAL_MIN_GAP after the last (review of Phase 5: back to back above about 1 GB/s).
+        if (!this.sealing.has(id) && t.received < t.state.total && (now - l.sealedAt >= SEAL_EVERY || (rec.netBytes - (run.sealBytes ?? 0) >= SEAL_BYTES && now - l.sealedAt >= SEAL_MIN_GAP))) {
+          run.sealBytes = rec.netBytes;
+          void this.seal(rec, t, 'timer');
+        }
+      }
       this.dirty.add(id);
     }
     this.flush();
-    if (now - this.lastSave > SAVE_EVERY && this.runs.size) this.save(now - this.lastFlushed > FLUSH_EVERY);
+    if (now - this.lastSave > SAVE_EVERY && this.runs.size) {
+      this.save(now - this.lastFlushed > FLUSH_EVERY);
+      // The block lines hashed meanwhile reach the journal (a seal flushes them to the disk).
+      for (const [id, run] of this.runs) if (run.transfer instanceof FileTransfer) void this.ledgers.get(id)?.journal.flush();
+    }
     if (!this.runs.size && this.ticker) {
       clearInterval(this.ticker);
       this.ticker = null;
@@ -2748,14 +3215,25 @@ class Manager {
     const received = t ? t.received : r.received;
     const left = total > 0 ? total - received : -1;
     const queued = this.recs.filter((x) => x.state === 'queued').sort((a, b) => a.queuedAt - b.queuedAt);
-    const fills = r.mode === 'stream' && r.stream ? streamFills(r.stream) : r.file ? fileFills(r.file) : [];
     const multi = r.mode === 'stream' || (!!r.file?.ranges && r.file.total >= 8 * 1024 * 1024);
     const connections = Math.max(1, Math.min(32, Number(s.connections) || 8));
     const renewing = !pausing && (this.renewing.has(r.id) || run?.phase === 'renewing');
     // Checking (RESUME-DESIGN.md 6) only once it took CHECKING_AFTER; 'probing' until then.
-    const phase = run?.phase === 'checking' && Date.now() - (run.phaseAt ?? 0) < CHECKING_AFTER ? 'probing' : (run?.phase ?? '');
+    // A completed row: Check file (Checking) and Repair or Restore original (Repairing), Phase 5.
+    const fixing = r.state === 'completed' ? this.fixing.get(r.id) : undefined;
+    const runPhase = run?.phase === 'checking' && Date.now() - (run.phaseAt ?? 0) < CHECKING_AFTER ? 'probing' : (run?.phase ?? '');
+    const phase = fixing ? 'repairing' : r.state === 'completed' && this.checking.has(r.id) ? 'checking' : runPhase;
     const wait = r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
-    const need = r.state === 'paused' && !pausing && r.need ? r.need : null;
+    // Changed after download (4.2): modified after it finished, read from the disk as `missing` is. Not while
+    // Deer's own Repair writes it, nor after one a crash cut short until the check after the start has looked.
+    const disk = checkDisk && r.state === 'completed' && !!r.path ? diskState(r.path, !!r.final) : null;
+    const own = !!fixing || !!r.repairing;
+    const edited = r.state === 'completed' && !own && (!!r.check?.edited || (!!disk && !!r.final && disk.mtime > 0 && editedSince(disk.mtime, r.final, r.finishedAt)));
+    // Damaged (RESUME-DESIGN.md 6): a completed row that needs Repair. A file modified after it finished is
+    // Changed after download first (review of Phase 5: Space on such a Damaged row repaired over the edit).
+    const need = (r.state === 'paused' && !pausing && r.need) || (r.state === 'completed' && r.need?.kind === 'repair' && !edited) ? (r.need ?? null) : null;
+    const damaged = need?.kind === 'repair' && !!r.check?.bad.length;
+    const fills = damaged && r.check ? damagedFills(r.total > 0 ? r.total : (r.final?.size ?? 0), r.check.bad, r.check.bs) : r.mode === 'stream' && r.stream ? streamFills(r.stream) : r.file ? fileFills(r.file) : [];
     // Keep partial file (3 G3): the unbroken beginning, for a one-file File changed row.
     const kept = need?.kind === 'choice' && r.mode === 'file' && r.file && r.path ? unbroken(r.file.segments) : 0;
     return {
@@ -2781,7 +3259,7 @@ class Manager {
       segments: fills,
       error: r.error,
       note: r.note ?? '',
-      missing: checkDisk && r.state === 'completed' && !!r.path && !existsSync(r.path),
+      missing: !!disk && !disk.exists,
       startedAt: r.startedAt,
       finishedAt: r.finishedAt,
       quality: r.quality,
@@ -2792,7 +3270,7 @@ class Manager {
       isPrivate: r.identity.isPrivate,
       blocked: r.state === 'failed' ? (r.blocked ?? '') : '',
       keepable: r.state === 'failed' && !!r.quarantine,
-      need: r.state === 'paused' && !pausing && r.need ? { kind: r.need.kind, status: r.need.status ?? 0, evidence: r.need.evidence ?? '' } : null,
+      need: need ? { kind: need.kind, status: need.status ?? 0, evidence: need.evidence ?? '' } : null,
       wait,
       nextAt: wait?.nextAt ?? 0,
       status: r.state === 'paused' ? (r.need?.status ?? r.wait?.status ?? 0) : (run?.status ?? 0),
@@ -2802,7 +3280,322 @@ class Manager {
       // The ring's dot (RESUME-DESIGN.md 6): only rows that started needing the person in this session.
       attention: !!need && need.since >= this.session.startedAt,
       keep: kept > 0 ? { bytes: kept, name: partialName(r.filename), older: !!r.oldParts?.length } : null,
+      check:
+        r.state === 'completed' && (r.check || edited)
+          ? {
+              at: r.check?.at ?? 0,
+              ok: !!r.check?.ok && !edited,
+              bad: r.check?.bad.length ?? 0,
+              badBytes: r.check?.badBytes ?? 0,
+              unlocated: !!r.check?.unlocated,
+              edited,
+              changedAt: r.check?.edited ? r.check.changedAt : (disk?.mtime ?? 0),
+              media: r.check?.media ?? '',
+              site: r.check?.site ?? '',
+              status: r.check?.status ?? 0,
+            }
+          : null,
+      repair: fixing ? { parts: fixing.parts, bytes: fixing.bytes } : null,
     };
+  }
+
+  // ---- finished files: Check file, Repair, Restore original (RESUME-DESIGN.md 4.2, 4.3, 6; Phase 5) ----
+
+  /**
+   * Check file (access key H): see downloads/finished.ts checkFinished(). Modified after it finished is
+   * Changed after download (never damage); damaged blocks make the row Damaged (need 'repair'); with ffmpeg,
+   * a video or a song is also read through (mediaCheck()). The result stays on the row (rec.check) and a
+   * history line says what was found.
+   */
+  async checkFile(id: string, quiet = false): Promise<void> {
+    const rec = this.find(id);
+    if (!rec || rec.state !== 'completed' || !rec.path || this.checking.has(id) || this.fixing.has(id)) return;
+    this.checking.add(id);
+    this.touch(rec);
+    const ac = new AbortController();
+    try {
+      const l = rec.mode === 'file' ? await this.ledgerOf(rec) : null;
+      const s = rec.file;
+      const path = rec.path;
+      // A file with no record and no checksum is compared with the site (never after a crash: no network then).
+      const site =
+        rec.mode === 'file' && s && s.ranges && s.finalUrl && !quiet
+          ? (total: number) => siteCompare({ state: s, identity: new Identity(rec.identity), kind: { kind: 'binary', sure: false }, saved: total }, s.finalUrl, path, total, ac.signal).catch(() => null)
+          : null;
+      // A repair of Deer's own that a quit or a crash cut short (its mark on the row, its repair line in the
+      // record: 4.3 step 4): its writes moved the modified time, so the record decides, never "edited".
+      const repairing = !!l && (!!rec.repairing || l.pendingRepair.length > 0);
+      const r = await checkFinished({ path: rec.path, ledger: l, sha256: rec.sha256 ?? '', final: rec.final, finishedAt: rec.finishedAt, site, repairing });
+      if (!this.recs.includes(rec) || rec.state !== 'completed') return;
+      if (r.missing) return;
+      if (repairing && l && !r.edited) {
+        // Review of Phase 5: that repair is accounted for now (what it left damaged is below); the file as it
+        // is now is what a later edit is measured from.
+        await this.stamp(rec);
+        rec.repairing = undefined;
+        if (l.pendingRepair.length && this.ledgers.get(rec.id) === l) await l.repaired([], new Map());
+      }
+      let media = '';
+      const ff = /^(video|music)$/.test(categoryOf(rec.filename, rec.mime)) && !r.edited ? (await this.ffmpeg()).path : null;
+      if (ff) media = (await mediaCheck(ff, rec.path)) ?? '';
+      const firstLine = media.split(/\r?\n/).find(Boolean) ?? '';
+      const damaged = r.bad.length > 0 || r.unlocated;
+      rec.check = {
+        at: Date.now(),
+        ok: !damaged && !r.edited && !r.changed,
+        bad: r.bad,
+        bs: r.bs,
+        badBytes: r.badBytes,
+        unlocated: r.unlocated,
+        edited: r.edited,
+        changedAt: r.changedAt,
+        media: firstLine.slice(0, 200),
+        site: r.changed ? 'changed' : '',
+        status: 0,
+      };
+      if (damaged) rec.need = { kind: 'repair', since: Date.now(), evidence: r.unlocated ? 'its checksum no longer matches' : damagedParts(r.bad.length) };
+      else if (rec.need?.kind === 'repair') rec.need = undefined;
+      if (r.edited) this.event(rec, 'Changed after download');
+      else if (r.changed) this.event(rec, 'Checked: the file on the site is different from this one');
+      else if (damaged) this.event(rec, r.unlocated ? 'Checked: the file no longer matches its checksum' : `Checked: ${damagedParts(r.bad.length)}`);
+      else if (r.how === 'none') this.event(rec, 'Checked: Deer has nothing to check this file against');
+      else this.event(rec, firstLine ? 'Checked: no damaged parts, but ffmpeg found problems' : 'Checked: no damage found');
+    } catch (e) {
+      console.warn('Deer downloads: Check file failed', String(e));
+    } finally {
+      this.checking.delete(id);
+      this.touch(rec);
+      this.save(true);
+    }
+  }
+
+  /**
+   * Repair (RESUME-DESIGN.md 4.3): a Damaged row's damaged parts, and only those, fetched again: proven with
+   * its good blocks, each part checked against the record before it is written in place
+   * (downloads/finished.ts repairFinished()). The site's file is another one: Repair refuses (the row stays
+   * Damaged and offers Download again). The link stopped working: the original address is asked first
+   * (G1). A file with no record is compared with the site first (2 of 3 windows, then block by block). With
+   * `restore` (Restore original, Changed after download, only when chosen) every block that no longer
+   * matches the record (downloads/finished.ts restoreFinished(): nothing of the file changes until every
+   * block is in hand). A stream or a yt-dlp file has no record: its repair is Download again (4.4).
+   * Review of Phase 5:
+   *   - a file modified after it finished is never repaired (4.4, 6: the person's edit, or another file
+   *     saved under the name): Repair refuses before anything is asked or written and the row reads Changed
+   *     after download; repairFinished() also checks before each block it writes;
+   *   - Deer's own writes move the modified time: the file as it is afterwards is what a later edit is
+   *     measured from (rec.final), also when the repair was cut short (a quit), whose mark (rec.repairing)
+   *     then stays so the next start checks it (4.3 step 4);
+   *   - a repaired file that still does not match the SHA-256 it was saved with stays Damaged and says so.
+   */
+  async repair(id: string, restore = false): Promise<void> {
+    const rec = this.find(id);
+    if (!rec || rec.state !== 'completed' || !rec.path || this.fixing.has(id) || this.checking.has(id) || !existsSync(rec.path)) return;
+    if (rec.mode !== 'file' || !rec.file) {
+      if (rec.need?.kind === 'repair') this.downloadAgain(id);
+      return;
+    }
+    const s = rec.file;
+    const ac = new AbortController();
+    const total = rec.final?.size ?? rec.total;
+    this.fixing.set(id, { parts: rec.check?.bad.length ?? 0, bytes: rec.check?.badBytes ?? 0, ac });
+    this.touch(rec);
+    const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, ''), saved: total };
+    let site: CheckState['site'] = '';
+    let status = 0;
+    let wrote = 0;
+    let done = false;
+    let edited = 0;
+    try {
+      const l = await this.ledgerOf(rec);
+      if (restore && !l) return;
+      const st = await statOf(rec.path);
+      if (!st) return;
+      // 4.4: never over a file someone changed after it finished (a repair of Deer's own cut short excepted).
+      const own = !!rec.repairing || (l?.pendingRepair.length ?? 0) > 0;
+      if (!restore && !own && editedSince(st.mtime, rec.final, rec.finishedAt)) {
+        edited = st.mtime;
+        return;
+      }
+      let bad = rec.check?.bad ?? [];
+      let bs = rec.check?.bs || l?.bs || blockSize(total);
+      if (!restore && (!l || (rec.check?.unlocated && !bad.length))) {
+        // No record (an older file), or a checksum no record can place: the site's bytes are the reference
+        // once 2 of 3 windows matched (4.3).
+        const cmp = await siteCompare(ctx, s.finalUrl, rec.path, total, ac.signal).catch(() => null);
+        if (!cmp) site = 'unreachable';
+        else if (cmp.changed) site = 'changed';
+        else {
+          bad = cmp.bad;
+          bs = cmp.bs;
+        }
+      }
+      if (site) return;
+      // What Repairing says it fetches (RESUME-DESIGN.md 6), and the mark a crash leaves (saved, flushed) before
+      // anything is written.
+      const plan = async (list: number[], size: number): Promise<void> => {
+        this.fixing.set(id, { parts: list.length, bytes: list.reduce((n, b) => n + Math.max(0, Math.min(bs, size - b * bs)), 0), ac });
+        if (list.length) {
+          rec.repairing = Date.now();
+          await this.save(true);
+        }
+        this.touch(rec);
+      };
+      const renew = async (): Promise<string | null> => {
+        const list = addresses(rec.url, s, s.finalUrl);
+        if (!list.length) return null;
+        const out = await originalAddress({ ctx: { ...ctx, heads: l }, partPath: rec.path, segments: [{ start: 0, end: total, received: total }], seed: rec.id }, list, ac.signal);
+        if (out.verdict !== 'same') return null;
+        adopt(s, out.found, 'original');
+        this.event(rec, 'New link found');
+        return s.finalUrl;
+      };
+      const counted = (): void => {
+        wrote++;
+      };
+      let out: RepairOutcome;
+      if (restore && l) {
+        bs = l.bs;
+        const patch = PathUtils.join(this.journalDir, `${rec.id}.restore`);
+        out = await restoreFinished({ ctx: { ...ctx, heads: l }, path: rec.path, url: s.finalUrl, seed: rec.id, ledger: l, patch, signal: ac.signal, renew, planned: (list) => plan(list, l.total), wrote: counted });
+      } else {
+        await plan(bad, l?.total ?? total);
+        out = bad.length ? await repairFinished({ ctx: { ...ctx, heads: l }, path: rec.path, url: s.finalUrl, seed: rec.id, ledger: l, bad, bs, total: l?.total ?? total, signal: ac.signal, renew, wrote: counted }) : { kind: 'repaired', fixed: [], url: s.finalUrl };
+      }
+      if (out.kind === 'edited') {
+        edited = (await statOf(rec.path))?.mtime ?? Date.now();
+        return;
+      }
+      if (out.kind === 'repaired') {
+        done = true;
+        if (out.url !== s.finalUrl) s.finalUrl = out.url;
+        await this.stamp(rec);
+        const sha = await IOUtils.computeHexDigest(rec.path, 'sha256').catch(() => '');
+        // A repaired file matches the SHA-256 it was saved with; with no record that is what decides. One that
+        // still does not keeps that SHA-256 as the reference, and stays Damaged (review of Phase 5).
+        const whole = !rec.sha256 || !sha || sha === rec.sha256;
+        if (sha && !rec.sha256) rec.sha256 = sha;
+        if (l && rec.final) await l.refinish({ sha256: rec.sha256 ?? '', size: rec.final.size, mtime: rec.final.mtime, path: rec.path, t: Date.now() });
+        rec.need = whole ? undefined : { kind: 'repair', since: rec.need?.kind === 'repair' ? rec.need.since : Date.now(), evidence: 'its checksum no longer matches' };
+        rec.check = { at: Date.now(), ok: whole, bad: [], bs, badBytes: 0, unlocated: !whole, edited: false, changedAt: 0, media: rec.check?.media ?? '', site: '', status: 0 };
+        const n = out.fixed.length;
+        if (!whole) this.event(rec, n ? `${damagedParts(n)} fetched again, but the file still does not match its checksum` : 'The file still does not match its checksum');
+        else this.event(rec, restore ? 'Original restored' : n ? `Repaired ${damagedParts(n)}` : 'Checked: no damage found');
+        return;
+      }
+      site = out.kind;
+      status = out.kind === 'expired' || out.kind === 'unreachable' ? out.status : 0;
+    } catch (e) {
+      if (!ac.signal.aborted) console.warn('Deer downloads: Repair failed', String(e));
+      site = ac.signal.aborted ? '' : 'unreachable';
+    } finally {
+      this.fixing.delete(id);
+      const here = this.recs.includes(rec);
+      // Deer's own writes moved the modified time; a repair cut short keeps its mark for the next start's check.
+      if (here && wrote > 0 && !edited && !done) await this.stamp(rec);
+      if (done || !wrote || edited || !ac.signal.aborted) rec.repairing = undefined;
+      if (here && edited) {
+        rec.check = { ...(rec.check ?? { at: 0, ok: false, bad: [], bs: 0, badBytes: 0, unlocated: false, media: '', site: '' as const, status: 0 }), at: Date.now(), ok: false, edited: true, changedAt: edited };
+        if (rec.need?.kind === 'repair') rec.need = undefined;
+        this.event(rec, restore ? 'Restore stopped: the file changed while it was being restored' : 'Repair stopped: the file was changed after download');
+      } else if (site && here) {
+        rec.check = { ...(rec.check ?? { at: Date.now(), ok: false, bad: [], bs: 0, badBytes: 0, unlocated: false, edited: false, changedAt: 0, media: '' }), site, status };
+        const what = restore ? 'Restore' : 'Repair';
+        this.event(rec, site === 'changed' ? `${what} stopped: the file on the site is different now` : site === 'expired' ? `${what} stopped: the link stopped working` : `${what} stopped: the site could not be reached`);
+      }
+      this.touch(rec);
+      this.save(true);
+    }
+  }
+
+  /** Restore original (Changed after download, RESUME-DESIGN.md 4.4, 6): only when the person chooses it. */
+  restoreOriginal(id: string): Promise<void> {
+    return this.repair(id, true);
+  }
+
+  /**
+   * Download again: the same download as a new row, the finished file left as it is (Repair refused: the
+   * file on the site changed; a stream or a yt-dlp file, which has no block record: 4.4). Its id, or null.
+   */
+  downloadAgain(id: string): string | null {
+    const rec = this.find(id);
+    if (!rec || rec.mode === 'browser') return null;
+    const base: StartOptions = { filename: rec.filename, named: true, title: rec.title, quality: rec.quality, pageUrl: rec.identity.pageUrl, identity: { ...rec.identity } };
+    try {
+      if (rec.mode === 'ytdlp' && rec.ytdlp) return this.start(rec.ytdlp.pageUrl, { ...base, mode: 'ytdlp', ytdlpFormat: rec.ytdlp.format, ytdlpExt: rec.ytdlp.ext, audioOnly: rec.ytdlp.audioOnly });
+      if (rec.mode === 'stream' && rec.stream) {
+        const st = rec.stream;
+        return this.start(st.sourceUrl, { ...base, mode: st.format, variantUrl: st.variantUrl, audioUrl: st.audioUrl, dashVideo: st.dashVideo, dashAudio: st.dashAudio, audioOnly: st.audioOnly, bytes: st.expected });
+      }
+      return this.start(rec.url, { ...base, mode: 'file' });
+    } catch (e) {
+      console.warn('Deer downloads: could not download again', String(e));
+      return null;
+    }
+  }
+
+  /**
+   * RESUME-DESIGN.md 4.2: after an unclean session, the files finished in it are checked (their records
+   * hashed again: no network), and so is any file whose repair a crash cut short. One at a time.
+   */
+  private async checkAfterStart(): Promise<void> {
+    const due: Rec[] = [];
+    for (const r of this.recs) {
+      if (r.state !== 'completed' || r.mode !== 'file' || !r.journal || !r.path) continue;
+      const crashed = !this.prevClean && !!this.prevStartedAt && r.finishedAt >= this.prevStartedAt;
+      if (crashed || r.repairing) due.push(r);
+    }
+    for (const r of due) {
+      if (this.quitting) return;
+      await this.checkFile(r.id, true);
+    }
+    // Review of Phase 5: a finished file whose record was never kept (a quit or a crash came while its last
+    // blocks were hashed from it after the finish: finishRecord()) gets it now.
+    for (const r of this.recs) {
+      if (this.quitting) return;
+      if (r.state === 'completed' && r.mode === 'file' && !!r.path && !!r.journal && !r.journal.endsWith('.done.jsonl')) await this.finishRecord(r).catch(() => undefined);
+    }
+  }
+
+  /**
+   * RESUME-DESIGN.md 5.7: the store and its .bak are both lost: a row for every journal, from its header
+   * (address, path, length, validators) and its last seal (the coverage), unfinished ones paused and marked
+   * dirty (so their saved part is checked when they continue), finished ones completed with their SHA-256.
+   */
+  private async fromJournals(): Promise<Rec[]> {
+    let names: string[] = [];
+    try {
+      names = await IOUtils.getChildren(this.journalDir);
+    } catch {
+      return [];
+    }
+    const out: Rec[] = [];
+    for (const path of names.filter((p) => /\.jsonl$/i.test(p)).sort()) {
+      const l = await Ledger.open(path).catch(() => null);
+      if (!l || !l.header.id || !l.header.url) continue;
+      const h = l.header;
+      const done = /\.done\.jsonl$/i.test(path);
+      const file = FileTransfer.fresh(h.url);
+      const cov = [...(l.seal?.cov ?? [])].sort((a, b) => a[0] - b[0]);
+      const segments: Segment[] = cov.map(([start, received], i) => ({ start, end: i + 1 < cov.length ? cov[i + 1][0] : h.total, received }));
+      Object.assign(file, { total: h.total, ranges: true, probed: true, etag: h.etag, lastModified: h.lm, contentType: h.ct, dispositionName: h.name, allowFresh: false, segments: done ? [{ start: 0, end: h.total, received: h.total }] : segments, dirty: !done });
+      const where = done && l.fin?.path ? l.fin.path : h.path;
+      const rec = this.newRec(h.url, { filename: PathUtils.filename(where), named: true, dir: PathUtils.parent(where) ?? '', identity: (h.identity ?? {}) as Partial<IdentityJSON> });
+      Object.assign(rec, {
+        id: h.id,
+        path: where,
+        mime: h.ct,
+        file,
+        total: h.total,
+        received: file.segments.reduce((n, seg) => n + seg.received, 0),
+        state: done ? 'completed' : 'paused',
+        startedAt: h.t,
+        finishedAt: done ? (l.fin?.t ?? h.t) : 0,
+        journal: path,
+        ...(done && l.fin ? { sha256: l.fin.sha256 || undefined, final: { size: l.fin.size, mtime: l.fin.mtime } } : {}),
+      });
+      out.push(rec);
+    }
+    return out;
   }
 
   // ---- persistence ----
@@ -2998,6 +3791,10 @@ class Manager {
         waits.push(this.whenSettled(id));
       }
       await Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, 5000))]);
+      // The seals of those stops (RESUME-DESIGN.md 4.1: at quit); one that does not finish leaves its row
+      // dirty, which the next start checks (4.2).
+      await Promise.race([Promise.all([...this.sealing.values()]), new Promise((r) => setTimeout(r, 4000))]);
+      for (const f of this.fixing.values()) f.ac.abort();
       this.session.clean = true;
       await this.save(true);
     })();
@@ -3078,6 +3875,37 @@ function pastedIdentity(id: IdentityJSON): IdentityJSON {
 function savedBytes(rec: Rec): number {
   if (rec.mode === 'stream') return (rec.stream?.tracks ?? []).reduce((n, t) => n + (t.bytes || 0), 0);
   return (rec.file?.segments ?? []).reduce((n, s) => n + (s.received || 0), 0);
+}
+
+/** "1 damaged part", "3 damaged parts" (RESUME-DESIGN.md 6 wording: "Fetching 3 damaged parts again"). */
+function damagedParts(n: number): string {
+  return `${n} damaged ${n === 1 ? 'part' : 'parts'}`;
+}
+
+/**
+ * Whether a finished file is there and, with `time`, when it was last modified (view(): Deleted, Changed after
+ * download).
+ */
+function diskState(path: string, time: boolean): { exists: boolean; mtime: number } {
+  try {
+    const f = fileFor(path);
+    if (!f.exists()) return { exists: false, mtime: 0 };
+    return { exists: true, mtime: time ? Number(f.lastModifiedTime) || 0 : 0 };
+  } catch {
+    return { exists: false, mtime: 0 };
+  }
+}
+
+/** Remove a file, trying again a few times while something (a scan, a hash read) still holds it. */
+async function removeSoon(path: string): Promise<void> {
+  for (let i = 0; i < 4; i++) {
+    try {
+      await IOUtils.remove(path, { ignoreAbsent: true });
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
 }
 
 function streamPartsExist(p: string): boolean {

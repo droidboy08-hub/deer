@@ -75,9 +75,10 @@ export async function findFfmpeg(settingPath: string): Promise<FfmpegInfo> {
 /**
  * Run ffmpeg to the end. `onProgress(seconds)` is called as ffmpeg reports how much media time it
  * has written (-progress pipe:2 puts key=value lines on stderr). Rejects with the tail of stderr
- * when the exit code isn't 0; `signal` kills the process.
+ * when the exit code isn't 0; `signal` kills the process. Resolves with the tail of stderr on success
+ * too (RESUME-DESIGN.md 4.2: the media check reads what ffmpeg found wrong in a file it read through).
  */
-export async function runFfmpeg(bin: string, args: string[], signal: AbortSignal | null = null, onProgress: ((seconds: number) => void) | null = null): Promise<void> {
+export async function runFfmpeg(bin: string, args: string[], signal: AbortSignal | null = null, onProgress: ((seconds: number) => void) | null = null): Promise<string> {
   if (signal?.aborted) throw new AbortedError();
   const proc = await Subprocess.call({
     command: bin,
@@ -117,5 +118,7 @@ export async function runFfmpeg(bin: string, args: string[], signal: AbortSignal
   await Promise.all([out, err]).catch(() => undefined);
   signal?.removeEventListener('abort', stop);
   if (signal?.aborted) throw new AbortedError();
+  if (pending && !/^[a-z_0-9]+=/.test(pending)) tail = (tail + pending + '\n').slice(-2000);
   if (exitCode !== 0) throw new Error(`ffmpeg exited with ${exitCode}: ${tail.trim()}`);
+  return tail;
 }

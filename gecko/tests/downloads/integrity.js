@@ -31,7 +31,8 @@
 //     download resumes from its segments (a stale "<part>.new" goes), and a version 1 row of a text
 //     file sniffed as binary resumes to the end; run 3: a stored record whose segments claim more than
 //     its total loads settled (the list builds, no hang); run 4: a store and .bak both unreadable are
-//     set aside as .corrupt and never written over.
+//     set aside as .corrupt and never written over, and the rows come back from their block hash records'
+//     journals (Phase 5, RESUME-DESIGN.md 5.7).
 // VITRE_DL_ONLY=a,b runs only those sections (control alone is also run on a build of the unchanged
 // code): control, store, mid, swap, unknown, expired, panel (needs swap and expired), md5, hls,
 // shrink (last: the unfixed build hung there), restart (runs 2-4).
@@ -69,7 +70,8 @@ spike.main(async () => {
     return settled(id, what + " to pause");
   };
   const flag = async (k, f = "") => (await fetch(`${DL.base}/flag?k=${k}${f ? `&f=${f}` : ""}`, { cache: "no-store" })).json();
-  const seen = async (prefix) => (await DL.stats()).requests.filter((r) => r.path.startsWith(prefix));
+  // Every byte count recorded (DL.settledStats(): the server writes it after its last pacing pause).
+  const seen = async (prefix) => (await DL.settledStats()).requests.filter((r) => r.path.startsWith(prefix));
   const brief = (reqs) => reqs.map((r) => `${r.status} ${r.range || "-"} ${r.ifrange || "-"}`);
   /** The proof's windows: ranges asked without If-Range (a first probe is bytes=0-0; a resume's carries If-Range). */
   const windowsOf = (reqs) => reqs.filter((r) => r.range && r.range !== "bytes=0-0" && !r.ifrange);
@@ -95,7 +97,11 @@ spike.main(async () => {
   // ---- run 4: the store and its .bak were both unreadable ----
   if (spike.run === 4) {
     const garbage = JSON.parse(Services.prefs.getStringPref("vitre.test.integrity4", "{}"));
-    check("a store and .bak that are both unreadable start an empty list", engine.list(false).length === 0, engine.list(false).map((v) => v.filename));
+    // Phase 5 (RESUME-DESIGN.md 5.7): both lost, the rows come back from their journals (only rows still
+    // listed have one; the finished ones completed, with their SHA-256).
+    const back = engine.list(false);
+    const journals = await IOUtils.getChildren(PathUtils.join(PathUtils.profileDir, "vitre-downloads")).catch(() => []);
+    check("a store and .bak that are both unreadable: the rows come back from their journals, one each", back.length > 0 && back.length === journals.length && back.every((v) => journals.some((j) => j.includes(v.id))) && back.every((v) => v.state !== "completed" || !!engine.recs.find((r) => r.id === v.id)?.sha256), { rows: back.map((v) => [v.filename, v.state]), journals: journals.map((j) => PathUtils.filename(j)) });
     await engine.save(true);
     const main = await IOUtils.readJSON(store).catch(() => null);
     const c1 = await IOUtils.readUTF8(store + ".corrupt").catch(() => "");
@@ -328,9 +334,12 @@ spike.main(async () => {
     engine.resume(ua);
     const uad = await settled(ua, "the download of unknown length to finish");
     const uar = await seen("/morph/medium");
-    // The resume's probe (bytes=0-65535) carries window 0: compared, not fetched again.
-    const uaFetched = sentIn(uar.filter((r) => r.status === 206 && r.end > r.start && r.range !== "bytes=0-65535"));
-    check("a download of unknown length whose address now takes ranges completes intact, fetching only what was missing", uad.state === "completed" && (await DL.sha256(uad.path)) === medium.sha256 && uaFetched === medium.size - uap.received, { state: uad.state, error: uad.error, fetched: uaFetched, missing: medium.size - uap.received, reqs: brief(uar).slice(0, 4) });
+    // The resume's probe (bytes=0-65535) carries window 0: compared, not fetched again. Phase 5 (RESUME-DESIGN.md
+    // 5.8): saved bytes with no block hash record become the record only after a second window matched the
+    // site (one 64 KiB range without If-Range): compared, not fetched again either.
+    const uaWindows = windowsOf(uar).filter((r) => r.range !== "bytes=0-65535" && r.end - r.start + 1 <= 65536);
+    const uaFetched = sentIn(uar.filter((r) => r.status === 206 && r.end > r.start && r.range !== "bytes=0-65535" && !uaWindows.includes(r)));
+    check("a download of unknown length whose address now takes ranges completes intact, fetching only what was missing", uad.state === "completed" && (await DL.sha256(uad.path)) === medium.sha256 && uaFetched === medium.size - uap.received && uaWindows.length <= 1, { state: uad.state, error: uad.error, fetched: uaFetched, missing: medium.size - uap.received, windows: uaWindows.length, reqs: brief(uar).slice(0, 4) });
 
     // A known total whose resume answer gives none ("/*") and whose whole answer is shorter.
     await DL.reset();

@@ -128,6 +128,9 @@ gecko/
   `inset` (pages start below the bar) are built in. Everything a page sends is validated as an
   envelope by the parent actor and reaches modules as `unknown`. A page module reads its setting from
   the `vitre.*` pref in the content process (`src/actors/page/README`).
+- `src/workers/*.js` -> `workers/*.js`, copied as they are: ChromeWorker scripts (a ChromeWorker made from
+  a `blob:` address does not load). `workers/flush.js` flushes a download's `.part` (FlushFileBuffers
+  through js-ctypes) off the main thread.
 - `src/pages/<name>/` -> bundled per page. `src/skin/*.css` copied. `browser.xhtml` CSP allows only
   `chrome:`/`resource:`/`moz-src:` scripts: no inline scripts, no `eval`; build DOM with
   `createElement`/DOMParser, never `innerHTML` with page-derived strings.
@@ -383,7 +386,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 to 4 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 5 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -473,9 +476,59 @@ local look-alike type, so a contract change fails `tsc`.
   runs and keeps them until the row is saved completed (a failed ffmpeg ends them before the tracks are
   moved as they are): at load, the output there (and no `.merge.part`) completes the row and removes the
   parts left, otherwise parts there merge again without asking the stream's addresses. The tick counts at
-  most two ticks of active time, so slept time is not counted.
+  most two ticks of active time, so slept time is not counted. The block hash record (Phase 5,
+  `downloads/ledger.ts`, `downloads/finished.ts`): a one-file download of known length keeps
+  `<profile>/vitre-downloads/<id>.jsonl` (append-only lines: header, block, seal, drop, decision, repair,
+  repaired, fin; a torn last line ignored; compacted past twice what it needs; in memory only for a private
+  download; removed with the row); its segments are cut at multiples of the block size (1 MiB up to 64 MiB,
+  at most 2048 blocks), and each block is hashed (crypto.subtle off the main thread: SHA-256 of the 1 MiB
+  chunk hashes cut to 128 bits, plus the SHA-256 of its first 64 KiB, the window the proof compares) once it
+  is certainly in the `.part`, two at a time, on every writer close and on the tick; while the run goes
+  faster than 256 MiB/s the hashing waits, and catches up when it slows, at a stop and from the finished
+  file (review of Phase 5: hashing beside a 2 GB/s local download slowed it by a quarter). A run marks the
+  file dirty (saved, flushed) before it writes; seals (the `.part` flushed by `workers/flush.js`, a seal
+  line timed before the flush, a flushed save) run every 30 s or 256 MiB (never sooner than 5 s apart), at
+  every stop and before the final rename (that one neither drains nor flushes: the finish never waits for
+  either), and a clean stop drains the hashing and clears the mark (one whose flush failed is checked as
+  after a crash if its session ends uncleanly). A seal or a finish whose row was removed or cancelled
+  meanwhile writes nothing (a removed journal is never written again). Every resume checks its part first (`inspect()`, Checking): the
+  last 2 hashed blocks below each frontier and 2 placed by the id; every block when the `.part` was modified
+  more than 5 s after its last seal while nothing ran ("The saved part was changed by another program");
+  after an unclean stop (still dirty) the claims above each segment's last hashed block are given back and
+  the blocks hashed since the last seal (2 minutes before it if it could not flush) hashed again ("Checked
+  after Deer closed unexpectedly", which replaces Phase 4's 8 MiB tail when there is a record). Bad blocks
+  are released (their segment split, saved flushed before anything is fetched) and must hash to their old
+  value when fetched again, otherwise File changed. A disk error cuts the failing segment's claim to the
+  start of its block. A server checksum that does not match at the end checks the blocks locally, then
+  compares every block with the site and replaces only those that differ. A missing `.part` starts over
+  ("Started over: the saved part was moved or deleted"). With the record, the proof's windows are hashed
+  block heads compared with their recorded head hashes, so local damage is never taken for another file;
+  when those windows cover too few stretches (one segment ran ahead) the windows over the saved bytes are
+  used, as before. A partial download from before Phase 5 gets its record after a second window matched.
+  The completion check (no strong validator and no checksum: 4 windows before the rename) stops a file
+  only when the site's bytes differ; a refusal, a page or no network lets it complete as before. A silent
+  restart or a checksum that did not match forgets the block hashes with the bytes. A finished file
+  keeps `<id>.done.jsonl` and `rec.sha256` (computed once at completion by `IOUtils.computeHexDigest`,
+  reused by Safe Browsing; the hashing after the finish waits a second, and while another download goes
+  faster than 256 MiB/s) and `rec.final` (its size and modified time): Check file (access key H) hashes
+  it against the record (no record: its stored SHA-256, else the site's bytes, 2 of 3 windows then every
+  block; under 5% different is local damage); Damaged (need 'repair' on a completed row, error colour, the
+  bar's damaged stretches empty, Repair · Open anyway · Show in folder · Remove from list, Space is Repair);
+  Repairing ("Fetching 3 damaged parts again (6 MB)": proven with the good blocks' head hashes, a refused
+  link renewed from its original address, each block fetched into memory and checked against the record
+  before a durable repair line and the write in place; the site's file changed: Repair refuses and offers
+  Download again); Changed after download (modified after its finish: normal colour, "This file was changed
+  on ...", Restore original only when chosen, Space only focuses it; it wins over Damaged, and Repair never
+  writes over such a file, checking it again before each block). Restore original changes nothing until
+  every block it needs is fetched and checked (kept aside in `<profile>/vitre-downloads/<id>.restore`), so
+  a refused or changed site leaves the person's file as it was. Deer's own repair writes are never taken
+  for an edit: the file's new modified time is stamped, and a repair a quit or a crash cut short keeps its
+  mark until the check after the next start. After an unclean session the files finished in it (and a
+  repair a crash cut) are checked by themselves, and a finished file whose record was never kept gets it; if the store and its `.bak` are both
+  lost the rows come back from the journals. With ffmpeg, Check file also reads a video or song through
+  (`ffmpeg -v error -i f -map 0 -c copy -f null -`; `runFfmpeg` returns its stderr tail).
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network; perf and ytdlp-real on demand; the
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

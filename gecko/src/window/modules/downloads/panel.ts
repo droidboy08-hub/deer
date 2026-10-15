@@ -481,7 +481,9 @@ export class Panel {
     if (queued) parts.push(`${queued} queued`);
     if (waiting) parts.push(`${waiting} waiting`);
     if (paused > attention + waiting) parts.push(`${paused - attention - waiting} paused`);
-    if (attention) parts.push(needAttention(attention));
+    // A Damaged file needs the person too (RESUME-DESIGN.md 6, Phase 5).
+    const damaged = views.filter(f.isDamaged).length;
+    if (attention + damaged) parts.push(needAttention(attention + damaged));
     if (!parts.length) parts.push(done ? `${done} completed` : 'No downloads');
     f.setText(els.summary, parts.join(' · '));
     const anyActive = running.length > 0 || queued > 0 || waiting > 0;
@@ -633,7 +635,14 @@ export class Panel {
     const running = v.state === 'downloading' && !v.phase;
     // Connections caption: how many are open, and whether the download can carry on later.
     let cap = '';
-    if (v.state === 'completed') cap = v.missing ? 'The file was moved or deleted' : v.note || 'Finished';
+    // A finished file (RESUME-DESIGN.md 6, Phase 5): Repairing, Checking, Damaged, Changed after download.
+    if (v.state === 'completed' && !v.missing && v.phase === 'repairing') cap = `Fetching ${f.damagedParts(v.repair?.parts ?? 0)} again${v.repair?.bytes ? ` (${f.bytes(v.repair.bytes)})` : ''}`;
+    else if (v.state === 'completed' && !v.missing && v.phase === 'checking') cap = 'Checking the file';
+    else if (f.isDamaged(v)) cap = damagedCaption(v);
+    else if (f.isEdited(v)) cap = `This file was changed on ${f.day(v.check?.changedAt || Date.now())}`;
+    else if (v.state === 'completed' && !v.missing && v.check?.site === 'changed') cap = 'The file on the site is different from this one.';
+    else if (v.state === 'completed' && !v.missing && v.check?.media) cap = `${v.note || 'Finished'} · ffmpeg reports: ${v.check.media}`;
+    else if (v.state === 'completed') cap = v.missing ? 'The file was moved or deleted' : v.note || 'Finished';
     else if (v.state === 'failed') cap = v.error || 'Failed';
     else if (v.state === 'cancelled') cap = 'Cancelled';
     else if (v.state === 'queued') cap = v.queuePos === 1 ? 'Queued · Next' : 'Queued';
@@ -650,10 +659,12 @@ export class Panel {
     else if (v.engine === 'browser') cap = `${v.state === 'downloading' ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else if (v.maxConnections <= 1) cap = `${running ? '1 of 1 active' : '1 connection'} · ${v.resumable ? 'Resumable' : 'Can’t resume'}`;
     else cap = `${running ? `${Math.min(v.connections, v.maxConnections)} of ${v.maxConnections} active` : `${v.maxConnections} connections`} · ${v.stream ? 'Stream' : 'Resumable'}`;
-    e.cap.classList.toggle('err', v.state === 'failed');
-    e.cap.classList.toggle('wrap', !!v.need || v.phase === 'renewing' || f.isWaiting(v));
+    // Red only for Damaged and real failures (RESUME-DESIGN.md 6).
+    e.cap.classList.toggle('err', v.state === 'failed' || f.isDamaged(v));
+    e.cap.classList.toggle('wrap', !!v.need || v.phase === 'renewing' || f.isWaiting(v) || (v.state === 'completed' && (!!v.check || !!v.phase)));
     f.setText(e.cap, cap);
-    const fills = v.state === 'completed' && !v.missing ? new Array<number>(v.maxConnections > 1 ? 8 : 1).fill(1) : v.segments;
+    // Damaged: the 8-block bar shows the damaged stretches empty (RESUME-DESIGN.md 6).
+    const fills = f.isDamaged(v) && v.segments.length ? v.segments : v.state === 'completed' && !v.missing ? new Array<number>(v.maxConnections > 1 ? 8 : 1).fill(1) : v.segments;
     e.segs.hidden = !fills.length;
     const choice = v.need?.kind === 'choice';
     // Every automatic fix leaves a history line here (RESUME-DESIGN.md 6): "New link found today, 13:02".
@@ -698,7 +709,7 @@ export class Panel {
       const at = Array.from(holder.children).indexOf(document.activeElement as Element);
       holder.replaceChildren(
         ...acts.map(([act, label, cls]) =>
-          el('button', { type: 'button', class: `vd-d-btn ${cls}`, 'data-act': act, 'aria-haspopup': act === 'limit' ? 'menu' : null, 'aria-describedby': act === 'start-over' || act === 'keep-partial' ? 'vd-d-cap' : null }, act === 'limit' && v.limitKBps ? `Limited to ${limitLabel(v.limitKBps)}` : label)
+          el('button', { type: 'button', class: `vd-d-btn ${cls}`, 'data-act': act, 'aria-haspopup': act === 'limit' ? 'menu' : null, 'aria-describedby': act === 'start-over' || act === 'keep-partial' || act === 'repair' || act === 'restore' ? 'vd-d-cap' : null }, act === 'limit' && v.limitKBps ? `Limited to ${limitLabel(v.limitKBps)}` : label)
         )
       );
       if (at >= 0) (holder.children[Math.min(at, holder.children.length - 1)] as HTMLElement | undefined)?.focus();
@@ -725,6 +736,7 @@ export class Panel {
     const map: Record<string, Command> = {
       pause: 'pause', resume: 'resume', now: 'start-now', try: 'start-now', retry: 'resume', open: 'open', folder: 'show-in-folder', copy: 'copy-address', cancel: 'cancel', keep: 'keep',
       'start-over': 'start-over', 'keep-partial': 'keep-partial', 'open-page': 'open-page', 'stop-waiting': 'stop-waiting',
+      check: 'check', repair: 'repair', restore: 'restore', 'open-anyway': 'open', again: 'download-again',
     };
     const cmd = map[act];
     if (cmd) this.store.run(cmd, v.id);
@@ -736,6 +748,8 @@ export class Panel {
    */
   private primary(v: DownloadView): void {
     if (v.need?.kind === 'choice') this.choose(v.id);
+    // Changed after download: Space only moves focus to Restore original (RESUME-DESIGN.md 6).
+    else if (f.isEdited(v)) this.choose(v.id, 'restore');
     else this.afterRefresh(v.id, this.store.primary(v));
   }
 
@@ -755,11 +769,14 @@ export class Panel {
     });
   }
 
-  /** Select a File changed row and put focus on its first choice (Start over). The quick view uses it too. */
-  choose(id: string): void {
+  /**
+   * Select a File changed row and put focus on its first choice (Start over), or a Changed after download
+   * row's Restore original (`act`). The quick view uses it too.
+   */
+  choose(id: string, act = 'start-over'): void {
     if (!this.isOpen) this.show(id);
     this.select(id, false);
-    requestAnimationFrame(() => this.details?.els.acts.querySelector<HTMLElement>('[data-act="start-over"]')?.focus());
+    requestAnimationFrame(() => this.details?.els.acts.querySelector<HTMLElement>(`[data-act="${act}"]`)?.focus());
   }
 
   // ---- Use another address… (RESUME-DESIGN.md 6) ----
@@ -919,7 +936,8 @@ export class Panel {
     else if (e.key === 'Enter' && v) {
       if (v.state === 'completed' && !v.missing) this.store.run('open', v.id);
     } else if (e.key === ' ' && v) {
-      if (v.state !== 'completed') this.primary(v);
+      // A finished file: Space is Repair on a Damaged row, and only moves focus on a Changed after download one.
+      if (v.state !== 'completed' || f.isDamaged(v) || f.isEdited(v)) this.primary(v);
     } else if (e.key === 'Delete' && v) {
       this.removeRow(v.id);
     } else if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
@@ -940,7 +958,14 @@ export class Panel {
     const run = (cmd: Command) => () => this.store.run(cmd, id);
     const entries: MenuEntry[] = [];
     const active = v.state === 'downloading' || v.state === 'starting';
-    if (v.state === 'completed' && !v.missing) entries.push({ label: 'Open', access: 'o', key: 'Enter', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+    // A finished file (RESUME-DESIGN.md 6, Phase 5): Damaged offers Repair (Download again once the site's file
+    // changed) and Open anyway; Changed after download, Restore original; every finished file, Check file (H).
+    if (f.isDamaged(v)) {
+      if (v.check?.site === 'changed') entries.push({ label: 'Download again', access: 'd', icon: 'reload', run: run('download-again') });
+      else entries.push({ label: 'Repair', access: 'e', key: v.phase ? undefined : 'Space', icon: 'reload', run: run('repair') });
+      entries.push({ label: 'Open anyway', access: 'o', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
+    } else if (f.isEdited(v)) entries.push({ label: 'Restore original', access: 's', icon: 'reload', run: run('restore') }, { label: 'Open', access: 'o', key: 'Enter', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+    else if (v.state === 'completed' && !v.missing) entries.push({ label: 'Open', access: 'o', key: 'Enter', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
     else if (v.state === 'completed') entries.push({ label: 'Download again', access: 'd', icon: 'reload', run: run('resume') });
     else if (active) entries.push({ label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else if (v.state === 'queued') entries.push({ label: 'Start now', access: 's', icon: 'play', run: run('start-now') }, { label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') });
@@ -1032,6 +1057,11 @@ export class Panel {
 }
 
 function statusOf(v: DownloadView): [string, string, string] {
+  if (v.state === 'completed' && !v.missing && v.phase === 'repairing') return ['Repairing', '', ''];
+  if (v.state === 'completed' && !v.missing && v.phase === 'checking') return ['Checking', '', ''];
+  // RESUME-DESIGN.md 6 (Phase 5): Damaged in the error colour; Changed after download in the normal one.
+  if (f.isDamaged(v)) return ['Damaged', 'err', ''];
+  if (f.isEdited(v)) return ['Changed after download', '', ''];
   if (v.state === 'completed') return v.missing ? ['Deleted', 'dim', ''] : ['Completed', '', ic.done];
   if (v.state === 'failed') return ['Failed', 'err', ''];
   if (v.state === 'cancelled') return ['Cancelled', 'dim', ''];
@@ -1051,6 +1081,10 @@ function statusOf(v: DownloadView): [string, string, string] {
 }
 
 function primaryOf(v: DownloadView): [string, string, string] {
+  // A Damaged file: Repair (Download again once the site's file changed); Changed after download: Restore
+  // original, which only moves focus there (RESUME-DESIGN.md 6). While it is repaired or checked: Show in folder.
+  if (f.isDamaged(v) && !v.phase) return v.check?.site === 'changed' ? ['again', 'Download again', ic.retry] : ['repair', 'Repair', ic.retry];
+  if (f.isEdited(v) && !v.phase) return ['restore', 'Restore original', ic.chevron];
   // Renewing link: Pause cancels the attempt and keeps the bytes (RESUME-DESIGN.md 6).
   if (v.state === 'downloading' || v.state === 'starting' || v.phase === 'renewing') return ['pause', 'Pause', ic.pause(14)];
   if (v.state === 'queued') return ['now', 'Start now', ic.play(14)];
@@ -1067,6 +1101,7 @@ function primaryOf(v: DownloadView): [string, string, string] {
 }
 
 function rowState(v: DownloadView): string {
+  if (f.isDamaged(v) && !v.phase) return `Damaged, ${v.check?.bad ? f.damagedParts(v.check.bad) : 'it no longer matches its checksum'}`;
   if (v.state === 'downloading' && !v.phase) return `${f.percent(v)} percent${v.speed ? `, ${f.speed(v.speed)}` : ''}${v.eta >= 0 ? `, ${f.eta(v.eta)} left` : ''}`;
   // "song.mp3, Link expired, 62 percent saved" (RESUME-DESIGN.md 6); a row Firefox moved saved nothing.
   if (v.need && v.need.kind !== 'page') return `${statusOf(v)[0]}, ${f.percent(v)} percent saved`;
@@ -1084,6 +1119,19 @@ function retrying(v: DownloadView): string {
 /** "1 needs attention", "2 need attention" (the toolbar summary; the ring says it too). */
 export function needAttention(n: number): string {
   return `${n} ${n === 1 ? 'needs' : 'need'} attention`;
+}
+
+/**
+ * A Damaged row's caption (RESUME-DESIGN.md 6): how much is damaged and what Repair does, or what the last
+ * Repair found at the site.
+ */
+function damagedCaption(v: DownloadView): string {
+  const c = v.check;
+  if (c?.site === 'changed') return 'The file on the site is different now, so this copy can’t be repaired. Download again gets the new one.';
+  if (c?.site === 'expired') return `The link stopped working${c.status ? ` (${c.status})` : ''}. Repair needs a working link.`;
+  if (c?.site === 'unreachable') return `Deer couldn’t reach the site to repair this file${c.status ? ` (${c.status})` : ''}.`;
+  if (c?.unlocated || !c?.bad) return 'This file no longer matches the checksum it was saved with. Repair compares it with the site.';
+  return `${f.damagedParts(c.bad)} (${f.bytes(c.badBytes)}). Repair fetches only ${c.bad === 1 ? 'that part' : 'those parts'} again.`;
 }
 
 /** "Use another address…" is for a one-file download Deer moves itself (streams renew with Phase 6). */
@@ -1108,7 +1156,14 @@ function historyLine(v: DownloadView): string {
 
 function detailActions(v: DownloadView): [string, string, string][] {
   const active = v.state === 'downloading' || v.state === 'starting';
-  if (v.state === 'completed' && !v.missing) return [['open', 'Open', ''], ['folder', 'Show in folder', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  // A finished file (RESUME-DESIGN.md 6, Phase 5). Repairing: what can't disturb it. Damaged: Repair · Open
+  // anyway · Show in folder · Remove from list (Download again first once the site's file changed). Changed
+  // after download: Restore original (only when chosen) · Open · Show in folder · Remove from list. Every
+  // other finished file gains Check file.
+  if (v.state === 'completed' && !v.missing && v.phase === 'repairing') return [['folder', 'Show in folder', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  if (f.isDamaged(v)) return [v.check?.site === 'changed' ? ['again', 'Download again', ''] : ['repair', 'Repair', ''], ['open-anyway', 'Open anyway', ''], ['folder', 'Show in folder', ''], ['remove', 'Remove from list', '']];
+  if (f.isEdited(v)) return [['restore', 'Restore original', ''], ['open', 'Open', ''], ['folder', 'Show in folder', ''], ['remove', 'Remove from list', '']];
+  if (v.state === 'completed' && !v.missing) return [['open', 'Open', ''], ['folder', 'Show in folder', ''], ['check', 'Check file', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'completed') return [['retry', 'Download again', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' && v.keepable) return [['keep', 'Keep file', ''], ['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' || v.state === 'cancelled') return [['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
