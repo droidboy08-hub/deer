@@ -34,7 +34,8 @@
 //     the same media playlist (refreshed()), then the master playlist or manifest read again with the same
 //     rung picked by its fingerprint (table.ts repick(), matchRep(): DASH ids renamed no longer end it; an
 //     audio rendition by its GROUP-ID, language and name), then yt-dlp's manifest for the same height when it
-//     is installed (StreamEnv.ytdlpManifest). The page step is Phase 7. A new playlist goes through the proof;
+//     is installed (StreamEnv.ytdlpManifest), then (Phase 7, outside a run) the streams of the page opened out
+//     of sight, each proven in turn (StreamEnv.pageStreams). A new playlist goes through the proof;
 //     on SAME the tracks take the new addresses and continue at the next sequence. Inside a run, a playlist
 //     read again is taken only when it is the same stream (the same numbering, count and durations, a DASH
 //     representation by its id or renamed) and, once the track wrote segments, its last written segment asked
@@ -163,6 +164,13 @@ export interface StreamEnv extends TransferEnv {
    * installed; null otherwise. Absent: the step is skipped.
    */
   ytdlpManifest?: (rung: StreamRung | undefined, audioOnly: boolean, signal: AbortSignal) => Promise<{ url: string; format: 'hls' | 'dash' } | null>;
+  /**
+   * G2 step 4 (Phase 7): the stream addresses the download's page loaded when opened out of sight (the
+   * engine's background page step: MediaWatch's HLS or DASH items under the hidden tab, likeliest master
+   * first, described fresh, within 1 s of `duration`, on the stream's host or path shape, not protected).
+   * Only the renewal attempts outside a run have it; absent: the step is skipped.
+   */
+  pageStreams?: (format: 'hls' | 'dash', duration: number, own: string[], signal: AbortSignal) => Promise<string[]>;
 }
 
 export const DRM_MESSAGE = 'This video is protected and can’t be saved.';
@@ -285,6 +293,8 @@ export class StreamTransfer {
   private hashing = new Set<Promise<void>>();
   private mpd: Mpd | null = null;
   private muxer: FfmpegInfo = { path: null, source: 'none', settingBroken: false };
+  /** prepare()'s parts and whether it proves renewWith()'s addresses: what the page step's proofs use (renewSteps()). */
+  private proveWith = { partBase: '', renewing: false };
 
   constructor(
     readonly state: StreamState,
@@ -363,6 +373,8 @@ export class StreamTransfer {
     // `prior` stays until a proof decides (a refused read leaves it for the next try).
     const s = this.state;
     const renewing = !!s.prior;
+    // The page step proves each of its streams in renewSteps() with these (review of Phase 7).
+    this.proveWith = { partBase, renewing };
     try {
       for (let round = 0; ; round++) {
         await this.read(signal);
@@ -839,10 +851,10 @@ export class StreamTransfer {
 
   /**
    * The automatic steps after the same media playlist (G2): 2, the master playlist or manifest read again,
-   * the same rung picked by its fingerprint; 3, yt-dlp's manifest for the same rung, when it is installed
-   * (the source page is Phase 7). True once the tracks have addresses whose playlists were read; the proof
-   * (prepare()) then decides whether they are the same stream. A master that no longer offers the rung is
-   * ChangedError.
+   * the same rung picked by its fingerprint; 3, yt-dlp's manifest for the same rung, when it is installed;
+   * 4, the streams of the page opened out of sight (Phase 7, StreamEnv.pageStreams). True once the tracks have
+   * addresses whose playlists were read; the proof (prepare()) then decides whether they are the same stream
+   * (step 4 proves each of its streams itself). A master that no longer offers the rung is ChangedError.
    */
   private async renewSteps(signal: AbortSignal, readable = false): Promise<boolean> {
     const s = this.state;
@@ -880,7 +892,54 @@ export class StreamTransfer {
       }
       s.sourceUrl = before;
     }
+    // Step 4 (Phase 7): the page opened out of sight. Each of its streams is read AND proven here, in turn
+    // (review of Phase 7: the first one, when it was another stream, ended the attempt as File changed before
+    // the stream's own one further down the list was tried): the first that proves SAME is the renewal (prepare()
+    // then finds it proven: no segment asked twice); one that is another stream (ChangedError) or can't be read
+    // gives the tracks their addresses back and the next is tried. Only when none proved SAME does the first
+    // ChangedError decide (File changed). Never a silent start over from a page's stream.
+    const own = [s.sourceUrl, s.variantUrl, ...s.tracks.map((t) => t.url)].filter((u) => /^https?:\/\//i.test(u));
+    const page = this.env.pageStreams ? await this.env.pageStreams(s.format ?? 'hls', s.duration, own, signal).catch(() => [] as string[]) : [];
+    if (signal.aborted) throw new AbortedError();
+    let changed: ChangedError | null = null;
+    const silent = this.silentRestarts;
+    this.silentRestarts = false;
+    try {
+      for (const url of page) {
+        if (url === s.sourceUrl) continue;
+        const back = this.keepAddresses();
+        try {
+          s.sourceUrl = url;
+          if (!(await this.fromSource(url, signal))) throw new NotAPlaylistError();
+          await this.settle(signal, this.proveWith.partBase, false, this.proveWith.renewing);
+          this.events.push('New link found on its page');
+          return true;
+        } catch (err) {
+          if (signal.aborted) throw new AbortedError();
+          back();
+          if (err instanceof ChangedError) changed ??= err;
+        }
+      }
+    } finally {
+      this.silentRestarts = silent;
+    }
+    if (changed) throw changed;
     return false;
+  }
+
+  /**
+   * Where the stream is asked and what the proof of a renewal set on it, for putting back (step 4 above): the
+   * addresses, the rung and each track's place in the playlist read. What the checks of the saved parts did (a
+   * part cut back, segments written back) is the parts' truth and stays.
+   */
+  private keepAddresses(): () => void {
+    const s = this.state;
+    const top = { sourceUrl: s.sourceUrl, variantUrl: s.variantUrl, audioUrl: s.audioUrl, dashVideo: s.dashVideo, dashAudio: s.dashAudio, bandwidth: s.bandwidth, rung: s.rung, duration: s.duration, renew: s.renew };
+    const tracks = s.tracks.map((t) => ({ t, was: { url: t.url, rung: t.rung, seq0: t.seq0, nextSeq: t.nextSeq, count: t.count, length: t.length, pathShape: t.pathShape, keyUrls: t.keyUrls } }));
+    return () => {
+      Object.assign(s, top);
+      for (const { t, was } of tracks) Object.assign(t, was);
+    };
   }
 
   /**

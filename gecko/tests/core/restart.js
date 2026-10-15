@@ -25,7 +25,10 @@ spike.main(async () => {
     askWhereToSave: true,
     connections: 16,
     speedLimitKBps: 2048,
-    // Added to Settings by the downloads module (src/shared/settings.ts); compared as a whole below.
+    // Added to Settings by the downloads module (src/shared/settings.ts); compared as a whole below, in the
+    // settings' own order (spikes/downloader/RESUME-DESIGN.md G4 and G1 step 3: both on by default).
+    continueDownloadsOnStart: false,
+    renewFromPage: false,
     ffmpegPath: "C:\\Tools\\ffmpeg\\ffmpeg.exe",
   };
   spike.log("run", spike.run, "pid", Services.appinfo.processID);

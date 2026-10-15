@@ -574,6 +574,26 @@ const downloads: SectionDef = {
         },
       ],
     },
+    {
+      // spikes/downloader/RESUME-DESIGN.md G1 step 3, G2 step 4 (the owner's decisions 6 and 7): on by default.
+      // The Phase 7 spike kept every hidden page's visit out of history (browsingContext.useGlobalHistory),
+      // so the description says so.
+      title: 'Expired links',
+      rows: [
+        {
+          title: 'Find new links on the download’s page',
+          desc: 'When a link stops working, Deer opens its page out of sight to look for a fresh one. It never clicks, signs in or fills anything in, and the visit stays out of your history.',
+          keywords: 'expired link renew refresh address background hidden page history sign in',
+          build: (ctx) =>
+            row({
+              icon: ico.link,
+              title: 'Find new links on the download’s page',
+              desc: 'When a link stops working, Deer opens its page out of sight to look for a fresh one. It never clicks, signs in or fills anything in, and the visit stays out of your history.',
+              control: (ids) => toggle(ctx, { labelledBy: ids.title, describedBy: ids.desc, get: (s) => s.renewFromPage, set: (v) => ctx.set({ renewFromPage: v }) }),
+            }),
+        },
+      ],
+    },
   ],
 };
 

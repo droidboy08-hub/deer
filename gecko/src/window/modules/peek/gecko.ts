@@ -187,13 +187,29 @@ export function mayLoad(principal: unknown, url: string): boolean {
   }
 }
 
-/** Silence a warm peek (browser-custom-element.mjs mute / unmute; the tab's own mute stays the user's). */
+/**
+ * Silence a page out of sight (a warm peek; the downloads' hidden page): its top browsing context's media
+ * controller, as tabbrowser mutes a tab (tabbrowser/content/tab.js toggleMuteAudio, Tabbrowser.sys.mjs;
+ * BackgroundPageThumbs and PageExtractorParent mute their hidden browsers the same way). 157's <browser> has
+ * no mute() (review of Phase 7: the old call did nothing, and a hidden page a site may autoplay was heard).
+ * A replaced browsing context (a process switch) starts unmuted: call it again then.
+ */
 export function setMuted(browser: XULBrowser, on: boolean): void {
   try {
-    if (on) (browser as any).mute();
-    else (browser as any).unmute();
+    const controller = (browser as any).browsingContext?.mediaController;
+    if (on) controller?.mute();
+    else controller?.unmute();
   } catch {
     /* no audio */
+  }
+}
+
+/** Whether a browser's media is muted now (its top browsing context's media controller). */
+export function isMuted(browser: XULBrowser): boolean {
+  try {
+    return !!(browser as any).browsingContext?.mediaController?.isMuted;
+  } catch {
+    return false;
   }
 }
 

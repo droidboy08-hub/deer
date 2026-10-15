@@ -21,6 +21,11 @@
 // From the window:
 //   downloads:pin          { id } | { id: null } follow that video's rectangle (every 250 ms + scroll)
 //   downloads:main-video   (query) -> PageVideo | null: the largest visible playing (else any) video
+//   downloads:links        (query, any frame) -> { links: [{ href, text, download }], password }: the frame's
+//                                                http(s) links (at most MAX_LINKS; download is the download
+//                                                attribute, null without one) and whether it shows a password
+//                                                field. Read-only: the background page step's (spikes/downloader/
+//                                                RESUME-DESIGN.md G1 step 3, Phase 7), which never clicks
 //
 // Elements are reached through Xray wrappers: tag names are compared by localName (instanceof
 // across the wrapper is not reliable), and nothing from the page is evaluated.
@@ -40,6 +45,8 @@ function linkPolicy(a: Element): ReferrerPolicy {
   }
 }
 const MIN_FRAME = { w: 320, h: 180 };
+/** 'downloads:links' reports at most this many links per frame (a long listing's first ones). */
+const MAX_LINKS = 2000;
 
 interface Rect {
   x: number;
@@ -363,6 +370,25 @@ export function onMessage(ctx: PageContext, name: string, data: unknown): unknow
       }
     }
     return best ? infoOf(ctx, best) : null;
+  }
+  if (name === 'downloads:links') {
+    // RESUME-DESIGN.md G1 step 3 (Phase 7): what a page opened out of sight shows. Only read: no click, no
+    // form, no script of the page's is run (attributes and text through the Xray wrappers).
+    const doc = ctx.document;
+    if (!doc) return null;
+    const links: { href: string; text: string; download: string | null }[] = [];
+    for (const a of Array.from(doc.querySelectorAll('a[href], area[href]'))) {
+      if (links.length >= MAX_LINKS) break;
+      const href = String((a as HTMLAnchorElement).href || '');
+      if (!/^https?:/i.test(href) || href.length > 8192) continue;
+      const text = String(a.textContent || a.getAttribute('title') || a.getAttribute('aria-label') || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
+      const download = a.hasAttribute('download') ? String(a.getAttribute('download') ?? '').slice(0, 300) : null;
+      links.push({ href, text, download });
+    }
+    return { links, password: !!doc.querySelector('input[type="password" i]') };
   }
   return undefined;
 }

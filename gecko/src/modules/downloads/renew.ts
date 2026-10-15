@@ -15,8 +15,8 @@
 //   - Attempts outside a run (VitreDownloads episode()): the run's own at the failure, then 2 min,
 //     15 min, 1 h and 6 h after it; after that only a manual action starts one (Phase 4 adds wake and
 //     network link-up). The count is rec.wait.tries, saved with the row, so it survives restarts.
-// Nothing here waits for the network (Phase 4), reads a master playlist (Phase 6) or opens the source
-// page (Phase 7).
+// Nothing here waits for the network (Phase 4) or reads a master playlist (Phase 6); the source page opened
+// out of sight is pagestep.ts (Phase 7).
 import { expiredAt, expiresAt } from './expiry';
 import { proveAddress, type Found, type ProofCtx } from './proof';
 import type { FileState, Segment } from './ranged';
@@ -105,9 +105,11 @@ export async function originalAddress(sub: Subject, list: string[], signal: Abor
 /**
  * How an address became the download's: 'original' (renewed from its original address), 'pasted' (Use
  * another address…), 'page' (started again on its page: a click, Alt+click, the 'downloads' service;
- * Phase 3), 'link' (started again from an address with no page: Add link, Download copied link).
+ * Phase 3), 'link' (started again from an address with no page: Add link, Download copied link),
+ * 'background' (found on its page opened out of sight: the page step, RESUME-DESIGN.md G1 step 3, Phase 7;
+ * an automatic attempt, which the schedule counts like 'original').
  */
-export type AttachHow = 'original' | 'pasted' | 'page' | 'link';
+export type AttachHow = 'original' | 'pasted' | 'page' | 'link' | 'background';
 
 /**
  * A proven address becomes the download's (RESUME-DESIGN.md 5.2 address, G1 attach): the one it

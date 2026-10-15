@@ -84,9 +84,12 @@ function option(o: Partial<VideoOption> & Pick<VideoOption, 'id' | 'group' | 'la
   return { detail: '', container: o.label, bytes: 0, height: 0, variantUrl: '', audioUrl: '', dashVideo: '', dashAudio: '', needsMux: false, ytdlpFormat: '', ytdlpExt: '', ...o } as VideoOption;
 }
 
-/** Streams to consider, likeliest master first, then the most recent (a page that moved on to another video). */
-function rankStreams(items: Candidate[]): string[] {
-  const score = (c: Candidate): number => {
+/**
+ * Streams to consider, likeliest master first, then the most recent (a page that moved on to another video).
+ * Also the order the background page step tries a hidden page's streams in (RESUME-DESIGN.md G2 step 4).
+ */
+export function rankStreams(items: Pick<Candidate, 'url' | 'at'>[]): string[] {
+  const score = (c: Pick<Candidate, 'url'>): number => {
     const name = c.url.split('?')[0].split('/').pop() ?? '';
     return (/master|index|playlist|manifest/i.test(name) ? 2 : 0) + (isOpaque(name) ? 0 : 1);
   };
@@ -458,9 +461,20 @@ export class MediaWatch {
     return base;
   }
 
-  private async describe(url: string, identity: Identity, muxer: boolean): Promise<StreamInfo> {
+  /**
+   * A stream a hidden page loaded, described fresh (RESUME-DESIGN.md G2 step 4, Phase 7: the 60 s cache is
+   * skipped, since the page step looks for addresses that work now): its length, DRM and whether it is live.
+   * Throws when it does not read as a playlist or manifest.
+   */
+  async streamInfo(url: string, kind: 'hls' | 'dash', identity: Identity): Promise<{ duration: number; drm: boolean; live: boolean }> {
+    const muxer = await this.muxer();
+    const info = kind === 'dash' ? await this.describeDash(url, identity, muxer, true) : await this.describe(url, identity, muxer, true);
+    return { duration: info.duration, drm: info.drm, live: info.live };
+  }
+
+  private async describe(url: string, identity: Identity, muxer: boolean, fresh = false): Promise<StreamInfo> {
     const hit = this.streams.get(url);
-    if (hit && Date.now() - hit.at < 60_000) return hit;
+    if (hit && !fresh && Date.now() - hit.at < 60_000) return hit;
     const text = await fetchText(url, identity, timeout(12000));
     if (!isPlaylist(text)) throw new Error('not a playlist');
     const info: StreamInfo = { at: Date.now(), master: false, drm: false, live: false, duration: 0, fmp4: false, options: [] };
@@ -509,9 +523,9 @@ export class MediaWatch {
     return info;
   }
 
-  private async describeDash(url: string, identity: Identity, muxer: boolean): Promise<StreamInfo> {
+  private async describeDash(url: string, identity: Identity, muxer: boolean, fresh = false): Promise<StreamInfo> {
     const hit = this.streams.get(url);
-    if (hit && Date.now() - hit.at < 60_000) return hit;
+    if (hit && !fresh && Date.now() - hit.at < 60_000) return hit;
     const mpd = parseMpd(await fetchText(url, identity, timeout(12000)), url);
     const info: StreamInfo = { at: Date.now(), master: true, drm: mpd.drm, live: mpd.live, duration: mpd.duration, fmp4: true, options: [] };
     if (!mpd.drm && !mpd.live && mpd.periods <= 1) {

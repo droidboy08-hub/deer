@@ -374,8 +374,9 @@ class Popover {
   }
 
   private update(row: HTMLElement, v: DownloadView): void {
-    // A row Firefox moved keeps none of its bytes: nothing to show a bar for (Start it again from its page).
-    const done = f.isFinished(v) || v.need?.kind === 'page';
+    // A row Firefox moved keeps none of its bytes: nothing to show a bar for (Start it again from its page). One of
+    // Deer's whose page may need the person to sign in (Phase 7) keeps its bar.
+    const done = f.isFinished(v) || (v.need?.kind === 'page' && v.engine !== 'vitre');
     row.classList.toggle('done', done);
     f.setText(row.querySelector('.vd-tile'), f.tile(v.filename));
     f.setText(row.querySelector('.vd-pop-name'), v.filename);
@@ -445,7 +446,8 @@ class Popover {
 function needWords(v: DownloadView): string {
   if (v.need?.kind === 'address') return v.armed ? 'Waiting for link' : 'Link expired';
   if (v.need?.kind === 'choice') return 'File changed';
-  if (v.need?.kind === 'page') return 'Start it again from its page';
+  // Armed by Open page, a row whose page may need a sign-in (Phase 7) is Waiting for link too.
+  if (v.need?.kind === 'page') return v.armed ? 'Waiting for link' : 'Start it again from its page';
   if (v.need?.kind === 'repair') return 'Damaged';
   return 'Needs attention';
 }
@@ -461,7 +463,7 @@ function meta(v: DownloadView): string {
   if (v.state === 'failed') return v.error || 'Failed';
   if (v.state === 'queued') return 'Queued';
   if (v.phase === 'renewing') return [of, 'Renewing link'].filter(Boolean).join(' · ');
-  if (v.need?.kind === 'page') return needWords(v);
+  if (v.need?.kind === 'page' && v.engine !== 'vitre') return needWords(v);
   // RESUME-DESIGN.md 6 (G4): Waiting for network, Retrying.
   if (f.isWaiting(v)) return [of, v.wait?.for === 'server' ? 'Retrying' : 'Waiting for network'].filter(Boolean).join(' · ');
   if (v.state === 'paused') return [of, v.need ? needWords(v) : 'Paused'].filter(Boolean).join(' · ');

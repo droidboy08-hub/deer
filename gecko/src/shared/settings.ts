@@ -38,6 +38,12 @@ export interface Settings {
    * person paused stay paused either way.
    */
   continueDownloadsOnStart: boolean;
+  /**
+   * When a download's link stops working, Deer opens its page out of sight to find a fresh one
+   * (spikes/downloader/RESUME-DESIGN.md G1 step 3, G2 step 4; the owner's decision 6, on by default). Off:
+   * only the original address, the stream's master playlist, yt-dlp and the person renew it.
+   */
+  renewFromPage: boolean;
   /** ffmpeg.exe for joining video and audio ('' = look beside the app, then for the copy Deer downloaded, then on PATH). Downloads module. */
   ffmpegPath: string;
 }
@@ -65,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   connections: 8,
   speedLimitKBps: 0,
   continueDownloadsOnStart: true,
+  renewFromPage: true,
   ffmpegPath: '',
 };
 

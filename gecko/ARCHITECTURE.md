@@ -386,7 +386,7 @@ local look-alike type, so a contract change fails `tsc`.
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
-  Phases 1 to 6 built): the resume probe judges the answer before it changes the saved state; an address
+  Phases 1 to 7 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the
   site (another size, other saved bytes, a stream with another segment count) pauses it as File
@@ -579,8 +579,44 @@ local look-alike type, so a contract change fails `tsc`.
   another stream, which is then File changed, never started again by itself); when that quality is gone the picker says "1080p is no
   longer offered" and another quality makes the row File changed (Start over then gets that quality). A stream's
   Link expired keeps Retry (its renewal steps); Refresh address runs them, then opens the page.
+  The background page step (Phase 7, G1 step 3, G2 step 4, decisions 6 and 7; `downloads/pagestep.ts`, the
+  window's `downloads/resolver.ts`): when the original address (and a stream's master playlist and yt-dlp) found
+  nothing, the attempt at the failure goes on at once (`rec.wait.step` 'page', the count kept) and every attempt of
+  the schedule ends the same way: a window of the download's privacy (engine `setResolver(win, fn)`, the quit
+  prompt's pattern; a private download only while a private window is open, in it) opens the download's page with
+  `b.openHidden` and a content principal plus its userContextId (always both), muted, kept active, its
+  BrowsingContext's `useGlobalHistory` false from TabOpen on (the spike, `spikes/downloader/boot-pagestep.js`:
+  no visit on 9 real sites, also across a BrowsingContext replacement; 2 without), dialogs and focus requests kept
+  from selecting it, then `removeQuietly` and `forgetClosedMarked`: b.tabs, the strip and the closed-tab list
+  end as they were, and nothing flies. The row reads Renewing link. Limits: one page at a time, 6 per site
+  (eTLD+1) per hour (the 7th's next attempt waits for the hour; in memory), once per download per 30 minutes
+  (`rec.pageAt`, saved), 30 s to load plus 10 s to collect (ended early by a download the page started, a link of
+  the file's path shape and name, media of its size). Candidates, each through the proof (`proveAddress`): a
+  download the page starts by itself (the claim registry at the top of adopt(): Firefox's transfer dropped, no row,
+  its Firefox download history removed), the row's own address again, the page's links (the read-only
+  'downloads:links' page query; scored: path shape +4, name +3, anchor text +1, site +1; the top 5 scoring 3 or
+  more), MediaWatch's media of the download's size under the hidden tab, the main video; asked with the page's own
+  principal and cookie jar (the row takes them on SAME, attach 'background', "New link found on its page"); the
+  real file over other bytes is File changed. A stream takes the hidden tab's HLS or DASH addresses (rankStreams,
+  described fresh, within 1 s, on its host or path shape, not protected), re-picks its rung and is proven. Never a
+  click, a form, a sign-in or a CAPTCHA: a page that lands on another site or shows a password field, where nothing
+  was the file, makes the row ask for its page (need 'page', "The page may need you to sign in.": Open page, which
+  arms it, · Use another address… · Show in folder · Cancel). Settings › Downloads › Expired links: "Find new links
+  on the download's page" (`renewFromPage`, on by default). From the review of Phase 7: every candidate is proven
+  before the real file over other bytes is File changed (SAME anywhere in the list wins; the row's own address,
+  then a claimed download, then a link, a player's media or the main video, which always ask, never a silent start
+  over); a stream's page streams are each read and proven in turn (`hls.ts` renewSteps step 4); the hidden tab is
+  muted through its media controller (`peek/gecko.ts setMuted`; 157's `<browser>` has no `mute()`), again on every
+  new top context and whenever its media turns audible; its pop-ups and new tabs are refused (`b.interceptOpen`);
+  every frame context attached under it is claimed as it attaches ("browsing-context-attached"); it gets no saved
+  logins (`LoginManagerParent` 'PasswordManager:findLogins' answered empty for a claimed tab); "another site" is the
+  registrable domain without the scheme (`downloads/site.ts`); a window closing ends its step at once and removes the
+  page before SessionStore keeps its tabs ("SSWindowClosing"); while tabbrowser's related-tab chain is live (a tab
+  opened from another since the last switch, close or move) the page is parked on about:blank, out of sight, until
+  the next TabSelect, TabClose or TabMove, so a step never changes where the next Ctrl+clicked link opens; a row
+  that asks for its page and was armed by Open page reads Waiting for link (Stop waiting).
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
-  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair, stream-expiry; perf and ytdlp-real on demand; the
+  ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair, stream-expiry, resolve; perf and ytdlp-real on demand; the
   ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).

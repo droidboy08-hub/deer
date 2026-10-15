@@ -647,9 +647,13 @@ export class Panel {
     else if (v.state === 'cancelled') cap = 'Cancelled';
     else if (v.state === 'queued') cap = v.queuePos === 1 ? 'Queued · Next' : 'Queued';
     else if (v.phase === 'renewing') cap = `The link stopped working${v.status ? ` (${v.status})` : ''}. Looking for a new one`;
-    else if (v.need?.kind === 'address' && v.armed) cap = `Start it again on ${f.host(v.pageUrl) || 'its page'}. Deer continues from ${f.percent(v)}%.`;
+    // Waiting for link: a Link expired row, or one whose page may need a sign-in (Phase 7), armed by Open page.
+    else if ((v.need?.kind === 'address' || v.need?.kind === 'page') && v.armed) cap = `Start it again on ${f.host(v.pageUrl) || 'its page'}. Deer continues from ${f.percent(v)}%.`;
     else if (v.need?.kind === 'address') cap = `The link stopped working${v.need.status ? ` (${v.need.status})` : ''} · ${f.percent(v)}% is saved${v.nextAt ? ` · next try ${nextTry(v.nextAt)}` : ''}`;
     else if (v.need?.kind === 'choice') cap = `The file on the site is different from the one being downloaded. ${f.percent(v)}% of the old one is saved.`;
+    // A download of Deer's whose page, opened out of sight, may need the person to sign in (Phase 7, G1 step 3): the
+    // engine's sentence, "The page may need you to sign in."
+    else if (v.need?.kind === 'page' && v.engine === 'vitre' && v.need.evidence) cap = `${v.need.evidence}.`;
     else if (v.need?.kind === 'page') cap = `Start it again from its page${v.need.evidence ? `: ${v.need.evidence}` : ''}.`;
     // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4).
     else if (f.isWaiting(v)) cap = v.wait?.for === 'server' ? `The site had a problem${v.status ? ` (${v.status})` : ''}. Trying again at ${nextTry(v.nextAt)}` : 'Continues when the connection is back';
@@ -995,7 +999,16 @@ export class Panel {
       if (v.keep) entries.push({ label: 'Keep partial file', access: 'k', icon: 'download', run: run('keep-partial') });
       entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     }
-    else if (v.need?.kind === 'page') entries.push({ label: 'Open page', access: 'o', key: 'Space', icon: 'opentab', run: run('open-page') });
+    else if (v.need?.kind === 'page') {
+      entries.push({ label: 'Open page', access: 'o', key: 'Space', icon: 'opentab', run: run('open-page') });
+      // Armed by Open page, it waits for its start there (Waiting for link): Stop waiting (review of Phase 7).
+      if (v.armed) entries.push({ label: 'Stop waiting', access: 'w', icon: 'close', run: run('stop-waiting') });
+      // Phase 7: a download of Deer's whose page may need the person to sign in keeps its bytes and its other ways back.
+      if (v.engine === 'vitre') {
+        if (canUseAddress(v)) entries.push({ label: 'Use another address…', access: 'u', icon: 'link', run: () => this.openAddress(id) });
+        entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+      }
+    }
     // Waiting for network, Retrying (RESUME-DESIGN.md 6, G4): Try now; Pause ends the wait.
     else if (f.isWaiting(v)) entries.push({ label: 'Try now', access: 't', key: 'Space', icon: 'reload', run: run('start-now') }, { label: 'Pause', access: 'p', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
     else if (v.state === 'paused') entries.push({ label: 'Resume', access: 's', key: 'Space', icon: 'play', run: run('resume') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
@@ -1074,6 +1087,8 @@ function statusOf(v: DownloadView): [string, string, string] {
   if (v.state === 'queued') return ['Queued', '', ''];
   if (v.phase === 'renewing') return ['Renewing link', '', ic.link];
   if (v.need?.kind === 'address') return [v.armed ? 'Waiting for link' : 'Link expired', '', ic.link];
+  // A row whose page may need a sign-in (Phase 7), armed by Open page: Waiting for link as well.
+  if (v.need?.kind === 'page' && v.armed) return ['Waiting for link', '', ic.link];
   if (v.need?.kind === 'choice') return ['File changed', '', ''];
   // No glyph: the design's words fill the column.
   if (v.need?.kind === 'page') return ['Start it again from its page', '', ''];
@@ -1109,8 +1124,9 @@ function primaryOf(v: DownloadView): [string, string, string] {
 function rowState(v: DownloadView): string {
   if (f.isDamaged(v) && !v.phase) return `Damaged, ${v.check?.bad ? f.damagedParts(v.check.bad) : 'it no longer matches its checksum'}`;
   if (v.state === 'downloading' && !v.phase) return `${f.percent(v)} percent${v.speed ? `, ${f.speed(v.speed)}` : ''}${v.eta >= 0 ? `, ${f.eta(v.eta)} left` : ''}`;
-  // "song.mp3, Link expired, 62 percent saved" (RESUME-DESIGN.md 6); a row Firefox moved saved nothing.
-  if (v.need && v.need.kind !== 'page') return `${statusOf(v)[0]}, ${f.percent(v)} percent saved`;
+  // "song.mp3, Link expired, 62 percent saved" (RESUME-DESIGN.md 6); a row Firefox moved saved nothing (one of
+  // Deer's that asks for its page, Phase 7, did).
+  if (v.need && (v.need.kind !== 'page' || v.engine === 'vitre')) return `${statusOf(v)[0]}, ${f.percent(v)} percent saved`;
   // Without Retrying's countdown, which would change the label every second.
   if (f.isWaiting(v)) return `${v.wait?.for === 'server' ? 'Retrying' : 'Waiting for network'}, ${f.percent(v)} percent saved`;
   return statusOf(v)[0];
@@ -1179,7 +1195,8 @@ function detailActions(v: DownloadView): [string, string, string][] {
   // the ones planned. Waiting for link: Open page · Stop waiting · Use another address… · Cancel. File
   // changed: Start over with the new file · Keep partial file · Show in folder. Start it again from its
   // page: Open page.
-  if (v.need?.kind === 'address' && v.armed && v.phase !== 'renewing') {
+  // A row whose page may need a sign-in (Phase 7) armed by Open page is Waiting for link too (review of Phase 7).
+  if ((v.need?.kind === 'address' || (v.need?.kind === 'page' && v.engine === 'vitre')) && v.armed && v.phase !== 'renewing') {
     const acts: [string, string, string][] = [['open-page', 'Open page', ''], ['stop-waiting', 'Stop waiting', '']];
     if (canUseAddress(v)) acts.push(['use-address', 'Use another address…', '']);
     acts.push(['cancel', 'Cancel', 'danger']);
@@ -1193,6 +1210,15 @@ function detailActions(v: DownloadView): [string, string, string][] {
     return acts;
   }
   if (v.need?.kind === 'choice') return [['start-over', 'Start over with the new file', 'danger'], ...(v.keep ? [['keep-partial', 'Keep partial file', ''] as [string, string, string]] : []), ['folder', 'Show in folder', '']];
+  // Phase 7 (RESUME-DESIGN.md G1 step 3): a download of Deer's whose page, opened out of sight, may need the
+  // person to sign in: Open page · Use another address… · Show in folder · Cancel (Pause first while an attempt
+  // runs). A download Firefox moved: Open page · Copy address · Remove from list, as before.
+  if (v.need?.kind === 'page' && v.engine === 'vitre') {
+    const acts: [string, string, string][] = v.phase === 'renewing' ? [['pause', 'Pause', ''], ['open-page', 'Open page', '']] : [['open-page', 'Open page', '']];
+    if (canUseAddress(v)) acts.push(['use-address', 'Use another address…', '']);
+    acts.push(['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']);
+    return acts;
+  }
   if (v.need?.kind === 'page') return [['open-page', 'Open page', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4): Try now · Pause (the wait ends) · Show in folder · Cancel.
   if (f.isWaiting(v)) return [['try', 'Try now', ''], ['pause', 'Pause', ''], ['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']];

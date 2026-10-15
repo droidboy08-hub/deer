@@ -116,6 +116,22 @@
              bytes; a refused init is never answered with a media segment; an audio rendition renews; a crash's
              saved place and lagging table lines; Continue never crosses containers; a refused first start
              asks three times and runs no yt-dlp
+  resolve    the background page step (spikes/downloader/RESUME-DESIGN.md, Phase 7, G1 step 3, G2 step 4): a
+             download whose signed address expired is renewed from a link on its page, opened out of sight,
+             within 30 s (b.tabs never changed, no flight, the hidden tab gone, the closed-tab list as it was,
+             only the missing ranges fetched); the page's visit is not in Places; a page that starts the download
+             by itself is claimed (no row) and proven; one whose link needs a click falls back within 45 s and is
+             never clicked; a password field or another site: "The page may need you to sign in."; the page opens
+             in the download's container (its cookie reaches the server); the setting off: no page; the seventh
+             expiry on one site within an hour waits; a private download resolves only in a private window and
+             nothing is written; an HLS stream is renewed from its page's player. From the review of Phase 7:
+             another file of the same name listed above the row's own never ends the search (and alone it asks,
+             even under 1 MiB saved); a page that autoplays where the site may plays muted; pop-ups where the site
+             allows them open nothing; a download from a frame removed at once is claimed; a saved login is never
+             filled into the hidden page; Open page on a sign-in row reads Waiting for link; a window closed with its
+             page open ends the step at once and keeps nothing of it; a step ending between two Ctrl+clicks leaves
+             the related-tab order alone. attach, ui, expiry and stream-expiry run with the setting off: they test
+             the manual path and the earlier steps
 
 Each run uses its own profile (dl-<name>) and downloads folder (%TEMP%/vitre-dl-tests/downloads/<name>).
 The local server is tests/downloads/server.py; fixtures come from tests/downloads/fixtures.py (ffmpeg
@@ -163,6 +179,7 @@ TESTS = {
     'network': (900, True),
     'repair': (600, True),
     'stream-expiry': (900, True),
+    'resolve': (720, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

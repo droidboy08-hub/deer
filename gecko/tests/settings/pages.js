@@ -179,6 +179,17 @@ spike.main(async () => {
   await settle(200);
   check("…and turning it off writes continueDownloadsOnStart (vitre.continueDownloadsOnStart)", store.get().continueDownloadsOnStart === false && Services.prefs.getBoolPref("vitre.continueDownloadsOnStart") === false);
   store.reset("continueDownloadsOnStart");
+  // Expired links (spikes/downloader/RESUME-DESIGN.md G1 step 3, the owner's decisions 6 and 7): on by default, and
+  // its description says the hidden page's visit stays out of history (the Phase 7 spike found a reliable way).
+  const renew = switchFor("Find new links on the download’s page");
+  const renewDesc = renew?.closest(".vs-row")?.querySelector(".vs-desc")?.textContent ?? "";
+  check("Downloads › Find new links on the download's page is there, on by default, and says the visit stays out of history", !!renew && store.get().renewFromPage === true && renew.getAttribute("aria-checked") === "true" && /out of your history/.test(renewDesc), { checked: renew?.getAttribute("aria-checked"), desc: renewDesc });
+  renew?.scrollIntoView({ block: "center" });
+  await settle(200);
+  spike.click(renew);
+  await settle(200);
+  check("…and turning it off writes renewFromPage (vitre.renewFromPage)", store.get().renewFromPage === false && Services.prefs.getBoolPref("vitre.renewFromPage") === false);
+  store.reset("renewFromPage");
 
   // Search engine radios: the address field's engine follows.
   svc.open("search");

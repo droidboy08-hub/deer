@@ -52,6 +52,7 @@ const SCHEMA: Record<string, Spec> = {
   connections: { kind: 'int', def: DEFAULT_SETTINGS.connections, min: 1, max: 32 },
   speedLimitKBps: { kind: 'int', def: DEFAULT_SETTINGS.speedLimitKBps, min: 0 },
   continueDownloadsOnStart: { kind: 'bool', def: DEFAULT_SETTINGS.continueDownloadsOnStart },
+  renewFromPage: { kind: 'bool', def: DEFAULT_SETTINGS.renewFromPage },
   ffmpegPath: { kind: 'string', def: DEFAULT_SETTINGS.ffmpegPath },
 };
 

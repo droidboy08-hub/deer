@@ -1,7 +1,7 @@
 // Downloads in the window: the panel (Ctrl+J), the ring and its quick view (over pages and Home
 // while anything downloads), the "Download this video" pill and quality picker (Ctrl+Shift+D), the
 // active pill's download mark, the flight of new downloads, the taskbar progress, the quit prompt,
-// and Settings › Video downloads. The engine is the process singleton VitreDownloads
+// Settings › Video downloads, and the background page step's hidden page (resolver.ts, Phase 7). The engine is the process singleton VitreDownloads
 // (src/modules/VitreDownloads.sys.ts); this module is its face in one window.
 // Port of app/src/renderer/modules/downloads/*.
 //
@@ -45,6 +45,7 @@ import { MEDIA_URL } from '../../../modules/downloads/media-url';
 import { CSS } from './css';
 import { Panel } from './panel';
 import { pageIdentity } from './principals';
+import { installResolver } from './resolver';
 import { Ring } from './ring';
 import { registerSettingsPage } from './settings-page';
 import { DownloadStore } from './store';
@@ -103,6 +104,9 @@ export function install(b: Browser): void {
   // Open page, From page and Refresh address open the download's page in this window (RESUME-DESIGN.md G1).
   store.pageOpener = (id) => video.openPage(id);
   const prompt = new QuitPrompt(b);
+  // The background page step's window half (RESUME-DESIGN.md G1 step 3, Phase 7): a download's page opened
+  // out of sight in this window when the engine asks (a private download's only in a private window).
+  installResolver(b);
   installTaskbar(b, store);
   registerSettingsPage(b);
   window.vitreDownloads = { store, panel, ring, video, prompt, taskbar: taskbarShown };

@@ -65,6 +65,7 @@ export const ico = {
   update: svg(20, '<path d="M15.6 8.4A5.8 5.8 0 0 0 5 6.2M4.4 11.6A5.8 5.8 0 0 0 15 13.8"/><path d="M15.8 3.8v4.6h-4.6M4.2 16.2v-4.6h4.6"/>'),
   data: svg(20,'<ellipse cx="10" cy="5.5" rx="5.5" ry="2"/><path d="M4.5 5.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M4.5 10c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/>'),
   open: svg(20, '<path d="M8.5 4.5h-3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-3"/><path d="M11.5 3.5h5v5M16.5 3.5l-7 7"/>'),
+  link: svg(20, '<path d="M8.6 11.4a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M11.4 8.6a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1"/>', 'stroke-linecap="round"'),
 };
 
 /** A fresh <svg> element from one of the markups above. */

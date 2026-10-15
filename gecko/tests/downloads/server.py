@@ -142,7 +142,9 @@ Routes (GET):
   /vod-expire?k=K           every token minted for K so far dies (variant, segment and master tokens)
   /vod-page.html?k=K&only=H a video page (the VIDEO template, title "Molten...") whose player fetched the master
                             /vod-sign/K/master.m3u8?mt=<a fresh master token>; with only=180 the master offers only
-                            that rendition (the page's 360p is no longer offered)
+                            that rendition (the page's 360p is no longer offered); once /flag?k=K-twin (review of
+                            Phase 7) the player then also fetches /vod-reenc/K-twin/hls/master.m3u8, another stream
+                            of the same length and host (other bytes), the latest fetched
   /vod-reenc/K/<path>       /fx/<path> (hls/v360/...); once /flag?k=K the TS segments are other bytes of the same
                             size (every byte XOR 0xA5 but the 0x47 sync bytes): the same count, re-encoded
   /dash-rename/K/<path>     /fx/<path> (dash/...); once /flag?k=K the manifest names its representations v360 and a96
@@ -171,6 +173,37 @@ Routes (GET):
                             segment N holds (/vod-hold)
   /vod-hold?k=K&from=N      segments N and later of K's routes above wait until the hold changes (from=-1: none;
                             at most 90 s), so a test pauses a stream at a known segment
+  The background page step (Phase 7 of RESUME-DESIGN.md: a download's page opened out of sight):
+  /page/<id>.html?f=F&name=N&ttl=S&ttl2=S2&rate=R&rate2=R2&v=link|auto|click|login|elsewhere|twin|other|audio|popup|iframe&pc=1
+                            a download page that mints a fresh signed address of fixture F (as N) on every load:
+                            the first load or mint per id is valid for S seconds at R KB/s, later ones for S2
+                            (default 600) at R2 (default 0). v=link: #dl is that address (/qsigned/), with an
+                            unrelated #notes (/named) and #home; auto: no link, the page goes to the address by
+                            itself 300 ms after it loads (a download the page starts); click: the address only
+                            appears after a click on #go, which also asks /page/<id>/clicked (so a test sees a
+                            click); login: a sign-in form with a password field and no address; elsewhere: a 302
+                            to http://localhost:<port>/signin.html (another site). pc=1 (a cookie scoped to one
+                            container): the first load sets pc_<id>, later loads never do, and the address is
+                            /pfile/<id>/F, which answers only to that cookie. From the review of Phase 7:
+                            login also asks /page/<id>/filled once its password field has a value (a saved
+                            login filled in); twin: another file of the same name and size, other bytes
+                            (/qsigned/ xor=1), listed above the address; other: that file alone; audio: no link,
+                            a <video> of /media/clip that plays by itself (with sound) where the site may
+                            autoplay, asking /page/<id>/played once it plays; popup: the address, plus
+                            window.open while the page is read, on load and
+                            sized, and a target=_blank link it clicks itself, each reported as
+                            /page/<id>/opened?how=H&got=1|0 (got: window.open gave a window); iframe: no link,
+                            a frame removed as soon as it is added, then the address loaded in a frame the page
+                            removes 150 ms later
+  /page/<id>.json?...       the same parameters: {"url": the address the page would show}, recorded as a mint, not
+                            as a page load (a test starts the download from it)
+  /page/<id>/clicked        recorded only: the page's #go was clicked
+  /page/<id>/filled  /page/<id>/opened  /page/<id>/played
+                            recorded only (with report=filled|opened|played): what the page reported about itself
+  /pfile/<id>/<f>?tok=T&name=N&rate=
+                            /qsigned/ that also needs the cookie /page/<id>.html?pc=1 set on its first load: 403
+                            "no cookie" without it
+  /signin.html              a sign-in service's page on another site (served as http://localhost:<port>)
   /stats  /reset            JSON: every request seen and the peak number of concurrent body transfers
                             (/reset leaves the flags and counts of /expire and /swap alone)
 
@@ -220,6 +253,8 @@ SLOW = {}
 # The stream routes of Phase 6: tokens by name ({'k', 'dead', 'only'}), the count that names them, and each key's
 # hold (segments from this number on wait; -1: none).
 VOD = {'tokens': {}, 'n': 0, 'hold': {}, 'trap': {}, 'br': {}}
+# /page/<id> (Phase 7): per id, whether its first load or mint happened and the cookie its first load set (pc=1).
+PAGES = {}
 RENAMED = {'0': 'v360', '1': 'a96'}
 EXPIRED_PAGE = ('<!doctype html><meta charset=utf-8><title>Sign in</title><main style="padding:120px 80px;font:16px Segoe UI">'
                 '<h1>This link has expired</h1><p>Sign in to download the file again.</p></main>')
@@ -441,6 +476,12 @@ class Handler(BaseHTTPRequestHandler):
             mt = self.vod_token(key, q.get('only', ''))
             self.record()
             script = "fetch('/vod-sign/%s/master.m3u8?mt=%s').then(r=>r.text())" % (key, mt)
+            with LOCK:
+                twin = (key + '-twin') in FLAGS
+            if twin:
+                # Review of Phase 7: once /flag?k=K-twin, the player then also fetches another stream of the same
+                # length on the same host (/vod-reenc/K-twin/: other bytes, as the flag says), the latest fetched.
+                script += ".then(() => fetch('/vod-reenc/%s-twin/hls/master.m3u8')).then(r=>r.text())" % key
             return self.text(200, VIDEO.replace('%STYLE%', STYLE).replace('%SCRIPT%', script).replace('%SRC%', 'src="/media/clip"'))
         if p.startswith('/vod-sign/'):
             return self.vod_sign(p[len('/vod-sign/'):], q, rate)
@@ -510,6 +551,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.text(200, json.dumps({'url': self.token(name, float(q.get('ttl', '600')), 0, q.get('rate', '0'))}), 'application/json')
         if p == '/attach.html':
             return self.attach_page(q)
+        if p.startswith('/page/'):
+            return self.page_route(p[len('/page/'):], q)
+        if p.startswith('/pfile/'):
+            return self.pfile(p[len('/pfile/'):], q, rate)
+        if p == '/signin.html':
+            self.record(status=200)
+            return self.text(200, '<!doctype html><meta charset=utf-8><title>Sign in · Accounts</title><style>%s</style>'
+                             '<main><h1>Sign in to continue</h1><p>accounts.localhost</p></main>' % STYLE)
         if p.startswith('/qsigned/'):
             return self.qsigned(p[len('/qsigned/'):], q, rate)
         if p.startswith('/qmint/'):
@@ -888,6 +937,134 @@ class Handler(BaseHTTPRequestHandler):
             headers.append(('Content-Range', 'bytes %d-%d/%d' % (start, end, size)))
         headers.append(('Content-Length', str(end - start + 1)))
         return self.send_part(path, status, start, end, rate, headers, xor=0xA5)
+
+    def page_route(self, rest, q):
+        """/page/<id>.html, /page/<id>.json, /page/<id>/clicked: the background page step's pages (see the docstring)."""
+        import base64 as b64
+        from html import escape
+        from urllib.parse import urlencode
+        if rest.endswith('/clicked'):
+            self.record(status=200, clicked=True)
+            return self.text(200, 'clicked', 'text/plain; charset=utf-8')
+        # What a page reports about itself (review of Phase 7): its sign-in form was filled in, it opened a pop-up,
+        # its player played.
+        if rest.endswith(('/filled', '/opened', '/played')):
+            self.record(status=200, report=rest.rsplit('/', 1)[1])
+            return self.text(200, 'ok', 'text/plain; charset=utf-8')
+        m = re.match(r'^([\w-]+)\.(html|json)$', rest)
+        if not m:
+            self.record(status=404)
+            return self.text(404, 'not found')
+        pid, kind = m.group(1), m.group(2)
+        v = q.get('v', 'link')
+        port = self.server.server_address[1]
+        if kind == 'html' and v == 'elsewhere':
+            where = 'http://localhost:%d/signin.html?k=%s' % (port, pid)
+            self.record(status=302, location=where, page=pid)
+            self.send_response(302)
+            self.send_header('Location', where)
+            self.send_header('Content-Length', '0')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return None
+        f = q.get('f', 'medium')
+        if not fixture(f):
+            self.record(status=404)
+            return self.text(404, 'not found')
+        filename = q.get('name', 'song.mp3')
+        with LOCK:
+            first = pid not in PAGES
+            st = PAGES.setdefault(pid, {'cookie': ''})
+        ttl = float(q.get('ttl', '600')) if first else float(q.get('ttl2', '600'))
+        rate = q.get('rate', '0') if first else q.get('rate2', '0')
+        headers = []
+        if q.get('pc') == '1':
+            # The cookie is set by the first load only: a later load in another container never gets it.
+            if first:
+                st['cookie'] = os.urandom(6).hex()
+                if kind == 'html':
+                    headers.append(('Set-Cookie', 'pc_%s=%s; Path=/' % (pid, st['cookie'])))
+            tok = os.urandom(8).hex()
+            with LOCK:
+                TOKENS[tok] = {'expires': time.time() + ttl, 'uses': 0, 'used': 0}
+            link = '/pfile/%s/%s?%s' % (pid, f, urlencode([('tok', tok), ('Expires', '%d' % int(time.time() + ttl + 0.999)), ('name', filename), ('rate', rate)]))
+        else:
+            link = self.qtoken(f, ttl, filename, rate)
+        if kind == 'json':
+            self.record(status=200, minted=True, page=pid)
+            return self.text(200, json.dumps({'url': link}), 'application/json')
+        self.record(status=200, page=pid, v=v)
+        title = escape(filename)
+        if v == 'auto':
+            body = ('<p>Your download of %s starts in a moment.</p>'
+                    '<script>setTimeout(() => { location.href = %s; }, 300);</script>' % (title, json.dumps(link)))
+        elif v == 'click':
+            body = ('<p><button id="go">Get the download link</button></p>'
+                    '<script>const t = atob(%s); document.getElementById("go").addEventListener("click", () => {'
+                    ' fetch("/page/%s/clicked"); const a = document.createElement("a"); a.id = "dl"; a.href = t;'
+                    ' a.textContent = "Download"; document.querySelector("main").append(a); });</script>'
+                    % (json.dumps(b64.b64encode(link.encode()).decode()), pid))
+        elif v == 'login':
+            # The page tells the server when its password field gets a value (a saved login filled in).
+            body = ('<form id="login" action="/page/%s/clicked"><p><input id="user" name="user" placeholder="Email"></p>'
+                    '<p><input id="pw" name="pw" type="password" placeholder="Password"></p><p><button>Sign in</button></p></form>'
+                    '<p><a id="notes" href="/named?name=notes.txt">Liner notes</a></p>'
+                    '<script>const pw = document.getElementById("pw"); const t = setInterval(() => {'
+                    ' if (pw.value) { clearInterval(t); fetch("/page/%s/filled"); } }, 100);</script>' % (pid, pid))
+        elif v in ('twin', 'other'):
+            # Another file of the same name and size, other bytes (xor=1), listed above the address (twin) or alone
+            # (other): a 64-bit installer above the 32-bit one, or the 32-bit one gone from the page.
+            twin = self.qtoken(f, 600, filename, rate, xor=True)
+            items = '<li><a id="twin" href="%s">Download %s (64-bit)</a></li>' % (escape(twin), title)
+            if v == 'twin':
+                items += '<li><a id="dl" href="%s">Download %s</a></li>' % (escape(link), title)
+            body = '<ul>%s<li><a id="notes" href="/named?name=notes.txt">Liner notes</a></li></ul>' % items
+        elif v == 'audio':
+            # A player that plays by itself (with sound) where the site may autoplay, telling the server once it
+            # plays; no link to the file.
+            body = ('<p><video id="v" autoplay loop src="/media/clip" style="width:320px"></video></p>'
+                    '<script>document.getElementById("v").addEventListener("playing", () => fetch("/page/%s/played"), { once: true });</script>' % pid)
+        elif v == 'popup':
+            # A page that opens pop-ups by itself where the site may (window.open while it is read, on load, a sized
+            # one, and a target=_blank link it clicks itself), telling the server whether each got a window.
+            body = ('<ul><li><a id="dl" href="%s">Download %s</a></li><li><a id="blank" target="_blank" href="/links.html?popup=blank">Notes</a></li></ul>'
+                    '<script>const tell = (how, w) => fetch("/page/%s/opened?how=" + how + "&got=" + (w ? 1 : 0));'
+                    ' tell("parse", window.open("/links.html?popup=parse"));'
+                    ' addEventListener("load", () => { tell("load", window.open("/links.html?popup=load", "_blank"));'
+                    ' tell("sized", window.open("/links.html?popup=sized", "x", "width=300,height=300"));'
+                    ' document.getElementById("blank").click(); });</script>' % (escape(link), title, pid))
+        elif v == 'iframe':
+            # No link: a frame that lives only a moment (removed as soon as it is added), then the address loaded in
+            # a frame the page removes 150 ms later (the download it started outlives its frame).
+            body = ('<p>Your download of %s starts in a moment.</p><script>addEventListener("load", () => setTimeout(() => {'
+                    ' const g = document.createElement("iframe"); g.src = "/links.html?frame=blink"; document.body.append(g); g.remove();'
+                    ' const f = document.createElement("iframe"); f.src = %s; document.body.append(f);'
+                    ' setTimeout(() => f.remove(), 150); }, 300));</script>' % (title, json.dumps(link)))
+        else:
+            body = ('<ul><li><a id="dl" href="%s">Download %s</a></li>'
+                    '<li><a id="notes" href="/named?name=notes.txt">Liner notes</a></li>'
+                    '<li><a id="home" href="/">Tideline</a></li></ul>' % (escape(link), title))
+        return self.text(200, '<!doctype html><meta charset=utf-8><title>Tideline · %s</title><style>%s</style>'
+                         '<main><h1>%s</h1><p>tideline.fm</p>%s</main>' % (title, STYLE, title, body), headers=headers)
+
+    def pfile(self, rest, q, rate):
+        """/pfile/<id>/<f>?tok=: /qsigned/ that answers only to the cookie /page/<id>.html?pc=1 set (see the docstring)."""
+        from urllib.parse import quote
+        pid, _, name = rest.partition('/')
+        path = fixture(name)
+        with LOCK:
+            want = PAGES.get(pid, {}).get('cookie', '')
+            t = TOKENS.get(q.get('tok', ''))
+            ok = bool(t) and bool(path) and time.time() < t['expires']
+        cookie = 'pc_%s=%s' % (pid, want)
+        if not want or cookie not in self.headers.get('Cookie', ''):
+            self.record(status=403, expired='cookie')
+            return self.text(403, 'no cookie', 'text/plain; charset=utf-8')
+        if not ok:
+            self.record(status=403, expired='token')
+            return self.text(403, 'Request has expired', 'text/plain; charset=utf-8')
+        extra = [('Content-Disposition', "attachment; filename*=UTF-8''" + quote(q['name'], safe=''))] if q.get('name') else []
+        return self.send_file(path, rate, extra=extra, until=t['expires'])
 
     def fetch_page(self, q):
         """/fetch.html: two files behind one script (/fetch?f=...), fresh tokens on every load (see the docstring)."""

@@ -9,7 +9,9 @@ export type DownloadState = 'starting' | 'queued' | 'downloading' | 'paused' | '
  * Why a paused row waits for the person (spikes/downloader/RESUME-DESIGN.md 5.1). Phase 1 sets
  * 'address' (Link expired) and 'choice' (File changed); Phase 3 'page' (a download Firefox moved,
  * which only its page can start again: Start it again from its page); Phase 5 'repair', on a completed
- * row: Damaged (Check file found damaged parts, or its whole-file checksum no longer matches).
+ * row: Damaged (Check file found damaged parts, or its whole-file checksum no longer matches). Phase 7
+ * sets 'page' on a download of Deer's too, when its page opened out of sight landed on another site or
+ * showed a password field and nothing there was the file ("The page may need you to sign in.").
  */
 export type NeedKind = 'address' | 'choice' | 'repair' | 'page';
 
@@ -206,6 +208,72 @@ export interface PageTarget {
   isPrivate: boolean;
   arm: boolean;
 }
+
+/**
+ * A link a page shows, as the read-only 'downloads:links' page query reports it (src/actors/page/downloads.ts;
+ * RESUME-DESIGN.md G1 step 3, Phase 7): its absolute http(s) address, its text, and its download attribute
+ * (null when it has none, '' when it has one with no name).
+ */
+export interface PageLink {
+  href: string;
+  text: string;
+  download: string | null;
+}
+
+/** A media address MediaWatch saw under the hidden page's tab (media.ts candidates()). */
+export interface PageMedia {
+  url: string;
+  kind: 'hls' | 'dash' | 'video' | 'audio';
+  bytes: number;
+  frameUrl: string;
+}
+
+/**
+ * What the background page step saw on a download's page (RESUME-DESIGN.md G1 step 3, G2 step 4; Phase 7),
+ * as the window's resolver (src/window/modules/downloads/resolver.ts) hands it to the engine:
+ *   outcome   'ok' the page loaded on the download's site; 'elsewhere' it landed on another site (a sign-in
+ *             service); 'timeout' it did not finish loading in time (what it had is kept); 'failed' no page
+ *             could be opened; 'aborted' the attempt was stopped (Pause, Cancel, a quit)
+ *   password  a password field showed in one of its frames (it may need the person to sign in)
+ *   links     its links (every frame), video the main video's address ('downloads:main-video'), media what
+ *             MediaWatch saw under its tab, protected the tab used DRM
+ *   principal / cookieJarSettings   the top document's principal and cookie jar, serialized (E10SUtils): the
+ *             identity its links are asked with, as Alt+click's (video.ts altClick())
+ */
+export interface PageSeen {
+  outcome: 'ok' | 'elsewhere' | 'timeout' | 'failed' | 'aborted';
+  finalUrl: string;
+  browserId: number;
+  password: boolean;
+  links: PageLink[];
+  video: string;
+  media: PageMedia[];
+  protected: boolean;
+  principal: string;
+  cookieJarSettings: string;
+}
+
+/**
+ * One background page step, for the window that runs it (engine setResolver(); RESUME-DESIGN.md G1 step 3,
+ * Phase 7): open `pageUrl` in a hidden, muted tab of the download's container (`userContextId`) and privacy,
+ * give the engine the tab's browserId as soon as it exists (`opened`: the claim registry), let it load for at
+ * most `loadMs` and collect for at most `collectMs` (`enough` ends either early), then close it without a
+ * trace. `signal` stops it.
+ */
+export interface PageJob {
+  id: string;
+  pageUrl: string;
+  userContextId: number;
+  isPrivate: boolean;
+  loadMs: number;
+  collectMs: number;
+  opened(browserId: number, contexts: number[]): void;
+  enough(seen: PageSeen): boolean;
+  signal: AbortSignal;
+}
+
+/** A window's background page step (engine setResolver(win, fn)). */
+export type PageResolver = (job: PageJob) => Promise<PageSeen>;
 
 /**
  * What "Use another address…" made of an address (engine setAddress(), RESUME-DESIGN.md 6). ok: it is

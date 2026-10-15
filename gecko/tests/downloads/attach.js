@@ -45,6 +45,10 @@ Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 spike.main(async () => {
   const { check, sleep, log, waitFor } = spike;
   const m = await DL.init();
+  // The background page step (RESUME-DESIGN.md G1 step 3, G2 step 4; Phase 7) is off here: this suite tests the
+  // earlier steps and the manual path, which it would otherwise renew from the page first. tests/downloads/
+  // resolve.js tests the page step.
+  DL.b.sys("VitreSettings").set({ renewFromPage: false });
   await spike.resize(1440, 900);
   await spike.activate();
   const b = DL.b;

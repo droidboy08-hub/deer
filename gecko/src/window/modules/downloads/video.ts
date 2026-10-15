@@ -774,9 +774,10 @@ export class VideoUI {
       requestAnimationFrame(() =>
         this.note(`Start ${name} again on this page.`, pct > 0 ? `Deer continues from ${pct}%.` : 'Deer continues from where it stopped.', 20000, { label: 'Stop waiting', run: () => engine.stopWaiting(id) })
       );
-    } else if (v?.need?.kind === 'page') requestAnimationFrame(() => this.note(`Start ${name} again on this page.`, ''));
-    // A stream's Link expired (RESUME-DESIGN.md G2 manual fallback, Phase 6): the pill on its video continues it.
-    else if (v?.stream && v.need?.kind === 'address') {
+    } else if (v?.need?.kind === 'page' && !v.stream) requestAnimationFrame(() => this.note(`Start ${name} again on this page.`, ''));
+    // A stream's Link expired (RESUME-DESIGN.md G2 manual fallback, Phase 6): the pill on its video continues it;
+    // so does one whose page, opened out of sight, may need the person to sign in (need 'page', Phase 7).
+    else if (v?.stream && (v.need?.kind === 'address' || v.need?.kind === 'page')) {
       const pct = f.percent(v);
       requestAnimationFrame(() => this.note(`Press Continue on the video to go on with ${name}.`, pct > 0 ? `Deer continues from ${pct}%.` : '', 20000));
     }

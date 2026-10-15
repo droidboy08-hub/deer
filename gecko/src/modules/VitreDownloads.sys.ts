@@ -56,6 +56,11 @@
 //                                  again). kind 'private': the last private window is closing
 //                                  (last-pb-context-exiting); confirmPrivateClose() cancels the private
 //                                  downloads and lets the next close through.
+//   setResolver(win, fn)           fn(PageJob) -> PageSeen (types.ts): the window's background page step
+//                                  (RESUME-DESIGN.md G1 step 3, G2 step 4; Phase 7; src/window/modules/
+//                                  downloads/resolver.ts) opens a download's page in a hidden, muted tab of its
+//                                  container and reports what it shows; null unregisters (setQuitPrompt's
+//                                  pattern). A private download's page opens only in a private window.
 //   pickSavePath / pickFolder / pickProgram(win, ...)   native dialogs
 //
 // Engine rules (see the files in ./downloads):
@@ -157,6 +162,20 @@
 //     schedule, as for a file. A resume with every segment written goes straight to the merge. Keep partial
 //     file merges the written segments; Repair runs a finished stream again against its table. The pill on
 //     the page opened again finds the row by its stable key (rec.streamKey) and continues it (renewWith()).
+//   - The background page step (RESUME-DESIGN.md G1 step 3, G2 step 4, decisions 6 and 7; Phase 7;
+//     downloads/pagestep.ts): when the cheaper steps found nothing, the download's page is opened out of sight
+//     by a window (setResolver()) in its container, muted, kept out of history, and closed without a trace; the
+//     row reads Renewing link. What it shows only nominates: a download the page starts by itself (claimed in
+//     adopt() before any row is made: the claim registry), the download's own address again, its links scored,
+//     media of the download's size, its main video; a stream's HLS or DASH addresses. Every candidate goes
+//     through the proof. One page at a time, at most 6 per site per hour (more waits), at most once per
+//     download per 30 minutes, 30 s to load plus 10 s to collect; the setting "Find new links on the
+//     download's page" (renewFromPage, on by default) turns it off. A page that lands on another site or shows
+//     a password field, where nothing was the file, makes the row ask for its page (need 'page'). Deer never
+//     clicks, submits, signs in or touches a CAPTCHA there. Review of Phase 7: every candidate is proven before
+//     the real file over other bytes is File changed (another file of the same name may be listed first); every
+//     frame of the hidden tab is claimed as it attaches; the hidden page gets no saved logins; a window closing
+//     ends its step at once.
 //   - Private downloads are never written to disk lists and are dropped when the last private
 //     window closes (last-pb-context-exited), as Firefox does. Closing the last private window
 //     while one runs asks first (last-pb-context-exiting), and a quit cancels them (the prompt says so).
@@ -166,6 +185,10 @@
 //   download.source / target / cancel / removePartialData / finalize / start
 //                                                gre/modules/DownloadCore.sys.mjs
 //   BrowsingContext.get / getCurrentTopByBrowserId, embedderElement.documentGlobal (157 rename)
+//   browsing-context-attached (BrowsingContext.browserId)
+//                                                gre/chrome/remote/content/shared/listeners/BrowsingContextListener.sys.mjs
+//   LoginManagerParent.prototype.receiveMessage ('PasswordManager:findLogins')
+//                                                gre/modules/LoginManagerParent.sys.mjs
 //   quit-application-requested ("lastwindow", "restart"), quit-application-granted
 //                                                gre/chrome/toolkit/content/global/globalOverlay.js
 //   last-pb-context-exiting (nsISupportsPRBool)  browser/chrome/browser/content/browser/browser.js
@@ -181,12 +204,13 @@ import { findFfmpeg, forgetFfmpeg } from './downloads/ffmpeg';
 import { cancelFfmpegInstall, ffmpegInstallDir, ffmpegInstallState, installFfmpeg, oldFolder, onFfmpegInstall, type FfmpegInstallState } from './downloads/ffmpeg-install';
 import { DRM_MESSAGE, StreamTransfer, allWritten, keptSecs, streamEstimate, streamFills, trackPart, type StreamEnv, type StreamState } from './downloads/hls';
 import { RateLimiter } from './downloads/limiter';
-import { MediaWatch } from './downloads/media';
+import { MediaWatch, rankStreams } from './downloads/media';
 import { MEDIA_URL } from './downloads/media-url';
 import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from './downloads/attach';
 import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
+import { Budget, COLLECT_MS, LOAD_MS, PER_ROW, SIGN_IN, STREAM_SETTLE, STRONG, linkNames, pickLinks, sameSizeMedia, scoreLink, siteKey, streamNear } from './downloads/pagestep';
 import { streamKeyOf } from './downloads/streamkey';
-import { StreamTable, rungFromQuality } from './downloads/table';
+import { DURATION_SLACK, StreamTable, rungFromQuality } from './downloads/table';
 import { checkFinished, damagedFills, editedSince, mediaCheck, repairFinished, restoreFinished, siteCompare, statOf, type RepairOutcome } from './downloads/finished';
 import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, type Header } from './downloads/ledger';
 import { AbortedError, ChangedError, DiskError, DownloadError, HttpStatusError, Identity, classify, describeError } from './downloads/net';
@@ -198,7 +222,7 @@ import { asPolicy, readReferrerInfo } from './downloads/referrer';
 import { hashWanted, mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
 import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
-import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageTarget, RefreshResult, RenewWithResult, StartOptions, StreamRung, VideoOption, WaitFor } from './downloads/types';
+import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageJob, PageResolver, PageSeen, PageTarget, RefreshResult, RenewWithResult, StartOptions, StreamRung, VideoOption, WaitFor } from './downloads/types';
 import { CONTINUE_AFTER, FRESH_AFTER, SERVER_GIVE_UP, SLEEP_FALLBACK, SOON, WAKE_SETTLE, rewindTails, waitNext } from './downloads/waits';
 import { YtdlpTransfer, cancelToolsInstall, installTools, manifestFor, oldToolsDir, onToolsInstall, toolsDir, toolsInstallState, toolsVersion, ytdlpParts, ytdlpTools, type ToolsState, type YtdlpState } from './downloads/ytdlp';
 
@@ -382,6 +406,12 @@ interface Rec {
    * again finds the row by it and continues it (renewWith()).
    */
   streamKey?: string;
+  /**
+   * When the background page step last opened the download's page (RESUME-DESIGN.md G1 step 3, decision 6;
+   * Phase 7): at most once per download per 30 minutes (pagestep.ts PER_ROW). Saved with the row, so a
+   * restart does not open the page again sooner.
+   */
+  pageAt?: number;
 }
 
 /**
@@ -407,9 +437,11 @@ type CheckState = {
 /**
  * A paused row's wait (Rec.wait; RESUME-DESIGN.md 5.1). `since`: when the wait began (a network and a
  * server wait are one: their failures share one count, review of Phase 4); `serverSince`: the first 5xx
- * or 429 of it, kept through the network failures between, which SERVER_GIVE_UP counts from.
+ * or 429 of it, kept through the network failures between, which SERVER_GIVE_UP counts from. `step` 'page'
+ * (Phase 7): the attempt due is the rest of the one at the failure, whose run already asked the original
+ * address: only the background page step runs (episode()), and the count is not raised.
  */
-type WaitState = { for: WaitFor; since: number; nextAt: number; tries: number; status?: number; serverSince?: number };
+type WaitState = { for: WaitFor; since: number; nextAt: number; tries: number; status?: number; serverSince?: number; step?: 'page' };
 
 /**
  * The address that gives the other version of a File changed row's file, kept for Start over
@@ -469,6 +501,48 @@ interface Run {
  * of those are private (a quit cancels them instead of pausing them).
  */
 type QuitPrompt = (kind: 'quit' | 'lastwindow' | 'restart' | 'private', count: number, privateCount: number) => void;
+
+/**
+ * A download a hidden page started by itself (RESUME-DESIGN.md G1 step 3, the claim registry; Phase 7): its
+ * address, whose request it is (as adopt() reads it from Firefox's download) and the name Firefox gave it.
+ */
+type Claimed = { url: string; identity: IdentityJSON; name: string };
+
+/**
+ * The claim registry's entry for one hidden page (Phase 7): the row whose page it is, its tab's browserId, the
+ * browsing contexts it had (a download that arrives after its tab closed, or from a frame the page removed at
+ * once, is matched by them: every context attached under the tab is recorded as it attaches, review of Phase
+ * 7), what it started, and until when a late arrival is still dropped (CLAIM_GRACE after the page closed;
+ * Infinity while it is open).
+ */
+interface Claim {
+  rec: string;
+  browserId: number;
+  contexts: Set<number>;
+  found: Claimed[];
+  until: number;
+  /** When the page opened: the history Firefox gave a claimed download is removed back to this (decision 7). */
+  since: number;
+  isPrivate: boolean;
+}
+
+/** A download the hidden page started as it closed is still dropped (never a row) for this long. */
+const CLAIM_GRACE = 5000;
+
+/**
+ * The background page step's verdict for a file row (pageStep(); RESUME-DESIGN.md G1 steps 3 and 4): 'skip',
+ * it does not apply (the setting, no page, no window, the row's 30 minutes); 'later', the site had its six
+ * pages this hour (`at`: when it may have another); 'none', nothing there was the file (`signIn`: the page
+ * landed on another site or showed a password field); 'same', a proven address with the identity it was
+ * asked with; 'changed', the real file over other bytes (`ask`: a link, a player's media or the main video
+ * nominated it, so the row asks even with at most 1 MiB saved: review of Phase 7).
+ */
+type PageOutcome =
+  | { kind: 'skip' }
+  | { kind: 'later'; at: number }
+  | { kind: 'none'; signIn: boolean }
+  | { kind: 'same'; found: Found; identity: IdentityJSON }
+  | { kind: 'changed'; found: Found; evidence: string; identity: IdentityJSON; ask: boolean };
 
 /** Same site (scheme + registrable domain), as SameSite cookies count it. IP hosts compare by host. */
 function sameSite(a: string, b: string): boolean {
@@ -611,6 +685,21 @@ class Manager {
   private quitting = false;
   private quitConfirmed = false;
   private prompts = new Map<any, QuitPrompt>();
+  /** The windows that run the background page step, by window (setResolver(); RESUME-DESIGN.md G1 step 3, Phase 7). */
+  private resolvers = new Map<any, PageResolver>();
+  /** The claim registry (Phase 7): hidden pages by their tab's browserId; adopt() drops what they start. */
+  private claims = new Map<number, Claim>();
+  /** Records every browsing context attached under a claimed tab (watchContexts(); review of Phase 7). */
+  private contextWatch: { observe: (subject: any) => void } | null = null;
+  /** One hidden page at a time (decision 6): each page step waits for the one before. */
+  private pageTurn: Promise<void> = Promise.resolve();
+  /** The page step open now: the window's step it runs and how to end it (its window closing ends it: setResolver()). */
+  private pageOpen: { fn: PageResolver; stop: () => void } | null = null;
+  /** At most PER_SITE pages per site per hour (decision 6). Tests may clear() it. */
+  readonly pageSites = new Budget();
+  /** Stream rows whose page step was put off by the per-site limit (when it may run), or saw a sign-in page (streamEpisode()). */
+  private pageLater = new Map<string, number>();
+  private pageSignIn = new Set<string>();
   private firefoxList: any = null;
   private storePath = '';
   /** Firefox's own download folder: Deer's scratch (see the header). */
@@ -1032,6 +1121,14 @@ class Manager {
     // probe below hands the download back to Firefox.
     const crossSite = /^https?:/i.test(url) && !!pageUrl && !sameSite(url, pageUrl);
     const identity = new Identity({ pageUrl, userContextId: src.userContextId ?? 0, isPrivate: !!src.isPrivate, firstParty: !crossSite, pageRules: crossSite, referrerPolicy: ref?.policy ?? '' }).toJSON();
+    // RESUME-DESIGN.md G1 step 3 (Phase 7), the claim registry: a download a hidden page of the background page
+    // step starts by itself is that step's candidate, never a row (no 'added', no flight): Firefox's transfer is
+    // dropped at once and the step proves the address (pageStep()). Before anything else is made of it.
+    const claim = this.claimOf(browserId, Number(src.browsingContextId) || 0);
+    if (claim) {
+      await this.claimed(list, download, target, claim, { url, identity, name: suggested });
+      return;
+    }
     const loading: string = src.loadingPrincipal?.spec ?? src.loadingPrincipal?.origin ?? '';
     const fromExtension = /^moz-extension:/i.test(loading) || !!src.loadingPrincipal?.addonId;
     const inScratch = !!target && PathUtils.parent(target)?.toLowerCase() === this.scratch.toLowerCase();
@@ -1050,8 +1147,8 @@ class Manager {
     // RESUME-DESIGN.md G1, "Catching a re-click in adopt()" (Phase 3): the file a row waits an address
     // for, started again on its page. With a pre-match the row is held back ('added' is not sent) until
     // the probe and the byte proof have spoken, about 0.3-2 s, so the window never flies a row that then
-    // vanishes. Without one (no row waits, or none scores) this is today's path, unchanged. The claim
-    // registry for hidden pages comes with Phase 7.
+    // vanishes. Without one (no row waits, or none scores) this is today's path, unchanged. (A hidden page's
+    // own downloads never get here: the claim registry above took them.)
     const match = this.preMatch({ url, identity, browserId, pageUrl, names: [suggested] });
     rec.state = 'starting';
     rec.queuedAt = 0;
@@ -1134,6 +1231,57 @@ class Manager {
     await download.finalize(true).catch(() => undefined);
     await list.remove(download).catch(() => undefined);
     if (target) await IOUtils.remove(target, { ignoreAbsent: true }).catch(() => undefined);
+  }
+
+  /**
+   * The claim registry's entry for a Firefox download (Phase 7): its tab is a hidden page of the background page
+   * step, or its browsing context was one of that page's (a download that arrives just after the tab closed,
+   * within CLAIM_GRACE).
+   */
+  private claimOf(browserId: number, context: number): Claim | null {
+    const now = Date.now();
+    const direct = browserId ? this.claims.get(browserId) : undefined;
+    if (direct && direct.until > now) return direct;
+    if (context) for (const c of this.claims.values()) if (c.until > now && c.contexts.has(context)) return c;
+    return null;
+  }
+
+  /**
+   * Every browsing context attached under a claimed tab is recorded at once (review of Phase 7): a frame the
+   * hidden page adds to start a download and removes at once is discarded before adopt() sees the download,
+   * so BrowsingContext.get() of its id gives null (no browserId) and the window's 600 ms samples (contextsOf())
+   * never saw it: the download became a row of its own and flew. "browsing-context-attached" (BrowsingContext::
+   * Attach, in the parent too; gre/chrome/remote/content/shared/listeners/BrowsingContextListener.sys.mjs) comes
+   * before any script of the frame runs, and BrowsingContext.browserId is its tab's for every frame. Once per
+   * process; it does nothing while no page is claimed.
+   */
+  private watchContexts(): void {
+    if (this.contextWatch) return;
+    this.contextWatch = {
+      observe: (subject: any) => {
+        if (!this.claims.size) return;
+        try {
+          const claim = this.claims.get(Number(subject?.browserId) || 0);
+          if (claim && claim.until > Date.now()) claim.contexts.add(Number(subject.id) || 0);
+        } catch {
+          /* a context already gone */
+        }
+      },
+    };
+    Services.obs.addObserver(this.contextWatch, 'browsing-context-attached');
+  }
+
+  /**
+   * A download a hidden page started by itself (RESUME-DESIGN.md G1 step 3, Phase 7): a candidate of the page
+   * step while the page is open (an http(s) address; blob: and data: can't be asked again), dropped either way:
+   * Firefox's transfer stops and its files go, and no row is made. Firefox put it in its download history when
+   * it began: that goes too (decision 7), never for a private one (Firefox keeps none).
+   */
+  private async claimed(list: any, download: any, target: string, claim: Claim, start: Claimed): Promise<void> {
+    this.takeovers.push({ url: start.url, action: 'claimed', id: claim.rec, page: start.identity.pageUrl });
+    if (claim.until === Infinity && /^https?:\/\//i.test(start.url)) claim.found.push(start);
+    await this.dropFirefox(list, download, target);
+    if (!claim.isPrivate) forgetDownloadVisit(start.url, claim.since);
   }
 
   /** Firefox moves the bytes; the row follows its Download object. */
@@ -2028,6 +2176,11 @@ class Manager {
         const done = attached || (run.transfer instanceof StreamTransfer && run.transfer.renewTried);
         rec.wait = done ? { for: 'address', since: now, tries, nextAt: nextTry(tries, now), status } : { for: 'address', since: now, tries: 0, nextAt: now, status };
       }
+      // Phase 7 (RESUME-DESIGN.md 3.0 "at the failure", G1 step 3, G2 step 4): the attempt at the failure goes on
+      // with the background page step at once (step 'page': the run already asked the cheaper steps), when it
+      // applies to the row (the setting, a page, a window, not within its 30 minutes). Never for a run an attempt
+      // queued that saved nothing: its page step just ran. Otherwise the schedule is as before.
+      if (!attached && rec.wait.nextAt !== now && this.pageDue(rec, now)) rec.wait = { ...rec.wait, nextAt: now, step: 'page' };
     } else if (kind === 'changed' && rec.mode === 'stream' && run.transfer instanceof StreamTransfer && this.restartStream(rec, run.transfer)) {
       // A stream found changed inside its run (a proof beside the download, a playlist read again, a piece's
       // bytes) with at most 1 MiB saved starts again by itself, as one found at its check does (3 G3, the
@@ -2670,6 +2823,12 @@ class Manager {
    * link); it holds no download slot. SAME attaches and the row carries on; CHANGED makes it File
    * changed (UNKNOWN too, unless at most ASK_ABOVE is saved: then it starts again from the address);
    * nothing found counts the attempt and plans the next (wait.tries, renew.ts nextTry()).
+   * Phase 7 (G1 step 3): when the original address found nothing, the background page step (pageStep())
+   * runs next; its SAME attaches ('background', the page's identity), the real file over other bytes is
+   * File changed (or starts over with at most 1 MiB saved), a page that wants the person makes the row ask
+   * for its page (need 'page'), and the per-site limit puts the next attempt off until the site may have a
+   * page again. A wait with step 'page' is the rest of the attempt at the failure: the page step only, and
+   * the count stays.
    */
   private async episode(rec: Rec): Promise<void> {
     if (rec.mode === 'stream') return this.streamEpisode(rec);
@@ -2683,12 +2842,18 @@ class Manager {
     const ac = new AbortController();
     this.renewing.set(rec.id, ac);
     this.touch(rec);
+    const pageOnly = rec.wait.step === 'page';
     let out: Outcome | null = null;
+    let page: PageOutcome | null = null;
     try {
       const part = `${rec.path}.part`;
-      const list = addresses(rec.url, s, '');
-      const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, part), saved: savedBytes(rec) };
-      out = list.length ? await originalAddress({ ctx, partPath: part, segments: s.segments, seed: rec.id }, list, ac.signal) : { verdict: 'failed', status: 0 };
+      if (pageOnly) out = { verdict: 'failed', status: rec.wait.status ?? 0 };
+      else {
+        const list = addresses(rec.url, s, '');
+        const ctx = { state: s, identity: new Identity(rec.identity), kind: await readKind(s, part), saved: savedBytes(rec) };
+        out = list.length ? await originalAddress({ ctx, partPath: part, segments: s.segments, seed: rec.id }, list, ac.signal) : { verdict: 'failed', status: 0 };
+      }
+      if (out.verdict === 'failed') page = await this.pageStep(rec, ac.signal);
     } catch (e) {
       // Counted as an attempt that found nothing, so an overdue wait never fires again at once.
       if (!ac.signal.aborted) {
@@ -2711,6 +2876,19 @@ class Manager {
       this.attach(rec, out.found, 'original');
       return;
     }
+    if (page?.kind === 'same') {
+      // Found on its page (G1 step 3): the page's address and identity become the row's; counted as above.
+      rec.renewTries = rec.wait.tries + (pageOnly ? 0 : 1);
+      this.attach(rec, page.found, 'background', page.identity);
+      return;
+    }
+    if (page?.kind === 'changed') {
+      // The real file over other bytes, on its page (G1 step 4, 3 G3): File changed with that address kept for
+      // Start over, or with at most 1 MiB saved a start over from it at once, unless only a link, a player or the
+      // main video nominated it (page.ask; review of Phase 7). Nothing flies: the person started nothing.
+      this.changedFor(rec, page.found, page.evidence, page.identity, null, page.ask);
+      return;
+    }
     if (out.verdict === 'unknown' && savedBytes(rec) <= ASK_ABOVE) {
       // R7 with nothing at stake: a fresh start from the original address.
       rec.file = FileTransfer.fresh(s.url);
@@ -2728,12 +2906,230 @@ class Manager {
       rec.wait = undefined;
     } else {
       this.renewFailed.set(rec.id, now);
-      const tries = rec.wait.tries + 1;
-      rec.wait = { ...rec.wait, tries, nextAt: nextTry(tries, now), status: out.status || rec.wait.status };
+      const tries = rec.wait.tries + (pageOnly ? 0 : 1);
+      // The site had its six pages this hour (decision 6): the next attempt waits until it may have one again.
+      const later = page?.kind === 'later' ? page.at : 0;
+      const planned = nextTry(tries, now);
+      rec.wait = { ...rec.wait, tries, nextAt: later ? Math.max(planned, later) : planned, status: out.status || rec.wait.status, step: undefined };
       if (out.status && rec.need) rec.need.status = out.status;
+      // The page landed on another site or showed a password field, and nothing there was the file: the row
+      // asks for its page ("The page may need you to sign in."); the attempts of the schedule go on.
+      if (page?.kind === 'none' && page.signIn && rec.need?.kind === 'address') rec.need = { kind: 'page', since: now, status: rec.need.status, evidence: SIGN_IN };
     }
     this.touch(rec);
     this.save(true);
+  }
+
+  /**
+   * Whether the background page step may run for a row now (RESUME-DESIGN.md G1 step 3, G2 step 4, decision 6;
+   * Phase 7): the setting is on (renewFromPage, default on), the row has an http(s) page, it is a one-file
+   * download Deer moves with saved bytes or a stream with its tracks, its page did not open in the last 30
+   * minutes (rec.pageAt), and a window of its privacy can open it (a private download only while a private
+   * window is open). The per-site limit is pageStep()'s.
+   */
+  private pageDue(rec: Rec, now = Date.now()): boolean {
+    if (settings().renewFromPage === false || this.quitting) return false;
+    if (!/^https?:\/\//i.test(rec.identity.pageUrl)) return false;
+    const fits = rec.mode === 'file' ? !!rec.file?.probed && !!rec.path : rec.mode === 'stream' && !!rec.stream?.tracks.length && !!rec.path;
+    if (!fits || (rec.pageAt && now - rec.pageAt < PER_ROW && rec.pageAt <= now)) return false;
+    return !!this.resolverFor(!!rec.identity.isPrivate);
+  }
+
+  /** A window's page step for a download of this privacy: the most recent such window first; null when none is open. */
+  private resolverFor(isPrivate: boolean): PageResolver | null {
+    const recent = Services.wm.getMostRecentWindow('navigator:browser');
+    const fits = (w: any): boolean => !!w && !w.closed && privateWindow(w) === isPrivate;
+    if (fits(recent) && this.resolvers.has(recent)) return this.resolvers.get(recent) ?? null;
+    for (const [w, fn] of this.resolvers) if (fits(w)) return fn;
+    return null;
+  }
+
+  /**
+   * The download's page, opened out of sight by a window (RESUME-DESIGN.md G1 step 3, G2 step 4, decision 6;
+   * Phase 7). One page at a time: this waits for the page step before it. The site's six pages an hour and the
+   * row's 30 minutes are counted when the page opens. While it is open, downloads it starts by itself are
+   * claimed (adopt()); `enough` lets the window stop collecting early. 'skip' when it does not apply (any more),
+   * 'later' with when the site may have a page again. Throws AbortedError when `signal` stopped it.
+   */
+  private async visitPage(rec: Rec, signal: AbortSignal, enough: (seen: PageSeen, claimed: Claimed[]) => boolean): Promise<{ kind: 'skip' } | { kind: 'later'; at: number } | { kind: 'seen'; seen: PageSeen; claimed: Claimed[] }> {
+    if (!this.pageDue(rec)) return { kind: 'skip' };
+    const site = siteKey(rec.identity.pageUrl);
+    const busy = this.pageSites.freeAt(site);
+    if (busy) return { kind: 'later', at: busy };
+    const before = this.pageTurn;
+    let done = (): void => undefined;
+    this.pageTurn = new Promise<void>((resolve) => (done = resolve));
+    try {
+      await before;
+      if (signal.aborted) throw new AbortedError();
+      // Again now that it is this row's turn: the page before may have been the site's sixth.
+      if (!this.pageDue(rec)) return { kind: 'skip' };
+      const at = this.pageSites.freeAt(site);
+      if (at) return { kind: 'later', at };
+      const fn = this.resolverFor(!!rec.identity.isPrivate);
+      if (!fn) return { kind: 'skip' };
+      const since = Date.now();
+      this.pageSites.use(site, since);
+      rec.pageAt = since;
+      const claim: Claim = { rec: rec.id, browserId: 0, contexts: new Set(), found: [], until: Infinity, since, isPrivate: !!rec.identity.isPrivate };
+      let browserId = 0;
+      const ac = new AbortController();
+      const stop = (): void => ac.abort();
+      signal.addEventListener('abort', stop);
+      // Review of Phase 7: frames the page adds (and may remove at once) are claimed by their contexts, and the
+      // hidden page is never given the person's saved logins.
+      this.watchContexts();
+      keepLoginsFrom((id) => {
+        const c = this.claims.get(id);
+        return !!c && c.until > Date.now();
+      });
+      // Its window closing ends it at once (setResolver(win, null)); a window that never answers otherwise, by
+      // this guard after its time.
+      this.pageOpen = { fn, stop };
+      const guard = setTimeout(stop, LOAD_MS + COLLECT_MS + 15000);
+      const job: PageJob = {
+        id: rec.id,
+        pageUrl: rec.identity.pageUrl,
+        userContextId: rec.identity.userContextId || 0,
+        isPrivate: !!rec.identity.isPrivate,
+        loadMs: LOAD_MS,
+        collectMs: COLLECT_MS,
+        opened: (id, contexts) => {
+          if (id && !browserId) {
+            browserId = id;
+            claim.browserId = id;
+            this.claims.set(id, claim);
+          }
+          for (const c of contexts) claim.contexts.add(Number(c) || 0);
+        },
+        enough: (seen) => enough(seen, claim.found),
+        signal: ac.signal,
+      };
+      let seen: PageSeen;
+      try {
+        seen = await Promise.race([fn(job), new Promise<PageSeen>((resolve) => ac.signal.addEventListener('abort', () => resolve(unseen('aborted'))))]);
+      } catch (e) {
+        console.warn('Deer downloads: the page step failed', String(e));
+        seen = unseen('failed');
+      } finally {
+        clearTimeout(guard);
+        signal.removeEventListener('abort', stop);
+        if (this.pageOpen?.stop === stop) this.pageOpen = null;
+        // A download the page started as it closed is still dropped for a moment, never a row.
+        claim.until = Date.now() + CLAIM_GRACE;
+        setTimeout(() => {
+          if (this.claims.get(browserId) === claim) this.claims.delete(browserId);
+        }, CLAIM_GRACE);
+      }
+      if (signal.aborted) throw new AbortedError();
+      return { kind: 'seen', seen, claimed: [...claim.found] };
+    } finally {
+      done();
+    }
+  }
+
+  /**
+   * The background page step for a one-file download (RESUME-DESIGN.md G1 steps 3 and 4, Phase 7): the page
+   * opened out of sight (visitPage()) nominates, in order, what it started by itself (the claim registry), the
+   * download's own address again (the page load may have set the cookie its host checks), its links scored
+   * (pagestep.ts pickLinks(): the top 5 scoring 3 or more), the media of the download's size it loaded and its
+   * main video; on a page that landed on another site only the first two. Each goes through the proof
+   * (proveAddress(): window 0, R1-R7, the windows) with the identity it would be fetched with: the page's own
+   * principal and cookie jar for what the page shows, as Alt+click's (video.ts altClick()). SAME wins at once;
+   * NOT THE FILE, a refusal and "not ours" (another file: realFile() false) lead to the next; the real file over
+   * other bytes (the row's own address, or the same page and name) is 'changed' once no other candidate proved
+   * SAME (review of Phase 7), asking when only the page's links, media or main video gave it.
+   */
+  private async pageStep(rec: Rec, signal: AbortSignal): Promise<PageOutcome> {
+    const s = rec.file;
+    if (!s || rec.mode !== 'file' || !rec.path) return { kind: 'skip' };
+    const row = { names: namesOf(rec), urls: urlsOf(rec) };
+    const total = s.total >= 0 ? s.total : rec.total;
+    // Collecting stops early at what is very likely the file: a download the page started, media of its size,
+    // a link with its path shape and name.
+    const enough = (seen: PageSeen, claimed: Claimed[]): boolean => claimed.length > 0 || sameSizeMedia(seen.media, total).length > 0 || seen.links.some((l) => scoreLink(l, row, sameSite) >= STRONG);
+    const visit = await this.visitPage(rec, signal, enough);
+    if (visit.kind !== 'seen') return visit;
+    const { seen, claimed } = visit;
+    const away = seen.outcome === 'elsewhere';
+    const part = `${rec.path}.part`;
+    const kind = await readKind(s, part);
+    const fromPage = seenIdentity(rec.identity, seen);
+    const ours: Named = { pageUrl: rec.identity.pageUrl, names: [rec.filename], disposition: s.dispositionName ?? '', urls: urlsOf(rec) };
+    const list: { url: string; identity: IdentityJSON; names: string[]; own: boolean; claimed: boolean }[] = [];
+    const listed = new Set<string>();
+    const add = (url: string, identity: IdentityJSON, names: string[], how: 'own' | 'claimed' | 'page' = 'page'): void => {
+      if (!/^https?:\/\//i.test(url) || url.length > 8192 || listed.has(url)) return;
+      listed.add(url);
+      list.push({ url, identity, names, own: how === 'own', claimed: how === 'claimed' });
+    };
+    for (const c of claimed) add(c.url, c.identity, [c.name], 'claimed');
+    add(rec.url, rec.identity, [rec.filename], 'own');
+    if (!away) {
+      for (const { link } of pickLinks(seen.links, row, sameSite, listed)) add(link.href, fromPage, linkNames(link));
+      for (const url of sameSizeMedia(seen.media, total)) add(url, fromPage, []);
+      add(seen.video, fromPage, []);
+    }
+    // The real file over other bytes is kept, not answered at once (review of Phase 7: a page listing another
+    // file of the same name above the row's own, a 64-bit installer above the 32-bit one, made the row File
+    // changed, or with at most 1 MiB saved started it over from the other file): every candidate is proven and
+    // SAME wins wherever it is; failing that, the row's own address first, then what the page started by
+    // itself, then a link, a player's media or the main video, which always ask.
+    let changed: { rank: number; out: PageOutcome } | null = null;
+    for (const c of list) {
+      if (signal.aborted) throw new AbortedError();
+      let v: Candidate;
+      try {
+        const ctx = { state: s, identity: new Identity(c.identity), kind, saved: savedBytes(rec) };
+        v = await proveAddress(ctx, part, s.segments, rec.id, c.url, signal);
+      } catch {
+        if (signal.aborted) throw new AbortedError();
+        continue;
+      }
+      if (v.verdict === 'same') return { kind: 'same', found: v.found, identity: c.identity };
+      if ((v.verdict === 'changed' || v.verdict === 'unknown') && (c.own || realFile(ours, { pageUrl: rec.identity.pageUrl, names: c.names, disposition: v.found.disposition, urls: [c.url] }))) {
+        const rank = c.own ? 0 : c.claimed ? 1 : 2;
+        if (!changed || rank < changed.rank) changed = { rank, out: { kind: 'changed', found: v.found, evidence: v.verdict === 'changed' ? v.evidence : UNSURE, identity: c.identity, ask: rank === 2 } };
+      }
+    }
+    return changed?.out ?? { kind: 'none', signIn: away || seen.password };
+  }
+
+  /**
+   * The background page step for a stream (RESUME-DESIGN.md G2 step 4, Phase 7), StreamEnv.pageStreams: the
+   * page opened out of sight (visitPage()); its HLS or DASH addresses of the stream's format on the stream's
+   * host or path shape, likeliest master first (media.ts rankStreams()), each described fresh (no 60 s cache):
+   * not protected, not live, within 1 s of the stream's length. The stream re-picks its rung there and the
+   * proof decides (hls.ts renewSteps()). The per-site limit and a page that wants the person are remembered
+   * for streamEpisode() (pageLater, pageSignIn).
+   */
+  private async pageStreams(rec: Rec, format: 'hls' | 'dash', duration: number, own: string[], signal: AbortSignal): Promise<string[]> {
+    let firstAt = 0;
+    const near = (seen: PageSeen): PageSeen['media'] => seen.media.filter((m) => m.kind === format && streamNear(m.url, own));
+    const enough = (seen: PageSeen): boolean => {
+      if (!near(seen).length) return false;
+      firstAt ||= Date.now();
+      return Date.now() - firstAt >= STREAM_SETTLE;
+    };
+    const visit = await this.visitPage(rec, signal, enough);
+    if (visit.kind === 'later') this.pageLater.set(rec.id, visit.at);
+    if (visit.kind !== 'seen') return [];
+    const { seen } = visit;
+    const items = seen.protected ? [] : near(seen);
+    const identity = new Identity({ pageUrl: rec.identity.pageUrl, userContextId: rec.identity.userContextId, isPrivate: rec.identity.isPrivate, withOrigin: true, firstParty: false });
+    const out: string[] = [];
+    for (const url of rankStreams(items.map((m, at) => ({ url: m.url, at }))).slice(0, 4)) {
+      if (signal.aborted) throw new AbortedError();
+      try {
+        const info = await this.media.streamInfo(url, format, identity);
+        if (info.drm || info.live || (duration > 0 && Math.abs(info.duration - duration) > DURATION_SLACK)) continue;
+        out.push(url);
+      } catch {
+        /* not a playlist now */
+      }
+    }
+    if (!out.length && (seen.outcome === 'elsewhere' || seen.password)) this.pageSignIn.add(rec.id);
+    return out;
   }
 
   /**
@@ -2758,7 +3154,13 @@ class Manager {
     // The table first: a row from before Phase 6 begins one, whose path the copy must carry.
     const table = await this.tableOf(rec);
     const copy: StreamState = JSON.parse(JSON.stringify(s));
-    const t = new StreamTransfer(copy, this.streamEnv(rec));
+    // G2 step 4 (Phase 7): outside a run, the steps end with the page opened out of sight (pageStreams()).
+    const env = this.streamEnv(rec);
+    if (this.pageDue(rec)) env.pageStreams = (format, duration, own, signal) => this.pageStreams(rec, format, duration, own, signal);
+    this.pageLater.delete(rec.id);
+    this.pageSignIn.delete(rec.id);
+    const pageOnly = rec.wait.step === 'page';
+    const t = new StreamTransfer(copy, env);
     t.silentRestarts = false;
     t.table = table;
     let verdict: 'same' | 'changed' | 'failed' = 'failed';
@@ -2798,15 +3200,24 @@ class Manager {
       this.pump();
       return;
     }
+    const later = this.pageLater.get(rec.id) ?? 0;
+    const signIn = this.pageSignIn.has(rec.id);
+    this.pageLater.delete(rec.id);
+    this.pageSignIn.delete(rec.id);
     if (verdict === 'changed') {
       rec.need = { kind: 'choice', since: now, evidence: err instanceof ChangedError ? err.evidence : UNSURE, candidate: this.streamCandidate(rec, t) };
       rec.wait = undefined;
     } else {
       this.renewFailed.set(rec.id, now);
       const status = classify(err).status;
-      const tries = rec.wait.tries + 1;
-      rec.wait = { ...rec.wait, tries, nextAt: nextTry(tries, now), status: status || rec.wait.status };
+      // Phase 7: step 'page', the rest of the attempt at the failure, does not raise the count; the per-site
+      // limit puts the next attempt off until the site may have a page again (decision 6).
+      const tries = rec.wait.tries + (pageOnly ? 0 : 1);
+      const planned = nextTry(tries, now);
+      rec.wait = { ...rec.wait, tries, nextAt: later ? Math.max(planned, later) : planned, status: status || rec.wait.status, step: undefined };
       if (status && rec.need) rec.need.status = status;
+      // A page that wants the person (another site, a password field) and nothing there: the row asks for its page.
+      if (signIn && rec.need?.kind === 'address') rec.need = { kind: 'page', since: now, status: rec.need.status, evidence: SIGN_IN };
     }
     this.touch(rec);
     this.save(true);
@@ -2851,6 +3262,8 @@ class Manager {
    * manual action: what the schedule remembers starts again. need, wait and catcher are cleared and the
    * row queues. Segments, path and .part stay, so it carries on under the same name (taken() and
    * uniquePath never make " (1)"). `from`: a start again, announced as 'attached' (it flies from that tab).
+   * 'background' (Phase 7): found on its page opened out of sight; the address and the page's identity become
+   * the row's, but it is an automatic attempt (renewTries is the caller's), and nothing flies.
    */
   private attach(rec: Rec, found: Found, how: AttachHow, identity?: IdentityJSON, from?: { origin: { x: number; y: number } | null; browserId: number }): void {
     if (!rec.file) return;
@@ -2858,14 +3271,14 @@ class Manager {
     if (how !== 'original') {
       rec.url = found.url;
       if (identity) rec.identity = identity;
-      rec.renewTries = undefined;
+      if (how !== 'background') rec.renewTries = undefined;
     }
     rec.need = undefined;
     rec.wait = undefined;
     rec.catcher = undefined;
     rec.error = '';
     this.renewFailed.delete(rec.id);
-    this.event(rec, how === 'pasted' || how === 'link' ? 'Continued from another address' : how === 'page' ? 'Continued from its page' : 'New link found');
+    this.event(rec, how === 'pasted' || how === 'link' ? 'Continued from another address' : how === 'page' ? 'Continued from its page' : how === 'background' ? 'New link found on its page' : 'New link found');
     rec.state = 'queued';
     rec.queuedAt = queueStamp();
     if (from) this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
@@ -2937,6 +3350,8 @@ class Manager {
    * it finds nothing and the download has a source page, the result asks the window to open that page
    * in a foreground tab in the download's container (a private download in its private window) and then
    * to arm the row (arm()): Waiting for link. Pause meanwhile stops it ('busy'), and nothing opens.
+   * Phase 7: the attempt includes the background page step when it applies (its limits hold: not within
+   * 30 minutes of the last for this row); a page that wanted the person (need 'page') opens as well.
    */
   async refreshAddress(id: string): Promise<RefreshResult> {
     const rec = this.find(id);
@@ -2960,7 +3375,7 @@ class Manager {
     if (!this.recs.includes(rec)) return out('busy');
     if (rec.state !== 'paused' || !need) return out('renewed');
     if (need.kind === 'choice') return out('changed');
-    if (need.kind !== 'address') return out('busy');
+    if (need.kind !== 'address' && !(need.kind === 'page' && (rec.mode === 'file' || rec.mode === 'stream'))) return out('busy');
     return out(rec.identity.pageUrl ? 'page' : 'none');
   }
 
@@ -2968,11 +3383,12 @@ class Manager {
    * The window opened the download's page for Refresh address or Open page (that tab: browserId): for 30
    * minutes the row waits for the download to be started again (Waiting for link). A start in that tab
    * scores most; one in another tab of the same container may still continue it (the person may sign in
-   * elsewhere first), and closing the tab does not stop the wait.
+   * elsewhere first), and closing the tab does not stop the wait. A file row the page step left asking for its
+   * page (need 'page', Phase 7: it may need the person to sign in) is armed the same way by Open page.
    */
   arm(id: string, browserId = 0): void {
     const rec = this.find(id);
-    if (!rec || rec.state !== 'paused' || rec.need?.kind !== 'address' || rec.mode !== 'file' || !rec.file || !rec.path) return;
+    if (!rec || rec.state !== 'paused' || (rec.need?.kind !== 'address' && rec.need?.kind !== 'page') || rec.mode !== 'file' || !rec.file || !rec.path) return;
     rec.catcher = { until: Date.now() + CATCH_FOR, browserId: Number(browserId) || 0 };
     this.touch(rec);
     this.save(true);
@@ -3063,7 +3479,8 @@ class Manager {
   openPage(id: string): PageTarget | null {
     const rec = this.find(id);
     if (!rec?.identity.pageUrl) return null;
-    const arm = rec.state === 'paused' && rec.need?.kind === 'address' && rec.mode === 'file' && !!rec.file && !!rec.path;
+    // Phase 7: a file row whose page may need the person to sign in (need 'page') waits for its start there too.
+    const arm = rec.state === 'paused' && (rec.need?.kind === 'address' || rec.need?.kind === 'page') && rec.mode === 'file' && !!rec.file && !!rec.path;
     return { pageUrl: rec.identity.pageUrl, userContextId: rec.identity.userContextId, isPrivate: rec.identity.isPrivate, arm };
   }
 
@@ -3073,10 +3490,11 @@ class Manager {
    * attempt of the schedule running (Renewing link) does not keep it out: the person's start again is a
    * manual action and comes first (proveFor() stops that attempt; review of Phase 3: a start again during
    * an attempt became "name (1)" and downloaded the whole file again). Another address of the person's
-   * being proven (a paste, another start) does.
+   * being proven (a paste, another start) does. Phase 7: so does a file row the page step left asking for its
+   * page (need 'page': the person signs in there and starts it again).
    */
   private waitsForAddress(r: Rec): boolean {
-    return r.state === 'paused' && r.mode === 'file' && !!r.file?.probed && !!r.path && (r.need?.kind === 'address' || r.wait?.for === 'address' || !!r.catcher) && !this.runs.has(r.id) && !this.proving.has(r.id) && !this.deciding.has(r.id);
+    return r.state === 'paused' && r.mode === 'file' && !!r.file?.probed && !!r.path && (r.need?.kind === 'address' || r.need?.kind === 'page' || r.wait?.for === 'address' || !!r.catcher) && !this.runs.has(r.id) && !this.proving.has(r.id) && !this.deciding.has(r.id);
   }
 
   /**
@@ -3174,15 +3592,17 @@ class Manager {
    * kept for Start over (need.candidate). With nothing at stake (at most ASK_ABOVE saved, the owner's
    * decision 1, whatever the evidence; at most twice in ten minutes, ranged.ts silentRestart()) it starts
    * over from it at once instead of asking, and the start flies to the row as an attach does (review of
-   * Phase 3: a click over a few KiB saved got a question about almost nothing).
+   * Phase 3: a click over a few KiB saved got a question about almost nothing). `from` null: the background
+   * page step found it (Phase 7), so nothing flies. `ask`: always asks (a page's link, player or main video
+   * nominated the file: it may be another file of the same name; review of Phase 7).
    */
-  private changedFor(rec: Rec, found: Found, evidence: string, identity: IdentityJSON, from: { origin: { x: number; y: number } | null; browserId: number }): void {
+  private changedFor(rec: Rec, found: Found, evidence: string, identity: IdentityJSON, from: { origin: { x: number; y: number } | null; browserId: number } | null, ask = false): void {
     this.stopRenewing(rec.id);
     const candidate: NeedCandidate = { ...candidateOf(found), identity };
     rec.wait = undefined;
     rec.catcher = undefined;
     rec.renewTries = undefined;
-    const log = silentRestart(rec.file?.silent, savedBytes(rec));
+    const log = ask ? null : silentRestart(rec.file?.silent, savedBytes(rec));
     if (log) {
       // Straight from Link expired to the new file: the row never reads File changed (no dot, nothing
       // announced but the start); the old part waits as "<name>.old.part" until the new file completes.
@@ -3198,7 +3618,7 @@ class Manager {
         if (rec.need || (rec.state !== 'queued' && rec.state !== 'downloading')) return;
         if (rec.file) rec.file.silent = log;
         this.event(rec, 'Started over: the file on the site changed');
-        this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
+        if (from) this.emit({ kind: 'attached', view: this.view(rec, false), origin: from.origin, browserId: from.browserId });
       });
       return;
     }
@@ -3657,7 +4077,9 @@ class Manager {
       nextAt: wait?.nextAt ?? 0,
       status: r.state === 'paused' ? (r.need?.status ?? r.wait?.status ?? 0) : (run?.status ?? 0),
       history: (r.events ?? []).map((e) => ({ at: e.at, text: e.text })),
-      armed: need?.kind === 'address' && !!r.catcher && r.catcher.until > Date.now(),
+      // Waiting for link: a row that needs an address, or a file row whose page may need a sign-in (need 'page',
+      // Phase 7), armed by Open page (review of Phase 7: the latter waited with no sign of it in the panel).
+      armed: (need?.kind === 'address' || (need?.kind === 'page' && r.mode === 'file')) && !!r.catcher && r.catcher.until > Date.now(),
       canRenew: r.mode === 'file' && !!r.file?.probed && !!r.path,
       // The ring's dot (RESUME-DESIGN.md 6): only rows that started needing the person in this session.
       attention: !!need && need.since >= this.session.startedAt,
@@ -4144,6 +4566,22 @@ class Manager {
     else this.prompts.delete(win);
   }
 
+  /**
+   * The window that runs the background page step registers here, and unregisters when it closes (Phase 7;
+   * RESUME-DESIGN.md G1 step 3): setQuitPrompt's pattern. The step picks a window of the download's privacy,
+   * the most recent first. A window that unregisters while its page is open ends that step at once (review of
+   * Phase 7: a closed window's step never answered, and the next page waited for the 55 s guard).
+   */
+  setResolver(win: any, fn: PageResolver | null): void {
+    if (fn) {
+      this.resolvers.set(win, fn);
+      return;
+    }
+    const was = this.resolvers.get(win);
+    this.resolvers.delete(win);
+    if (was && this.pageOpen?.fn === was) this.pageOpen.stop();
+  }
+
   /** The person chose to quit anyway: the next quit request goes through. */
   confirmQuit(): void {
     this.quitConfirmed = true;
@@ -4437,6 +4875,83 @@ function wholeTable(t: StreamTable, s: StreamState): boolean {
       return tr.count > 0 && lines.length === tr.count && lines.every((l, i) => l.i === i);
     })
   );
+}
+
+/** A browser window of private browsing (its docShell's load context). */
+function privateWindow(w: any): boolean {
+  try {
+    return !!w?.docShell?.QueryInterface(Ci.nsILoadContext).usePrivateBrowsing;
+  } catch {
+    return false;
+  }
+}
+
+/** What the page step saw when it saw nothing (no window answered, or it was stopped). */
+function unseen(outcome: PageSeen['outcome']): PageSeen {
+  return { outcome, finalUrl: '', browserId: 0, password: false, links: [], video: '', media: [], protected: false, principal: '', cookieJarSettings: '' };
+}
+
+/**
+ * Whose request an address the hidden page shows is (RESUME-DESIGN.md G1 attach, "for hidden pages, from the
+ * page's documentPrincipal"; Phase 7): the page's own principal and cookie jar, as Alt+click's (video.ts
+ * altClick()), in the download's container and privacy; the row's page stays its source. Without a principal
+ * the page could not be read: a first-party request with the page as its referrer.
+ */
+function seenIdentity(row: IdentityJSON, seen: PageSeen): IdentityJSON {
+  const base = { pageUrl: row.pageUrl, userContextId: row.userContextId, isPrivate: row.isPrivate };
+  return new Identity(seen.principal ? { ...base, firstParty: false, principal: seen.principal, cookieJarSettings: seen.cookieJarSettings } : { ...base, firstParty: true }).toJSON();
+}
+
+/**
+ * Firefox's own history of a download a hidden page started (decision 7; Phase 7): the visit with
+ * TRANSITION_DOWNLOAD that DownloadHistory.addDownloadToHistory() inserts as its transfer begins
+ * (gre/modules/DownloadHistory.sys.mjs, DownloadCore.sys.mjs addToHistory) goes, back to when the page opened
+ * (History.removeVisitsByFilter: url, beginDate, transition). That insert is asynchronous: removed now and
+ * twice more a moment later.
+ */
+function forgetDownloadVisit(url: string, since: number): void {
+  if (!/^https?:\/\//i.test(url)) return;
+  const go = (): void => {
+    try {
+      const { PlacesUtils } = ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs');
+      PlacesUtils.history.removeVisitsByFilter({ url, beginDate: new Date(since - 1000), transition: PlacesUtils.history.TRANSITIONS.DOWNLOAD }).catch(() => undefined);
+    } catch {
+      /* no Places */
+    }
+  };
+  go();
+  setTimeout(go, 3000);
+  setTimeout(go, 10000);
+}
+
+/**
+ * A hidden page of the background page step never gets the person's saved logins (review of Phase 7; the
+ * setting promises Deer never signs in or fills anything in). Firefox fills a login form as soon as its
+ * document reports 'visible' (LoginManagerChild #isReadyForAutofill), which a kept-active hidden tab does, and
+ * with a Primary Password set it asks for it from a page the person never opened. The child asks its parent
+ * actor for the logins ('PasswordManager:findLogins', gre/modules/LoginManagerParent.sys.mjs receiveMessage ->
+ * sendLoginDataToChild, where the Primary Password prompt is): for a tab `hidden(browserId)` names the answer
+ * is no logins and no recipes, so nothing is filled and nothing asked. Patched once per process on the
+ * prototype (JSWindowActorParent messages are dispatched through it); every other tab is untouched.
+ */
+function keepLoginsFrom(hidden: (browserId: number) => boolean): void {
+  try {
+    const { LoginManagerParent } = ChromeUtils.importESModule('resource://gre/modules/LoginManagerParent.sys.mjs');
+    const proto = LoginManagerParent?.prototype;
+    if (!proto || proto.vitreHiddenPages || typeof proto.receiveMessage !== 'function') return;
+    proto.vitreHiddenPages = true;
+    const original = proto.receiveMessage;
+    proto.receiveMessage = function (this: any, msg: any) {
+      try {
+        if (msg?.name === 'PasswordManager:findLogins' && hidden(Number(this.browsingContext?.top?.browserId) || 0)) return Promise.resolve({ logins: [], recipes: [] });
+      } catch {
+        /* an actor whose page went away: as Firefox answers it */
+      }
+      return original.call(this, msg);
+    };
+  } catch (e) {
+    console.warn('Deer downloads: the hidden page could not be kept from saved logins', String(e));
+  }
 }
 
 function streamPartsExist(p: string): boolean {
