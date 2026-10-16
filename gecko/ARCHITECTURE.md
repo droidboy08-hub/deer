@@ -362,8 +362,8 @@ local look-alike type, so a contract change fails `tsc`.
   wired to `VitreSettings`, rebinding of the four rebindable verbs, Clear browsing data (Sanitizer),
   Home's background popover; other modules add pages with `registerPage`. Panel state `panel-open`
   and `settings-open` on `b.root`; Esc and close layers 60. Tests: `tests/settings` (pages, rebind,
-  clear, picker, appicon), `tests/settings-verify` (ladder, keyboard, windows, scale, restart, hung, a11y,
-  integration).
+  clear, picker, appicon, wallpapers), `tests/settings-verify` (ladder, keyboard, windows, scale, restart,
+  hung, a11y, integration).
 - **Downloads** (`modules/downloads/`, engine `modules/VitreDownloads.sys.ts` + `modules/downloads/*`,
   page module `actors/page/downloads.ts`): IDM-style segmented engine (one network partition per
   connection), take-over of Firefox's downloads, HLS / DASH joined by ffmpeg (`-c copy`), yt-dlp with
@@ -696,6 +696,21 @@ auto-hidden bar on screen.
   picture `VitreHome` remembers in memory, shows it only once decoded, and paints the picture's mean
   colour under it until then (tests `input/home-preload.js`, `input/home-flash.js`). Decoded
   pictures are not locked (`imgIRequest.lockImage` hung the browser when such a tab closed).
+  Deer wallpapers (`VitreWallpapers.sys.ts`, contract in its header; owner's decision 2026-10-16: no
+  rotation, no new page): the collection droidboy08-hub/deer-wallpapers on GitHub Pages is one more
+  group, "Deer wallpapers", at the end of the picker's Photo tab (Settings and Home's popover alike).
+  The owner's own photos carry no author or license (no credit shown); someone else's carry both.
+  Network only while a Photo tab shows (never for Find a setting's results, which show what this
+  session already has): the manifest at most once per 10 minutes per session (counted
+  when sent; once sent it runs to its end), the listed thumbnails 3 at a time, a picture only when its
+  tile is chosen; anonymous fetch() (no cookie
+  sent or stored, no referrer, no HTTP cache, no redirects). Nothing is trusted
+  (`modules/wallpapers/manifest.ts`): a bad entry is skipped, and a file is written (temporary name,
+  then renamed) only once its size, SHA-256, JPEG start and frame size match. A chosen picture is an
+  ordinary 'image' background on its copy in `<profile>\deer-wallpapers` (Home needs nothing new),
+  never one of the recent photos; offline the cached group shows, with nothing cached none.
+  `tools/run.py` points the hidden pref `vitre.wallpapers.base` at a port nothing serves, so no test
+  reaches GitHub (test `settings/wallpapers.js`, stand-in `settings/wallpaper_server.py`).
   A private window opens on Home too: `VitreShell.beforeLayout` turns the window's
   `about:privatebrowsing` start argument into Home before Firefox reads it, because that page's
   search box hands every key to Firefox's hidden address bar (`gURLBar.handoff`), so nothing could

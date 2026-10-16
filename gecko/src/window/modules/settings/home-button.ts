@@ -52,6 +52,11 @@ export class HomeButton {
     });
     watch.observe(b.root, { attributes: true, attributeFilter: ['class'] });
     b.onDestroy(() => watch.disconnect());
+    // A window closed with the popover open: its picker follows process-wide Deer wallpapers.
+    b.onDestroy(() => {
+      this.picker?.dispose();
+      this.picker = null;
+    });
     this.sync();
   }
 

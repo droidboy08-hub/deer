@@ -92,6 +92,10 @@ PREFS = {
     # make download tests wait on the network; the local lists are still checked
     # (src/modules/downloads/reputation.ts).
     'browser.safebrowsing.downloads.remote.enabled': False,
+    # Deer wallpapers (src/modules/VitreWallpapers.sys.ts) would read the collection from GitHub Pages
+    # whenever a test shows the background picker's Photo tab: a port nothing serves instead (Necko
+    # refuses port 9 outright), so the group stays away. tests/settings/wallpapers.js sets its own.
+    'vitre.wallpapers.base': 'http://127.0.0.1:9/',
 }
 
 user32 = ctypes.windll.user32

@@ -10,10 +10,16 @@
 //                        chosen and remembered in the recent list
 //   bg.tiles(kind)       tiles for the picker: 'photo' (the Windows wallpaper, your recent photos,
 //                        the photos Windows ships) or 'video' (your recent videos)
+//   bg.deerWallpapers()  Deer wallpapers (VitreWallpapers, a process singleton): the Photo tab's
+//                        "Deer wallpapers" group; null when it could not be loaded
 //   bg.error             why the last choice could not be shown, or null
 //   bg.onChange(fn)      the choice or the error changed
 // The recent list is a per-profile convenience, not a setting: the pref vitre.home.recent (a JSON
 // array of { kind, path }), outside the Settings schema so VitreSettings never reports it.
+// A Deer wallpaper is an ordinary 'image' background whose path is its copy in the profile
+// (<profile>\deer-wallpapers\<id>.jpg): it shows in its own group, never among your recent photos.
+// Any choice here supersedes a Deer wallpaper still downloading (it is never applied).
+import type { WallpaperTile } from '../../../modules/VitreWallpapers.sys';
 import type { Settings } from '../../../shared/settings';
 import type { Browser } from '../../browser';
 import { builtinWallpapers, exists, extOf, knownFolder, pickFile, PHOTO_EXT, VIDEO_EXT } from './gecko';
@@ -25,7 +31,11 @@ export interface Tile {
   kind: BgKind;
   path: string;
   label: string;
+  /** A Deer wallpaper (kind 'image', path its copy in the profile, which may not be downloaded yet). */
+  deer?: WallpaperTile;
 }
+
+type Wallpapers = VitreSysModules['VitreWallpapers'];
 
 const RECENT_PREF = 'vitre.home.recent';
 const RECENT_MAX = 6;
@@ -84,15 +94,39 @@ export class HomeBackground {
 
   /** Store a background; `fromDisk` files (picked in the dialog) join the recent list. */
   choose(bg: HomeBg, fromDisk = false): void {
-    if (fromDisk && (bg.kind === 'image' || bg.kind === 'video')) this.remember(bg);
+    this.deerWallpapers()?.supersede();
+    if (fromDisk && (bg.kind === 'image' || bg.kind === 'video') && !this.deerWallpapers()?.isDeerPath(bg.path)) this.remember(bg);
     this.error = null;
     this.pending.push({ kind: bg.kind, path: bg.path });
     this.b.sys('VitreSettings').set({ homeBackground: { kind: bg.kind, path: bg.path } });
     this.changed();
   }
 
-  /** Choose a tile, unless its file has gone (then say so and keep what Home shows). */
+  /** Deer wallpapers (VitreWallpapers), or null when the singleton could not be loaded. */
+  deerWallpapers(): Wallpapers | null {
+    try {
+      return this.b.sys('VitreWallpapers');
+    } catch (e) {
+      console.error('Deer settings: Deer wallpapers are not available', e);
+      return null;
+    }
+  }
+
+  /**
+   * Choose a tile, unless its file has gone (then say so and keep what Home shows). A Deer wallpaper
+   * is downloaded first (once) by VitreWallpapers, which sets it when it is here and checked; its tile
+   * shows the download, or a failure, and nothing else changes meanwhile.
+   */
   async chooseTile(t: Tile): Promise<void> {
+    if (t.deer) {
+      if (this.error) {
+        this.error = null;
+        this.changed();
+      }
+      await this.deerWallpapers()?.choose(t.deer.id);
+      return;
+    }
+    this.deerWallpapers()?.supersede();
     if ((t.kind === 'image' || t.kind === 'video') && !(await exists(t.path))) {
       this.error = `Couldn’t open ${baseName(t.path)}`;
       this.forget(t.path);
@@ -143,7 +177,9 @@ export class HomeBackground {
     const want = kind === 'video' ? 'video' : 'image';
     const wp = kind === 'photo' ? await this.wallpapers() : { windows: null, builtins: [] as string[] };
     const shipped = new Set(wp.builtins.map((p) => p.toLowerCase()));
-    const yours = (p: string): boolean => !!p && !shipped.has(p.toLowerCase());
+    // Deer wallpapers have their own group (bg-picker.ts): never one of your recent photos.
+    const deer = this.deerWallpapers();
+    const yours = (p: string): boolean => !!p && !shipped.has(p.toLowerCase()) && !deer?.isDeerPath(p);
     const mine = this.recent().filter((r) => r.kind === want && yours(r.path));
     const cur = this.current();
     if (cur.kind === want && yours(cur.path) && !mine.some((r) => r.path.toLowerCase() === cur.path.toLowerCase())) mine.unshift(cur);

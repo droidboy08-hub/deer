@@ -269,9 +269,13 @@ const home: SectionDef = {
         {
           title: 'Background',
           desc: 'A photo, a video, your Windows wallpaper or none',
-          keywords: 'wallpaper picture photo video image home none',
+          // "deer wallpapers", "gallery": the picker's Deer wallpapers group (VitreWallpapers). Not
+          // "download": that search is for the Downloads settings.
+          keywords: 'wallpaper picture photo video image home none deer wallpapers gallery collection',
           build: (ctx) => {
-            const picker = backgroundPicker(ctx.bg, 'panel');
+            // In Find a setting's results the picker shows what is here but never asks the site: a
+            // letter typed is not a visit to Home and background.
+            const picker = backgroundPicker(ctx.bg, 'panel', { offline: !!ctx.inSearch });
             ctx.cleanup(picker.dispose);
             const head = row({ icon: ico.picture, title: 'Background', desc: 'What Home shows behind the tab bar', control: () => picker.tabs });
             return h('div', { class: 'vs-rows' }, head, h('div', { class: 'vs-block' }, picker.el));

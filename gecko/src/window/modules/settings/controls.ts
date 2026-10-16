@@ -32,6 +32,8 @@ export interface Ctx {
   cleanup(fn: () => void): void;
   listbox: ListboxHost;
   go(section: SectionId, anchor?: string): void;
+  /** True while rows are built as Find a setting's results rather than on their own page. */
+  inSearch?: boolean;
 }
 
 /** One searchable entry on a page: a row, or a block such as the switcher style picker. */

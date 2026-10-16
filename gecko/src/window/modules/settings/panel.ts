@@ -519,7 +519,7 @@ export class SettingsPanel {
         if (!hits.length) continue;
         found += hits.length;
         out.push(heading(g.title && g.title !== sec.title ? `${sec.title} › ${g.title}` : sec.title));
-        out.push(card(...hits.map((r) => r.build(this.ctx))));
+        out.push(card(...hits.map((r) => r.build({ ...this.ctx, inSearch: true }))));
       }
     }
     if (!found) out.push(h('p', { class: 'vs-intro vs-empty', text: `No settings match “${q}”.` }));
