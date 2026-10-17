@@ -29,6 +29,10 @@
 //   VitreHome.baseColor(bg)          the mean colour of that background's picture (remembered in the
 //                                    pref vitre.home.color across restarts), or null: what Home paints
 //                                    under the picture while it decodes, instead of the plain grey.
+//   VitreHome.setBaseColor(bg, color)
+//                                    that colour for a background Home has no picture of to read it
+//                                    from (a Deer wallpaper's video: its entry's colour), so a Home page
+//                                    loading it paints that colour until the first frame, not the grey.
 //   VitreHome.themeFor(luma)         the rule: luma above 0.62 is light glass.
 //   VitreHome.fileURL(path)          file: URL for a Windows path (spaces, #, non-ASCII).
 // Everything here is local file access: nothing is fetched from the network.
@@ -324,6 +328,15 @@ export const VitreHome = {
       return saved?.key === settingKey(bg) && /^#[0-9a-f]{6}$/.test(saved.color) ? saved.color : null;
     } catch {
       return null;
+    }
+  },
+
+  setBaseColor(bg: HomeBackground, color: string): void {
+    if (!/^#[0-9a-f]{6}$/.test(color)) return;
+    try {
+      Services.prefs.setStringPref(COLOR_PREF, JSON.stringify({ key: settingKey(bg), color }));
+    } catch {
+      /* not fatal: Home paints the plain grey under its first frame */
     }
   },
 };

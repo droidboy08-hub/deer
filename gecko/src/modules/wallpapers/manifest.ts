@@ -2,10 +2,17 @@
 // downloaded file must pass. No Gecko globals here, so the rules can be read on their own.
 // The format is the one droidboy08-hub/deer-wallpapers' add.py writes (its --check runs the same
 // file and size rules); Deer trusts none of it: an entry that breaks a rule is skipped, never the list.
+// Two kinds of entry (owner's decision 2026-10-17, live wallpapers): a photo (no "kind", or "photo":
+// full/<id>.jpg, as Deer 0.1.5 reads it) and a video ("kind": "video": full/<id>.mp4, its "duration"
+// in seconds, any length); any other kind is skipped. Deer 0.1.5 skips a video entry itself (its file
+// rule wants full/<id>.jpg), so the same list serves both.
+
+export type WallpaperKind = 'photo' | 'video';
 
 /** One wallpaper as Deer keeps it once checked (added and source are not used). */
 export interface WallpaperEntry {
   id: string;
+  kind: WallpaperKind;
   title: string;
   /** Both '' for the collection owner's own photos (add.py without --author / --license): no credit. */
   author: string;
@@ -14,10 +21,12 @@ export interface WallpaperEntry {
   color: string;
   width: number;
   height: number;
-  /** full/<id>.jpg */
+  /** A video's length in seconds (checked, shown nowhere); 0 for a photo. */
+  duration: number;
+  /** full/<id>.jpg (a photo) or full/<id>.mp4 (a video) */
   bytes: number;
   sha256: string;
-  /** thumbs/<id>.jpg */
+  /** thumbs/<id>.jpg (a video's: its poster frame) */
   thumbBytes: number;
   thumbSha256: string;
 }
@@ -32,6 +41,24 @@ export const MAX_SIDE = 8192;
 export const MIN_SIDE = 16;
 export const MAX_PIXELS = 40_000_000;
 export const MAX_THUMB_SIDE = 2048;
+/**
+ * A video: GitHub's limit for one file, and add.py's frame (H.264, the long side at most 2560). Its
+ * length is not limited (owner's decision 2026-10-17: "dont cap the clips"); the size bounds the download.
+ */
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const MAX_VIDEO_SIDE = 3840;
+/** The 'ftyp' box an MP4 starts with: its brands, a few dozen bytes (read whole before a byte is written). */
+export const MAX_FTYP = 1024;
+/**
+ * Brands of an MP4 or QuickTime movie (ffmpeg, as add.py runs it, writes isom, iso2, avc1, mp41); one
+ * of them must be the major or a compatible brand.
+ */
+const VIDEO_BRANDS = new Set(['isom', 'iso2', 'iso3', 'iso4', 'iso5', 'iso6', 'iso7', 'iso8', 'iso9', 'mp41', 'mp42', 'avc1', 'M4V ', 'qt  ']);
+/** Brands of still pictures in the same box format (AVIF, HEIF / HEIC): none may be named. */
+const IMAGE_BRANDS = new Set(['avif', 'avis', 'heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'mif2', 'msf1', 'miaf']);
+
+/** The file of each kind, in full/ and in the profile. */
+export const EXT: Record<WallpaperKind, 'jpg' | 'mp4'> = { photo: 'jpg', video: 'mp4' };
 
 const HEX64 = /^[0-9a-f]{64}$/i;
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -60,7 +87,10 @@ export function checkEntry(raw: unknown): WallpaperEntry | string {
   const e = raw as Record<string, unknown>;
   const id = typeof e.id === 'string' && ID_RE.test(e.id) ? e.id : null;
   if (!id) return 'bad id';
-  if (e.file !== `full/${id}.jpg`) return 'file is not full/<id>.jpg';
+  const kind: WallpaperKind | null = e.kind === undefined || e.kind === 'photo' ? 'photo' : e.kind === 'video' ? 'video' : null;
+  if (!kind) return 'kind is neither photo nor video';
+  const video = kind === 'video';
+  if (e.file !== `full/${id}.${EXT[kind]}`) return `file is not full/<id>.${EXT[kind]}`;
   if (e.thumb !== `thumbs/${id}.jpg`) return 'thumb is not thumbs/<id>.jpg';
   const title = text(e.title, 120);
   if (!title) return 'title missing, too long or with control characters';
@@ -71,26 +101,40 @@ export function checkEntry(raw: unknown): WallpaperEntry | string {
   if (!author !== !license) return 'author and license go together';
   if (e.added !== undefined && !(typeof e.added === 'string' && DATE.test(e.added))) return 'added is not a date';
   if (typeof e.color !== 'string' || !COLOR.test(e.color)) return 'color is not #rrggbb';
-  const width = whole(e.width, MIN_SIDE, MAX_SIDE);
-  const height = whole(e.height, MIN_SIDE, MAX_SIDE);
+  const width = whole(e.width, MIN_SIDE, video ? MAX_VIDEO_SIDE : MAX_SIDE);
+  const height = whole(e.height, MIN_SIDE, video ? MAX_VIDEO_SIDE : MAX_SIDE);
   if (!width || !height || width * height > MAX_PIXELS) return 'width or height out of range';
-  const bytes = whole(e.bytes, 4, MAX_BYTES);
+  const d = e.duration;
+  // Any length: only a number of seconds above 0 (no upper bound, see MAX_VIDEO_BYTES).
+  const duration = !video ? 0 : typeof d === 'number' && Number.isFinite(d) && d > 0 ? d : null;
+  if (duration === null) return 'duration is not a number of seconds';
+  const bytes = whole(e.bytes, 4, video ? MAX_VIDEO_BYTES : MAX_BYTES);
   const thumbBytes = whole(e.thumbBytes, 4, MAX_THUMB_BYTES);
   if (!bytes || !thumbBytes) return 'bytes or thumbBytes out of range';
   if (typeof e.sha256 !== 'string' || !HEX64.test(e.sha256) || typeof e.thumbSha256 !== 'string' || !HEX64.test(e.thumbSha256)) return 'sha256 or thumbSha256 is not 64 hex digits';
   return {
     id,
+    kind,
     title,
     author,
     license,
     color: e.color.toLowerCase(),
     width,
     height,
+    duration,
     bytes,
     sha256: e.sha256.toLowerCase(),
     thumbBytes,
     thumbSha256: e.thumbSha256.toLowerCase(),
   };
+}
+
+/** An entry in the manifest's own format again (the cached copy is checked as the site's when read back). */
+export function toManifest(e: WallpaperEntry): Record<string, unknown> {
+  const { kind, duration, ...rest } = e;
+  const out: Record<string, unknown> = { ...rest, file: `full/${e.id}.${EXT[kind]}`, thumb: `thumbs/${e.id}.jpg` };
+  if (kind === 'video') Object.assign(out, { kind, duration });
+  return out;
 }
 
 /**
@@ -152,4 +196,23 @@ export function jpegSize(b: Uint8Array): { width: number; height: number } | nul
     i += 2 + len;
   }
   return null;
+}
+
+const fourcc = (b: Uint8Array, at: number): string => String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
+
+/**
+ * The start of an MP4 video (ISO/IEC 14496-12), in a file of `total` bytes: the first box is 'ftyp'
+ * (a major brand, a minor version, the compatible brands, 4 bytes each), 16 bytes to MAX_FTYP, whose
+ * brands name an MP4 or QuickTime movie and no still picture (an AVIF or HEIC picture starts with an
+ * 'ftyp' box too). True or false once `head` holds the whole box; null while it is shorter (feed it
+ * more of the file's start). Whether the rest plays is Gecko's media stack's business.
+ */
+export function mp4Start(head: Uint8Array, total: number): boolean | null {
+  if (head.length < 8) return null;
+  const size = head[0] * 0x1000000 + ((head[1] << 16) | (head[2] << 8) | head[3]);
+  if (fourcc(head, 4) !== 'ftyp' || size < 16 || size > MAX_FTYP || size > total || (size - 16) % 4) return false;
+  if (head.length < size) return null;
+  const brands = [fourcc(head, 8)];
+  for (let at = 16; at < size; at += 4) brands.push(fourcc(head, at));
+  return brands.some((x) => VIDEO_BRANDS.has(x)) && !brands.some((x) => IMAGE_BRANDS.has(x));
 }

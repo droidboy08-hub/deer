@@ -5,7 +5,8 @@
 //   video     a video file, muted and looping; it plays only while this tab is on screen
 //   none      the plain base colour
 // and tells every window which glass suits it (VitreHome.setTheme: light over a bright picture,
-// clear otherwise). A file that cannot be shown falls back to "none".
+// clear otherwise). A file that cannot be shown falls back to "none"; a video that breaks after its
+// first frame is on screen (damaged further on) keeps its last frame, no longer playing.
 //
 // A new tab must not flash grey before its picture (owner's bug report, 2026-10-05):
 //   - the picture the last Home tab showed is remembered in memory (VitreHome.peek), so loading
@@ -15,9 +16,11 @@
 //     not locked (imgIRequest.lockImage hung the browser when such a tab closed, 2026-10-05);
 //   - each window keeps one Home page drawn in a hidden browser, which the next new tab takes
 //     (Firefox's new-tab preloading, switched on for Home in VitreStartup.useHomeAsNewTab);
-//   - until then the page is painted in the picture's mean colour (VitreHome.baseColor), not grey.
+//   - until then the page is painted in the picture's mean colour (VitreHome.baseColor), not grey;
+//     a video's until its first frame is in, when one is known (a Deer wallpaper's: its entry's).
 // The remembered picture is then checked against the files (VitreHome.background): a changed
-// wallpaper cross-fades in.
+// wallpaper cross-fades in. A video loops for as long as it is the background (no length limit,
+// owner's decision 2026-10-17) and plays muted.
 //
 // The page runs in the parent process with the system principal. It builds DOM with createElement
 // only, takes no input from the web, and loads nothing from the network.
@@ -118,22 +121,39 @@ function syncPlayback(): void {
     delete root.dataset.playing;
     return;
   }
+  if (v.error) {
+    root.dataset.playing = 'false'; // stopped for good (its last frame stays): not started again
+    return;
+  }
   if (document.visibilityState === 'visible' && !reducedMotion.matches) {
     if (v.paused) v.play().catch(() => undefined);
   } else if (!v.paused) v.pause();
   root.dataset.playing = String(!v.paused);
 }
 
+/**
+ * Take an element off the page. A video also lets go of its file at once (an element removed keeps
+ * it open until it is collected, and Windows will not delete an open file: Deer wallpapers removes
+ * the videos it no longer keeps).
+ */
+function discard(el: Media): void {
+  el.remove();
+  if (el instanceof HTMLVideoElement) {
+    el.removeAttribute('src');
+    el.load();
+  }
+}
+
 function retire(el: Media | null, fade: boolean): void {
   if (!el) return;
   if (el instanceof HTMLVideoElement) el.pause();
   if (!fade) {
-    el.remove();
+    discard(el);
     return;
   }
   el.classList.add('fade');
   el.classList.remove('shown');
-  window.setTimeout(() => el.remove(), FADE_MS + 20);
+  window.setTimeout(() => discard(el), FADE_MS + 20);
 }
 
 /** Put a loaded picture or video on screen; the first one of a page load appears without a fade. */
@@ -197,10 +217,30 @@ function makeVideo(url: string): Promise<HTMLVideoElement | null> {
     v.preload = 'auto';
     v.tabIndex = -1;
     // Playback follows visibility (syncPlayback); autoplay could start it in a background tab.
-    v.addEventListener('loadeddata', () => resolve(v), { once: true });
-    v.addEventListener('error', () => resolve(null), { once: true });
+    let loaded = false;
+    v.addEventListener(
+      'loadeddata',
+      () => {
+        loaded = true;
+        resolve(v);
+      },
+      { once: true }
+    );
+    v.addEventListener('error', () => {
+      if (!loaded) {
+        discard(v); // never shown: not left on the page holding the file
+        resolve(null);
+        return;
+      }
+      // It broke after its first frame (a file damaged further on, the decoder lost): its last frame
+      // stays on screen, as it always has, and the page no longer says it plays.
+      if (current === v) syncPlayback();
+    });
     v.addEventListener('play', syncPlayback);
-    v.addEventListener('pause', () => (root.dataset.playing = 'false'));
+    // Only the video on screen speaks for the page (one replaced is paused as it goes).
+    v.addEventListener('pause', () => {
+      if (current === v) root.dataset.playing = 'false';
+    });
     v.src = url;
     host.append(v);
   });
@@ -225,16 +265,17 @@ async function apply(bg: Background): Promise<void> {
   }
 
   if (bg.kind === 'video') {
+    // The page's first background: its colour (or the plain one) until the first frame is in.
+    if (!current) tint(VitreHome.baseColor(bg));
     let video: HTMLVideoElement | null = null;
     try {
       if (bg.path) video = await makeVideo(VitreHome.fileURL(bg.path));
     } catch (e) {
       console.error('Deer Home: background failed', e);
-      video?.remove();
       video = null;
     }
     if (mine !== serial) {
-      video?.remove(); // a newer choice came first
+      if (video) discard(video); // a newer choice came first
       return;
     }
     if (!video) {

@@ -10,15 +10,16 @@
 //                        chosen and remembered in the recent list
 //   bg.tiles(kind)       tiles for the picker: 'photo' (the Windows wallpaper, your recent photos,
 //                        the photos Windows ships) or 'video' (your recent videos)
-//   bg.deerWallpapers()  Deer wallpapers (VitreWallpapers, a process singleton): the Photo tab's
-//                        "Deer wallpapers" group; null when it could not be loaded
+//   bg.deerWallpapers()  Deer wallpapers (VitreWallpapers, a process singleton): the "Deer wallpapers"
+//                        group of the Photo tab (photos) and of the Video tab (videos); null when it
+//                        could not be loaded
 //   bg.error             why the last choice could not be shown, or null
 //   bg.onChange(fn)      the choice or the error changed
 // The recent list is a per-profile convenience, not a setting: the pref vitre.home.recent (a JSON
 // array of { kind, path }), outside the Settings schema so VitreSettings never reports it.
-// A Deer wallpaper is an ordinary 'image' background whose path is its copy in the profile
-// (<profile>\deer-wallpapers\<id>.jpg): it shows in its own group, never among your recent photos.
-// Any choice here supersedes a Deer wallpaper still downloading (it is never applied).
+// A Deer wallpaper is an ordinary 'image' or 'video' background whose path is its copy in the profile
+// (<profile>\deer-wallpapers\<id>.jpg or <id>.mp4): it shows in its own group, never among your recent
+// photos or videos. Any choice here supersedes a Deer wallpaper still downloading (it is never applied).
 import type { WallpaperTile } from '../../../modules/VitreWallpapers.sys';
 import type { Settings } from '../../../shared/settings';
 import type { Browser } from '../../browser';
@@ -31,7 +32,7 @@ export interface Tile {
   kind: BgKind;
   path: string;
   label: string;
-  /** A Deer wallpaper (kind 'image', path its copy in the profile, which may not be downloaded yet). */
+  /** A Deer wallpaper (kind 'image' or 'video', path its copy in the profile, which may not be downloaded yet). */
   deer?: WallpaperTile;
 }
 
@@ -123,7 +124,8 @@ export class HomeBackground {
         this.error = null;
         this.changed();
       }
-      await this.deerWallpapers()?.choose(t.deer.id);
+      // By id and kind: a collection may list the same id as a photo and later as a video.
+      await this.deerWallpapers()?.choose(t.deer.id, t.deer.kind);
       return;
     }
     this.deerWallpapers()?.supersede();
@@ -177,7 +179,7 @@ export class HomeBackground {
     const want = kind === 'video' ? 'video' : 'image';
     const wp = kind === 'photo' ? await this.wallpapers() : { windows: null, builtins: [] as string[] };
     const shipped = new Set(wp.builtins.map((p) => p.toLowerCase()));
-    // Deer wallpapers have their own group (bg-picker.ts): never one of your recent photos.
+    // Deer wallpapers have their own group (bg-picker.ts): never one of your recent photos or videos.
     const deer = this.deerWallpapers();
     const yours = (p: string): boolean => !!p && !shipped.has(p.toLowerCase()) && !deer?.isDeerPath(p);
     const mine = this.recent().filter((r) => r.kind === want && yours(r.path));

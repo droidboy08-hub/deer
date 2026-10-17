@@ -22,7 +22,14 @@
              stops through a download; the manifest once per 10 minutes; Find a setting; a wallpaper
              taken out of the collection; pruning; no Cookie / Referer / Origin sent, no cookie
              stored; after a restart: leftovers of cut-short writes removed, with the site down the
-             cached group
+             cached group; then live wallpapers (videos, the clip live-wallpaper.mp4): the Video
+             tab's own group (no "Add a video" note meanwhile), a clip three days long listed,
+             choose, download, check, Home plays it muted and looping (wrapping past the end),
+             progress and a superseded download, not an MP4 / an AVIF picture / wrong hash / endless
+             body refused, the 2 videos chosen last kept, a video taken out of the collection; after
+             another restart Home plays it again on the entry's colour, the popover's focus on its
+             tile wholly in view, and an id listed as a photo, then a video, then the photo again:
+             each tab's tile fetches, applies and keeps only its own kind's file
 
 The module is built alone into build-settings (node tools/build.mjs --out=build-settings
 --modules=settings) so other authors' half-written modules cannot get in the way; --no-build skips it.
@@ -46,7 +53,7 @@ TESTS = [
     ('clear', 'settings-clear', 200),
     ('picker', 'settings-picker', 240),
     ('appicon', 'settings-appicon', 160),
-    ('wallpapers', 'settings-wallpapers', 400),
+    ('wallpapers', 'settings-wallpapers', 600),
 ]
 
 

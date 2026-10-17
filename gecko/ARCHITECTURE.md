@@ -698,19 +698,34 @@ auto-hidden bar on screen.
   pictures are not locked (`imgIRequest.lockImage` hung the browser when such a tab closed).
   Deer wallpapers (`VitreWallpapers.sys.ts`, contract in its header; owner's decision 2026-10-16: no
   rotation, no new page): the collection droidboy08-hub/deer-wallpapers on GitHub Pages is one more
-  group, "Deer wallpapers", at the end of the picker's Photo tab (Settings and Home's popover alike).
+  group, "Deer wallpapers", at the end of the picker's Photo tab (its photos) and of its Video tab (its
+  videos, the live wallpapers, owner's decision 2026-10-17), in Settings and Home's popover alike.
   The owner's own photos carry no author or license (no credit shown); someone else's carry both.
-  Network only while a Photo tab shows (never for Find a setting's results, which show what this
-  session already has): the manifest at most once per 10 minutes per session (counted
-  when sent; once sent it runs to its end), the listed thumbnails 3 at a time, a picture only when its
-  tile is chosen; anonymous fetch() (no cookie
+  Network only while a Photo or Video tab shows (never for Find a setting's results, which show what
+  this session already has): the manifest at most once per 10 minutes per session whichever tab asks
+  (counted when sent; once sent it runs to its end), the listed thumbnails of both kinds 3 at a time (a
+  video's is its poster frame), a file only when its tile is chosen; anonymous fetch() (no cookie
   sent or stored, no referrer, no HTTP cache, no redirects). Nothing is trusted
-  (`modules/wallpapers/manifest.ts`): a bad entry is skipped, and a file is written (temporary name,
-  then renamed) only once its size, SHA-256, JPEG start and frame size match. A chosen picture is an
-  ordinary 'image' background on its copy in `<profile>\deer-wallpapers` (Home needs nothing new),
-  never one of the recent photos; offline the cached group shows, with nothing cached none.
+  (`modules/wallpapers/manifest.ts`): a bad entry is skipped (a "kind" other than none, "photo" or
+  "video" too, as is a video whose file is not `full/<id>.mp4`: Deer 0.1.5 skips every video entry by
+  that rule), and a file is kept only once its size and SHA-256 match: a photo is written (temporary
+  name, then renamed) once its JPEG start and frame size match too; a video (up to 100 MiB, no length
+  limit) streams to `<id>.mp4.part`, hashed on the way and refused at once unless its whole 'ftyp' box
+  (read before a byte is written) names an MP4 brand and no picture's (AVIF and HEIC have that box
+  too), or once it runs past its size, and is renamed to `<id>.mp4` when it checks out. A wallpaper is
+  an id and a kind: the collection may list an id as a photo and later as a video, so choices,
+  downloads, failures and the records of chosen files are per id and kind (a photo tile never fetches
+  or applies the video of its id, and the other kind's copy is kept). A chosen photo is an ordinary
+  'image' background and a chosen video an ordinary 'video' one (muted, looping for as long as it is
+  the background; one that breaks after its first frame keeps that frame, as any video background
+  does), on its copy in `<profile>\deer-wallpapers`, never one of the recent photos or videos; Home
+  paints a Deer video's colour (`VitreHome.setBaseColor`) until its first frame. Kept there: the
+  current background's file, the 5 photos and the 2 videos chosen last. Offline the cached groups
+  show, with nothing cached none. The Video tab's "Add a video…" note waits while the collection is
+  being read or asked for.
   `tools/run.py` points the hidden pref `vitre.wallpapers.base` at a port nothing serves, so no test
-  reaches GitHub (test `settings/wallpapers.js`, stand-in `settings/wallpaper_server.py`).
+  reaches GitHub (test `settings/wallpapers.js`, stand-in `settings/wallpaper_server.py`, video fixture
+  `settings/live-wallpaper.mp4`).
   A private window opens on Home too: `VitreShell.beforeLayout` turns the window's
   `about:privatebrowsing` start argument into Home before Firefox reads it, because that page's
   search box hands every key to Firefox's hidden address bar (`gURLBar.handoff`), so nothing could

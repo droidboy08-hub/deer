@@ -52,6 +52,8 @@ out-*/
 *.bmp
 *.webm
 *.mp4
+# ...except the small clip the Deer wallpapers test serves as a live wallpaper (made once with ffmpeg)
+!gecko/tests/settings/live-wallpaper.mp4
 # Firefox profile data that a run may leave behind (profiles normally live in %TEMP% and are deleted)
 *.sqlite
 *.sqlite-wal

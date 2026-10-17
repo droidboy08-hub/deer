@@ -1,21 +1,23 @@
 // Deer wallpapers: the collection the owner hosts on GitHub Pages (droidboy08-hub/deer-wallpapers),
-// offered as one more group, "Deer wallpapers", in the background picker's Photo tab (Settings ›
-// Home and background and Home's Background popover, src/window/modules/settings/bg-picker.ts).
-// Choosing a tile downloads that picture once into the profile and makes it Home's background: an
-// ordinary 'image' background whose path is the profile copy, so Home (VitreHome) shows it as any
-// other photo. Nothing changes by itself: no rotation, no picture of the day. A process singleton
-// (window code: b.sys('VitreWallpapers')).
+// offered as one more group, "Deer wallpapers", in the background picker's Photo tab (its photos) and
+// in its Video tab (its videos, the live wallpapers: owner's decision 2026-10-17); the picker is in
+// Settings › Home and background and Home's Background popover, src/window/modules/settings/bg-picker.ts.
+// Choosing a tile downloads that file once into the profile and makes it Home's background: an
+// ordinary 'image' or 'video' background whose path is the profile copy, so Home (VitreHome) shows it
+// as any other photo, or plays it as any other video (muted, looping, however long it is). Nothing
+// changes by itself: no rotation, no picture of the day. A process singleton (window code:
+// b.sys('VitreWallpapers')).
 //
-// What is contacted, and when (nothing else, and never while no picker shows its Photo tab):
-//   GET <base>wallpapers.json   when a picker's Photo tab comes on screen, at most once per 10 minutes
-//                               per session (counted when it is sent; once sent it runs to its end, at
-//                               most 1 MiB within a minute, even when the tab goes meanwhile, so its
-//                               answer is not thrown away for another request)
-//   GET <base>thumbs/<id>.jpg   the thumbnails of the entries listed, 3 at a time, while a Photo tab is
-//                               on screen; each is kept in the profile and fetched again only when the
-//                               manifest lists another one under that id
-//   GET <base>full/<id>.jpg     a picture, only when the person chooses its tile (it goes on when the
-//                               picker closes: the person asked for it)
+// What is contacted, and when (nothing else, and never while no picker shows its Photo or Video tab):
+//   GET <base>wallpapers.json   when a picker's Photo or Video tab comes on screen, at most once per 10
+//                               minutes per session (counted when it is sent; once sent it runs to its
+//                               end, at most 1 MiB within a minute, even when the tab goes meanwhile, so
+//                               its answer is not thrown away for another request)
+//   GET <base>thumbs/<id>.jpg   the thumbnails of the entries listed (a video's is its poster frame), 3 at
+//                               a time, while such a tab is on screen; each is kept in the profile and
+//                               fetched again only when the manifest lists another one under that id
+//   GET <base>full/<id>.jpg     a photo, or full/<id>.mp4, a video, only when the person chooses its tile
+//                               (it goes on when the picker closes: the person asked for it)
 // <base> is BASE, or the hidden pref vitre.wallpapers.base when it is an https:// address or
 // http://127.0.0.1 / http://localhost (the tests' stand-in; tools/run.py points it at a port nothing
 // listens on, so no test reaches GitHub). Every request is fetch() with credentials 'omit' (Necko's
@@ -27,48 +29,68 @@
 // Nothing from the server is trusted (the rules are in wallpapers/manifest.ts):
 //   - wallpapers.json is read up to 1 MiB and must be {"version": 1, "wallpapers": [...]}; at most 500
 //     entries are looked at, each on its own (a bad one is skipped and named in a console warning,
-//     never the whole list): id, file exactly full/<id>.jpg, thumb exactly thumbs/<id>.jpg, sizes,
-//     SHA-256s, colour, width and height, short strings without control or bidi characters.
-//   - every file is read with its declared size as a hard limit, and before a byte is written it must
-//     be exactly that size, hash to the SHA-256 listed, start with a JPEG's FF D8 FF and have a frame of
-//     the width and height listed (a thumbnail at most 2048 px a side). It is then written under a
-//     temporary name and renamed (IOUtils.write tmpPath): a failure leaves nothing behind.
+//     never the whole list): id, kind (none or "photo", or "video"; any other is skipped), file exactly
+//     full/<id>.jpg (a photo) or full/<id>.mp4 (a video), thumb exactly thumbs/<id>.jpg, sizes (a
+//     video up to 100 MiB and 3840 px a side, with a duration), SHA-256s, colour, width and height,
+//     short strings without control or bidi characters.
+//   - every file is read with its declared size as a hard limit. A photo or a thumbnail is read whole,
+//     and before a byte is written it must be exactly that size, hash to the SHA-256 listed, start with
+//     a JPEG's FF D8 FF and have a frame of the width and height listed (a thumbnail at most 2048 px a
+//     side); it is then written under a temporary name and renamed (IOUtils.write tmpPath). A video is
+//     never held whole in memory: it is written to <id>.mp4.part as it arrives, hashed on the way, and
+//     refused as soon as it does not start as an MP4 video does (its whole 'ftyp' box, read before a
+//     byte is written, naming an MP4 brand and no picture's: AVIF and HEIC have that box too) or runs
+//     past its size; it is renamed to <id>.mp4 only once its size and SHA-256 are the ones listed. A
+//     failure leaves nothing behind.
+//   - a wallpaper is an id AND a kind: the collection may list an id as a photo today and as a video
+//     tomorrow. Choices, downloads, failures and the records of chosen files are kept per id and kind,
+//     so a tile only ever gets (and applies) its own kind's file, and the other kind's copy is kept.
 //
 // Files, only ever in <profile>\deer-wallpapers (nothing outside it is written or removed):
 //   wallpapers.json   the last good manifest as checked, with the base it came from (a manifest from
 //                     another base is not shown)
 //   thumbs\<id>.jpg   thumbnails; those the manifest no longer lists (or lists with another hash) go
 //                     whenever a manifest arrives
-//   <id>.jpg          pictures chosen; kept: the current background's and the 5 chosen most recently,
-//                     the others removed after each choice
-//   chosen.json       those pictures, newest choice first: id, SHA-256, size, title, credit, colour
-//                     (a picture taken out of the collection keeps working, and its tile stays in the
-//                     group while it is Home's background)
+//   <id>.jpg          photos chosen, <id>.mp4 videos chosen; kept: the current background's, the 5
+//                     photos and the 2 videos chosen most recently, the others removed after each choice
+//   chosen.json       those files, newest choice first: id, kind, SHA-256, size, title, credit, colour,
+//                     one record per id and kind (a file taken out of the collection keeps working, and
+//                     its tile stays in the group while it is Home's background)
 // Removal is of regular files named as above, in those two folders, and only when the folder is not a
-// link elsewhere. Temporary files a write cut short (Deer killed, a crash: <id>.jpg.part in either
-// folder, wallpapers.json.tmp, chosen.json.tmp) are removed when the folder is first read in a session.
+// link elsewhere. Temporary files a write cut short (Deer killed, a crash: <id>.jpg.part or
+// <id>.mp4.part, thumbs\<id>.jpg.part, wallpapers.json.tmp, chosen.json.tmp) are removed when the folder
+// is first read in a session.
 //
 // Contract:
-//   watch()                a picker's Photo tab came on screen; returns the call for when it goes. While
-//                          any is on screen: the manifest when due, then the missing thumbnails. A second
-//                          after the last one goes, the thumbnails under way stop (a manifest request
-//                          sent runs to its end) and a failure is forgotten.
-//   state() / onChange(fn) the group to show (WallpaperState); fn() on every change; returns the remover
-//   choose(id)             download (once) and set as Home's background; 'applied' | 'failed' |
-//                          'superseded'. Choosing the tile that is downloading again joins it.
+//   watch()                a picker's Photo or Video tab came on screen; returns the call for when it
+//                          goes. While any is on screen: the manifest when due, then the missing
+//                          thumbnails (of both kinds). A second after the last one goes, the thumbnails
+//                          under way stop (a manifest request sent runs to its end) and a failure is
+//                          forgotten.
+//   state() / onChange(fn) the groups to show (WallpaperState: every tile carries its kind, as do the
+//                          download and the failure; `pending` while the collection may still change by
+//                          itself); fn() on every change; returns the remover
+//   choose(id, kind)       download (once) and set as Home's background; 'applied' | 'failed' |
+//                          'superseded'. Choosing the tile that is downloading again joins it. A kind
+//                          the collection does not list under that id is the copy in the profile, if any.
 //   supersede()            the person chose something else: a download under way is cancelled and never
 //                          applied. Also done for any other change of homeBackground (another window,
 //                          about:config).
-//   isDeerPath(path)       a picture of this folder (the picker keeps it out of the recent photos)
+//   isDeerPath(path)       a file of this folder (the picker keeps it out of the recent photos and videos)
 //   folder()               <profile>\deer-wallpapers
-// Tests: the pref above; now() can be replaced (the 10-minute rule); debug() tells what is going on.
+// A video chosen also gives VitreHome its entry's colour (setBaseColor): a Home page loading it paints
+// that colour until the first frame is in. Tests: the pref above; now() can be replaced (the 10-minute
+// rule); debug() tells what is going on.
 //
 // Firefox internals (157): fetch() in the shared system global (as VitreUpdater uses it);
 // RequestCredentials 'omit' -> nsIRequest::LOAD_ANONYMOUS (dom/fetch/FetchDriver.cpp); IOUtils
-// (write with tmpPath, getChildren, stat, remove); nsIFile.isSymlink (true for a junction on Windows).
+// (write with tmpPath or mode 'append', move, getChildren, stat, remove); nsICryptoHash (update() takes
+// a Uint8Array: XPConnect copies a typed array of octets as it is; 8 MiB in about 12 ms);
+// nsIFile.isSymlink (true for a junction on Windows).
+import { VitreHome } from 'chrome://vitre/content/modules/VitreHome.sys.mjs';
 import { VitreSettings } from 'chrome://vitre/content/modules/VitreSettings.sys.mjs';
 import { clearTimeout, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
-import { checkEntry, checkManifest, ID_RE, jpegSize, MAX_MANIFEST, MAX_THUMB_SIDE, type WallpaperEntry } from './wallpapers/manifest';
+import { checkEntry, checkManifest, EXT, ID_RE, jpegSize, MAX_FTYP, MAX_MANIFEST, MAX_THUMB_SIDE, mp4Start, toManifest, type WallpaperEntry, type WallpaperKind } from './wallpapers/manifest';
 
 declare global {
   interface VitreSysModules {
@@ -76,37 +98,52 @@ declare global {
   }
 }
 
-/** One tile of the group. */
+/** One tile of a group. */
 export interface WallpaperTile {
   id: string;
+  /** 'photo': a tile of the Photo tab's group; 'video': of the Video tab's. */
+  kind: WallpaperKind;
   title: string;
-  /** '' for a picture no longer listed whose credit was never recorded. */
+  /** '' for a file no longer listed whose credit was never recorded. */
   author: string;
   license: string;
   /** '#rrggbb': the face until the thumbnail is in. */
   color: string;
-  /** The picture's place in the profile: Home's background once chosen (it may not be there yet). */
+  /** The file's place in the profile (<id>.jpg, <id>.mp4): Home's background once chosen (it may not be there yet). */
   path: string;
   /** The checked thumbnail in the profile, or '' (not fetched yet, or refused). */
   thumb: string;
-  /** The picture is in the profile already: choosing it needs no download. */
+  /** The file is in the profile already: choosing it needs no download. */
   local: boolean;
   /** False: the current background, taken out of the collection since it was chosen. */
   listed: boolean;
 }
 
+/** A wallpaper as chosen: the same id may be a photo in one collection and a video in another. */
+export interface WallpaperRef {
+  id: string;
+  kind: WallpaperKind;
+}
+
 export interface WallpaperState {
   tiles: WallpaperTile[];
   /** The person's choice being downloaded. */
-  downloading: { id: string; received: number; total: number } | null;
+  downloading: (WallpaperRef & { received: number; total: number }) | null;
   /** The last choice that could not be downloaded or checked (its tile says so). */
-  failed: string | null;
+  failed: WallpaperRef | null;
+  /**
+   * The tiles may still change by themselves: the folder not read yet, or the manifest being asked
+   * for (a picker holds its "no video" note meanwhile, rather than show it and take it back).
+   */
+  pending: boolean;
 }
 
 export type ChooseResult = 'applied' | 'failed' | 'superseded';
 
 interface Chosen {
   id: string;
+  /** A record Deer 0.1.5 wrote has none: a photo. */
+  kind: WallpaperKind;
   sha256: string;
   bytes: number;
   title: string;
@@ -119,6 +156,8 @@ interface Chosen {
 
 interface Download {
   id: string;
+  /** The tile's kind: only that kind's file is downloaded and applied. */
+  kind: WallpaperKind;
   ac: AbortController;
   received: number;
   total: number;
@@ -132,15 +171,22 @@ const CACHE = 'wallpapers.json';
 const CHOSEN = 'chosen.json';
 const REFRESH_MS = 10 * 60 * 1000;
 const THUMBS_AT_ONCE = 3;
-const KEEP_CHOSEN = 5;
+/** Files kept besides the current background's: the photos and the videos chosen most recently. */
+const KEEP: Record<WallpaperKind, number> = { photo: 5, video: 2 };
 /** No byte for this long: the request is given up. */
 const IDLE_MS = 30_000;
 /** The manifest and a thumbnail, whole, within this. */
 const SMALL_DEADLINE_MS = 60_000;
 /** The last picker gone this long: what is under way stops (a re-render builds a new picker at once). */
 const STOP_DELAY_MS = 1000;
-const NAME = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.jpg$/;
-const TEMP = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.jpg\.part$/;
+/** A video goes to its temporary file this much at a time. */
+const WRITE_STEP = 1024 * 1024;
+/** Chosen files in the folder, and what a write cut short leaves of them. */
+const FILE = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.(jpg|mp4)$/;
+const FILE_TEMP = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.(jpg|mp4)\.part$/;
+/** Thumbnails in thumbs\ (JPEG only, of either kind). */
+const THUMB = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.jpg$/;
+const THUMB_TEMP = /^([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)\.jpg\.part$/;
 
 const listeners = new Set<() => void>();
 let loading: Promise<void> | null = null;
@@ -155,11 +201,13 @@ const thumbs = new Map<string, number>();
 const thumbRunning = new Map<string, AbortController>();
 /** Thumbnails refused or unreachable since the last manifest: not asked again until the next one. */
 const thumbFailed = new Set<string>();
-/** Pictures in the profile, by id. */
-const pictures = new Set<string>();
+/** Chosen files in the profile, by name (<id>.jpg, <id>.mp4). */
+const files = new Set<string>();
 let chosen: Chosen[] = [];
 let download: Download | null = null;
-let failed: string | null = null;
+let failed: WallpaperRef | null = null;
+/** start() runs under way (reading the folder, the manifest when due): see WallpaperState.pending. */
+let starting = 0;
 let watchers = 0;
 let stopTimer = 0;
 let emitTimer = 0;
@@ -211,22 +259,28 @@ function folder(): string {
 }
 
 const thumbsFolder = (): string => PathUtils.join(folder(), 'thumbs');
-const picturePath = (id: string): string => PathUtils.join(folder(), `${id}.jpg`);
+const fileName = (id: string, kind: WallpaperKind): string => `${id}.${EXT[kind]}`;
+const filePath = (id: string, kind: WallpaperKind): string => PathUtils.join(folder(), fileName(id, kind));
 const thumbPath = (id: string): string => PathUtils.join(thumbsFolder(), `${id}.jpg`);
 
 function isDeerPath(path: string): boolean {
   if (!path || typeof path !== 'string') return false;
   const dir = folder().toLowerCase() + '\\';
   const p = path.replace(/\//g, '\\').toLowerCase();
-  return p.startsWith(dir) && NAME.test(p.slice(dir.length));
+  return p.startsWith(dir) && FILE.test(p.slice(dir.length));
 }
 
-/** The id of the current background when it is one of these pictures. */
-function currentId(): string | null {
+/**
+ * The current background when it is one of these files: a photo as an 'image' background, a video as
+ * a 'video' one (a file shown as the other kind is not one Deer set).
+ */
+function current(): { id: string; kind: WallpaperKind } | null {
   try {
     const bg = VitreSettings.get().homeBackground;
-    if (bg.kind !== 'image' || !isDeerPath(bg.path)) return null;
-    return NAME.exec(PathUtils.filename(bg.path).toLowerCase())?.[1] ?? null;
+    if ((bg.kind !== 'image' && bg.kind !== 'video') || !isDeerPath(bg.path)) return null;
+    const m = FILE.exec(PathUtils.filename(bg.path).toLowerCase());
+    const kind: WallpaperKind = m?.[2] === 'mp4' ? 'video' : 'photo';
+    return m && (kind === 'video') === (bg.kind === 'video') ? { id: m[1], kind } : null;
   } catch {
     return null;
   }
@@ -295,16 +349,16 @@ async function writeJSON(name: string, value: unknown): Promise<void> {
   }
 }
 
-/** What is in the profile now: pictures and thumbnails by id (swapped in whole, never half-read). */
+/** What is in the profile now: chosen files by name, thumbnails by id (swapped in whole, never half-read). */
 async function scan(): Promise<void> {
   const found = new Set<string>();
   const sizes = new Map<string, number>();
   for (const child of await children(folder())) {
-    const m = NAME.exec(PathUtils.filename(child));
-    if (m && (await exists(child))) found.add(m[1]);
+    const name = PathUtils.filename(child);
+    if (FILE.test(name) && (await exists(child))) found.add(name);
   }
   for (const child of await children(thumbsFolder())) {
-    const m = NAME.exec(PathUtils.filename(child));
+    const m = THUMB.exec(PathUtils.filename(child));
     if (!m) continue;
     try {
       const st = await IOUtils.stat(child);
@@ -313,8 +367,8 @@ async function scan(): Promise<void> {
       /* gone meanwhile */
     }
   }
-  pictures.clear();
-  for (const id of found) pictures.add(id);
+  files.clear();
+  for (const name of found) files.add(name);
   thumbs.clear();
   for (const [id, size] of sizes) thumbs.set(id, size);
 }
@@ -325,8 +379,8 @@ async function pruneThumbs(keep: (id: string) => boolean): Promise<void> {
   if (!realFolder(dir)) return;
   for (const child of await children(dir)) {
     const name = PathUtils.filename(child);
-    const m = NAME.exec(name);
-    const temp = TEMP.exec(name);
+    const m = THUMB.exec(name);
+    const temp = THUMB_TEMP.exec(name);
     if (m && keep(m[1])) continue;
     if (temp && thumbRunning.has(temp[1])) continue;
     if (m || temp) {
@@ -336,37 +390,39 @@ async function pruneThumbs(keep: (id: string) => boolean): Promise<void> {
   }
 }
 
-/** The pictures that stay: the current background's, the 5 chosen most recently, one downloading. */
-function keptPictures(): Set<string> {
-  const keep = new Set(chosen.slice(0, KEEP_CHOSEN).map((c) => c.id));
-  const cur = currentId();
-  if (cur) keep.add(cur);
-  if (download) keep.add(download.id);
+/** The files that stay: the current background's, the 5 photos and the 2 videos chosen most recently, one downloading. */
+function keptFiles(): Set<string> {
+  const keep = new Set<string>();
+  for (const kind of ['photo', 'video'] as const) for (const c of chosen.filter((x) => x.kind === kind).slice(0, KEEP[kind])) keep.add(fileName(c.id, kind));
+  const cur = current();
+  if (cur) keep.add(fileName(cur.id, cur.kind));
+  if (download) keep.add(fileName(download.id, download.kind));
   return keep;
 }
 
+/** The temporary file the download under way may be writing (a video's, as it arrives). */
+const writing = (): string | null => (download ? fileName(download.id, download.kind) + '.part' : null);
+
 let pruning: Promise<void> = Promise.resolve();
 
-/** Pictures not kept go; one prune at a time, each file judged when it is reached (a choice may land meanwhile). */
-function prunePictures(): Promise<void> {
+/** Files not kept go; one prune at a time, each file judged when it is reached (a choice may land meanwhile). */
+function pruneFiles(): Promise<void> {
   const run = async (): Promise<void> => {
     const dir = folder();
     if (!realFolder(dir)) return;
     let removed = false;
     for (const child of await children(dir)) {
       const name = PathUtils.filename(child);
-      const m = NAME.exec(name);
-      const temp = TEMP.exec(name);
-      if (m && !keptPictures().has(m[1])) {
+      if (FILE.test(name) && !keptFiles().has(name)) {
         await removeFile(child);
-        removed = pictures.delete(m[1]) || removed;
-      } else if (temp && temp[1] !== download?.id) {
+        removed = files.delete(name) || removed;
+      } else if (FILE_TEMP.test(name) && name !== writing()) {
         await removeFile(child); // left by a write that never finished
       }
     }
-    const keep = keptPictures();
+    const keep = keptFiles();
     const before = chosen.length;
-    chosen = chosen.filter((c) => keep.has(c.id));
+    chosen = chosen.filter((c) => keep.has(fileName(c.id, c.kind)));
     if (chosen.length !== before) await writeJSON(CHOSEN, chosen);
     if (removed) emit(); // those tiles need a download again
   };
@@ -378,30 +434,32 @@ function readChosen(j: unknown): Chosen[] {
   if (!Array.isArray(j)) return [];
   const out: Chosen[] = [];
   for (const c of j) {
-    if (!c || typeof c !== 'object' || typeof c.id !== 'string' || !ID_RE.test(c.id) || out.some((x) => x.id === c.id)) continue;
-    // The credit is shown again: it gets the manifest's own checks.
-    const e = checkEntry({ ...c, file: `full/${c.id}.jpg`, thumb: `thumbs/${c.id}.jpg`, width: 16, height: 16, thumbBytes: 4, thumbSha256: c.sha256, added: undefined });
+    if (!c || typeof c !== 'object' || typeof c.id !== 'string' || !ID_RE.test(c.id)) continue;
+    // The credit is shown again: it gets the manifest's own checks (a record without a kind is a photo).
+    const kind: WallpaperKind | null = c.kind === undefined || c.kind === 'photo' ? 'photo' : c.kind === 'video' ? 'video' : null;
+    if (!kind || out.some((x) => x.id === c.id && x.kind === kind)) continue; // one record per id and kind
+    const e = checkEntry({ ...c, kind, file: `full/${fileName(c.id, kind)}`, thumb: `thumbs/${c.id}.jpg`, width: 16, height: 16, duration: 1, thumbBytes: 4, thumbSha256: c.sha256, added: undefined });
     if (typeof e === 'string') continue;
-    out.push({ id: e.id, sha256: e.sha256, bytes: e.bytes, title: e.title, author: e.author, license: e.license, color: e.color, at: Number(c.at) || 0 });
+    out.push({ id: e.id, kind: e.kind, sha256: e.sha256, bytes: e.bytes, title: e.title, author: e.author, license: e.license, color: e.color, at: Number(c.at) || 0 });
   }
   return out.sort((a, b) => b.at - a.at);
 }
 
 /**
  * Temporary files a write cut short left behind (Deer killed, a crash, power lost: IOUtils leaves its
- * temporary file then). Run once, first, before anything of this session can be writing.
+ * temporary file then, a video its .part). Run once, first, before anything of this session can be writing.
  */
 async function removeLeftovers(): Promise<void> {
   if (!realFolder(folder())) return;
   for (const child of await children(folder())) {
     const name = PathUtils.filename(child);
-    if (TEMP.test(name) || name === `${CACHE}.tmp` || name === `${CHOSEN}.tmp`) await removeFile(child);
+    if (FILE_TEMP.test(name) || name === `${CACHE}.tmp` || name === `${CHOSEN}.tmp`) await removeFile(child);
   }
   if (!realFolder(thumbsFolder())) return;
-  for (const child of await children(thumbsFolder())) if (TEMP.test(PathUtils.filename(child))) await removeFile(child);
+  for (const child of await children(thumbsFolder())) if (THUMB_TEMP.test(PathUtils.filename(child))) await removeFile(child);
 }
 
-/** Leftovers go; the cached manifest, the records of chosen pictures, the files; then follow homeBackground. */
+/** Leftovers go; the cached manifest, the records of chosen files, the files; then follow homeBackground. */
 function ensureLoaded(): Promise<void> {
   loading ??= (async () => {
     await removeLeftovers();
@@ -422,7 +480,7 @@ function ensureLoaded(): Promise<void> {
       if (!changed.some((k) => k.startsWith('homeBackground'))) return;
       // A background chosen anywhere else wins over a download under way.
       if (download) VitreWallpapers.supersede();
-      emit(); // a picture no longer listed is shown only while it is the background
+      emit(); // a file no longer listed is shown only while it is the background
     });
   })();
   return loading;
@@ -441,10 +499,12 @@ function join(chunks: Uint8Array[], total: number): Uint8Array {
 }
 
 /**
- * One file, read whole into memory: a 200 answer of at most `cap` bytes (more is refused while it
- * arrives), each piece within IDLE_MS, a small one within SMALL_DEADLINE_MS. Anonymous: see the header.
+ * One file, piece by piece as it arrives: a 200 answer of at most `cap` bytes (more is refused while it
+ * arrives), each piece within IDLE_MS, a small one whole within SMALL_DEADLINE_MS. `take` gets each
+ * piece and the bytes so far (it may refuse the rest by throwing). Anonymous: see the header. Returns
+ * the number of bytes received.
  */
-async function getBytes(url: string, cap: number, accept: string, signal: AbortSignal, small: boolean, progress?: (n: number) => void): Promise<Uint8Array> {
+async function getStream(url: string, cap: number, accept: string, signal: AbortSignal, small: boolean, take: (piece: Uint8Array, n: number) => void | Promise<void>): Promise<number> {
   const ac = new AbortController();
   const stop = (): void => ac.abort();
   if (signal.aborted) throw new Refused('stopped');
@@ -459,7 +519,6 @@ async function getBytes(url: string, cap: number, accept: string, signal: AbortS
     if (Number.isFinite(length) && length > cap) throw new Refused(`${length} bytes, more than ${cap}`);
     if (!res.body) throw new Refused('no body');
     reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
     let n = 0;
     for (;;) {
       const r: { done: boolean; value?: Uint8Array } = await reader.read();
@@ -468,10 +527,9 @@ async function getBytes(url: string, cap: number, accept: string, signal: AbortS
       idle = setTimeout(stop, IDLE_MS);
       n += r.value.byteLength;
       if (n > cap) throw new Refused(`more than ${cap} bytes`);
-      chunks.push(r.value);
-      progress?.(n);
+      await take(r.value, n);
     }
-    return join(chunks, n);
+    return n;
   } finally {
     clearTimeout(idle);
     if (deadline) clearTimeout(deadline);
@@ -483,6 +541,16 @@ async function getBytes(url: string, cap: number, accept: string, signal: AbortS
       /* finished */
     }
   }
+}
+
+/** One file, read whole into memory (the manifest, a thumbnail, a photo). */
+async function getBytes(url: string, cap: number, accept: string, signal: AbortSignal, small: boolean, progress?: (n: number) => void): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  const n = await getStream(url, cap, accept, signal, small, (piece, total) => {
+    chunks.push(piece);
+    progress?.(total);
+  });
+  return join(chunks, n);
 }
 
 function hex(buf: ArrayBuffer): string {
@@ -548,8 +616,7 @@ async function adopt(b: string, entries: WallpaperEntry[]): Promise<void> {
   manifest = { base: b, entries, network: true };
   thumbFailed.clear();
   // In the manifest's own format: it is checked again, as the site's, when it is read back.
-  const wallpapers = entries.map((e) => ({ ...e, file: `full/${e.id}.jpg`, thumb: `thumbs/${e.id}.jpg` }));
-  await writeJSON(CACHE, { version: 1, base: b, savedAt: new Date().toISOString(), wallpapers });
+  await writeJSON(CACHE, { version: 1, base: b, savedAt: new Date().toISOString(), wallpapers: entries.map(toManifest) });
 }
 
 function pumpThumbs(): void {
@@ -587,6 +654,7 @@ async function fetchThumb(b: string, e: WallpaperEntry): Promise<void> {
 }
 
 async function start(first: boolean): Promise<void> {
+  starting++; // counted at once: the picker that called watch() renders before anything is read
   try {
     await ensureLoaded();
     if (!watchers) return;
@@ -598,10 +666,13 @@ async function start(first: boolean): Promise<void> {
     pumpThumbs();
   } catch (e) {
     console.warn('Deer wallpapers: could not start', e);
+  } finally {
+    starting--;
+    emit(); // no longer pending
   }
 }
 
-/** No picker has shown its Photo tab for a second: the thumbnails stop (not a manifest request sent). */
+/** No picker has shown its Photo or Video tab for a second: the thumbnails stop (not a manifest request sent). */
 function stop(): void {
   stopTimer = 0;
   if (watchers) return;
@@ -614,63 +685,58 @@ function stop(): void {
 
 // ---- choosing ----
 
-function listedEntry(id: string): WallpaperEntry | undefined {
-  return manifest && manifest.base === baseURL() ? manifest.entries.find((e) => e.id === id) : undefined;
+/** The entry listed under this id with this kind (the same id listed as the other kind is another wallpaper). */
+function listedEntry(id: string, kind: WallpaperKind): WallpaperEntry | undefined {
+  return manifest && manifest.base === baseURL() ? manifest.entries.find((e) => e.id === id && e.kind === kind) : undefined;
 }
 
-/** The picture in the profile is the one this entry lists (it was checked against that hash). */
+/** The file in the profile is the one this entry lists (it was checked against that hash). */
 function isLocal(e: WallpaperEntry): boolean {
-  return pictures.has(e.id) && chosen.some((c) => c.id === e.id && c.sha256 === e.sha256);
+  return files.has(fileName(e.id, e.kind)) && chosen.some((c) => c.id === e.id && c.kind === e.kind && c.sha256 === e.sha256);
 }
 
-/** Put a choice first in chosen.json (an entry: its record anew; else the record it had). */
-async function remember(id: string, e: WallpaperEntry | undefined): Promise<void> {
-  const old = chosen.find((c) => c.id === id);
+/**
+ * Put a choice first in chosen.json (an entry: its record anew; else the record it had). The record
+ * of the same id's other kind stays as it is, and so does its file.
+ */
+async function remember(id: string, kind: WallpaperKind, e: WallpaperEntry | undefined): Promise<void> {
+  const same = (c: Chosen): boolean => c.id === id && c.kind === kind;
+  const old = chosen.find(same);
   const rec: Chosen | undefined = e
-    ? { id, sha256: e.sha256, bytes: e.bytes, title: e.title, author: e.author, license: e.license, color: e.color, at: Date.now() }
+    ? { id, kind, sha256: e.sha256, bytes: e.bytes, title: e.title, author: e.author, license: e.license, color: e.color, at: Date.now() }
     : old && { ...old, at: Date.now() };
   if (!rec) return;
-  chosen = [rec, ...chosen.filter((c) => c.id !== id)];
+  chosen = [rec, ...chosen.filter((c) => !same(c))];
   await writeJSON(CHOSEN, chosen);
 }
 
-function apply(path: string): void {
-  VitreSettings.set({ homeBackground: { kind: 'image', path } });
+/** Home's background: a photo as an 'image', a video as a 'video' (its colour first, for Home's first paint). */
+function apply(path: string, kind: WallpaperKind, color: string | undefined): void {
+  const bg = { kind: kind === 'video' ? ('video' as const) : ('image' as const), path };
+  if (kind === 'video' && color) VitreHome.setBaseColor(bg, color);
+  VitreSettings.set({ homeBackground: bg });
 }
 
 function fail(d: Download, why: string): ChooseResult {
   console.warn(`Deer wallpapers: ${d.id} was not used: ${why}`);
   if (download === d) {
     download = null;
-    failed = d.id;
+    failed = { id: d.id, kind: d.kind };
     emit();
   }
   return 'failed';
 }
 
-async function fetchAndApply(d: Download): Promise<ChooseResult> {
-  await ensureLoaded();
-  const b = baseURL();
-  const e = listedEntry(d.id);
-  const path = picturePath(d.id);
-  // Here already (the same picture as listed; one no longer listed is used as it is): at once.
-  if ((e ? isLocal(e) : pictures.has(d.id)) && (await exists(path))) {
-    if (download !== d) return 'superseded';
-    download = null;
-    apply(path); // nothing awaited since the check: a choice made meanwhile cannot be overwritten
-    await remember(d.id, e);
-    void prunePictures();
-    return 'applied';
-  }
-  if (!e) return fail(d, 'it is not in the collection');
-  d.total = e.bytes;
-  emit();
+function progressOf(d: Download, n: number): void {
+  d.received = n;
+  emitSoon();
+}
+
+/** A photo (at most 25 MiB), read whole and checked, then written. Null once it is at `path`. */
+async function savePhoto(b: string, e: WallpaperEntry, path: string, d: Download): Promise<ChooseResult | null> {
   let bytes: Uint8Array;
   try {
-    bytes = await getBytes(`${b}full/${e.id}.jpg`, e.bytes, 'image/jpeg', d.ac.signal, false, (n) => {
-      d.received = n;
-      emitSoon();
-    });
+    bytes = await getBytes(`${b}full/${e.id}.jpg`, e.bytes, 'image/jpeg', d.ac.signal, false, (n) => progressOf(d, n));
   } catch (err) {
     if (download !== d) return 'superseded';
     return fail(d, err instanceof Error ? err.message : String(err));
@@ -684,16 +750,110 @@ async function fetchAndApply(d: Download): Promise<ChooseResult> {
   } catch (err) {
     return fail(d, `it could not be saved (${err})`);
   }
+  return null;
+}
+
+/**
+ * A video (up to 100 MiB), never whole in memory: written to <id>.mp4.part a step at a time as it
+ * arrives and hashed on the way, refused as soon as it does not start as an MP4 video does (its 'ftyp'
+ * box, read whole before the first byte is written) or runs past its size, renamed to <id>.mp4 once its
+ * size and SHA-256 are the ones listed. Null once it is at `path`; otherwise the temporary file is gone
+ * before the tile hears of it.
+ */
+async function saveVideo(b: string, e: WallpaperEntry, path: string, d: Download): Promise<ChooseResult | null> {
+  const part = path + '.part';
+  const hash = Cc['@mozilla.org/security/hash;1'].createInstance(Ci.nsICryptoHash);
+  hash.init(Ci.nsICryptoHash.SHA256);
+  /** The file's first bytes (at most MAX_FTYP), until mp4Start() can tell. */
+  let head: Uint8Array = new Uint8Array(0);
+  let mp4: boolean | null = null;
+  let queued: Uint8Array[] = [];
+  let queuedBytes = 0;
+  let written = 0;
+  const flush = async (): Promise<void> => {
+    if (!queuedBytes) return;
+    if (mp4 !== true) throw new Refused('not an MP4 video'); // nothing reaches the disk before the box is judged
+    const step = join(queued, queuedBytes);
+    queued = [];
+    queuedBytes = 0;
+    // The first step makes the file; later ones fail if it went meanwhile (a prune: this was superseded).
+    await IOUtils.write(part, step, { mode: written ? 'append' : 'overwrite' });
+    written += step.byteLength;
+  };
+  const refuse = async (why: string): Promise<ChooseResult> => {
+    await removeFile(part);
+    return download === d ? fail(d, why) : 'superseded';
+  };
+  let n = 0;
+  try {
+    await IOUtils.makeDirectory(folder(), { createAncestors: true, ignoreExisting: true });
+    n = await getStream(`${b}full/${e.id}.mp4`, e.bytes, 'video/mp4', d.ac.signal, false, async (piece, total) => {
+      if (mp4 === null) {
+        const more = piece.subarray(0, MAX_FTYP - head.byteLength);
+        head = join([head, more], head.byteLength + more.byteLength);
+        mp4 = mp4Start(head, e.bytes);
+        if (mp4 === false) throw new Refused('not an MP4 video');
+      }
+      hash.update(piece, piece.byteLength);
+      queued.push(piece);
+      queuedBytes += piece.byteLength;
+      if (queuedBytes >= WRITE_STEP) await flush();
+      progressOf(d, total);
+    });
+    await flush();
+  } catch (err) {
+    return refuse(err instanceof Error ? err.message : String(err));
+  }
+  if (download !== d) return refuse('superseded');
+  if (n !== e.bytes) return refuse(`${n} bytes, not the ${e.bytes} listed`);
+  if (mp4 !== true) return refuse('not an MP4 video');
+  const raw: string = hash.finish(false);
+  if (Array.from(raw, (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('') !== e.sha256) return refuse('its SHA-256 is not the one listed');
+  if (download !== d) return refuse('superseded');
+  try {
+    await IOUtils.move(part, path);
+  } catch (err) {
+    return refuse(`it could not be saved (${err})`);
+  }
+  return null;
+}
+
+async function fetchAndApply(d: Download): Promise<ChooseResult> {
+  await ensureLoaded();
+  const b = baseURL();
+  const { id, kind } = d;
+  // Only this kind's entry: the same id listed as the other kind is not this tile's wallpaper.
+  const e = listedEntry(id, kind);
+  const rec = chosen.find((c) => c.id === id && c.kind === kind);
+  const path = filePath(id, kind);
+  // Here already (the same file as listed; one no longer listed is used as it is): at once.
+  if ((e ? isLocal(e) : files.has(fileName(id, kind))) && (await exists(path))) {
+    if (download !== d) return 'superseded';
+    download = null;
+    apply(path, kind, e?.color ?? rec?.color); // nothing awaited since the check: a choice made meanwhile cannot be overwritten
+    // The tile is no longer busy (choosing the background it already is changes no setting, so no
+    // other change would tell the pickers).
+    emit();
+    await remember(id, kind, e);
+    void pruneFiles();
+    return 'applied';
+  }
+  if (!e) return fail(d, 'it is not in the collection');
+  d.total = e.bytes;
+  emit();
+  const stopped = e.kind === 'video' ? await saveVideo(b, e, path, d) : await savePhoto(b, e, path, d);
+  if (stopped) return stopped;
   if (download !== d) {
     // Superseded while it was written: never applied, and not kept (unless it is the background).
-    if (currentId() !== e.id) await removeFile(path);
+    const now = current();
+    if (now?.id !== e.id || now.kind !== e.kind) await removeFile(path);
     return 'superseded';
   }
   download = null;
-  pictures.add(e.id);
-  apply(path);
-  await remember(e.id, e);
-  void prunePictures();
+  files.add(fileName(e.id, e.kind));
+  apply(path, e.kind, e.color);
+  await remember(e.id, e.kind, e);
+  void pruneFiles();
   return 'applied';
 }
 
@@ -729,14 +889,19 @@ export const VitreWallpapers = {
       const thumb = thumbs.get(e.id) === e.thumbBytes ? thumbPath(e.id) : '';
       const local = isLocal(e);
       if (!m!.network && !thumb && !local) continue; // without the network: only what is here
-      tiles.push({ id: e.id, title: e.title, author: e.author, license: e.license, color: e.color, path: picturePath(e.id), thumb, local, listed: true });
+      tiles.push({ id: e.id, kind: e.kind, title: e.title, author: e.author, license: e.license, color: e.color, path: filePath(e.id, e.kind), thumb, local, listed: true });
     }
-    const cur = currentId();
-    if (cur && pictures.has(cur) && !tiles.some((t) => t.id === cur)) {
-      const r = chosen.find((c) => c.id === cur);
-      tiles.unshift({ id: cur, title: r?.title ?? 'Deer wallpaper', author: r?.author ?? '', license: r?.license ?? '', color: r?.color ?? '#2b2a2e', path: picturePath(cur), thumb: '', local: true, listed: false });
+    const cur = current();
+    if (cur && files.has(fileName(cur.id, cur.kind)) && !tiles.some((t) => t.id === cur.id && t.kind === cur.kind)) {
+      const r = chosen.find((c) => c.id === cur.id && c.kind === cur.kind);
+      tiles.unshift({ id: cur.id, kind: cur.kind, title: r?.title ?? 'Deer wallpaper', author: r?.author ?? '', license: r?.license ?? '', color: r?.color ?? '#2b2a2e', path: filePath(cur.id, cur.kind), thumb: '', local: true, listed: false });
     }
-    return { tiles, downloading: download ? { id: download.id, received: download.received, total: download.total } : null, failed };
+    return {
+      tiles,
+      downloading: download ? { id: download.id, kind: download.kind, received: download.received, total: download.total } : null,
+      failed: failed && { ...failed },
+      pending: starting > 0 || !!manifestAc,
+    };
   },
 
   onChange(fn: () => void): () => void {
@@ -746,10 +911,11 @@ export const VitreWallpapers = {
     };
   },
 
-  choose(id: string): Promise<ChooseResult> {
-    if (download?.id === id) return download.done;
+  choose(id: string, kind: WallpaperKind): Promise<ChooseResult> {
+    if (kind !== 'photo' && kind !== 'video') return Promise.resolve('failed');
+    if (download?.id === id && download.kind === kind) return download.done;
     VitreWallpapers.supersede();
-    const d: Download = { id, ac: new AbortController(), received: 0, total: 0, done: Promise.resolve<ChooseResult>('failed') };
+    const d: Download = { id, kind, ac: new AbortController(), received: 0, total: 0, done: Promise.resolve<ChooseResult>('failed') };
     download = d;
     d.done = fetchAndApply(d).catch((e) => fail(d, String(e)));
     emit();
@@ -766,9 +932,9 @@ export const VitreWallpapers = {
   },
 
   /** For tests and diagnostics. */
-  debug(): { base: string; fetching: boolean; asked: Record<string, number>; source: 'none' | 'cache' | 'network'; watchers: number; thumbsRunning: number; chosen: string[] } {
+  debug(): { base: string; fetching: boolean; asked: Record<string, number>; source: 'none' | 'cache' | 'network'; watchers: number; thumbsRunning: number; chosen: string[]; files: string[] } {
     const b = baseURL();
     const source = manifest?.base === b ? (manifest.network ? 'network' : 'cache') : 'none';
-    return { base: b, fetching: !!manifestAc, asked: Object.fromEntries(asked), source, watchers, thumbsRunning: thumbRunning.size, chosen: chosen.map((c) => c.id) };
+    return { base: b, fetching: !!manifestAc, asked: Object.fromEntries(asked), source, watchers, thumbsRunning: thumbRunning.size, chosen: chosen.map((c) => fileName(c.id, c.kind)), files: [...files].sort() };
   },
 };

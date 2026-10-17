@@ -4,18 +4,22 @@
 // themselves (<img> / <video> on a file: URL; browser.xhtml's CSP leaves img-src and media-src
 // open, and Gecko decodes an image at the size it is drawn), no thumbnail service.
 //
-// The Photo tab ends with one more group, "Deer wallpapers" (VitreWallpapers: the collection hosted
-// on GitHub Pages), under its own caption and radio group, shown only when it has a tile. Its tiles
-// look and behave as the others (sizes, check, focus ring, arrows, Home / End); a tile's face is its
-// thumbnail (the mean colour until it is in), its name and tooltip give the title and the credit
-// ("Photo: <author> · <license>"). Choosing one that is not downloaded yet moves nothing: the tile
-// dims and shows a thin progress line while the picture downloads, and the check moves once Home
-// has it; another choice meanwhile supersedes it. A download that fails or does not check out
+// The Photo and Video tabs end with one more group, "Deer wallpapers" (VitreWallpapers: the collection
+// hosted on GitHub Pages; the Photo tab shows its photos, the Video tab its videos), under its own
+// caption and radio group, shown only when it has a tile. Its tiles look and behave as the others
+// (sizes, check, focus ring, arrows, Home / End); a tile's face is its thumbnail (a video's poster
+// frame; the mean colour until it is in), its name and tooltip give the title and the credit
+// ("Photo: <author> · <license>", "Video: …"). Choosing one that is not downloaded yet moves nothing:
+// the tile dims and shows a thin progress line while the file downloads, and the check moves once
+// Home has it; another choice meanwhile supersedes it. A download that fails or does not check out
 // leaves a short line on the tile ("Couldn’t download this wallpaper.", also said to screen readers)
-// and changes nothing. The picker asks for the collection only while its Photo tab is shown
+// and changes nothing. The picker asks for the collection only while its Photo or Video tab is shown
 // (VitreWallpapers.watch), and never as one of Find a setting's results (`offline`: it shows what
-// this session already has).
-import type { WallpaperState, WallpaperTile } from '../../../modules/VitreWallpapers.sys';
+// this session already has). A tile is an id and a kind (the collection may list an id as a photo,
+// later as a video): its download, failure and choice are of its own kind only. The Video tab's note
+// ("Add a video…") is for a tab with no video at all: it waits while the collection is being read or
+// asked for, so it never shows to be taken back as the Deer videos arrive.
+import type { WallpaperRef, WallpaperState, WallpaperTile } from '../../../modules/VitreWallpapers.sys';
 import { setTip } from '../../tips';
 import type { HomeBackground, Tile } from './background';
 import { h, uid } from './controls';
@@ -47,10 +51,24 @@ function tabFor(kind: string): Tab {
   return kind === 'video' ? 'video' : kind === 'none' ? 'none' : 'photo';
 }
 
-/** "Photo: <author> · <license>", or '' when the credit is not known. */
+/** "Photo: <author> · <license>" ("Video: …" for a video), or '' when the credit is not known. */
 function creditOf(w: WallpaperTile): string {
-  return w.author ? `Photo: ${w.author}${w.license ? ` · ${w.license}` : ''}` : '';
+  return w.author ? `${w.kind === 'video' ? 'Video' : 'Photo'}: ${w.author}${w.license ? ` · ${w.license}` : ''}` : '';
 }
+
+/** The Deer wallpapers a tab shows: the Photo tab's photos, the Video tab's videos. */
+function deerKindOf(tab: Tab): WallpaperTile['kind'] | null {
+  return tab === 'photo' ? 'photo' : tab === 'video' ? 'video' : null;
+}
+
+/** A Deer wallpaper as a tile of the picker: a photo is an 'image' background, a video a 'video' one. */
+const deerTile = (w: WallpaperTile): Tile => ({ kind: w.kind === 'video' ? 'video' : 'image', path: w.path, label: w.title, deer: w });
+
+/** The download or failure `r` is this tile's: the same id and the same kind. */
+const isOf = (r: WallpaperRef, w: WallpaperTile): boolean => r.id === w.id && r.kind === w.kind;
+
+/** Beyond a tile's face, its focus ring (styles.ts: a 2 px outline 4 px out). */
+const RING = 6;
 
 export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover', opts: { offline?: boolean } = {}): Picker {
   const columns = variant === 'panel' ? 3 : 2;
@@ -64,6 +82,8 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   let build = 0;
   let shownKey = '';
   let deerKey = '';
+  /** This picker watches the collection and it may still change by itself (WallpaperState.pending). */
+  let deerPending = false;
   let unwatch: (() => void) | null = null;
   /**
    * A tile chosen here that HomeBackground has not answered yet (it looks for the file first): it is
@@ -123,11 +143,10 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     if (moved) paintGroup(group, true);
   };
 
-  const fillFace = (face: HTMLElement, t: Tile): void => {
-    const url = fileURL(t.path);
-    if (!url) return;
+  /** A face's picture: a photo's file itself, or a frame of a video (muted, never playing). */
+  const faceMedia = (url: string, video: boolean): HTMLImageElement | HTMLVideoElement => {
     let media: HTMLImageElement | HTMLVideoElement;
-    if (t.kind === 'video') {
+    if (video) {
       const v = h('video', { preload: 'metadata', 'aria-hidden': 'true', tabindex: '-1' });
       v.muted = true;
       v.src = `${url}#t=0.5`;
@@ -139,7 +158,12 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     }
     // A file that is gone leaves a plain face, never a broken-image glyph.
     media.addEventListener('error', () => media.remove(), { once: true });
-    face.append(media);
+    return media;
+  };
+
+  const fillFace = (face: HTMLElement, t: Tile): void => {
+    const url = fileURL(t.path);
+    if (url) face.append(faceMedia(url, t.kind === 'video'));
   };
 
   const tileEl = (t: Tile): HTMLElement => {
@@ -184,7 +208,9 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
 
   const paintNote = (): void => {
     const error = bg.error ?? bg.homeError();
-    const empty = tab === 'video' && !tiles.length;
+    // No video of yours and no Deer video listed, nor any on the way (the collection being read or
+    // asked for in this tab: the note would show, be read out, and go again as the group comes).
+    const empty = tab === 'video' && !tiles.length && deerBox.hidden && !deerPending;
     note.textContent = error ?? (empty ? 'Add a video to play it behind Home. It plays muted and loops.' : tab === 'none' ? 'Home shows a plain dark background.' : '');
     note.classList.toggle('error', !!error);
     note.hidden = !note.textContent;
@@ -192,9 +218,9 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
 
   // ---- Deer wallpapers ----
 
-  /** The collection is asked for only while the Photo tab is shown. */
+  /** The collection is asked for only while the Photo or the Video tab is shown. */
   const follow = (): void => {
-    const want = tab === 'photo' && !!wp && !opts.offline;
+    const want = !!deerKindOf(tab) && !!wp && !opts.offline;
     if (want && !unwatch) unwatch = wp!.watch();
     else if (!want && unwatch) {
       unwatch();
@@ -205,25 +231,23 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   /** A Deer tile as the state says: face, download, failure (touching only what changed). */
   const paintDeer = (btn: HTMLElement, w: WallpaperTile, st: WallpaperState): void => {
     const face = btn.querySelector('.hb-face') as HTMLElement;
-    // The thumbnail; a picture no longer listed shows itself; the mean colour until then. A source is
-    // tried once per face: one that does not decode (it passed every check and still holds no picture)
-    // leaves the colour, and is not tried again on each repaint.
-    const src = w.thumb ? fileURL(w.thumb) : !w.listed && w.local ? fileURL(w.path) : '';
+    // The thumbnail; a file no longer listed shows itself (a video as the recent videos do: a frame);
+    // the mean colour until then. A source is tried once per face: one that does not decode (it passed
+    // every check and still holds no picture) leaves the colour, and is not tried again on each repaint.
+    const own = !w.thumb && !w.listed && w.local;
+    const src = w.thumb ? fileURL(w.thumb) : own ? fileURL(w.path) : '';
     if (face.dataset.src !== src) {
       face.dataset.src = src;
-      face.querySelector('img')?.remove();
-      if (src) {
-        const img = h('img', { alt: '', draggable: 'false', decoding: 'async' });
-        img.src = src;
-        img.addEventListener('error', () => img.remove(), { once: true });
-        face.prepend(img);
-      }
+      face.querySelector(':scope > :is(img, video)')?.remove();
+      if (src) face.prepend(faceMedia(src, own && w.kind === 'video'));
     }
     if (face.dataset.color !== w.color) {
       face.dataset.color = w.color;
       face.style.backgroundColor = w.color;
     }
-    const d = st.downloading?.id === w.id ? st.downloading : null;
+    // The download and the failure are this tile's only when the kind matches too (the same id may be
+    // listed as the other kind, in the other tab).
+    const d = st.downloading && isOf(st.downloading, w) ? st.downloading : null;
     if (d) {
       const p = d.total ? Math.min(1, d.received / d.total) : 0;
       btn.setAttribute('aria-busy', 'true');
@@ -234,21 +258,22 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
       delete btn.dataset.progress;
       (face.querySelector('.hb-bar') as HTMLElement).style.width = '0';
     }
-    const failed = st.failed === w.id;
+    const failed = !!st.failed && isOf(st.failed, w);
     const line = face.querySelector('.hb-fail') as HTMLElement;
     if (line.hidden === failed) line.hidden = !failed;
     btn.dataset.failed = String(failed);
   };
 
   const renderDeer = (): void => {
-    const st = tab === 'photo' && wp ? wp.state() : null;
-    const list = st?.tiles ?? [];
-    const key = list.map((w) => `${w.id}|${w.listed}|${w.title}|${w.author}|${w.license}`).join('\n');
+    const kind = deerKindOf(tab);
+    const st = kind && wp ? wp.state() : null;
+    const list = st?.tiles.filter((w) => w.kind === kind) ?? [];
+    const key = list.map((w) => `${w.id}|${w.kind}|${w.listed}|${w.title}|${w.author}|${w.license}`).join('\n');
     if (key !== deerKey) {
       const was = (document.activeElement as HTMLElement | null)?.dataset?.id;
       const hadFocus = deerGrid.contains(document.activeElement);
       deerKey = key;
-      deerTiles = list.map((w) => tileEl({ kind: 'image', path: w.path, label: w.title, deer: w }));
+      deerTiles = list.map((w) => tileEl(deerTile(w)));
       deerGrid.replaceChildren(...deerTiles);
       paintGroup(deerTiles);
       if (hadFocus) {
@@ -256,13 +281,19 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
         paintGroup(deerTiles, true); // the tab stop where focus came back
       }
     }
-    deerBox.hidden = !list.length;
+    // Only a picker that asks for the collection waits for it (Find a setting's shows what is here).
+    const pending = !!unwatch && !!st?.pending;
+    if (deerBox.hidden !== !list.length || deerPending !== pending) {
+      deerBox.hidden = !list.length;
+      deerPending = pending;
+      paintNote(); // the Video tab's note is for a tab with no video at all
+    }
     list.forEach((w, i) => paintDeer(deerTiles[i], w, st!));
-    syncGroup(deerTiles, list.map((w) => ({ kind: 'image', path: w.path, label: w.title })));
+    syncGroup(deerTiles, list.map(deerTile));
     // A Deer wallpaper just applied (or one taken off): the other group's check moves at the same
     // moment (its own render waits for its tiles).
     syncGroup(tiles, shown);
-    const said = st?.failed && list.some((w) => w.id === st.failed) ? WALLPAPER_FAILED : '';
+    const said = st?.failed && list.some((w) => isOf(st.failed!, w)) ? WALLPAPER_FAILED : '';
     if (live.textContent !== said) live.textContent = said;
     el.dataset.deer = String(list.length);
   };
@@ -339,6 +370,20 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   gridKeys(grid, () => tiles);
   gridKeys(deerGrid, () => deerTiles);
 
+  /**
+   * A tile wholly inside the popover's scroll area, its focus ring too: Gecko's focus() scrolls only a
+   * tile that is out of view, and leaves one partly hidden as it is (with two groups, the checked tile
+   * can sit across the area's lower edge). Only the panel scrolls (Settings' panel does not: no-op).
+   */
+  const reveal = (tile: HTMLElement): void => {
+    const box = panel.getBoundingClientRect();
+    const r = (tile.querySelector('.hb-face') ?? tile).getBoundingClientRect();
+    const top = r.top - RING - box.top;
+    const bottom = r.bottom + RING - box.bottom;
+    if (top < 0) panel.scrollTop += top;
+    else if (bottom > 0) panel.scrollTop += Math.min(top, bottom);
+  };
+
   // Follow changes made elsewhere (the other picker, the file dialog, another window). Only a new
   // background moves the tab: a note coming or going (a file that has gone, a Deer wallpaper chosen)
   // leaves the person where they are.
@@ -375,7 +420,11 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
           });
           if (document.activeElement !== was) return; // the person moved on meanwhile
         }
-        (checked() ?? tiles.find((t) => t.tabIndex === 0) ?? tabButtons.find((b) => b.tabIndex === 0))?.focus();
+        const target = checked() ?? tiles.find((t) => t.tabIndex === 0);
+        if (target) {
+          target.focus();
+          reveal(target);
+        } else tabButtons.find((b) => b.tabIndex === 0)?.focus();
       }),
     dispose: () => {
       off();

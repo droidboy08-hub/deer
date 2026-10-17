@@ -269,9 +269,9 @@ const home: SectionDef = {
         {
           title: 'Background',
           desc: 'A photo, a video, your Windows wallpaper or none',
-          // "deer wallpapers", "gallery": the picker's Deer wallpapers group (VitreWallpapers). Not
-          // "download": that search is for the Downloads settings.
-          keywords: 'wallpaper picture photo video image home none deer wallpapers gallery collection',
+          // "deer wallpapers", "gallery": the picker's Deer wallpapers group (VitreWallpapers); "live
+          // wallpapers", "animated": its videos. Not "download": that search is for the Downloads settings.
+          keywords: 'wallpaper picture photo video image home none deer wallpapers gallery collection live animated',
           build: (ctx) => {
             // In Find a setting's results the picker shows what is here but never asks the site: a
             // letter typed is not a visit to Home and background.

@@ -2,7 +2,9 @@
 //   python tools/run.py --test tests/input/home.js --name input-home --timeout 300
 // Captures in tests/input/out: home-1-windows (the user's own wallpaper), home-2-image-light,
 // home-3-image-dark, home-4-video, home-5-none, home-6-second-window.
-// The pictures and the video are made here (canvas, MediaRecorder) and written to the output folder.
+// The pictures and the video are made here (canvas, MediaRecorder) and written to the output folder;
+// the MP4 is tests/settings/live-wallpaper.mp4 (as Deer's live wallpapers are: H.264, no sound), and
+// a copy of it damaged past the middle (home-broken.mp4: it plays, then its decoder fails).
 /* global spike, Services, Cc, Ci, ChromeUtils, gBrowser, IOUtils, PathUtils, K */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js?" + Date.now(), window);
 spike.main(async () => {
@@ -187,6 +189,50 @@ spike.main(async () => {
   b.activate(homeTab);
   await sleep(900);
   check("... and plays again when the tab is shown", !v.paused && v.currentTime !== stillAt, { paused: v.paused, now: v.currentTime });
+  /** currentTime every 100 ms for `ms`: how often it wrapped back to the start. */
+  const loopOf = async (el, ms) => {
+    const at = [];
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      at.push(el.currentTime);
+      await sleep(100);
+    }
+    let wraps = 0;
+    for (let i = 1; i < at.length; i++) if (at[i] < at[i - 1] - 1) wraps++;
+    return { wraps, duration: el.duration, max: Math.max(...at), paused: el.paused, ended: el.ended };
+  };
+  const clipLoop = await loopOf(v, 6000);
+  check("... and loops: its time wraps past the end (2.2 s) again and again, and it plays on", clipLoop.wraps >= 2 && !clipLoop.paused && !clipLoop.ended, clipLoop);
+  // An MP4 as Deer's live wallpapers are (H.264, faststart, no sound: the clip the Deer wallpapers
+  // test serves), one video replacing another: it loops for good, muted, and the page says it plays.
+  const mp4 = PathUtils.join(PathUtils.parent(PathUtils.parent(Services.env.get("VITRE_LIB"))), "tests", "settings", "live-wallpaper.mp4");
+  settings.set({ homeBackground: { kind: "video", path: mp4 } });
+  const mv = await waitFor(() => { const m = page().querySelector("#bg > video.shown"); return m && m.src.endsWith("/live-wallpaper.mp4") && data().state === "ready" ? m : null; }, { timeout: 15000, what: "the MP4" });
+  await sleep(600);
+  const mp4Loop = await loopOf(mv, 7500);
+  check("an MP4 video background replacing another plays muted and loops for good (wraps again and again), the page saying it plays", mv.muted && mv.loop && mp4Loop.wraps >= 2 && !mp4Loop.paused && !mp4Loop.ended && data().playing === "true" && media().length === 1, { ...mp4Loop, playing: data().playing, n: media().length });
+  // The same MP4 damaged further on (bytes of its media data overwritten past the middle): its first
+  // frames decode, then the decoder fails. Its last frame stays on screen (Home does not go blank
+  // while it says it is ready), and the page no longer says it plays.
+  const clipBytes = await IOUtils.read(mp4);
+  let mdat = -1;
+  for (let i = 0; i + 8 <= clipBytes.length && mdat < 0; i++) if (clipBytes[i + 4] === 0x6d && clipBytes[i + 5] === 0x64 && clipBytes[i + 6] === 0x61 && clipBytes[i + 7] === 0x74) mdat = i;
+  const mdatEnd = mdat + new DataView(clipBytes.buffer, clipBytes.byteOffset).getUint32(mdat);
+  const broken = new Uint8Array(clipBytes);
+  const at = mdat + Math.floor((mdatEnd - mdat) * 0.6);
+  broken.fill(0xff, at, Math.min(mdatEnd, at + 4000));
+  const brokenPath = PathUtils.join(out, "home-broken.mp4");
+  await IOUtils.write(brokenPath, broken);
+  settings.set({ homeBackground: { kind: "video", path: brokenPath } });
+  const bv = await waitFor(() => { const m = page().querySelector("#bg > video.shown"); return m && m.src.endsWith("/home-broken.mp4") && data().state === "ready" ? m : null; }, { timeout: 15000, what: "the damaged MP4 on screen" });
+  const broke = await waitFor(() => bv.error, { timeout: 10000, what: "the damaged MP4 failing" }).catch(() => null);
+  await sleep(800);
+  check("a video that breaks after its first frame keeps that frame on screen (not a blank page) and the page says it no longer plays", !!broke && bv.isConnected && bv.classList.contains("shown") && media().length === 1 && data().state === "ready" && data().playing === "false", { error: bv.error?.code, connected: bv.isConnected, n: media().length, state: data().state, playing: data().playing, mdat, at });
+  b.activate(b.tabs[0]);
+  await sleep(400);
+  b.activate(homeTab);
+  await sleep(600);
+  check("... and stays so when its tab is shown again (not started again)", bv.isConnected && media().length === 1 && data().playing === "false", { playing: data().playing, n: media().length });
 
   // ------------------------------------------------------------------ 4. none, and a missing file
   log("--- 4. none");

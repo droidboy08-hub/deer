@@ -17,19 +17,36 @@
 // popover shows the group; the open picker follows changes made elsewhere (another window, Browse),
 // to and from a Deer wallpaper, keeps the arrows' tab stop through a download's repaints, and checks a
 // photo chosen during a download at once and for good; the manifest asked once across reopenings,
-// again only after 10 minutes; Find a setting; a wallpaper taken out of the collection that is the
-// background stays shown and checked; pruning keeps the current one and the 5 chosen last; no Cookie,
-// Referer or Origin ever sent, no cookie stored.
+// again only after 10 minutes, the Video tab of a collection of photos only (Deer 0.1.5's format) with
+// no group and its note; Find a setting (also by "live wallpapers"); a wallpaper taken out of the
+// collection that is the background stays shown and checked; pruning keeps the current one and the 5
+// chosen last; no Cookie, Referer or Origin ever sent, no cookie stored.
 // Run 2 (a restart): temporary files a write cut short left are gone after the first look; the site
-// down with a cache: the cached group, no message.
+// down with a cache: the cached group, no message. Then live wallpapers (/live/, photos and videos):
+// the None tab asks nothing, the Video tab asks by itself and lists the videos only (posters, names,
+// tooltips, radios, keys, the size of the photo tiles, no empty-tab note, not even while the
+// collection is asked for), a clip three days long listed, the skipped kinds and videos never asked
+// for, the Photo tab the photos only, the manifest once across both tabs; choose -> download ->
+// checked -> an ordinary 'video' background -> Home plays it muted and looping (its time wraps past
+// the end, again and again) on the entry's colour, never among the recent videos; progress while it
+// streams to a temporary file, superseded (nothing left); not an MP4, an AVIF picture (an 'ftyp' box
+// with a picture's brands), a wrong hash, a body without end: refused with the tile's line, nothing
+// written; pruning keeps the 2 videos chosen last (and the 5 photos); a video taken out of the
+// collection that is the background stays.
+// Run 3 (a restart): Home plays the Deer video again, painting its colour first, looping; the popover
+// opens on its Video tab with focus on its tile, wholly in view below two videos of the person's own;
+// a video's cut-short temporary file is gone; an id the collection lists as a photo, then as a video,
+// then as the photo again: each tab's tile fetches, applies and keeps only its own kind's file.
 // Captures: wallpapers-settings, wallpapers-progress, wallpapers-failed, wallpapers-popover,
-// wallpapers-removed, wallpapers-offline (tests/settings/out).
+// wallpapers-removed, wallpapers-offline, wallpapers-videos, wallpapers-video-removed,
+// wallpapers-video-popover (tests/settings/out).
 /* global spike, Services, Ci, IOUtils, PathUtils */
 spike.main(async () => {
   const b = window.vitre;
   const { check, log, sleep, waitFor } = spike;
   const store = b.sys("VitreSettings");
   const W = b.sys("VitreWallpapers");
+  const H = b.sys("VitreHome");
   const ORIGIN = Services.env.get("WPTEST_ORIGIN");
   const DOWN = Services.env.get("WPTEST_DOWN");
   if (!ORIGIN || !DOWN) throw new Error("run through tests/settings/all.py (WPTEST_ORIGIN, WPTEST_DOWN)");
@@ -38,6 +55,7 @@ spike.main(async () => {
   const root = () => document.getElementById("vitre-settings");
   const dir = W.folder();
   const FAILED = "Couldn’t download this wallpaper.";
+  const VIDEO_NOTE = "Add a video to play it behind Home. It plays muted and loops.";
   await spike.resize(1440, 900);
   await spike.activate();
 
@@ -54,6 +72,26 @@ spike.main(async () => {
     }
   };
   const pictures = async () => (await files(dir)).filter((n) => n.endsWith(".jpg"));
+  const vpathOf = (id) => PathUtils.join(dir, id + ".mp4");
+  const videos = async () => (await files(dir)).filter((n) => n.endsWith(".mp4"));
+  /** The video Home shows (the one on screen, not one fading out). */
+  const homeVideo = () => b.active().browser.contentDocument?.querySelector("#bg > video.shown");
+  /** currentTime every 100 ms for `ms`: how often it went forward, and how often it wrapped to the start. */
+  const watchLoop = async (v, ms) => {
+    const samples = [];
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      samples.push(v.currentTime);
+      await sleep(100);
+    }
+    let wraps = 0;
+    let forward = 0;
+    for (let i = 1; i < samples.length; i++) {
+      if (samples[i] < samples[i - 1] - 1) wraps++;
+      else if (samples[i] > samples[i - 1]) forward++;
+    }
+    return { wraps, forward, steps: samples.length - 1, duration: v.duration, max: Math.max(...samples), paused: v.paused, ended: v.ended };
+  };
   const temps = async () => [...(await files(dir)), ...(await files(PathUtils.join(dir, "thumbs")))].filter((n) => /\.(part|tmp)$/.test(n));
   const picker = (scope = root()) => scope?.querySelector(".hb-picker");
   const mainTiles = (scope = root()) => [...(picker(scope)?.querySelectorAll(".hb-panel > .hb-grid .hb-tile") ?? [])];
@@ -78,6 +116,12 @@ spike.main(async () => {
   /** The Settings picker's tabs (in the row's control column, outside .hb-picker). */
   const selectedTab = () => root()?.querySelector('.hb-tabs [aria-selected="true"]')?.textContent;
   const tabButton = (label) => [...(root()?.querySelectorAll('.hb-tabs [role="tab"]') ?? [])].find((x) => x.textContent === label);
+  /** Click a tab of the Settings picker, scrolled into view first (a tile chosen low down scrolls it away). */
+  const clickTab = async (label) => {
+    tabButton(label).scrollIntoView({ block: "nearest" });
+    await sleep(150);
+    spike.click(tabButton(label));
+  };
   /** Every checked tile of the Settings picker, both groups: a Deer wallpaper by id, a photo by path. */
   const checkedOf = () => [...mainTiles(), ...deerTiles()].filter((t) => t.getAttribute("aria-checked") === "true").map((t) => t.dataset.id || (t.dataset.kind === "windows" ? "windows" : t.dataset.path));
   const choose = async (id, scope = root()) => {
@@ -90,6 +134,10 @@ spike.main(async () => {
   const chooseAndWait = async (id, scope = root()) => {
     await choose(id, scope);
     await waitFor(() => bgNow().path === pathOf(id), { timeout: 15000, what: "background " + id });
+  };
+  const chooseVideoAndWait = async (id, scope = root()) => {
+    await choose(id, scope);
+    await waitFor(() => bgNow().kind === "video" && bgNow().path === vpathOf(id), { timeout: 15000, what: "video background " + id });
   };
   const GOOD = ["lake-at-dawn", "hills", "quiet-bay", "red-rocks", "snow-field", "city-lights", "old-pier", "bad-thumb", "odd-thumb", "slow-forest"];
   const BAD = ["wrong-hash", "short-file", "long-file", "not-jpeg", "wrong-dims", "gone-file"];
@@ -179,6 +227,7 @@ spike.main(async () => {
     const slowAsks = (await serverLog()).filter((r) => r.path === "/slow/wallpapers.json").length;
     check("a manifest slow to answer is asked for once, though Settings closed before it answered, three times", slowAsks === 1, slowAsks);
     check("…and its answer was taken when it came", W.debug().source === "network" && W.debug().base === slowBase, W.debug());
+    check("a Deer wallpaper's file is known by its folder and name, a photo's and a video's", W.isDeerPath(pathOf("x")) && W.isDeerPath(vpathOf("x")) && !W.isDeerPath(PathUtils.join(dir, "x.gif")) && !W.isDeerPath(PathUtils.join(dir, "thumbs", "x.jpg")));
 
     // ---------------------------------------------------------------- the main collection
     const main = ORIGIN + "/main/";
@@ -385,7 +434,7 @@ spike.main(async () => {
     spike.press("Right");
     await sleep(150);
     const arrowed = document.activeElement;
-    const busy = W.choose("slow-forest"); // as from another window's picker: focus stays here
+    const busy = W.choose("slow-forest", "photo"); // as from another window's picker: focus stays here
     await waitFor(() => tileOf("slow-forest")?.getAttribute("aria-busy") === "true" && Number(tileOf("slow-forest").dataset.progress) > 0.1, { timeout: 8000, what: "the download's progress" }).catch(() => null);
     const stops = mainTiles().filter((t) => t.tabIndex === 0);
     check("a download's repaints leave the other group's tab stop where the arrows put it", mainTiles().indexOf(arrowed) === 2 && stops.length === 1 && stops[0] === arrowed && document.activeElement === arrowed, { at: mainTiles().indexOf(arrowed), stops: stops.map((t) => t.dataset.path || t.dataset.kind) });
@@ -412,6 +461,8 @@ spike.main(async () => {
     const tabs = [...root().querySelectorAll('.hb-tabs [role="tab"]')];
     spike.click(tabs.find((x) => x.textContent === "Video"));
     await sleep(1500);
+    // Deer 0.1.5's format (photos, no "kind"): nothing for the Video tab, which says how to add a video.
+    check("a collection of photos only (Deer 0.1.5's format): the Video tab shows no Deer group, and its note", selectedTab() === "Video" && !deerShown() && picker().dataset.deer === "0" && mainTiles().length === 0 && noteText() === VIDEO_NOTE, { tab: selectedTab(), deer: picker().dataset.deer, note: noteText() });
     spike.click(tabs.find((x) => x.textContent === "Photo"));
     await sleep(1000);
     const manifestAsks = (await serverLog()).filter((r) => r.path === "/main/wallpapers.json").length;
@@ -433,7 +484,7 @@ spike.main(async () => {
     const nowBeforeSearch = W.now;
     W.now = () => Date.now() + 22 * 60 * 1000;
     try {
-      for (const q of ["deer wallpapers", "gallery"]) {
+      for (const q of ["deer wallpapers", "gallery", "live wallpapers", "animated"]) {
         b.service("settings").open("home", q);
         await sleep(400);
         const row = [...root().querySelectorAll(".vs-title")].some((x) => x.textContent === "Background") && !!root().querySelector(".hb-picker");
@@ -492,6 +543,11 @@ spike.main(async () => {
     return;
   }
 
+  if (spike.run === 3) {
+    await afterRestart();
+    return;
+  }
+
   // ==================================================================== run 2: the site down, a cache
   const main2 = ORIGIN + "/main2/";
   setBase(main2); // user.js put the harness's value back at the start
@@ -530,8 +586,274 @@ spike.main(async () => {
   panel.close();
   await sleep(300);
   await ctl("/__drop?prefix=");
-  Services.prefs.setStringPref(PREF, "http://127.0.0.1:9/");
-  store.reset("homeBackground.kind");
-  store.reset("homeBackground.path");
-  await sleep(300);
+  await liveWallpapers(); // ends with a restart into run 3
+  return;
+
+  // ==================================================================== live wallpapers (run 2, then 3)
+  // /live/: photos and videos mixed (wallpaper_server.py). The Video tab's own group, a video chosen,
+  // downloaded, checked and played by Home muted and looping; the Photo tab keeps the photos only.
+  async function liveWallpapers() {
+    await ctl("/__reset");
+    const live = ORIGIN + "/live/";
+    const live2 = ORIGIN + "/live2/";
+    const VIDEOS = ["night-river", "surf", "drift", "long-take", "slow-clip", "not-mp4", "avif-picture", "video-wrong-hash", "video-endless"];
+    const LIVE_PHOTOS = ["lake-at-dawn", "hills", "quiet-bay"];
+    const BAD_VIDEOS = ["not-mp4", "avif-picture", "video-wrong-hash", "video-endless"];
+    const liveAsks = async () => (await serverLog()).filter((r) => r.path === "/live/wallpapers.json").length;
+    const photosBefore = await pictures();
+    const recentBefore = Services.prefs.getStringPref("vitre.home.recent", "[]");
+    setBase(live);
+    store.set({ homeBackground: { kind: "none", path: "" } });
+    await openSettings();
+    await waitFor(() => selectedTab() === "None", { timeout: 5000, what: "the None tab" }).catch(() => null);
+    await sleep(1500);
+    check("live wallpapers: Settings on its None tab asks the site for nothing", selectedTab() === "None" && !(await serverLog()).some((r) => r.path.startsWith("/live/")), (await serverLog()).map((r) => r.path));
+
+    // ---------------------------------------------------------------- the Video tab asks, and lists the videos
+    // Its "Add a video" note is for a tab with no video at all: it must not show while the collection
+    // is read or asked for, only to be taken back (and read out) as the Deer videos arrive.
+    const noteSeen = [];
+    const noteWatch = new MutationObserver(() => {
+      if (noteText() === VIDEO_NOTE) noteSeen.push(`${selectedTab()} ${deerTiles().length} tiles, fetching ${W.debug().fetching}`);
+    });
+    noteWatch.observe(picker(), { subtree: true, childList: true, characterData: true, attributes: true });
+    spike.click(tabButton("Video"));
+    await attempted(live);
+    await waitFor(() => deerShown() && W.debug().thumbsRunning === 0 && deerTiles().filter((t) => t.querySelector(".hb-face img")).length >= VIDEOS.length, { timeout: 20000, what: "the videos' posters" }).catch(() => null);
+    await sleep(500);
+    noteWatch.disconnect();
+    check("the Video tab's “Add a video” note never showed while the collection was read and asked for", noteSeen.length === 0, noteSeen.slice(0, 3));
+    check("the Video tab asks for the collection by itself (once)", (await liveAsks()) === 1, await liveAsks());
+    check("the Video tab lists the collection's videos only, in its order, as its own “Deer wallpapers” group", selectedTab() === "Video" && JSON.stringify(deerIds()) === JSON.stringify(VIDEOS) && picker().querySelector(".hb-group")?.textContent === "Deer wallpapers" && picker().dataset.deer === String(VIDEOS.length), deerIds());
+    const noPoster = deerTiles().filter((t) => !(t.dataset.kind === "video" && t.querySelector(".hb-face img")?.src.includes(`/deer-wallpapers/thumbs/${t.dataset.id}.jpg`)));
+    check("…every tile a video tile whose face is its checked poster from the profile", noPoster.length === 0, noPoster.map((t) => t.dataset.id));
+    check("…radios, none checked yet", deerTiles().every((t) => t.getAttribute("role") === "radio" && t.getAttribute("aria-checked") === "false"));
+    check("…and no “Add a video” note: the tab has videos", mainTiles().length === 0 && noteText() === "", noteText());
+    const river = tileOf("night-river");
+    check("a video tile's accessible name gives the title and the credit", river?.getAttribute("aria-label") === "Night river, Video: Kai Lund · CC-BY-4.0", river?.getAttribute("aria-label"));
+    check("…and so does its tooltip, and its caption is the title", river?.dataset.tip === "Night river" && river?.dataset.key === "Video: Kai Lund · CC-BY-4.0" && river?.querySelector(".hb-cap")?.textContent === "Night river", { tip: river?.dataset.tip, key: river?.dataset.key });
+    check("the owner's own video (no author or license) is listed with no credit", tileOf("surf")?.getAttribute("aria-label") === "Surf" && !tileOf("surf")?.dataset.key);
+    check("a video three days long and of 100 MiB is listed (no length limit)", !!tileOf("long-take"));
+    const liveLog = await serverLog();
+    const liveAsked = new Set(liveLog.map((r) => r.path));
+    const liveWanted = new Set(["/live/wallpapers.json", ...[...VIDEOS, ...LIVE_PHOTOS].map((i) => `/live/thumbs/${i}.jpg`)]);
+    const liveStray = [...liveAsked].filter((p) => !liveWanted.has(p));
+    check("only the manifest and the thumbnails of both kinds were asked for (nothing of the kinds gif and Video, a video named .jpg, no or a bad duration, too wide, over 100 MiB)", liveStray.length === 0 && [...liveWanted].every((p) => liveAsked.has(p)), { stray: liveStray, missing: [...liveWanted].filter((p) => !liveAsked.has(p)) });
+    river.focus();
+    spike.press("Right");
+    await sleep(100);
+    check("Right moves to the next video tile without choosing", document.activeElement === tileOf("surf") && bgNow().kind === "none");
+    spike.press("End");
+    await sleep(100);
+    check("End goes to the group's last tile", document.activeElement === deerTiles().at(-1));
+    spike.press("Home");
+    await sleep(100);
+    check("Home to its first", document.activeElement === tileOf("night-river") && bgNow().kind === "none");
+    const videoFace = tileOf("night-river").querySelector(".hb-face").getBoundingClientRect();
+    picker().querySelector(".hb-deer").scrollIntoView({ block: "start" });
+    await sleep(400);
+    await spike.capture("wallpapers-videos");
+
+    // ---------------------------------------------------------------- the Photo tab: the photos only
+    spike.click(tabButton("Photo"));
+    await waitFor(() => selectedTab() === "Photo" && JSON.stringify(deerIds()) === JSON.stringify(LIVE_PHOTOS), { timeout: 5000, what: "the Photo tab's group" }).catch(() => null);
+    await sleep(300);
+    check("the Photo tab lists the collection's photos only (one with \"kind\": \"photo\" too)", JSON.stringify(deerIds()) === JSON.stringify(LIVE_PHOTOS) && deerTiles().every((t) => t.dataset.kind === "image"), deerIds());
+    const photoFace = tileOf("hills").querySelector(".hb-face").getBoundingClientRect();
+    check("video tiles are the size of the photo tiles", Math.abs(photoFace.width - videoFace.width) < 0.6 && Math.abs(photoFace.height - videoFace.height) < 0.6, { photo: [photoFace.width, photoFace.height], video: [videoFace.width, videoFace.height] });
+    spike.click(tabButton("Video"));
+    await waitFor(() => selectedTab() === "Video" && tileOf("night-river"), { timeout: 5000, what: "the Video tab" }).catch(() => null);
+    await sleep(600);
+    check("the manifest was asked for once across both tabs", (await liveAsks()) === 1, await liveAsks());
+
+    // ---------------------------------------------------------------- choose -> download -> checked -> Home plays it
+    await chooseVideoAndWait("night-river");
+    const info = await ctl("/__info");
+    check("choosing a video tile downloads it into the profile and makes it Home's background (an ordinary video)", bgNow().kind === "video" && bgNow().path === vpathOf("night-river"), bgNow());
+    check("the file is the one listed (size and SHA-256)", (await IOUtils.stat(vpathOf("night-river"))).size === info["night-river"].bytes && (await sha256(vpathOf("night-river"))) === info["night-river"].sha256);
+    check("Home's colour under its first frame is the entry's", H.baseColor(bgNow()) === info["night-river"].color, { base: H.baseColor(bgNow()), entry: info["night-river"].color });
+    await waitFor(() => tileOf("night-river")?.getAttribute("aria-checked") === "true", { timeout: 5000, what: "check" }).catch(() => null);
+    check("its tile is checked (and is its group's tab stop), no other tile is", JSON.stringify(checkedOf()) === JSON.stringify(["night-river"]) && tileOf("night-river").tabIndex === 0, checkedOf());
+    check("…the Video tab stays, with no note", selectedTab() === "Video" && noteText() === "", { tab: selectedTab(), note: noteText() });
+    check("it is not among the recent videos (not a tile of the tab's own group, not in vitre.home.recent)", !mainTiles().some((t) => t.dataset.path?.toLowerCase() === vpathOf("night-river").toLowerCase()) && Services.prefs.getStringPref("vitre.home.recent", "[]") === recentBefore, mainTiles().map((t) => t.dataset.path));
+    panel.close();
+    await waitFor(() => homeDoc()?.dataset.kind === "video" && homeDoc()?.dataset.state === "ready" && homeDoc()?.dataset.playing === "true", { timeout: 10000, what: "Home playing the video" }).catch(() => null);
+    const v = homeVideo();
+    check("Home plays it from the profile copy, muted and looping", !!v && v.muted && v.loop && !v.paused && v.src.endsWith("/deer-wallpapers/night-river.mp4") && homeDoc().dataset.playing === "true", { ...homeDoc()?.dataset, src: v?.src, muted: v?.muted, loop: v?.loop });
+    const loop = v ? await watchLoop(v, 7500) : null;
+    check("…its time goes forward and wraps past the end (3 s), again and again, and it plays on", !!loop && loop.wraps >= 2 && loop.forward >= loop.steps * 0.6 && !loop.paused && !loop.ended, loop);
+    await openSettings();
+    await waitFor(() => selectedTab() === "Video" && tileOf("night-river")?.getAttribute("aria-checked") === "true", { timeout: 5000, what: "Settings again" }).catch(() => null);
+    check("Settings again: on the Video tab with the Deer video checked, not among your videos, the manifest not asked again", selectedTab() === "Video" && tileOf("night-river")?.getAttribute("aria-checked") === "true" && mainTiles().length === 0 && (await liveAsks()) === 1, { tab: selectedTab(), mine: mainTiles().length, asks: await liveAsks() });
+
+    // ---------------------------------------------------------------- progress (streamed to a temporary file), then superseded
+    await choose("slow-clip");
+    await waitFor(() => tileOf("slow-clip")?.getAttribute("aria-busy") === "true" && Number(tileOf("slow-clip").dataset.progress) > 0.05, { timeout: 8000, what: "progress" }).catch(() => null);
+    const slow = tileOf("slow-clip");
+    const p1 = Number(slow.dataset.progress);
+    check("a video's download shows its progress on the tile (aria-busy, a line filling), nothing else changing", slow.getAttribute("aria-busy") === "true" && p1 > 0 && p1 < 1 && slow.querySelector(".hb-bar").style.width !== "0px" && bgNow().path === vpathOf("night-river") && slow.getAttribute("aria-checked") === "false", { busy: slow.getAttribute("aria-busy"), p: p1 });
+    await spike.capture("wallpapers-video-progress");
+    const partPath = PathUtils.join(dir, "slow-clip.mp4.part");
+    const part = await waitFor(async () => { try { const st = await IOUtils.stat(partPath); return st.size >= 1024 * 1024 ? st.size : null; } catch { return null; } }, { timeout: 10000, interval: 30, what: "the temporary file" }).catch(() => 0);
+    check("…it is written to <id>.mp4.part as it arrives (1 MiB at a time), not held whole in memory", part >= 1024 * 1024 && Number(tileOf("slow-clip").dataset.progress) < 1 && !(await videos()).includes("slow-clip.mp4"), { part, p: tileOf("slow-clip")?.dataset.progress });
+    await chooseVideoAndWait("surf");
+    check("choosing another video meanwhile: that one is applied", bgNow().path === vpathOf("surf"));
+    await sleep(6000);
+    check("the superseded video is never applied", bgNow().path === vpathOf("surf"), bgNow());
+    check("…and left nothing behind (no file, no temporary file)", !(await videos()).includes("slow-clip.mp4") && (await temps()).length === 0, { videos: await videos(), temps: await temps() });
+    check("…and its tile is no longer busy", tileOf("slow-clip")?.getAttribute("aria-busy") !== "true");
+
+    // ---------------------------------------------------------------- downloads that do not check out
+    for (const id of BAD_VIDEOS) {
+      await choose(id);
+      await waitFor(() => tileOf(id)?.dataset.failed === "true", { timeout: 20000, what: id + " refused" }).catch(() => null);
+      const t = tileOf(id);
+      const line = t?.querySelector(".hb-fail");
+      check(`${id}: refused, the tile says “${FAILED}”`, t?.dataset.failed === "true" && !line.hidden && line.textContent === FAILED, t?.dataset.failed);
+      check(`${id}: …nothing changed and nothing was written`, bgNow().path === vpathOf("surf") && !(await videos()).includes(id + ".mp4") && (await temps()).length === 0, { bg: bgNow().path, videos: await videos(), temps: await temps() });
+      check(`${id}: …screen readers hear it`, picker().querySelector(".hb-live").textContent === FAILED);
+    }
+
+    // ---------------------------------------------------------------- pruning: the 2 videos chosen last
+    await chooseVideoAndWait("drift");
+    check("the next choice clears the failure line", deerTiles().every((t) => t.dataset.failed !== "true" && t.querySelector(".hb-fail").hidden));
+    await sleep(1500);
+    check("videos kept: the current one and the 2 chosen last (night-river removed), and the 5 photos stay", JSON.stringify(await videos()) === JSON.stringify(["drift.mp4", "surf.mp4"]) && JSON.stringify(await pictures()) === JSON.stringify(photosBefore), { videos: await videos(), photos: await pictures(), was: photosBefore });
+    check("…no temporary file anywhere", (await temps()).length === 0, await temps());
+    await waitFor(() => homeVideo()?.src.endsWith("/drift.mp4") && homeDoc()?.dataset.playing === "true", { timeout: 8000, what: "Home playing drift" }).catch(() => null);
+    check("Home plays the video chosen last, and only it", homeVideo()?.src.endsWith("/deer-wallpapers/drift.mp4") && b.active().browser.contentDocument.querySelectorAll("#bg > video").length === 1 && homeDoc()?.dataset.playing === "true", { ...homeDoc()?.dataset });
+
+    // ---------------------------------------------------------------- taken out of the collection while it is the background
+    setBase(live2);
+    await openSettings();
+    await attempted(live2);
+    await waitFor(() => W.debug().thumbsRunning === 0 && tileOf("drift")?.querySelector(".hb-face video"), { timeout: 15000, what: "live2" }).catch(() => null);
+    await sleep(600);
+    const gone = tileOf("drift");
+    check("a video taken out of the collection that is the background keeps its tile, first, checked", selectedTab() === "Video" && deerIds()[0] === "drift" && gone?.getAttribute("aria-checked") === "true", deerIds());
+    check("…its face is a frame of the video itself (its poster went with the manifest)", !!gone?.querySelector(".hb-face video")?.src.includes("/deer-wallpapers/drift.mp4") && !(await files(PathUtils.join(dir, "thumbs"))).includes("drift.jpg"));
+    check("…with its title and credit kept", gone?.getAttribute("aria-label") === "Drift, Video: Lea Moor · CC0-1.0", gone?.getAttribute("aria-label"));
+    check("…and Home still plays it", bgNow().path === vpathOf("drift") && homeDoc()?.dataset.kind === "video" && homeDoc()?.dataset.state === "ready");
+    gone?.scrollIntoView({ block: "center" });
+    await sleep(300);
+    await spike.capture("wallpapers-video-removed");
+    spike.click(tabButton("Photo"));
+    await waitFor(() => selectedTab() === "Photo" && deerShown(), { timeout: 5000, what: "the Photo tab" }).catch(() => null);
+    await sleep(300);
+    check("…and it is not in the Photo tab's group", JSON.stringify(deerIds()) === JSON.stringify(LIVE_PHOTOS), deerIds());
+    anonymous((await serverLog()).filter((r) => r.path.startsWith("/live")), "live wallpapers");
+    check("no cookie of the site in the jar", jarHas("wptrack") === false);
+    panel.close();
+    await sleep(1500); // the picker gone, nothing under way
+    // What a video download cut short (Deer killed) leaves behind.
+    await IOUtils.write(PathUtils.join(dir, "cut-short.mp4.part"), new Uint8Array([0, 0, 0, 32, 0x66, 0x74, 0x79, 0x70]));
+    await ctl("/__reset");
+    log("restarting with a Deer video as Home's background");
+    await spike.restart();
+  }
+
+  // Run 3: the Deer video after a restart (base /live2/, where it is no longer listed).
+  async function afterRestart() {
+    const live2 = ORIGIN + "/live2/";
+    setBase(live2); // user.js put the harness's value back at the start
+    const info = await ctl("/__info");
+    // Two videos of the person's own (one row of the popover), so the Deer group starts lower down.
+    const gecko = PathUtils.parent(PathUtils.parent(Services.env.get("VITRE_LIB")));
+    const fixture = PathUtils.join(gecko, "tests", "settings", "live-wallpaper.mp4");
+    const ownVideos = [];
+    for (const name of ["wptest own one.mp4", "wptest own two.mp4"]) {
+      const p = PathUtils.join(PathUtils.profileDir, name);
+      await IOUtils.copy(fixture, p);
+      ownVideos.push({ kind: "video", path: p });
+    }
+    const recentWas = Services.prefs.getStringPref("vitre.home.recent", "[]");
+    Services.prefs.setStringPref("vitre.home.recent", JSON.stringify(ownVideos));
+    b.newTab();
+    await sleep(300);
+    if (b.omni.open) b.omni.close();
+    await waitFor(() => b.active().url === "about:vitre-home" && homeDoc()?.dataset.kind === "video" && homeDoc()?.dataset.state === "ready", { timeout: 15000, what: "Home" }).catch(() => null);
+    await waitFor(() => homeDoc()?.dataset.playing === "true", { timeout: 5000, what: "Home playing" }).catch(() => null);
+    const v = homeVideo();
+    check("after the restart Home plays the chosen Deer video from the profile, muted and looping", bgNow().kind === "video" && bgNow().path === vpathOf("drift") && !!v && v.muted && v.loop && !v.paused && v.src.endsWith("/deer-wallpapers/drift.mp4"), { bg: bgNow(), ...homeDoc()?.dataset });
+    check("…a Home page loading it paints the entry's colour until its first frame (not the grey)", homeDoc()?.style.getPropertyValue("--home-base") === info.drift.color, { base: homeDoc()?.style.getPropertyValue("--home-base"), entry: info.drift.color });
+    const loop = v ? await watchLoop(v, 7000) : null;
+    check("…and loops on, wrapping past the end again and again", !!loop && loop.wraps >= 2 && !loop.paused && !loop.ended, loop);
+    // The first picker of the session: the popover, on its Video tab, focus on the Deer video's tile.
+    spike.click(document.querySelector("#vitre-home-bg .hb-circle-face"));
+    await waitFor(() => home.isOpen && document.querySelector("#vitre-home-bg-pop .hb-picker")?.dataset.ready, { timeout: 5000, what: "popover" });
+    const pop = document.getElementById("vitre-home-bg-pop");
+    await waitFor(() => document.activeElement?.dataset?.id === "drift", { timeout: 4000, what: "focus on the Deer tile" }).catch(() => null);
+    check("Home's popover opens on its Video tab with focus on the Deer video's tile", pop.querySelector('.hb-tabs [aria-selected="true"]')?.textContent === "Video" && document.activeElement?.dataset?.id === "drift" && document.activeElement.getAttribute("aria-checked") === "true", { tab: pop.querySelector('.hb-tabs [aria-selected="true"]')?.textContent, focus: document.activeElement?.getAttribute?.("aria-label") });
+    // Below a row of the person's own videos, the focused tile (its face and focus ring, 6 px out) is
+    // wholly inside the popover's scroll area, not cut by its lower edge.
+    await sleep(300);
+    const area = picker(pop).querySelector(".hb-panel").getBoundingClientRect();
+    const face = tileOf("drift", pop)?.querySelector(".hb-face").getBoundingClientRect();
+    check("…below two videos of the person's own, that tile wholly in view, focus ring and all", mainTiles(pop).length === 2 && !!face && face.top - 6 >= area.top - 0.5 && face.bottom + 6 <= area.bottom + 0.5, { area: [area.top, area.bottom], face: face && [face.top, face.bottom], mine: mainTiles(pop).length });
+    await attempted(live2);
+    const listed = ["drift", "night-river", "surf", "long-take", "slow-clip", "not-mp4", "avif-picture", "video-wrong-hash", "video-endless"];
+    await waitFor(() => JSON.stringify(deerIds(pop)) === JSON.stringify(listed) && W.debug().thumbsRunning === 0, { timeout: 15000, what: "the popover's videos" }).catch(() => null);
+    await sleep(400);
+    check("…its group: the Deer video no longer listed first, then the videos listed, in 2 columns", JSON.stringify(deerIds(pop)) === JSON.stringify(listed) && picker(pop).querySelector(".hb-deer .hb-grid").classList.contains("cols-2") && !noteText(pop), deerIds(pop));
+    await spike.capture("wallpapers-video-popover");
+    spike.press("Escape");
+    await sleep(400);
+    Services.prefs.setStringPref("vitre.home.recent", recentWas);
+    check("the temporary file a video download cut short left is gone once the collection is first read", !(await IOUtils.exists(PathUtils.join(dir, "cut-short.mp4.part"))));
+
+    // ---------------------------------------------------------------- an id listed as a photo, then as a video
+    // The collection may reuse an id for the other kind (the owner turning a photo into a live
+    // wallpaper under the same name): a tile fetches, applies and keeps only its own kind's file.
+    const shiftAsks = async (site, ext) => (await serverLog()).filter((r) => r.path === `/${site}/full/shift.${ext}`).length;
+    const k1 = ORIGIN + "/kswap1/";
+    setBase(k1);
+    await openSettings(); // on the Video tab: drift is Home's background
+    await clickTab("Photo");
+    await attempted(k1);
+    await waitFor(() => selectedTab() === "Photo" && tileOf("shift")?.querySelector(".hb-face img"), { timeout: 10000, what: "the photo shift" }).catch(() => null);
+    await chooseAndWait("shift");
+    check("an id listed as a photo: its photo is downloaded and applied", bgNow().kind === "image" && bgNow().path === pathOf("shift") && (await shiftAsks("kswap1", "jpg")) === 1, bgNow());
+    const k2 = ORIGIN + "/kswap2/";
+    setBase(k2);
+    await openSettings(); // on the Photo tab
+    await attempted(k2);
+    await waitFor(() => W.debug().thumbsRunning === 0 && tileOf("shift")?.querySelector(".hb-face img"), { timeout: 10000, what: "the photo shift, no longer listed" }).catch(() => null);
+    await sleep(400);
+    const asPhoto = tileOf("shift");
+    check("the same id now listed as a video: the Photo tab keeps the photo's tile (the background: checked, the picture its face)", selectedTab() === "Photo" && JSON.stringify(deerIds()) === JSON.stringify(["shift"]) && asPhoto?.dataset.kind === "image" && asPhoto.getAttribute("aria-checked") === "true" && !!asPhoto.querySelector(".hb-face img")?.src.includes("/deer-wallpapers/shift.jpg"), { tab: selectedTab(), ids: deerIds(), kind: asPhoto?.dataset.kind });
+    await choose("shift");
+    await sleep(2500);
+    check("clicking the photo's tile keeps the photo: no video asked for or applied, no progress or failure on it, the Photo tab stays", bgNow().kind === "image" && bgNow().path === pathOf("shift") && (await shiftAsks("kswap2", "mp4")) === 0 && selectedTab() === "Photo" && tileOf("shift")?.getAttribute("aria-busy") !== "true" && tileOf("shift")?.dataset.failed !== "true", { bg: bgNow(), asked: await shiftAsks("kswap2", "mp4"), tab: selectedTab(), busy: tileOf("shift")?.getAttribute("aria-busy"), failed: tileOf("shift")?.dataset.failed });
+    await clickTab("Video");
+    await waitFor(() => selectedTab() === "Video" && tileOf("shift")?.querySelector(".hb-face img"), { timeout: 8000, what: "the video shift" }).catch(() => null);
+    const asVideo = tileOf("shift");
+    check("the Video tab lists the video under that id: unchecked, its poster its face, no progress or failure", asVideo?.dataset.kind === "video" && asVideo.getAttribute("aria-checked") === "false" && !!asVideo.querySelector(".hb-face img")?.src.includes("/deer-wallpapers/thumbs/shift.jpg") && asVideo.getAttribute("aria-busy") !== "true" && asVideo.dataset.failed !== "true", { kind: asVideo?.dataset.kind, checked: asVideo?.getAttribute("aria-checked") });
+    await chooseVideoAndWait("shift");
+    await sleep(1500); // the prune after the choice
+    check("choosing it downloads and applies the video", bgNow().kind === "video" && bgNow().path === vpathOf("shift") && (await sha256(vpathOf("shift"))) === info.shift.video.sha256 && (await shiftAsks("kswap2", "mp4")) === 1, bgNow());
+    check("…and the photo of the same id is kept beside it", (await pictures()).includes("shift.jpg") && (await videos()).includes("shift.mp4"), { pictures: await pictures(), videos: await videos() });
+    const k3 = ORIGIN + "/kswap3/"; // the photo again
+    setBase(k3);
+    await openSettings(); // on the Video tab
+    await attempted(k3);
+    await waitFor(() => W.debug().thumbsRunning === 0 && tileOf("shift")?.querySelector(".hb-face video"), { timeout: 10000, what: "the video shift, no longer listed" }).catch(() => null);
+    const curVideo = tileOf("shift");
+    check("listed as a photo again: the Video tab keeps the video's tile (the background: checked, a frame of it its face)", selectedTab() === "Video" && curVideo?.dataset.kind === "video" && curVideo.getAttribute("aria-checked") === "true" && !!curVideo.querySelector(".hb-face video")?.src.includes("/deer-wallpapers/shift.mp4"), { tab: selectedTab(), kind: curVideo?.dataset.kind });
+    await choose("shift");
+    await sleep(2500);
+    check("clicking the video's tile keeps the video: no photo asked for or applied, no progress or failure on it, the Video tab stays", bgNow().kind === "video" && bgNow().path === vpathOf("shift") && (await shiftAsks("kswap3", "jpg")) === 0 && selectedTab() === "Video" && tileOf("shift")?.getAttribute("aria-busy") !== "true" && tileOf("shift")?.dataset.failed !== "true", { bg: bgNow(), asked: await shiftAsks("kswap3", "jpg"), tab: selectedTab(), busy: tileOf("shift")?.getAttribute("aria-busy"), failed: tileOf("shift")?.dataset.failed });
+    await clickTab("Photo");
+    await waitFor(() => selectedTab() === "Photo" && tileOf("shift"), { timeout: 8000, what: "the photo shift, listed again" }).catch(() => null);
+    await chooseAndWait("shift");
+    check("the Photo tab's photo of that id is applied from the copy kept, with no download", bgNow().kind === "image" && bgNow().path === pathOf("shift") && (await shiftAsks("kswap3", "jpg")) === 0 && (await sha256(pathOf("shift"))) === info.shift.photo.sha256, bgNow());
+    panel.close();
+    await sleep(300);
+    anonymous(await serverLog(), "run 3");
+    check("still no cookie of the site in the jar", jarHas("wptrack") === false);
+    await ctl("/__drop?prefix=");
+    Services.prefs.setStringPref(PREF, "http://127.0.0.1:9/");
+    store.reset("homeBackground.kind");
+    store.reset("homeBackground.path");
+    await sleep(300);
+  }
 });
