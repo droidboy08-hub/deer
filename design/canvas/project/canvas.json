@@ -357,6 +357,55 @@
       "w": 1440,
       "x": 1520,
       "y": 2340
+    },
+    "SplitPill.dc.html": {
+      "h": 44,
+      "page": "parts",
+      "title": "Part · split pill (pair pill and pair capsule)",
+      "w": 480,
+      "x": 960,
+      "y": 3060
+    },
+    "SplitOpen.dc.html": {
+      "h": 900,
+      "page": "split",
+      "title": "Split view · two pages side by side",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "SplitMotion.dc.html": {
+      "h": 980,
+      "page": "split",
+      "title": "Split view · in motion: start, focus, resize, separate (plays by itself)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0,
+      "is_interactive": true
+    },
+    "SplitStart.dc.html": {
+      "h": 900,
+      "page": "split",
+      "title": "Split view · the ways in: tab circle, link, tab pill",
+      "w": 1440,
+      "x": 0,
+      "y": 1100
+    },
+    "SplitDrop.dc.html": {
+      "h": 900,
+      "page": "split",
+      "title": "Split view · dragging a tab circle to the right edge",
+      "w": 1440,
+      "x": 1520,
+      "y": 1100
+    },
+    "SplitSpec.dc.html": {
+      "h": 3500,
+      "page": "split",
+      "title": "Split view · anatomy, divider, menus, keys and edge cases",
+      "w": 1440,
+      "x": 0,
+      "y": 2120
     }
   },
   "createdOnFiles": {
@@ -449,6 +498,15 @@
       "x": 0,
       "y": -300,
       "w": 240
+    },
+    "t12": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "split",
+      "text": "Split view: two pages side by side",
+      "w": 240,
+      "x": 0,
+      "y": -300
     }
   },
   "order": [
@@ -460,6 +518,7 @@
     "PeekIssue.dc.html",
     "FindPill.dc.html",
     "CtxMenu.dc.html",
+    "SplitPill.dc.html",
     "Home.dc.html",
     "HomeSearch.dc.html",
     "HomeBrowse.dc.html",
@@ -495,7 +554,12 @@
     "KeyMap.dc.html",
     "SettingsKeys.dc.html",
     "KeyRouting.dc.html",
-    "SwitcherKeys.dc.html"
+    "SwitcherKeys.dc.html",
+    "SplitOpen.dc.html",
+    "SplitMotion.dc.html",
+    "SplitStart.dc.html",
+    "SplitDrop.dc.html",
+    "SplitSpec.dc.html"
   ],
   "pages": [
     {
@@ -529,6 +593,10 @@
     {
       "id": "keys",
       "name": "Keyboard"
+    },
+    {
+      "id": "split",
+      "name": "Split view"
     },
     {
       "id": "parts",

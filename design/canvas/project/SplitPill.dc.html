@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Split pill (part)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@media (prefers-reduced-motion: reduce){.vt-m{transition-property:opacity !important;transition-duration:150ms !important;transition-delay:0ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="position: relative; width: {{box.w}}px; height: 44px; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="{{lens.id}}" x="0" y="0" width="{{lens.w}}" height="44" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/288d693bd243616b99e29672a748d2df" x="0" y="0" width="{{lens.w}}" height="44" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="20" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<sc-if value="{{isPair}}" hint-placeholder-val="{{true}}">
+<div role="group" aria-label="{{pair.label}}" style="position: absolute; left: 0; top: 0; width: {{box.w}}px; height: 44px; border-radius: 22px; box-shadow: {{pair.shadow}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#{{lens.id}})"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: {{B.tint}}"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: {{B.rim}}; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+<span aria-hidden="true" style="position: absolute; left: {{pair.s}}px; top: 12px; width: 1px; height: 20px; background: {{pair.seam}}"></span>
+
+<div class="vt-m" aria-hidden="true" style="position: absolute; left: {{plate.l}}px; top: 6px; width: {{plate.w}}px; height: 32px; border-radius: 16px; background: {{plate.bg}}; box-shadow: {{plate.inset}}; transition: {{plate.tr}}; pointer-events: none"></div>
+
+<button aria-label="{{nav.back}}" style="position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: {{B.icon}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.8 6.8 10l5.2 5.2"></path></svg></button>
+<button aria-label="{{nav.fwd}}" aria-disabled="true" style="position: absolute; left: 38px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: {{B.dim}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.8 13.2 10 8 15.2"></path></svg></button>
+
+<sc-for list="{{halves}}" as="hf" hint-placeholder-count="2">
+<sc-if value="{{hf.plate}}" hint-placeholder-val="{{false}}"><div aria-hidden="true" style="position: absolute; left: {{hf.plateL}}px; top: 6px; width: {{plate.w}}px; height: 32px; border-radius: 16px; background: {{hf.plateBg}}; pointer-events: none"></div></sc-if>
+<button aria-label="{{hf.aria}}" aria-pressed="{{hf.ariaPressed}}" style="position: absolute; left: {{hf.x}}px; top: 0; width: {{hf.w}}px; height: 44px; border: 0; border-radius: 0; padding: 0; background: transparent; font: inherit; text-align: left">
+<span style="position: absolute; left: 14px; top: 14px; width: 16px; height: 16px; display: block">
+<sc-if value="{{hf.fav.fieldnotes}}" hint-placeholder-val="{{true}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></sc-if>
+<sc-if value="{{hf.fav.tideline}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></sc-if>
+<sc-if value="{{hf.fav.refract}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></sc-if>
+<sc-if value="{{hf.fav.vitre}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+<sc-if value="{{hf.fav.lec}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></sc-if>
+<sc-if value="{{hf.fav.home}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="{{hf.icon}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M14.1 8.8a5.3 5.3 0 1 1-10.6 0 5.3 5.3 0 1 1 10.6 0zM12.8 12.8l3.6 3.6"></path></svg></sc-if>
+</span>
+<span class="vt-m" style="position: absolute; left: 38px; top: 0; width: {{hf.tw}}px; height: 44px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; font-size: 13.5px; font-weight: {{hf.fw}}; color: {{hf.color}}; text-shadow: {{hf.textShadow}}; -webkit-mask-image: {{hf.mask}}; mask-image: {{hf.mask}}; transition: {{hf.tr}}">{{hf.label}}</span>
+</button>
+<sc-if value="{{hf.showX}}" hint-placeholder-val="{{false}}"><button aria-label="{{hf.xAria}}" style="position: absolute; left: {{hf.xL}}px; top: 10px; width: 24px; height: 24px; border: 0; border-radius: 12px; padding: 0; background: {{hf.xBg}}; color: {{hf.icon}}; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8"></path></svg></button></sc-if>
+<sc-if value="{{hf.loading}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position: absolute; left: {{hf.loadL}}px; top: 40px; width: {{hf.loadW}}px; height: 2px; border-radius: 1px; background: {{hf.load}}"></span></sc-if>
+</sc-for>
+
+<span aria-hidden="true" style="position: absolute; left: {{pair.markL}}px; top: 8px; width: 28px; height: 28px"></span>
+<sc-if value="{{nav.isReload}}" hint-placeholder-val="{{true}}"><button aria-label="{{nav.reload}}" style="position: absolute; left: {{pair.relL}}px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: {{B.icon}}; display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.3 10a5.3 5.3 0 1 1-1.55-3.75"></path><path d="M15.4 4v3.4H12"></path></svg></button></sc-if>
+<sc-if value="{{nav.isStop}}" hint-placeholder-val="{{false}}"><button aria-label="{{nav.stop}}" style="position: absolute; left: {{pair.relL}}px; top: 8px; width: 28px; height: 28px; border: 0; border-radius: 14px; padding: 0; background: transparent; color: {{B.icon}}; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"></path></svg></button></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isCapsule}}" hint-placeholder-val="{{false}}">
+<div role="group" aria-label="{{cap.label}}" style="position: absolute; left: 0; top: 0; width: 96px; height: 44px; border-radius: 22px; box-shadow: {{L.shadow}}">
+<div style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: blur(10px) saturate(1.6)"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; background: {{cap.tint}}"></div>
+<div style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: {{L.rim}}; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+<span aria-hidden="true" style="position: absolute; left: 48px; top: 14px; width: 1px; height: 16px; background: {{L.hair}}"></span>
+<sc-for list="{{capHalves}}" as="ch" hint-placeholder-count="2">
+<button aria-label="{{ch.aria}}" style="position: absolute; left: {{ch.x}}px; top: 0; width: 48px; height: 44px; border: 0; border-radius: {{ch.radius}}; padding: 0; background: transparent">
+<span style="position: absolute; left: {{ch.fx}}px; top: 13px; width: 18px; height: 18px; display: block">
+<sc-if value="{{ch.fav.fieldnotes}}" hint-placeholder-val="{{true}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></sc-if>
+<sc-if value="{{ch.fav.tideline}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></sc-if>
+<sc-if value="{{ch.fav.refract}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></sc-if>
+<sc-if value="{{ch.fav.vitre}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+<sc-if value="{{ch.fav.lec}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></sc-if>
+<sc-if value="{{ch.fav.home}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="{{L.text}}" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M3.5 9.5 10 4l6.5 5.5V16a1 1 0 0 1-1 1H12v-4.5H8V17H4.5a1 1 0 0 1-1-1z"></path></svg></sc-if>
+</span>
+</button>
+<sc-if value="{{ch.badge}}" hint-placeholder-val="{{false}}"><button aria-label="{{ch.xAria}}" style="position: absolute; left: {{ch.bx}}px; top: -5px; width: 18px; height: 18px; border: 0; border-radius: 9px; padding: 0; background: rgba(28,28,32,0.88); color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.3)"><svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button></sc-if>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"face":{"editor":"enum","default":"pair","options":["pair","capsule"],"section":"Split"},"left":{"editor":"enum","default":"fieldnotes","options":["fieldnotes","tideline","refract","vitre","lec","home"],"section":"Split"},"right":{"editor":"enum","default":"tideline","options":["fieldnotes","tideline","refract","vitre","lec","home"],"section":"Split"},"themeL":{"editor":"enum","default":"light","options":["light","dark","clear"],"section":"Split"},"themeR":{"editor":"enum","default":"dark","options":["light","dark","clear"],"section":"Split"},"bar":{"editor":"enum","default":"auto","options":["auto","light","dark","clear"],"section":"Split"},"focus":{"editor":"enum","default":"left","options":["left","right"],"section":"State"},"hover":{"editor":"enum","default":"none","options":["none","left","right"],"section":"State"},"xHover":{"editor":"boolean","default":false,"section":"State"},"pressed":{"editor":"enum","default":"none","options":["none","left","right"],"section":"State"},"width":{"editor":"int","default":480,"min":360,"max":480,"unit":"px","section":"State"},"loading":{"editor":"enum","default":"none","options":["none","left","right","both"],"section":"State"},"snap":{"editor":"boolean","default":true,"section":"State"},"$preview":{"width":480,"height":44}}'>
+class Component extends DCLogic {
+renderVals() {
+const p = this.props;
+const one = (v, list, d) => (list.indexOf(v) >= 0 ? v : d);
+const SITES = ['fieldnotes', 'tideline', 'refract', 'vitre', 'lec', 'home'];
+const THEMES = ['light', 'dark', 'clear'];
+const face = one(p.face, ['pair', 'capsule'], 'pair');
+const left = one(p.left, SITES, 'fieldnotes');
+const right = one(p.right, SITES, 'tideline');
+const themeL = one(p.themeL, THEMES, 'light');
+const themeR = one(p.themeR, THEMES, 'dark');
+const focus = one(p.focus, ['left', 'right'], 'left');
+const hover = one(p.hover, ['none', 'left', 'right'], 'none');
+const xHover = !!(p.xHover ?? false);
+const pressed = one(p.pressed, ['none', 'left', 'right'], 'none');
+const loading = one(p.loading, ['none', 'left', 'right', 'both'], 'none');
+const snap = !!(p.snap ?? true);
+const W = Math.max(360, Math.min(480, Math.round(Number(p.width ?? 480)) || 480));
+const S = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const tr = (s) => (snap ? 'none' : s);
+
+// Glass tokens: gecko/src/skin/glass.css (theme-light, theme-dark, theme-clear).
+const DARK_RIM = 'linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35))';
+const T = {
+light: { tint: 'linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22))', hoverTint: 'linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.36))', rim: 'linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8))', shadow: '0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18)', text: '#16181d', icon: 'rgba(22,24,29,0.78)', dim: 'rgba(22,24,29,0.28)', hover: 'rgba(22,24,29,0.06)', press: 'rgba(22,24,29,0.1)', placeholder: 'rgba(22,24,29,0.5)', plate: 'rgba(0,95,184,0.10)', plateIn: 'inset 0 0 0 1px rgba(0,95,184,0.35)', load: '#005fb8', hair: 'rgba(22,24,29,0.12)', textShadow: 'none' },
+dark: { tint: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.3)', hoverTint: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.14)), rgba(16,16,20,0.3)', rim: DARK_RIM, shadow: '0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3)', text: '#ffffff', icon: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.3)', hover: 'rgba(255,255,255,0.10)', press: 'rgba(255,255,255,0.16)', placeholder: 'rgba(255,255,255,0.6)', plate: 'rgba(76,194,255,0.18)', plateIn: 'inset 0 0 0 1px rgba(76,194,255,0.45)', load: '#4cc2ff', hair: 'rgba(255,255,255,0.12)', textShadow: 'none' },
+clear: { tint: 'linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03))', hoverTint: 'linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.13))', rim: DARK_RIM, shadow: '0 10px 28px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.22)', text: '#ffffff', icon: 'rgba(255,255,255,0.9)', dim: 'rgba(255,255,255,0.32)', hover: 'rgba(255,255,255,0.10)', press: 'rgba(255,255,255,0.16)', placeholder: 'rgba(255,255,255,0.62)', plate: 'rgba(255,255,255,0.16)', plateIn: 'inset 0 0 0 1px rgba(255,255,255,0.45)', load: '#4cc2ff', hair: 'rgba(255,255,255,0.12)', textShadow: '0 1px 2px rgba(0,0,0,0.35)' }
+};
+// themeL / themeR are the themes of the two pages. The capsule keeps the left one.
+const L = T[themeL];
+const R = T[themeR];
+// One contact shadow: the darker theme's (dark, then clear, then light).
+const rank = { light: 0, clear: 1, dark: 2 };
+const shadow = rank[themeL] >= rank[themeR] ? L.shadow : R.shadow;
+
+// The bar stays centred and takes the focused side's theme (owner, 2026-10-20), so the
+// whole pill is one glass. It spans both pages; when one page is light and the other is
+// not, it uses that theme's mixed tint (FindPill mixedLight / mixedDark) to keep 4.5:1.
+// bar "auto" is the focused side's theme; a fixed theme lets a board stack two pills and
+// cross-fade them when focus moves (SplitMotion).
+const bar = one(p.bar, ['auto', 'light', 'dark', 'clear'], 'auto');
+const barTheme = bar === 'auto' ? (focus === 'left' ? themeL : themeR) : bar;
+const mixed = (themeL === 'light') !== (themeR === 'light');
+const MIXED = { light: 'linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54))', dark: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72)' };
+const B = Object.assign({}, T[barTheme], mixed ? { tint: barTheme === 'light' ? MIXED.light : MIXED.dark } : {});
+
+// Pair geometry, pill-local: Back/Forward 8-66, halves 70-s and s-(s+h), mark w-70, Reload w-38.
+const h = (W - 140) / 2;
+const s = 70 + h;
+const seam = barTheme === 'light' ? 'rgba(22,24,29,0.12)' : 'rgba(255,255,255,0.16)';
+
+const HOST = { fieldnotes: 'fieldnotes.press', tideline: 'tideline.fm', refract: 'refract.wiki', vitre: 'code.vitre.dev', lec: 'longexposure.club', home: 'Search' };
+const NAME = { fieldnotes: 'Field Notes', tideline: 'Tideline', refract: 'Refract', vitre: 'vitre-shell', lec: 'Long Exposure Club', home: 'Home' };
+const TITLE = { fieldnotes: 'Sand, heat and a bath of molten tin', tideline: 'Molten: a 4K study of glass in motion', refract: 'Float glass', vitre: 'Issues · vitre-shell', lec: 'Slow light', home: 'Search' };
+// Measured host widths at 13.5 px (FindPill), so the 12 px fade only appears when a host is cut.
+const HOST_W = { fieldnotes: 96, tideline: 65.7, refract: 67.7, vitre: 85.8, lec: 112.8, home: 44 };
+const sameHost = left === right && left !== 'home';
+const favs = (site) => ({ fieldnotes: site === 'fieldnotes', tideline: site === 'tideline', refract: site === 'refract', vitre: site === 'vitre', lec: site === 'lec', home: site === 'home' });
+
+const half = (side) => {
+const isL = side === 'left';
+const site = isL ? left : right;
+const t = B;
+const x = isL ? 70 : s;
+const focused = focus === side;
+const hov = hover === side;
+const prs = pressed === side;
+const isHome = site === 'home';
+const label = sameHost ? TITLE[site] : HOST[site];
+const labelW = sameHost ? label.length * 6.9 : HOST_W[site];
+const textEnd = hov ? h - 34 : h - 12;
+const tw = Math.max(0, textEnd - 38);
+const loadOn = loading === 'both' || loading === side;
+return {
+x: x,
+w: h,
+fav: favs(site),
+icon: t.icon,
+label: label,
+tw: tw,
+mask: labelW > tw ? 'linear-gradient(90deg, #000 calc(100% - 12px), transparent)' : 'none',
+color: isHome ? t.placeholder : (focused ? t.text : t.icon),
+fw: focused ? 500 : 400,
+textShadow: t.textShadow,
+tr: tr('color 150ms ease, font-weight 150ms ease'),
+aria: label + ', ' + side + ' page' + (focused ? ', edit address' : ''),
+ariaPressed: focused ? 'true' : 'false',
+plate: !focused && (hov || prs),
+plateL: x + 2,
+plateBg: prs ? t.press : t.hover,
+showX: hov,
+xL: x + h - 30,
+xBg: xHover ? t.hover : 'transparent',
+xAria: 'Close ' + side + ' page, ' + NAME[site],
+loading: loadOn,
+loadL: x + 12,
+loadW: Math.max(0, h - 24),
+load: t.load
+};
+};
+
+const fT = B;
+const focusLoading = loading === 'both' || loading === focus;
+
+const capHalf = (side) => {
+const isL = side === 'left';
+const site = isL ? left : right;
+return {
+x: isL ? 0 : 48,
+fx: isL ? 13 : 17,
+radius: isL ? '22px 0 0 22px' : '0 22px 22px 0',
+fav: favs(site),
+aria: NAME[site] + ', ' + side + ' page',
+badge: hover === side,
+bx: isL ? -5 : 83,
+xAria: 'Close ' + side + ' page, ' + NAME[site]
+};
+};
+
+return {
+isPair: face === 'pair',
+isCapsule: face === 'capsule',
+box: { w: face === 'capsule' ? 96 : W },
+lens: { id: 'lens-split-' + W, w: W },
+L: L,
+B: B,
+pair: {
+label: 'Split view: ' + NAME[left] + ', left; ' + NAME[right] + ', right',
+shadow: shadow,
+s: s,
+seam: seam,
+markL: W - 70,
+relL: W - 38
+},
+plate: {
+l: (focus === 'left' ? 70 : s) + 2,
+w: h - 4,
+bg: fT.plate,
+inset: fT.plateIn,
+tr: tr('left 240ms ' + S + ', background 150ms ease, box-shadow 150ms ease')
+},
+halves: [half('left'), half('right')],
+nav: {
+back: 'Back, ' + focus + ' page',
+fwd: 'Forward, ' + focus + ' page',
+reload: 'Reload, ' + focus + ' page',
+stop: 'Stop, ' + focus + ' page',
+isReload: !focusLoading,
+isStop: focusLoading
+},
+cap: {
+label: NAME[left] + ' and ' + NAME[right] + ', split view',
+tint: hover === 'none' ? L.tint : L.hoverTint
+},
+capHalves: [capHalf('left'), capHalf('right')]
+};
+}
+}
+</script>
+</body>
+</html>

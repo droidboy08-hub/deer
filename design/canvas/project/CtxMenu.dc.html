@@ -30,7 +30,7 @@ body{margin:0}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"link","options":["page","link","filelink","mailto","image","canvas","imagelink","selection","selectionurl","editable","password","misspelled","video","videodrm","audio","pill","address","suggestion","circle","plus","ring","peekpage","peekheader","peeklink","home","findfield"],"section":"Menu"},"theme":{"editor":"enum","default":"dark","options":["dark","raised","light","solid","contrast"],"section":"Menu"},"hover":{"editor":"int","default":-1,"min":-1,"max":12,"section":"State"},"pressed":{"editor":"boolean","default":false,"section":"State"},"keys":{"editor":"boolean","default":false,"section":"State"},"touch":{"editor":"boolean","default":false,"section":"State"},"quote":{"editor":"text","default":"float glass","section":"Menu"},"caption":{"editor":"text","default":"Slow light · Long Exposure Club","section":"Menu"},"$preview":{"width":264,"height":234}}'>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"link","options":["page","link","linksplit","linkpair","filelink","mailto","image","canvas","imagelink","selection","selectionurl","editable","password","misspelled","video","videodrm","audio","pill","pillsplit","splitpill","address","suggestion","circle","circlesplit","circlepair","capsule","plus","ring","peekpage","peekheader","peeklink","home","findfield"],"section":"Menu"},"theme":{"editor":"enum","default":"dark","options":["dark","raised","light","solid","contrast"],"section":"Menu"},"hover":{"editor":"int","default":-1,"min":-1,"max":12,"section":"State"},"pressed":{"editor":"boolean","default":false,"section":"State"},"keys":{"editor":"boolean","default":false,"section":"State"},"touch":{"editor":"boolean","default":false,"section":"State"},"narrow":{"editor":"boolean","default":false,"section":"State"},"focused":{"editor":"boolean","default":true,"section":"State"},"quote":{"editor":"text","default":"float glass","section":"Menu"},"caption":{"editor":"text","default":"Slow light · Long Exposure Club","section":"Menu"},"$preview":{"width":264,"height":234}}'>
 class Component extends DCLogic {
 componentDidMount() {
 this.prevHover = this.props.hover ?? -1;
@@ -52,6 +52,9 @@ const touch = !!(this.props.touch ?? false);
 let quote = String(this.props.quote ?? 'float glass').split(/\r?\n/)[0].replace(/\s+/g, ' ').trim();
 if (quote.length > 24) quote = quote.slice(0, 24).trimEnd() + '…';
 const caption = this.props.caption ?? 'Slow light · Long Exposure Club';
+const narrow = !!(this.props.narrow ?? false);
+const focused = !!(this.props.focused ?? true);
+const capCaption = this.props.caption === undefined || this.props.caption === 'Slow light · Long Exposure Club' ? 'Field Notes · Tideline' : this.props.caption;
 
 const P = {
 newtab: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM3 8h6V4.5', ''],
@@ -77,7 +80,9 @@ mute: ['M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 8l4 4M17.5 8l-4 4', ''],
 close: ['M5.5 5.5l9 9M14.5 5.5l-9 9', ''],
 folder: ['M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 1.5h6A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z', ''],
 opentab: ['M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12M11 4.5h4.5V9M15.5 4.5 9.5 10.5', ''],
-check: ['M5 10.5 8.5 14 15 6.5', '']
+check: ['M5 10.5 8.5 14 15 6.5', ''],
+split: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11', ''],
+swap: ['M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3', '']
 };
 
 const I = (label, icon, accel, ak, o) => Object.assign({ t: 'item', label: label, icon: icon || '', accel: accel || '', ak: ak || '' }, o || {});
@@ -85,10 +90,15 @@ const S = { t: 'sep' };
 const C = (label) => ({ t: 'cap', label: label });
 const q = '“' + quote + '”';
 const inspect = I('Inspect', 'inspect', '', 'N');
+const SP = (label, ak) => I(label, 'split', narrow ? 'Window too narrow' : '', ak, narrow ? { dis: true } : {});
+const linkRows = (splitRow) => [I('Open link in new tab', 'newtab', '', 'T'), I('Peek link', 'peek', 'Shift+click', 'P'), splitRow, I('Open link in new window', 'newwindow', '', 'W'), I('Open link in new private window', 'newwindow', '', 'R'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, inspect];
+const circleRows = (splitRow) => [C(caption), S, splitRow, S, I('Reload tab', 'reload', '', 'R'), I('Duplicate tab', '', '', 'D'), I('Copy address', 'link', '', 'A'), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', '', 'C')];
 
 const M = {
 page: [I('Back', 'back', 'Alt+Left', 'B'), I('Forward', 'forward', 'Alt+Right', 'F', { dis: true }), I('Reload', 'reload', 'Ctrl+R', 'R'), S, I('Find on page…', 'find', 'Ctrl+F', 'I'), I('Print…', 'print', 'Ctrl+P', 'P'), I('Save page as…', 'download', 'Ctrl+S', 'A'), S, I('View page source', '', 'Ctrl+U', 'V'), inspect],
 link: [I('Open link in new tab', 'newtab', '', 'T'), I('Peek link', 'peek', 'Shift+click', 'P'), I('Open link in new window', 'newwindow', '', 'W'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, inspect],
+linksplit: linkRows(SP('Open link in split view', 'S')),
+linkpair: linkRows(SP('Open link on the right side', 'S')),
 filelink: [I('Download linked file', 'download', '', 'D'), I('Copy link address', 'link', '', 'E'), S, inspect],
 mailto: [I('Copy email address', 'copy', '', 'E'), S, inspect],
 image: [I('Open image in new tab', 'image', '', 'I'), I('Peek image', 'peek', '', 'P'), S, I('Save image as…', 'download', '', 'V'), I('Copy image', 'copy', '', 'Y'), I('Copy image address', 'link', '', 'O'), S, inspect],
@@ -103,9 +113,14 @@ video: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', 
 videodrm: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', '', 'L', { check: false }), I('Show controls', '', '', 'C', { check: false }), I('Picture in picture', '', '', 'I', { check: false }), S, I('Download video…', 'download', 'Protected', 'D', { dis: true }), S, inspect],
 audio: [I('Pause', 'pause', '', 'P'), I('Mute', 'mute', '', 'M'), I('Loop', '', '', 'L', { check: true }), I('Show controls', '', '', 'C', { check: false }), S, I('Download audio', 'download', '', 'D'), I('Copy audio address', 'link', '', 'O'), S, inspect],
 pill: [I('Copy address', 'link', '', 'A'), I('Paste and go', 'paste', '', 'G'), S, I('Duplicate tab', '', '', 'D'), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', 'Ctrl+W', 'C')],
+pillsplit: [I('Copy address', 'link', '', 'A'), I('Paste and go', 'paste', '', 'G'), S, I('Duplicate tab', '', '', 'D'), I('New tab in split view', 'split', narrow ? 'Window too narrow' : 'Ctrl+Shift+U', 'N', narrow ? { dis: true } : {}), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', 'Ctrl+W', 'C')],
+splitpill: [I('Copy address', 'link', '', 'A'), I('Paste and go', 'paste', '', 'G'), S, I('Swap sides', 'swap', '', 'P'), I('Separate tabs', '', 'Ctrl+Shift+U', 'E'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', focused ? 'Ctrl+W' : '', 'C')],
 address: [I('Undo', 'undo', 'Ctrl+Z', 'U'), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Paste and go', '', '', 'G'), I('Select all', '', 'Ctrl+A', 'A')],
 suggestion: [I('Remove from history', 'close', 'Shift+Delete', 'R')],
 circle: [C(caption), S, I('Reload tab', 'reload', '', 'R'), I('Duplicate tab', '', '', 'D'), I('Copy address', 'link', '', 'A'), I('Move tab to new window', 'newwindow', '', 'W'), S, I('Close other tabs', '', '', 'O'), I('Close tab', 'close', '', 'C')],
+circlesplit: circleRows(SP('Open in split view', 'S')),
+circlepair: circleRows(SP('Open in split view instead of Tideline', 'S')),
+capsule: [C(capCaption), S, I('Swap sides', 'swap', '', 'P'), I('Separate tabs', '', '', 'E'), S, I('Close other tabs', '', '', 'O'), I('Close both tabs', 'close', '', 'C')],
 plus: [I('New window', 'newwindow', 'Ctrl+N', 'W'), I('Reopen closed tab', '', 'Ctrl+Shift+T', 'R'), S, I('Show downloads', 'download', 'Ctrl+J', 'S'), I('Full screen', '', 'F11', 'F', { check: false }), I('Settings', '', 'Ctrl+,', 'E')],
 ring: [I('Show downloads', 'download', 'Ctrl+J', 'S'), I('Open Downloads folder', 'folder', '', 'F'), S, I('Pause all', 'pause', '', 'P'), I('Download copied link', 'link', '', 'D'), I('Clear finished', '', '', 'C')],
 peekpage: [I('Open as tab', 'opentab', 'Alt+Enter', 'T'), I('Copy address', 'link', '', 'A'), S, I('Back', 'back', 'Alt+Left', 'B', { dis: true }), I('Forward', 'forward', 'Alt+Right', 'F', { dis: true }), I('Reload', 'reload', 'Ctrl+R', 'R'), S, I('Find on page…', 'find', 'Ctrl+F', 'I'), I('Print…', 'print', 'Ctrl+P', 'P'), S, inspect],
@@ -195,7 +210,7 @@ const S2 = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const plateTr = glide ? 'top 90ms ' + S2 + ', background 80ms ease, opacity 60ms ease' : (hover >= 0 ? 'opacity 60ms ease' : 'opacity 120ms ease');
 
 return {
-ariaLabel: kind === 'circle' ? caption : 'Context',
+ariaLabel: kind === 'circle' || kind === 'circlesplit' || kind === 'circlepair' ? caption : (kind === 'capsule' ? capCaption : 'Context'),
 w: w, h: h, t: t, rows: rows, rowH: rowH,
 plate: { top: plateTop, w: w - 12, h: rowH, bg: plateBg, inset: plateIn, op: hovRow ? 1 : 0, tr: plateTr }
 };
