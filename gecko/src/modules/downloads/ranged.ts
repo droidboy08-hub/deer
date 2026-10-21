@@ -76,10 +76,11 @@ import { throttle, type RateLimiter } from './limiter';
 import { nameFromDisposition } from './naming';
 import {
   AbortedError, AddressRefusedError, ChangedError, ChecksumError, ConnectionRefusedError, DiskError, DownloadError, HttpStatusError, NetError, NotTheFileError,
-  REFUSED_STATUS, Response, ShortBodyError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal,
+  REFUSED_STATUS, Response, ShortBodyError, TooBigForDriveError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal,
   retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
 import { CUT_CODES, HOLD_AFTER_MS, classOf, delayOf, waitToAsk, type RetryClass } from './retry';
+import { dropParts, hasParts, joinParts, layoutFor, partBase, partFile, partsDir, removeFile, removeParts, useParts, volumeInfo } from './parts';
 import { blockSize, hashBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
 import { Writer, freeSpace, heldBytes, readAt, setSize, sizeOf, writeAt } from './partfile';
 import {
@@ -230,6 +231,11 @@ export interface Segment {
   /** Exclusive; -1 when the length is unknown. */
   end: number;
   received: number;
+  /**
+   * The parts layout (parts.ts): its bytes are in the file of the part that starts here (missing: 0, the .part
+   * itself), at local offset start - base. In place (NTFS) it is never set.
+   */
+  base?: number;
 }
 
 /** Where a download's address came from and until when it works (RESUME-DESIGN.md 5.2). */
@@ -252,6 +258,8 @@ export interface FileState {
   finalUrl: string;
   total: number;
   ranges: boolean;
+  /** 'parts': kept as IDM keeps a download, one file per part (parts.ts; a volume without sparse files). Missing: in place. */
+  layout?: 'parts';
   etag: string;
   lastModified: string;
   digest: { alg: string; value: string } | null;
@@ -339,6 +347,10 @@ export interface TransferEnv {
    * now gives another version of the file. Single-flight per download, with its limits (renew.ts Gate).
    */
   renew?: (why: RenewWhy, status: number) => Promise<Renewed | null>;
+  /** The parts layout's join (join()): the row shows Saving while it runs ('merging'), then nothing (''). */
+  phase?: (phase: 'merging' | '') => void;
+  /** Saves the state now, flushed (the join's steps: parts.ts joinParts()). */
+  checkpoint?: () => Promise<void>;
 }
 
 const remaining = (s: Segment): number => s.end - s.start - s.received;
@@ -371,7 +383,7 @@ export class FileTransfer {
    * sparse mark, the .part's sizing time, the slowest Writer open, and how long answers were held for the disk and
    * the speed limit. O(connections); nothing here decides anything.
    */
-  diag = { reconnectsAll: 0, retired: 0, failures: {} as Record<string, number>, nudges: 0, rejoins: 0, sparse: null as null | { ok: boolean; ms: number }, room: null as null | { needed: number; others: number; holds: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
+  diag = { reconnectsAll: 0, retired: 0, failures: {} as Record<string, number>, nudges: 0, rejoins: 0, sparse: null as null | { ok: boolean; ms: number }, room: null as null | { needed: number; others: number; holds: number }, layout: null as null | { kind: string; fs: string; sparse: boolean | null; root: string; ms: number }, join: null as null | { bytes: number; ms: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
   /** Lane -> its record for the diagnostics. */
   private laneStats = new Map<number, LaneStat>();
   /** Lane -> when it last received bytes. */
@@ -493,7 +505,7 @@ export class FileTransfer {
       ...s,
       segments: s.segments.map((seg) => {
         const w = this.writers.get(seg);
-        return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.backlog) : seg.received };
+        return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.backlog) : seg.received, ...(seg.base ? { base: seg.base } : {}) };
       }),
     };
   }
@@ -509,7 +521,7 @@ export class FileTransfer {
       // The writer took seg.received - written before it began; of its own bytes, only the settled ones are
       // certainly in the file. Review of Phase 5: once a write failed its copier closes the pipe, whose
       // backlog then reads 0, so the backlog no longer says what never arrived (Writer.settled).
-      return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.written + w.settled) : seg.received };
+      return { start: seg.start, end: seg.end, received: w ? Math.max(0, seg.received - w.written + w.settled) : seg.received, ...(seg.base ? { base: seg.base } : {}) };
     });
   }
 
@@ -916,6 +928,7 @@ export class FileTransfer {
         if (this.ledger?.expect.size) await untilAborted(this.ledger.drain(), signal);
         if (signal.aborted) throw new AbortedError();
         if (this.ledger?.mismatch) throw this.ledger.mismatch;
+        await this.join(partPath, signal);
         await this.completionCheck(partPath, signal);
       } catch (err) {
         if (signal.aborted) throw new AbortedError();
@@ -960,6 +973,13 @@ export class FileTransfer {
    */
   private async openPart(partPath: string): Promise<void> {
     const s = this.state;
+    // The layout (parts.ts): decided whenever nothing is claimed (a first start, Start over, a silent restart, a row
+    // paused before its first byte); once bytes are saved it never changes.
+    if (s.ranges && s.total > 0 && !s.segments.some((seg) => seg.received > 0)) await this.chooseLayout(partPath);
+    if (s.layout === 'parts' && s.ranges && s.total > 0) return this.openParts(partPath);
+    // In place: reads of the .part are of the .part itself (review: a stale redirection from an earlier parts row at
+    // the same path). A parts row that fell back to one stream keeps its own: its bytes are in its parts.
+    if (s.layout !== 'parts') dropParts(partPath);
     const size = await sizeOf(partPath);
     if (size < 0) for (const seg of s.segments) seg.received = 0;
     else for (const seg of s.segments) seg.received = Math.max(0, Math.min(seg.received, size - seg.start));
@@ -1000,6 +1020,121 @@ export class FileTransfer {
       setSize(partPath, 0, { truncate: true });
     }
     s.allowFresh = false;
+  }
+
+  /**
+   * The layout for a ranged download with nothing claimed yet (parts.ts): in place where the volume has sparse
+   * files, IDM's parts where it has none. A file bigger than the volume can hold (FAT32: 4 GiB - 1) is refused
+   * before anything is written.
+   */
+  private async chooseLayout(partPath: string): Promise<void> {
+    const s = this.state;
+    const dir = PathUtils.parent(partPath) ?? partPath;
+    const t0 = Date.now();
+    const v = await volumeInfo(dir);
+    const layout = layoutFor(v);
+    this.diag.layout = { kind: layout, fs: v?.fs ?? '', sparse: v ? v.sparse : null, root: v?.root ?? '', ms: Date.now() - t0 };
+    if (v && v.maxFile > 0 && s.total > v.maxFile) {
+      throw new TooBigForDriveError(`This file is ${sizeText(s.total)}, and the drive it is saved to (${v.root.replace(/\\$/, '')}, ${v.fs}) can't hold a file of 4 GB or more. Choose another folder in Settings \u203a Downloads, then download it again.`);
+    }
+    if (layout === 'parts') {
+      s.layout = 'parts';
+      for (const seg of s.segments) seg.base = seg.start || undefined;
+      for (const seg of s.segments) if (!seg.base) delete seg.base;
+    } else if (s.layout === 'parts') {
+      delete s.layout;
+      for (const seg of s.segments) delete seg.base;
+    }
+  }
+
+  /**
+   * openPart() for the parts layout: each segment is clamped by its own file; a part shorter than what a later piece
+   * of it claims (a crash, another program) gives that piece a part of its own, so nothing is ever written past a
+   * file's end; part files no segment refers to go; then the room (what is not written yet, plus the join's largest
+   * part: the join copies a part before it deletes it), and the folder made. No sizing, no sparse mark.
+   */
+  private async openParts(partPath: string): Promise<void> {
+    const s = this.state;
+    const dir = partsDir(partPath);
+    if (this.saved === 0 && s.allowFresh) {
+      await removeParts(partPath);
+      if ((await sizeOf(partPath)) > 0) setSize(partPath, 0, { truncate: true });
+    }
+    const sizes = new Map<number, number>();
+    const sizeFor = async (base: number): Promise<number> => {
+      if (!sizes.has(base)) sizes.set(base, await sizeOf(partFile(partPath, base)));
+      return sizes.get(base) as number;
+    };
+    s.segments.sort((a, b) => a.start - b.start);
+    for (const seg of s.segments) {
+      const base = seg.base ?? 0;
+      const have = await sizeFor(base);
+      seg.received = Math.max(0, Math.min(seg.received, have - (seg.start - base)));
+      if (seg.received === 0 && seg.start - base > Math.max(0, have)) {
+        // Its part is shorter than where this piece starts: the piece gets a part of its own.
+        seg.base = seg.start;
+        const file = partFile(partPath, seg.base);
+        if ((await sizeOf(file)) > 0) setSize(file, 0, { truncate: true });
+        sizes.set(seg.base, 0);
+      }
+    }
+    const used = new Set(s.segments.map((seg) => seg.base ?? 0));
+    try {
+      if (await IOUtils.exists(dir)) {
+        for (const p of await IOUtils.getChildren(dir)) {
+          const b = partBase(PathUtils.filename(p));
+          if (b > 0 && !used.has(b)) await removeFile(p);
+        }
+      }
+    } catch {
+      /* the folder is not there yet */
+    }
+    const claimed = s.segments.reduce((n, seg) => (seg.received > 0 ? Math.max(n, seg.start + seg.received) : n), 0);
+    if (claimed > s.total) throw new ChangedError(`now ${sizeText(s.total)}, but ${sizeText(claimed)} were already saved`);
+    // The join's peak: the largest part but the first is copied before it is deleted.
+    let extra = 0;
+    for (const b of used) {
+      if (b <= 0) continue;
+      const end = Math.max(...s.segments.filter((seg) => (seg.base ?? 0) === b).map((seg) => seg.end));
+      extra = Math.max(extra, end - b);
+    }
+    const target = PathUtils.parent(partPath) ?? partPath;
+    const needed = Math.max(0, s.total - written(s)) + extra;
+    const others = needed > 0 ? stillNeeded(this, target) : 0;
+    this.diag.room = { needed, others, holds: written(s) };
+    ensureRoom(target, needed > 0 ? needed + others : 0);
+    await IOUtils.makeDirectory(dir, { ignoreExisting: true });
+    if ((await sizeOf(partPath)) < 0) setSize(partPath, 0);
+    useParts(partPath, () => this.state.segments);
+    filling.set(this, { dir: target, path: partPath, total: s.total + extra, written: () => written(s), parts: true });
+    s.allowFresh = false;
+  }
+
+  /**
+   * The parts layout after the last byte: every part is added to the .part in order (parts.ts joinParts()), shown as
+   * Saving, each step's state saved, so a pause, a quit or a crash in the middle loses nothing and the next run
+   * continues the join. In place there is nothing to do.
+   */
+  private async join(partPath: string, signal: AbortSignal): Promise<void> {
+    if (this.state.layout !== 'parts') return;
+    if (!hasParts(this.state.segments)) {
+      dropParts(partPath);
+      await removeParts(partPath);
+      return;
+    }
+    // Every block is hashed before its bytes move (the hashing reads them where they are).
+    if (this.ledger) await untilAborted(this.ledger.drain(), signal);
+    this.env.phase?.('merging');
+    const t0 = Date.now();
+    try {
+      const moved = await joinParts(partPath, this.state.segments, signal, async () => {
+        await this.env.checkpoint?.();
+      }, () => new DiskError(Cr.NS_ERROR_FAILURE));
+      this.diag.join = { bytes: moved, ms: Date.now() - t0 };
+    } finally {
+      this.env.phase?.('');
+    }
+    dropParts(partPath);
   }
 
   private async runRanged(partPath: string, signal: AbortSignal): Promise<void> {
@@ -1160,7 +1295,9 @@ export class FileTransfer {
       cut = c;
     }
     if (!best || cut < 0) return null;
-    const piece = { start: cut, end: best.end, received: 0 };
+    // The parts layout: the piece is a part of its own, named by its start (parts.ts), so nothing is ever written
+    // past the end of a file.
+    const piece: Segment = { start: cut, end: best.end, received: 0, ...(this.state.layout === 'parts' ? { base: cut } : {}) };
     best.end = cut;
     segs.splice(segs.indexOf(best) + 1, 0, piece);
     return piece;
@@ -1565,7 +1702,8 @@ export class FileTransfer {
     let writer: Writer;
     const opening = Date.now();
     try {
-      writer = new Writer(partPath, seg.start + seg.received);
+      // The parts layout: its own part, at the local offset (never past that file's end: parts.ts).
+      writer = new Writer(partFile(partPath, seg.base ?? 0), seg.start + seg.received - (seg.base ?? 0));
     } catch (err) {
       res.destroy();
       throw err;
@@ -1955,7 +2093,7 @@ export function fileFills(s: FileState, n = 8): number[] {
  * Ranged downloads still writing (openPart(); gone when download() ends): a sparse .part holds no room ahead
  * of its writes.
  */
-const filling = new Map<FileTransfer, { dir: string; path: string; total: number; written: () => number }>();
+const filling = new Map<FileTransfer, { dir: string; path: string; total: number; written: () => number; parts?: boolean }>();
 
 function written(s: FileState): number {
   return s.segments.reduce((n, seg) => n + seg.received, 0);
@@ -1976,7 +2114,8 @@ function stillNeeded(self: FileTransfer, dir: string): number {
   let n = 0;
   for (const [t, f] of filling) {
     if (t === self || volumeOf(f.dir) !== vol) continue;
-    const h = heldBytes(f.path);
+    // The parts layout holds what was written (its files grow only at their ends); in place, what the disk says.
+    const h = f.parts ? f.written() : heldBytes(f.path);
     n += Math.max(0, f.total - (h >= 0 ? h : f.written()));
   }
   return n;

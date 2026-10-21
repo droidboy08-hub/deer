@@ -31,6 +31,7 @@
 //     the disk, 0-2 ms over 256 MiB of dirty pages where FlushFileBuffers took 65 ms), then a seal line
 //     with the coverage, flushed.
 import { clearTimeout, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
+import { placeOf } from './partfile';
 import { ChangedError, textStart } from './net';
 import { WINDOW, sha256Hex, sizeText } from './proof';
 import type { Segment } from './ranged';
@@ -105,7 +106,8 @@ export interface BlockRec {
 
 export interface Seal {
   t: number;
-  cov: Array<[number, number]>;
+  /** [start, received] of each segment with bytes, and its part's base in the parts layout (parts.ts) when not 0. */
+  cov: number[][];
   /** The .part was flushed (FlushFileBuffers) before the line was written. */
   f: boolean;
 }
@@ -152,6 +154,11 @@ export async function hashBlock(path: string, start: number, len: number): Promi
   const parts: Uint8Array[] = [];
   let w = '';
   let first = new Uint8Array(0);
+  // A block lies within one segment, so within one file of the parts layout (parts.ts; in place: the .part itself).
+  const at = placeOf(path, start, len);
+  if (!at) return null;
+  path = at.path;
+  start = at.offset;
   try {
     // The next chunk is read while this one is digested; the head and the first chunk are digested together.
     const read = (at: number): Promise<Uint8Array> => {
@@ -667,11 +674,13 @@ export class Ledger {
           continue;
         }
         const end = s.end < 0 ? Math.max(got, e) : s.end;
-        if (s.start < a) next.push({ start: s.start, end: a, received: a - s.start });
+        // Every piece keeps its part in the parts layout (parts.ts): its bytes are in that file.
+        const base = s.base ? { base: s.base } : {};
+        if (s.start < a) next.push({ start: s.start, end: a, received: a - s.start, ...base });
         const cut = Math.max(s.start, a);
         const blockEnd = Math.min(e, end);
-        if (blockEnd > cut) next.push({ start: cut, end: blockEnd, received: 0 });
-        if (end > blockEnd) next.push({ start: blockEnd, end: s.end < 0 ? -1 : end, received: Math.max(0, got - blockEnd) });
+        if (blockEnd > cut) next.push({ start: cut, end: blockEnd, received: 0, ...base });
+        if (end > blockEnd) next.push({ start: blockEnd, end: s.end < 0 ? -1 : end, received: Math.max(0, got - blockEnd), ...base });
       }
       out = next;
     }
@@ -739,7 +748,7 @@ export class Ledger {
    * is when the seal began, before the flush (review of Phase 5): a block hashed while FlushFileBuffers ran
    * may hold bytes written after the flush started, so it must count as newer than the seal (newer()).
    */
-  async sealed(cov: Array<[number, number]>, flushed: boolean, at = Date.now()): Promise<void> {
+  async sealed(cov: number[][], flushed: boolean, at = Date.now()): Promise<void> {
     this.seal = { t: at, cov, f: flushed };
     this.sealedAt = Date.now();
     this.sinceSeal = 0;

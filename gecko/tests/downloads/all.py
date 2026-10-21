@@ -1,9 +1,12 @@
-"""Run the downloader tests (from gecko/):  python tests/downloads/all.py [name ...] [--app build-downloads] [--port 47931]
+"""Run the downloader tests (from gecko/):  python tests/downloads/all.py [name ...] [--app build-downloads] [--port 47931] [--layout parts]
 
   engine     256 MiB on 8 connections (sha256), sockets per lane, pause/resume with If-Range,
              speed limit, panel and ring captures
-  connections  a big file's .part is sparse; a connection whose part keeps failing steps aside while the
-             others go on (no stop and wait); a crawling connection is cut and asked again
+  connections  a big file's .part is sparse; failures asked again as IDM does (a part's 500 on 4 s steps, a
+             site that allows 3 connections, Retry-After, a challenge, an outage that keeps asking); a crawling
+             connection is cut and asked again
+  layout     the hybrid layout: in place on NTFS; IDM's part files and their join (forced, as on exFAT/FAT32),
+             pause/resume, Keep partial, Cancel under parts; a FAT32 drive refuses a file over 4 GiB - 1
   restart    a download paused by a restart (the quit prompt confirmed) resumes from its segments; a paused
              download whose record is dirty with no seal and 3 MiB of zeros under its claims (what a power
              loss leaves): the zeros are found and fetched again (Phase 5)
@@ -175,6 +178,7 @@ TESTS = {
     # name: (timeout s, with ffmpeg)
     'engine': (240, True),
     'connections': (720, True),
+    'layout': (600, True),
     'restart': (240, True),
     'takeover': (180, True),
     'crosssite': (120, True),
@@ -210,6 +214,8 @@ def main():
     ap.add_argument('--app', default='build-downloads')
     ap.add_argument('--port', type=int, default=47931)
     ap.add_argument('--keep-going', action='store_true')
+    # --layout parts: every download takes the parts layout (parts.ts), as on an exFAT or FAT32 drive.
+    ap.add_argument('--layout', choices=['parts', 'inplace'])
     a = ap.parse_args()
     names = a.names or [n for n in TESTS if n not in ('perf', 'ytdlp-real')]
 
@@ -250,6 +256,7 @@ def main():
                    # The stand-in yt-dlp's call log, this run's own (a concurrent run of the other runner removed a shared one).
                    '--env', 'VITRE_FAKE_YTDLP_LOG=' + os.path.join(DATA, 'fake-ytdlp-%s.log' % name),
                    '--pref', 'vitre.downloadsFolder=' + dl,
+                   *(['--pref', 'vitre.test.partLayout=' + a.layout] if a.layout else []),
                    # Widevine is never fetched in tests (Firefox would download its CDM on a request).
                    '--pref', 'media.gmp-manager.updateEnabled=false', '--pref', 'media.gmp-manager.url=http://127.0.0.1:9/none']
             if with_ff and manifest.get('ffmpeg'):

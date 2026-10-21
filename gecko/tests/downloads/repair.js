@@ -156,10 +156,11 @@ spike.main(async () => {
       // Block k: the second block of the third segment (6..9 MiB), wholly saved and hashed.
       const k = 7;
       check("block 7 is saved and hashed", l.blocks.has(k), [...l.blocks.keys()]);
-      const part = rec(id).path + ".part";
-      // More than 5 s after the seal: the .part's modified time says another program wrote it (4.2).
+      // Where block k is kept: the .part, or its part under the parts layout.
+      const at = DL.placeOf(rec(id), k * MiB + 4096);
+      // More than 5 s after the seal: the file's modified time says another program wrote it (4.2).
       await waitFor(() => Date.now() > l.seal.t + 6000, { timeout: 10000, interval: 200, what: "6 s after the seal" });
-      await writeAt(part, k * MiB + 4096, await inverted(part, k * MiB + 4096, 512), false);
+      await writeAt(at.path, at.offset, await inverted(at.path, at.offset, 512), false);
       await DL.reset();
       engine.resume(id);
       const done = await DL.until(id, ["completed", "failed"], { timeout: 90000, what: "the resume" });

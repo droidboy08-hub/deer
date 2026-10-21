@@ -22,6 +22,19 @@ window.DL = (() => {
     dir,
     b,
     engine,
+    /** True when this run forces the parts layout (all.py --layout parts: vitre.test.partLayout). */
+    partsLayout() {
+      return Services.prefs.getStringPref("vitre.test.partLayout", "") === "parts";
+    },
+    /**
+     * Where the byte at file offset `at` of a row's saved download is kept: its .part, or in the parts layout the part
+     * that holds it ("<name>.parts\<start in hex>.part", at a local offset; parts.ts).
+     */
+    placeOf(rec, at) {
+      const seg = (rec.file?.segments ?? []).find((s) => at >= s.start && at < s.end);
+      const base = seg?.base ?? 0;
+      return base ? { path: PathUtils.join(rec.path + ".parts", base.toString(16) + ".part"), offset: at - base } : { path: rec.path + ".part", offset: at };
+    },
     get manifest() {
       return manifest;
     },

@@ -1,7 +1,10 @@
 """Hold a byte-range lock on a file for a while, so another process's WriteFile into that range
 fails (ERROR_LOCK_VIOLATION). Used to provoke a real disk-write error in the download engine.
 
-  python lock_region.py <path> <seconds>
+  python lock_region.py <path> <seconds> [<bytes>]
+
+With <bytes>, at least that many are locked from 0, past the file's end too (Windows allows it): a file that grows
+at its end (the parts layout's part files) is refused there as well.
 """
 import msvcrt
 import os
@@ -11,7 +14,7 @@ import time
 
 def main():
     path, secs = sys.argv[1], float(sys.argv[2])
-    size = os.path.getsize(path)
+    size = max(os.path.getsize(path), int(sys.argv[3]) if len(sys.argv) > 3 else 0)
     fd = os.open(path, os.O_RDWR | os.O_BINARY)
     locked = 0
     chunk = 1 << 30

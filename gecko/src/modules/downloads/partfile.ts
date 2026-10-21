@@ -57,10 +57,34 @@ export async function sizeOf(path: string): Promise<number> {
  * reputation.ts does; null when the file can't be read. The same-file proof compares saved bytes
  * through it (RESUME-DESIGN.md 2.4 R4).
  */
+/** Where bytes of a file are kept when they are not in the file itself (parts.ts, the parts layout). */
+export interface Place {
+  path: string;
+  offset: number;
+}
+const places = new Map<string, (from: number, len: number) => Place | null>();
+
+/** Reads of `path` by file offset go where `resolve` says (parts.ts useParts()). */
+export function registerPlaces(path: string, resolve: (from: number, len: number) => Place | null): void {
+  places.set(path.toLowerCase(), resolve);
+}
+
+export function unregisterPlaces(path: string): void {
+  places.delete(path.toLowerCase());
+}
+
+/** The file and offset that hold `len` bytes of `path` at `offset`: the path itself unless parts.ts registered it (null: can't be read whole). */
+export function placeOf(path: string, offset: number, length: number): Place | null {
+  const resolve = places.get(path.toLowerCase());
+  return resolve ? resolve(offset, length) : { path, offset };
+}
+
 export async function readAt(path: string, offset: number, length: number): Promise<Uint8Array | null> {
   if (length <= 0) return new Uint8Array(0);
+  const at = placeOf(path, offset, length);
+  if (!at) return null;
   try {
-    return await IOUtils.read(path, { offset, maxBytes: length });
+    return await IOUtils.read(at.path, { offset: at.offset, maxBytes: length });
   } catch {
     return null;
   }

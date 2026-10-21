@@ -39,6 +39,9 @@ import type { IdentityJSON } from './types';
 /** A failure with a sentence a person can read; never retried. */
 export class DownloadError extends Error {}
 
+/** A file bigger than the drive it is saved to can hold (FAT32: 4 GiB - 1), refused before anything is written (parts.ts). */
+export class TooBigForDriveError extends DownloadError {}
+
 export class HttpStatusError extends Error {
   constructor(
     readonly status: number,
@@ -911,6 +914,7 @@ export function describeError(err: unknown): string {
   const code = String((err as { code?: string; name?: string })?.code ?? (err as { name?: string })?.name ?? '');
   if (err instanceof DiskError || /^NS_ERROR_FILE_|NotFoundError|NotAllowedError|OperationError/.test(code)) {
     if (/NO_DEVICE_SPACE|DISK_FULL/.test(code)) return 'The disk is full.';
+    if (/FILE_TOO_BIG/.test(code)) return 'The file is too big for the drive it is saved to.';
     if (/ACCESS_DENIED|READ_ONLY|NotAllowedError/.test(code)) return 'Deer isn’t allowed to write to the downloads folder.';
     if (/IS_LOCKED/.test(code)) return 'Another program is using the file.';
     return 'Couldn’t write to the downloads folder.';

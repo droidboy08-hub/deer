@@ -523,8 +523,13 @@ local look-alike type, so a contract change fails `tsc`.
   before opening an executable that is not an .exe, page-derived addresses fetched with the page's
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
-  main window from a popup. Connections (`ranged.ts`; compared with IDM 6.43 in
-  `spikes/downloader/IDM-BENCH.md`, test `tests/downloads/connections.js`): the .part is sparse while it
+  main window from a popup. On a volume without sparse files (exFAT, FAT32, some shares: `parts.ts` volumeInfo(), test
+  `tests/downloads/layout.js`) a ranged download is kept as IDM keeps it: "<name>.part" plus "<name>.parts\<start in
+  hex>.part" per other part (Segment.base), each written only at its end, every read of saved bytes by file offset
+  resolved through partfile.ts placeOf(); after the last byte the parts are added to the .part in 8 MiB steps (Saving,
+  each step saved: a pause, quit or crash loses nothing) and deleted; a file over 4 GiB - 1 is refused on FAT32 before
+  anything is written. On NTFS no segment ever has a base and nothing changes. Connections (`ranged.ts`; compared with
+  IDM 6.43 in `spikes/downloader/IDM-BENCH.md`, test `tests/downloads/connections.js`): the .part is sparse while it
   downloads (no zero-fill wait far into a big file; made ordinary again before it is moved into place or
   kept as a partial file; the room check counts what a .part does not hold yet, GetCompressedFileSizeW,
   and what other sparse downloads on that disk still need),

@@ -239,6 +239,7 @@ import { ASK_ABOVE, UNSURE, compareWindows, proveAddress, readKind, sizeText, wi
 import { asPolicy, readReferrerInfo } from './downloads/referrer';
 import { hashWanted, mayLaunch, reputationOf, type Verdict } from './downloads/reputation';
 import { FileTransfer, fileFills, hasRoom, silentRestart, type FileState, type TransferEnv } from './downloads/ranged';
+import { clampParts, dropParts, hasParts, joinParts, partFiles, partsDir, removeParts as removePartFiles, useParts } from './downloads/parts';
 import { FORGET_FAILURE, Gate, addresses, adopt, nextTry, originalAddress, type AttachHow, type Outcome, type RenewWhy, type Renewed } from './downloads/renew';
 import type { AddressResult, DownloadEvent, DownloadState, DownloadView, FfmpegInfo, IdentityJSON, NeedKind, PageJob, PageResolver, PageSeen, PageTarget, RefreshResult, RenewWithResult, StartOptions, StreamRung, VideoOption, WaitFor } from './downloads/types';
 import { CONTINUE_AFTER, FRESH_AFTER, SERVER_GIVE_UP, SLEEP_FALLBACK, SOON, WAKE_SETTLE, rewindTails, waitNext } from './downloads/waits';
@@ -758,6 +759,9 @@ class Manager {
       this.journalDir = PathUtils.join(PathUtils.profileDir, 'vitre-downloads');
       await IOUtils.makeDirectory(this.journalDir, { ignoreExisting: true, createAncestors: true }).catch(() => undefined);
       await this.load();
+      // The parts layout (parts.ts): reads of a row's saved bytes go to its parts from the start, also for the proofs a
+      // paused row runs with no transfer (review: after a restart they read the .part alone and saw another file).
+      for (const r of this.recs) this.placeReads(r);
       this.installLifecycle();
       this.loadedAt = Date.now();
       // RESUME-DESIGN.md G4 crash detection: this session is unclean until shutdown's last save, and the
@@ -1613,11 +1617,15 @@ class Manager {
       await this.save(true);
       return null;
     }
+    // The parts layout (parts.ts): reads of the .part by file offset go to the part that holds them.
+    if (s.layout === 'parts') useParts(part, () => s.segments);
     if (!l || l.total !== s.total || l.bs !== blockSize(s.total)) return null;
     t.ledger = l;
     const before = savedBytes(rec);
-    // Never claims past the file's end (openPart() does the same).
-    for (const seg of s.segments) seg.received = Math.max(0, Math.min(seg.received, st.size - seg.start));
+    // Never claims past the file's end (openPart() does the same); in the parts layout, each part's own.
+    let mtime = st.mtime;
+    if (s.layout === 'parts') mtime = Math.max(mtime, await clampParts(part, s.segments));
+    else for (const seg of s.segments) seg.received = Math.max(0, Math.min(seg.received, st.size - seg.start));
     const bad = new Set<number>();
     let why: '' | 'crash' | 'other' = '';
     if (s.dirty) {
@@ -1625,7 +1633,7 @@ class Manager {
       l.rewind(s.segments);
       const since = l.seal ? l.seal.t - (l.seal.f ? 0 : UNFLUSHED_MARGIN) : 0;
       for (const b of await l.verify(part, l.newer(since))) bad.add(b);
-    } else if (l.seal && st.mtime > l.seal.t + MTIME_SLACK) {
+    } else if (l.seal && mtime > l.seal.t + MTIME_SLACK) {
       why = 'other';
       // What no hashed block covers can't be checked (the part of a block below each frontier): fetched again too.
       l.rewind(s.segments);
@@ -1775,9 +1783,14 @@ class Manager {
         if (why === 'stop') l.detach();
         if (!ours()) return;
         const segs = t && why === 'timer' ? t.provable() : (rec.file?.segments ?? []);
-        const cov = segs.filter((seg) => seg.received > 0).map((seg): [number, number] => [seg.start, seg.received]);
+        // The parts layout: each segment's part is in its seal line too (parts.ts), so a row rebuilt from its journal
+        // still knows where its bytes are.
+        const cov = segs.filter((seg) => seg.received > 0).map((seg): number[] => (seg.base ? [seg.start, seg.received, seg.base] : [seg.start, seg.received]));
         const at = Date.now();
-        const flushed = why !== 'final' && existsSync(part) ? await flushPart(part) : false;
+        // The parts layout: every file the segments use is flushed (parts.ts); in place, the .part.
+        const files = rec.file?.layout === 'parts' ? partFiles(part, segs).filter((f) => existsSync(f)) : existsSync(part) ? [part] : [];
+        let flushed = why !== 'final' && files.length > 0;
+        if (flushed) for (const f of files) if (!(await flushPart(f))) flushed = false;
         if (!ours()) return;
         await l.sealed(cov, flushed, at);
         if (why === 'stop' && rec.file) {
@@ -2418,7 +2431,11 @@ class Manager {
 
   /** The partial files Start over kept aside go (the new file completed, or the row was cancelled or removed). */
   private dropOldParts(rec: Rec): void {
-    for (const p of rec.oldParts ?? []) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    for (const p of rec.oldParts ?? []) {
+      // A folder of parts set aside with its .part (parts.ts) goes with it: its part files, then the folder if empty.
+      if (/\.parts$/i.test(p)) void removePartFiles(p.replace(/\.parts$/i, '.part'));
+      else IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
+    }
     rec.oldParts = undefined;
   }
 
@@ -2698,6 +2715,12 @@ class Manager {
     // Its block hashing may hold the .part open a moment (Phase 5): the removal waits for a seal still
     // running and tries again for a while.
     if (rec.mode === 'file') void (this.sealing.get(rec.id) ?? Promise.resolve()).then(() => removeSoon(parts[0]));
+    // The parts layout's other parts (parts.ts): only part files, then the folder if that leaves it empty; its reads
+    // are of the path itself again.
+    if (rec.mode === 'file') {
+      dropParts(parts[0]);
+      void (this.sealing.get(rec.id) ?? Promise.resolve()).then(() => removePartFiles(parts[0]));
+    }
     else for (const p of parts) IOUtils.remove(p, { ignoreAbsent: true }).catch(() => undefined);
     // RESUME-DESIGN.md 5.7: a stream's spill folder ("<part>.d", hls.ts) was left behind before.
     if (rec.mode === 'stream') for (const p of parts) IOUtils.remove(`${p}.d`, { recursive: true, ignoreAbsent: true }).catch(() => undefined);
@@ -2886,6 +2909,8 @@ class Manager {
       const before = rec.oldParts ?? [];
       const moves: Array<[string, string]> = [];
       for (const p of parts) moves.push([p, this.oldPartFor(rec, p, moves.map(([, old]) => old))]);
+      // The parts layout: its folder of parts goes aside with the .part ("<name>.old.parts", parts.ts).
+      if (rec.mode === 'file' && rec.file?.layout === 'parts' && moves.length && existsSync(partsDir(moves[0][0]))) moves.push([partsDir(moves[0][0]), partsDir(moves[0][1])]);
       rec.oldParts = [...new Set([...before, ...moves.map(([, old]) => old)])];
       await this.save(true);
       if (!ready()) {
@@ -2896,8 +2921,9 @@ class Manager {
       const moved: Array<[string, string]> = [];
       try {
         for (const [p, old] of moves) {
-          // Only a partial this row set aside before is replaced (oldPartFor never names another file).
-          if (existsSync(old)) fileFor(old).remove(false);
+          // Only a partial this row set aside before is replaced (oldPartFor never names another file); a folder of
+          // parts only when this row set it aside (review: a second Start over failed on it).
+          if (existsSync(old)) fileFor(old).remove(/\.parts$/i.test(old) && before.some((b) => b.toLowerCase() === old.toLowerCase()));
           fileFor(p).moveTo(null, PathUtils.filename(old));
           moved.push([p, old]);
         }
@@ -3008,7 +3034,8 @@ class Manager {
       const name = `${base}.old${n ? ` (${n})` : ''}.part`;
       if (has(planned, name)) continue;
       if (has(rec.oldParts ?? [], name)) return name;
-      if (!existsSync(name) && !this.taken(name.slice(0, -'.part'.length), rec.id)) return name;
+      // A folder of parts by that name (parts.ts) that is not this row's takes the name too (review).
+      if (!existsSync(name) && !existsSync(partsDir(name)) && !this.taken(name.slice(0, -'.part'.length), rec.id)) return name;
     }
     return `${base}.old (${Date.now()}).part`;
   }
@@ -3212,6 +3239,12 @@ class Manager {
     run.phaseAt = Date.now();
   }
 
+  /** A parts-layout row's saved bytes are read from its parts (parts.ts useParts(); read through rec, so a new state is followed). */
+  private placeReads(rec: Rec): void {
+    if (rec.mode !== 'file' || !rec.path || rec.state === 'completed' || rec.file?.layout !== 'parts') return;
+    useParts(`${rec.path}.part`, () => (rec.file?.layout === 'parts' ? rec.file.segments : []));
+  }
+
   /** Everything a transfer needs from its download. */
   private env(rec: Rec, _run: Run | null): TransferEnv {
     const own = new RateLimiter(() => rec.limitKBps || 0);
@@ -3226,6 +3259,14 @@ class Manager {
       // Looked up in the download's current run when called: a taken-over download's transfer was
       // made by the run that probed it.
       renew: (why, status) => this.renewInRun(rec, why, status),
+      // The parts layout's join (ranged.ts join()): shown as Saving, each step's state saved, flushed.
+      phase: (phase) => {
+        const r = this.runs.get(rec.id);
+        if (!r) return;
+        this.setPhase(r, phase === 'merging' ? 'merging' : '');
+        this.touch(rec);
+      },
+      checkpoint: () => this.save(true),
     };
   }
 
@@ -4144,7 +4185,10 @@ class Manager {
     const ready = (): boolean => !!rec && this.recs.includes(rec) && rec.state === 'paused' && rec.need?.kind === 'choice' && rec.mode === 'file' && !!rec.file && !!rec.path && !this.runs.has(rec.id);
     if (!rec || !ready() || this.deciding.has(id) || !rec.file) return;
     const part = `${rec.path}.part`;
-    const bytes = Math.min(unbroken(rec.file.segments), Math.max(0, await sizeOf(part)));
+    // The parts layout: the claims are each part's own, kept within what each file holds (review), the .part alone is
+    // only the first part.
+    if (rec.file.layout === 'parts') await clampParts(part, rec.file.segments);
+    const bytes = rec.file.layout === 'parts' ? unbroken(rec.file.segments) : Math.min(unbroken(rec.file.segments), Math.max(0, await sizeOf(part)));
     if (bytes <= 0 || !ready() || this.deciding.has(id)) return;
     this.stopRenewing(id);
     this.deciding.add(id);
@@ -4167,6 +4211,24 @@ class Manager {
         if (rec.need) rec.need = { ...rec.need, evidence: 'another program has the saved part open; close it and try again' };
         this.touch(rec);
       };
+      // The parts layout (parts.ts): the parts of the unbroken beginning are joined into the .part first, each step
+      // saved, so an interruption leaves a valid row that asks again.
+      if (rec.file.layout === 'parts' && hasParts(rec.file.segments)) {
+        useParts(part, () => rec.file?.segments ?? []);
+        try {
+          await joinParts(part, rec.file.segments, new AbortController().signal, () => this.save(true), () => new DiskError(Cr.NS_ERROR_FAILURE), bytes);
+        } catch (e) {
+          why(e);
+          await this.save(true);
+          return;
+        }
+        // Cancel or Remove during the join has the last word: the joined state is saved, nothing is moved (review).
+        if (!ready()) {
+          rec.keeping = undefined;
+          await this.save(true);
+          return;
+        }
+      }
       try {
         fileFor(part).moveTo(null, PathUtils.filename(target));
       } catch (e) {
@@ -4187,6 +4249,8 @@ class Manager {
         await this.save(true);
         return;
       }
+      // The parts past the unbroken beginning go (parts.ts).
+      if (rec.file?.layout === 'parts') void removePartFiles(part);
       // The kept file is an ordinary one, as in placeFinished(); cleared once it is cut to its unbroken beginning,
       // so no hole is filled first (review: before the cut, every hole that is about to go was zero-filled). Not
       // waited for: the row's last step stays as it was (Cancel and Remove keep their word, review).
@@ -4991,8 +5055,9 @@ class Manager {
       const done = /\.done\.jsonl$/i.test(path);
       const file = FileTransfer.fresh(h.url);
       const cov = [...(l.seal?.cov ?? [])].sort((a, b) => a[0] - b[0]);
-      const segments: Segment[] = cov.map(([start, received], i) => ({ start, end: i + 1 < cov.length ? cov[i + 1][0] : h.total, received }));
+      const segments: Segment[] = cov.map(([start, received, base], i) => ({ start, end: i + 1 < cov.length ? cov[i + 1][0] : h.total, received, ...(base ? { base } : {}) }));
       Object.assign(file, { total: h.total, ranges: true, probed: true, etag: h.etag, lastModified: h.lm, contentType: h.ct, dispositionName: h.name, allowFresh: false, segments: done ? [{ start: 0, end: h.total, received: h.total }] : segments, dirty: !done });
+      if (!done && segments.some((seg) => seg.base)) file.layout = 'parts';
       const where = done && l.fin?.path ? l.fin.path : h.path;
       const rec = this.newRec(h.url, { filename: PathUtils.filename(where), named: true, dir: PathUtils.parent(where) ?? '', identity: (h.identity ?? {}) as Partial<IdentityJSON> });
       Object.assign(rec, {

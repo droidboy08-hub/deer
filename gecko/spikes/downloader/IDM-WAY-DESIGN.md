@@ -1,7 +1,13 @@
 # Downloads the IDM way: retries and the hybrid file layout (design, 2026-10-21)
 
 Status: retries BUILT (2026-10-21, while the owner was away; they asked for the fix to be committed when done),
-the hybrid layout next. Built as this design with these differences, each because the owner chose "Exactly like IDM"
+and the hybrid layout BUILT the same day, as section 4 with these differences: the volume query and the copy run in
+workers of their own (flush.js 'volume', 'copy'); reads of saved bytes are resolved through one registry
+(partfile.ts placeOf(), used by readAt() and ledger.ts hashBlock()) instead of a PartStore passed to every reader; no
+in-place second-chance sequence (a volume that reports sparse files stays in place); a drive that is gone at a resume
+still reads "Started over" (question 16's pause is not built); a resume of a row whose every byte is saved still asks
+the site before the join continues; Start over moves the folder of parts aside with the .part. Owner questions 13-15,
+17 and 18 taken as recommended. Built as this design with these differences, each because the owner chose "Exactly like IDM"
 over the softer paced option: no per-site token buckets or per-connection 250 ms floor (only a main-thread cap of
 150 asks a second after failures across Deer: Necko itself sends a reset request again up to 10 times, so that is
 about IDM's 1,270 a second at the server, measured; a spike showed no main-thread lag to speak of up to 800 asks a second); the first re-ask of a refused start is after 4 s, as the 2026-10-20 and 2026-10-21 logs show

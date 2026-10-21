@@ -98,11 +98,13 @@ spike.main(async () => {
   const segs = zr.file.segments.slice(0, 2);
   check("the first two segments claim at least 1.5 MiB each", segs.length === 2 && segs.every((s) => s.received >= 1.5 * MiB), segs);
   for (const s of segs) {
+    // Where the segment's bytes are kept (its part under the parts layout).
+    const at = DL.placeOf(zr, s.start);
     const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-    file.initWithPath(zp.path + ".part");
+    file.initWithPath(at.path);
     const out = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
     out.init(file, 0x02, 0o644, 0);
-    out.QueryInterface(Ci.nsISeekableStream).seek(Ci.nsISeekableStream.NS_SEEK_SET, s.start);
+    out.QueryInterface(Ci.nsISeekableStream).seek(Ci.nsISeekableStream.NS_SEEK_SET, at.offset);
     const bin = Cc["@mozilla.org/binaryoutputstream;1"].createInstance(Ci.nsIBinaryOutputStream);
     bin.setOutputStream(out);
     bin.writeByteArray(zeros);

@@ -632,7 +632,8 @@ spike.main(async () => {
     // The .part was sparse while it filled (ranged.ts openPart()); the kept file is an ordinary one.
     const attrs = attrsOf(d.path);
     k32.close();
-    check("the kept partial file is not sparse (its .part was)", before !== 0xffffffff && (before & 0x200) !== 0 && attrs !== 0xffffffff && (attrs & 0x200) === 0, { part: "0x" + before.toString(16), kept: "0x" + attrs.toString(16) });
+    // In place the .part is sparse; under the parts layout (all.py --layout parts) it never is.
+    check("the kept partial file is not sparse (its .part was, in place)", (DL.partsLayout() || (before !== 0xffffffff && (before & 0x200) !== 0)) && attrs !== 0xffffffff && (attrs & 0x200) === 0, { part: "0x" + before.toString(16), kept: "0x" + attrs.toString(16) });
   }
 
   // ---- peek: a click in a peek sheet that continues a row flies from the sheet's header ----

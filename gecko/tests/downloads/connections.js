@@ -91,7 +91,8 @@ spike.main(async () => {
   const part = v1.path + ".part";
   const attrs = GetFileAttributesW(part);
   log("part", part, "attributes", "0x" + attrs.toString(16));
-  check("the .part of a ranged download is sparse", attrs !== 0xffffffff && (attrs & SPARSE) === SPARSE, "0x" + attrs.toString(16));
+  // In place only: under the parts layout (all.py --layout parts) no file is sparse.
+  if (!DL.partsLayout()) check("the .part of a ranged download is sparse", attrs !== 0xffffffff && (attrs & SPARSE) === SPARSE, "0x" + attrs.toString(16));
   engine.cancel(id1);
   await DL.until(id1, ["cancelled"], { timeout: 10000 });
   engine.remove(id1);
@@ -249,7 +250,8 @@ spike.main(async () => {
   await DL.until(id14, ["downloading"], { test: (v) => v.received > 8 * MiB, timeout: 30000, what: "8 MiB" });
   const fresh14 = room(id14);
   log("room: fresh", fresh14);
-  check("a fresh download needs room for the whole file", !!fresh14 && fresh14.holds === 0 && fresh14.needed === 256 * MiB, fresh14);
+  // In place: the whole file; under parts the join's largest part too (ranged.ts openParts()).
+  check("a fresh download needs room for the whole file", !!fresh14 && fresh14.holds === 0 && (DL.partsLayout() ? fresh14.needed === 256 * MiB + 32 * MiB : fresh14.needed === 256 * MiB), fresh14);
   const id14b = engine.start(`${DL.base}/blob/medium?rate=512`, { pageUrl: page });
   await DL.until(id14b, ["downloading"], { test: (v) => v.received > 0, timeout: 30000, what: "the second's first bytes" });
   const other14 = room(id14b);
@@ -257,7 +259,8 @@ spike.main(async () => {
   log("room: second download", other14, "first received", first14);
   // What the first still needs is what its .part does not hold: less than what it has left to write, since the part
   // past its farthest write is still held (counting that too refused downloads that fit, review).
-  check("a second download on the same disk counts the room the first still needs, once", !!other14 && other14.needed === 24 * MiB && other14.others > 100 * MiB && other14.others < 256 * MiB - first14, { room: other14, first: first14 });
+  // In place: what the first's .part does not hold yet; under parts, what it has not written plus its join's part.
+  check("a second download on the same disk counts the room the first still needs, once", !!other14 && (DL.partsLayout() ? other14.needed === 24 * MiB + 3 * MiB && other14.others > 200 * MiB : other14.needed === 24 * MiB && other14.others > 100 * MiB && other14.others < 256 * MiB - first14), { room: other14, first: first14 });
   engine.cancel(id14b);
   await DL.until(id14b, ["cancelled"], { timeout: 10000 }).catch(() => null);
   engine.remove(id14b);
@@ -267,7 +270,9 @@ spike.main(async () => {
   await DL.until(id14, ["downloading"], { test: (v) => v.received > p14.received, timeout: 30000, what: "bytes after the resume" });
   const again14 = room(id14);
   log("room: resumed", again14, "saved", p14.received);
-  check("a resumed sparse .part counts the room it does not hold yet", !!again14 && again14.holds >= p14.received && again14.holds < 256 * MiB && again14.needed === 256 * MiB - again14.holds, { room: again14, saved: p14.received });
+  // In place: what the sparse .part does not hold yet; under parts, what is not written plus the join's part.
+  if (DL.partsLayout()) check("a resumed parts download counts what it has not written, plus its join's largest part", !!again14 && again14.needed === 256 * MiB - again14.holds + 32 * MiB, { room: again14, saved: p14.received });
+  else check("a resumed sparse .part counts the room it does not hold yet", !!again14 && again14.holds >= p14.received && again14.holds < 256 * MiB && again14.needed === 256 * MiB - again14.holds, { room: again14, saved: p14.received });
   engine.cancel(id14);
   await DL.until(id14, ["cancelled"], { timeout: 10000 }).catch(() => null);
   engine.remove(id14);

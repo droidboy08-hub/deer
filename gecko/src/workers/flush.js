@@ -14,6 +14,11 @@
 //
 //   unsparse  FSCTL_SET_SPARSE with SetSparse FALSE on the finished file: Windows refuses to mount a sparse ISO,
 //           VHD or VHDX (every range is written by then, so it is an ordinary file again).
+//   volume  GetVolumePathNameW + GetVolumeInformationW for the folder `path`: {root, fs, flags, serial} (parts.ts:
+//           a volume without sparse files keeps a download as IDM does, one file per part). Opens nothing.
+//   copy    `len` bytes of `from` at `src` written to `path` at `at` (ReadFile, WriteFile, a 4 MiB buffer), then
+//           FlushFileBuffers when `flush` (the parts layout's join, ranged.ts). A write that would start past `path`'s
+//           end is refused (never a gap, never a zero-fill). Out: {copied}.
 //
 // Message in: {id, path, op} (op 'flush' when absent). Message out: {id, ok: 1|0, ms, err}. The file is
 // opened for writing with every share mode (the transfer's own writers may hold it); nothing is written.
@@ -30,8 +35,70 @@ function load() {
     DeviceIoControl: k32.declare('DeviceIoControl', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.uint32_t, ctypes.voidptr_t, ctypes.uint32_t, ctypes.voidptr_t, ctypes.uint32_t, ctypes.uint32_t.ptr, ctypes.voidptr_t),
     CloseHandle: k32.declare('CloseHandle', ctypes.winapi_abi, ctypes.int32_t, HANDLE),
     GetLastError: k32.declare('GetLastError', ctypes.winapi_abi, ctypes.uint32_t),
+    GetVolumePathNameW: k32.declare('GetVolumePathNameW', ctypes.winapi_abi, ctypes.int32_t, ctypes.char16_t.ptr, ctypes.char16_t.ptr, ctypes.uint32_t),
+    GetVolumeInformationW: k32.declare('GetVolumeInformationW', ctypes.winapi_abi, ctypes.int32_t, ctypes.char16_t.ptr, ctypes.char16_t.ptr, ctypes.uint32_t, ctypes.uint32_t.ptr, ctypes.uint32_t.ptr, ctypes.uint32_t.ptr, ctypes.char16_t.ptr, ctypes.uint32_t),
+    GetFileSizeEx: k32.declare('GetFileSizeEx', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.int64_t.ptr),
+    SetFilePointerEx: k32.declare('SetFilePointerEx', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.int64_t, ctypes.int64_t.ptr, ctypes.uint32_t),
+    ReadFile: k32.declare('ReadFile', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.voidptr_t, ctypes.uint32_t, ctypes.uint32_t.ptr, ctypes.voidptr_t),
+    WriteFile: k32.declare('WriteFile', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.voidptr_t, ctypes.uint32_t, ctypes.uint32_t.ptr, ctypes.voidptr_t),
   };
   return api;
+}
+
+const COPY_BUFFER = 4 * 1024 * 1024;
+let copyBuf = null;
+
+function invalid(h) {
+  return ctypes.cast(h, ctypes.intptr_t).value == -1;
+}
+
+/** The 'volume' op: where `dir` lives and what it can do. */
+function volume(k, dir) {
+  const rootBuf = ctypes.char16_t.array(1024)();
+  if (!k.GetVolumePathNameW(String(dir), rootBuf, 1024)) return { ok: 0, err: ctypes.winLastError };
+  const root = rootBuf.readString();
+  const serial = new ctypes.uint32_t(0);
+  const maxName = new ctypes.uint32_t(0);
+  const flags = new ctypes.uint32_t(0);
+  const fsBuf = ctypes.char16_t.array(64)();
+  if (!k.GetVolumeInformationW(root, null, 0, serial.address(), maxName.address(), flags.address(), fsBuf, 64)) return { ok: 0, err: ctypes.winLastError, root };
+  return { ok: 1, root, fs: fsBuf.readString(), flags: flags.value, serial: serial.value };
+}
+
+/** The 'copy' op. */
+function copy(k, data) {
+  const { from, path, src, at, len, flush } = data;
+  // GENERIC_READ, every share mode, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL.
+  const hin = k.CreateFileW(String(from), 0x80000000, 0x7, null, 3, 0x08000080, null);
+  if (invalid(hin)) return { ok: 0, err: ctypes.winLastError, copied: 0 };
+  const hout = k.CreateFileW(String(path), 0x40000000, 0x7, null, 3, 0x80, null);
+  if (invalid(hout)) {
+    const err = ctypes.winLastError;
+    k.CloseHandle(hin);
+    return { ok: 0, err, copied: 0 };
+  }
+  let copied = 0;
+  try {
+    const size = new ctypes.int64_t(0);
+    if (!k.GetFileSizeEx(hout, size.address())) return { ok: 0, err: ctypes.winLastError, copied };
+    if (at > Number(size.value.toString())) return { ok: 0, err: 'gap', copied };
+    if (!k.SetFilePointerEx(hin, src, null, 0) || !k.SetFilePointerEx(hout, at, null, 0)) return { ok: 0, err: ctypes.winLastError, copied };
+    copyBuf ??= ctypes.uint8_t.array(COPY_BUFFER)();
+    const got = new ctypes.uint32_t(0);
+    const put = new ctypes.uint32_t(0);
+    while (copied < len) {
+      const n = Math.min(COPY_BUFFER, len - copied);
+      if (!k.ReadFile(hin, copyBuf.address(), n, got.address(), null)) return { ok: 0, err: ctypes.winLastError, copied };
+      if (got.value === 0) break;
+      if (!k.WriteFile(hout, copyBuf.address(), got.value, put.address(), null) || put.value !== got.value) return { ok: 0, err: ctypes.winLastError, copied };
+      copied += got.value;
+    }
+    if (flush && !k.FlushFileBuffers(hout)) return { ok: 0, err: ctypes.winLastError, copied };
+    return { ok: copied === len ? 1 : 0, copied };
+  } finally {
+    k.CloseHandle(hin);
+    k.CloseHandle(hout);
+  }
 }
 
 const FSCTL_SET_SPARSE = 0x000900c4;
@@ -41,6 +108,10 @@ onmessage = (e) => {
   const t = Date.now();
   try {
     const k = load();
+    if (op === 'volume' || op === 'copy') {
+      postMessage({ id, ...(op === 'volume' ? volume(k, path) : copy(k, e.data)), ms: Date.now() - t });
+      return;
+    }
     // GENERIC_READ | GENERIC_WRITE for sparse (DeviceIoControl needs both), GENERIC_WRITE for flush;
     // FILE_SHARE_READ | WRITE | DELETE; OPEN_EXISTING; FILE_ATTRIBUTE_NORMAL.
     const access = op === 'sparse' || op === 'unsparse' ? 0xc0000000 : 0x40000000;

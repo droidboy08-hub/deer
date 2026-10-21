@@ -109,10 +109,11 @@ spike.main(async () => {
   /** Every segment claims exactly the fixture's bytes in the .part. */
   const claimsTrue = async (id, fixture) => {
     const r = rec(id);
-    const part = r.path + ".part";
     for (const s of r.file.segments) {
       if (!s.received) continue;
-      const ours = await IOUtils.read(part, { offset: s.start, maxBytes: s.received });
+      // Where its bytes are kept (its part under the parts layout).
+      const at = DL.placeOf(r, s.start);
+      const ours = await IOUtils.read(at.path, { offset: at.offset, maxBytes: s.received });
       const theirs = await IOUtils.read(PathUtils.join(DL.fix, fixture), { offset: s.start, maxBytes: s.received });
       if (ours.length !== theirs.length) return false;
       for (let i = 0; i < ours.length; i++) if (ours[i] !== theirs[i]) return false;
@@ -231,9 +232,12 @@ spike.main(async () => {
     check("the row that was running comes back paused, marked to continue, with its marks, its record and its dirty mark (the hash rules decide when it continues)", r?.state === "paused" && !!r.resumeOnStart && r.file?.dirty === true && !!r.journal && r.suspect?.bytes === 0 && same, { state: r?.state, flag: r?.resumeOnStart, dirty: r?.file?.dirty, journal: r?.journal, suspect: r?.suspect, marks, now });
     // What a crash can leave: under the marks, bytes the disk never got. The last MiB below each mark is
     // made other bytes; only the hash rules' refetch puts the file right.
-    const part = r.path + ".part";
     const junk = new Uint8Array(MiB).fill(0x5a);
-    for (const [start, got] of marks) if (got >= MiB) writeAt(part, start + got - MiB, junk);
+    for (const [start, got] of marks) {
+      if (got < MiB) continue;
+      const at = DL.placeOf(r, start + got - MiB);
+      writeAt(at.path, at.offset, junk);
+    }
     const t2At = await leftPausedAt(t2);
     check("... it continues by its wait about 5 s after the start (before the 10 s of the restarted ones), with no history of a restart or a crash", t2At >= 4500 && t2At <= 9000 && !events(t2).some((e) => /^Continued after restart|^Checked after Deer closed/.test(e)), { t2At, events: events(t2) });
     const done = await DL.until(k, ["completed", "failed"], { timeout: 120000, what: "the killed download to continue and complete" });

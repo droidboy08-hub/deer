@@ -20,8 +20,11 @@ spike.main(async () => {
   const part = v.path + ".part";
   const py = Services.env.get("VITRE_DL_PY");
   const lock = Services.env.get("VITRE_DL_LOCK");
-  // The lock is held for 8 s, in the background.
-  const locker = DL.tool(py, [lock, part, "8"]);
+  // The lock is held for 8 s, in the background. Under the parts layout (all.py --layout parts) the file a running
+  // segment writes is a part that grows at its end: it is locked past its end.
+  const live = engine.recs.find((x) => x.id === id).file.segments.find((s) => (s.base ?? 0) > 0 && s.received < s.end - s.start);
+  const locked = DL.partsLayout() && live ? DL.placeOf(engine.recs.find((x) => x.id === id), live.start).path : part;
+  const locker = DL.tool(py, [lock, locked, "8", ...(locked !== part ? [String(256 << 20)] : [])]);
   const t0 = Date.now();
   const failed = await DL.until(id, ["failed", "completed"], { timeout: 30000, what: "the write error" });
   const secs = (Date.now() - t0) / 1000;
