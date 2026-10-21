@@ -14,9 +14,12 @@
 //
 //   unsparse  FSCTL_SET_SPARSE with SetSparse FALSE on the finished file: Windows refuses to mount a sparse ISO,
 //           VHD or VHDX (every range is written by then, so it is an ordinary file again).
+//   held    GetCompressedFileSizeW: the bytes of disk the file holds (a sparse .part: what was written and what
+//           lies past its farthest write), so the room a download still needs is known (ranged.ts openPart()).
 //
-// Message in: {id, path, op} (op 'flush' when absent). Message out: {id, ok: 1|0, ms, err}. The file is
-// opened for writing with every share mode (the transfer's own writers may hold it); nothing is written.
+// Message in: {id, path, op} (op 'flush' when absent). Message out: {id, ok: 1|0, ms, err} ('held' adds size).
+// The file is opened for writing with every share mode (the transfer's own writers may hold it); nothing is
+// written. 'held' opens nothing.
 /* global ctypes, onmessage: writable, postMessage */
 let api = null;
 
@@ -30,6 +33,7 @@ function load() {
     DeviceIoControl: k32.declare('DeviceIoControl', ctypes.winapi_abi, ctypes.int32_t, HANDLE, ctypes.uint32_t, ctypes.voidptr_t, ctypes.uint32_t, ctypes.voidptr_t, ctypes.uint32_t, ctypes.uint32_t.ptr, ctypes.voidptr_t),
     CloseHandle: k32.declare('CloseHandle', ctypes.winapi_abi, ctypes.int32_t, HANDLE),
     GetLastError: k32.declare('GetLastError', ctypes.winapi_abi, ctypes.uint32_t),
+    GetCompressedFileSizeW: k32.declare('GetCompressedFileSizeW', ctypes.winapi_abi, ctypes.uint32_t, ctypes.char16_t.ptr, ctypes.uint32_t.ptr),
   };
   return api;
 }
@@ -41,6 +45,15 @@ onmessage = (e) => {
   const t = Date.now();
   try {
     const k = load();
+    if (op === 'held') {
+      const high = new ctypes.uint32_t(0);
+      const low = k.GetCompressedFileSizeW(String(path), high.address());
+      // INVALID_FILE_SIZE is also the low half of a real size: only an error code says it failed.
+      const err = low === 0xffffffff ? ctypes.winLastError : 0;
+      if (err) postMessage({ id, ok: 0, err, ms: Date.now() - t });
+      else postMessage({ id, ok: 1, err: 0, size: high.value * 4294967296 + low, ms: Date.now() - t });
+      return;
+    }
     // GENERIC_READ | GENERIC_WRITE for sparse (DeviceIoControl needs both), GENERIC_WRITE for flush;
     // FILE_SHARE_READ | WRITE | DELETE; OPEN_EXISTING; FILE_ATTRIBUTE_NORMAL.
     const access = op === 'sparse' || op === 'unsparse' ? 0xc0000000 : 0x40000000;

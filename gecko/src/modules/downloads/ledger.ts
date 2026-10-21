@@ -832,7 +832,7 @@ export class Ledger {
 let worker: any = null;
 let workerBroken = false;
 let asked = 0;
-const answers = new Map<number, (ok: boolean) => void>();
+const answers = new Map<number, (data: any) => void>();
 
 /**
  * FlushFileBuffers on `path`, off the main thread (a ChromeWorker with js-ctypes: Phase 5 spike (a)). True
@@ -860,35 +860,50 @@ export function unsparsePart(path: string, timeout = 5000): Promise<boolean> {
   return fileOp('unsparse', path, timeout);
 }
 
+/**
+ * The bytes of disk `path` holds (GetCompressedFileSizeW, workers/flush.js 'held'): for a sparse .part only
+ * the clusters written so far and those past its farthest write, for an ordinary one its size. -1 when it
+ * can't be told.
+ */
+export async function heldBytes(path: string, timeout = 5000): Promise<number> {
+  const data = await fileAsk('held', path, timeout);
+  return data?.ok && typeof data.size === 'number' ? data.size : -1;
+}
+
 function fileOp(op: 'flush' | 'sparse' | 'unsparse', path: string, timeout: number): Promise<boolean> {
-  if (workerBroken) return Promise.resolve(false);
+  return fileAsk(op, path, timeout).then((data) => !!data?.ok);
+}
+
+/** The worker's answer ({id, ok, ms, err, size}), or null when it can't be asked or took longer than `timeout`. */
+function fileAsk(op: 'flush' | 'sparse' | 'unsparse' | 'held', path: string, timeout: number): Promise<any> {
+  if (workerBroken) return Promise.resolve(null);
   try {
     if (!worker) {
       worker = new (globalThis as any).ChromeWorker('chrome://vitre/content/workers/flush.js');
       worker.onmessage = (e: any) => {
         const done = answers.get(e.data?.id);
         answers.delete(e.data?.id);
-        done?.(!!e.data?.ok);
+        done?.(e.data);
       };
       worker.onerror = () => {
         workerBroken = true;
-        for (const done of answers.values()) done(false);
+        for (const done of answers.values()) done(null);
         answers.clear();
       };
     }
   } catch {
     workerBroken = true;
-    return Promise.resolve(false);
+    return Promise.resolve(null);
   }
   const id = ++asked;
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       answers.delete(id);
-      resolve(false);
+      resolve(null);
     }, timeout);
-    answers.set(id, (ok) => {
+    answers.set(id, (data) => {
       clearTimeout(timer);
-      resolve(ok);
+      resolve(data ?? null);
     });
     worker.postMessage({ id, path, op });
   });

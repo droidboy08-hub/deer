@@ -21,12 +21,15 @@
 //      take its part, and the download never pauses as "Link expired". (A 404 before anything arrived still
 //      fails the download, as before.)
 //  10. the finished file is not sparse (Windows refuses to mount a sparse ISO, VHD or VHDX);
-//  11. a server that sends one answer's head at once and its body 12 s later: never cut as a stall (the time
-//      before the first byte is the idle timeout's);
+//  11. a server that sends one answer's head at once and its body 16 s later: never cut as a stall or as slow
+//      (the time before the first byte is the idle timeout's; the slow rule used to count it and cut it);
 //  12. an outage mid-run (every connection cut, then 502 on every ask): the run stops and waits within about
 //      10 s, no connection steps aside (it used to keep going about 18 s more with 0 B/s);
 //  13. every connection refused at once mid-run (cut, then 404 on every ask): the row pauses as Link expired,
-//      never Failed (lanes no longer all retire together).
+//      never Failed (lanes no longer all retire together);
+//  14. the room a sparse download still needs (a sparse .part holds no room ahead of its writes): a fresh one
+//      needs the whole file, a second download on the same disk also counts what the first has left to write,
+//      and a resumed .part counts what it does not hold yet (workers/flush.js 'held').
 /* global spike, Services, ChromeUtils, DL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 
@@ -178,11 +181,11 @@ spike.main(async () => {
   check("404: completed, never paused as Link expired", r9.v?.state === "completed" && neverPaused(r9), [r9.v?.state, r9.states, r9.v?.error]);
   check("404: that connection left for the run", (r9.diag?.retired ?? 0) >= 1, r9.diag?.retired);
   check("sha256 matches (404)", r9.v?.state === "completed" && (await DL.sha256(r9.v.path)) === m["big.bin"].sha256);
-  // ---- 11. a head at once, the body 12 s later: no stall cut ----
+  // ---- 11. a head at once, the body 16 s later: no stall or slow cut ----
   await DL.reset();
-  const r11 = await follow(engine.start(`${DL.base}/blob/big?rate=1024&bodydelay=${96 * MiB}-${128 * MiB}&bodydelayms=12000`, { pageUrl: page }), 150000);
-  log("body after 12 s", { states: r11.states, ends: r11.ends, most: r11.most, secs: r11.secs });
-  check("a body that starts 12 s after its head is not cut as a stall", r11.v?.state === "completed" && !r11.ends.stall && r11.most.reconnects === 0, { ends: r11.ends, most: r11.most });
+  const r11 = await follow(engine.start(`${DL.base}/blob/big?rate=1024&bodydelay=${96 * MiB}-${128 * MiB}&bodydelayms=16000`, { pageUrl: page }), 150000);
+  log("body after 16 s", { states: r11.states, ends: r11.ends, most: r11.most, secs: r11.secs });
+  check("a body that starts 16 s after its head is not cut as a stall or as slow", r11.v?.state === "completed" && !r11.ends.stall && !r11.ends.slow && r11.most.reconnects === 0, { ends: r11.ends, most: r11.most });
 
   /** Follow a download until `pred(view)` holds or it ends; the most its transfer counted on the way. */
   const until = async (id, pred, timeout) => {
@@ -221,5 +224,32 @@ spike.main(async () => {
   engine.cancel(id13);
   await DL.until(id13, ["cancelled"], { timeout: 10000 }).catch(() => null);
   engine.remove(id13);
+
+  // ---- 14. the room a sparse download still needs ----
+  await DL.reset();
+  const room = (id) => engine.transferInfo(id)?.diag?.room ?? null;
+  const id14 = engine.start(`${DL.base}/blob/big?rate=512`, { pageUrl: page });
+  await DL.until(id14, ["downloading"], { test: (v) => v.received > 8 * MiB, timeout: 30000, what: "8 MiB" });
+  const fresh14 = room(id14);
+  log("room: fresh", fresh14);
+  check("a fresh download needs room for the whole file", !!fresh14 && fresh14.holds === 0 && fresh14.needed === 256 * MiB, fresh14);
+  const id14b = engine.start(`${DL.base}/blob/medium?rate=512`, { pageUrl: page });
+  await DL.until(id14b, ["downloading"], { test: (v) => v.received > 0, timeout: 30000, what: "the second's first bytes" });
+  const other14 = room(id14b);
+  log("room: second download", other14);
+  check("a second download on the same disk counts what the first still has to write", !!other14 && other14.needed === 24 * MiB && other14.others > 200 * MiB && other14.others < 256 * MiB, other14);
+  engine.cancel(id14b);
+  await DL.until(id14b, ["cancelled"], { timeout: 10000 }).catch(() => null);
+  engine.remove(id14b);
+  engine.pause(id14);
+  const p14 = await DL.until(id14, ["paused"], { timeout: 15000 });
+  engine.resume(id14);
+  await DL.until(id14, ["downloading"], { test: (v) => v.received > p14.received, timeout: 30000, what: "bytes after the resume" });
+  const again14 = room(id14);
+  log("room: resumed", again14, "saved", p14.received);
+  check("a resumed sparse .part counts the room it does not hold yet", !!again14 && again14.holds >= p14.received && again14.holds < 256 * MiB && again14.needed === 256 * MiB - again14.holds, { room: again14, saved: p14.received });
+  engine.cancel(id14);
+  await DL.until(id14, ["cancelled"], { timeout: 10000 }).catch(() => null);
+  engine.remove(id14);
   k32.close();
 });

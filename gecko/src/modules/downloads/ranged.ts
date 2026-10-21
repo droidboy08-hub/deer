@@ -79,7 +79,7 @@ import {
   REFUSED_STATUS, Response, ShortBodyError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal, refusedConnection,
   retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
-import { blockSize, hashBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
+import { blockSize, hashBytes, heldBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
 import { Writer, freeSpace, readAt, setSize, sizeOf, writeAt } from './partfile';
 import {
   ASK_ABOVE, UNSURE, WINDOW, compareWindows, differs, digestOf, enough, fetchRange, headerChange, judge, notFile, readKind, sizeText, totalOf, validatorsDiffer,
@@ -362,7 +362,7 @@ export class FileTransfer {
    * a refusal retired, the sparse mark, the .part's sizing time, the slowest Writer open, and how long answers
    * were held for the disk and the speed limit. O(connections); nothing here decides anything.
    */
-  diag = { reconnectsAll: 0, retired: 0, sparse: null as null | { ok: boolean; ms: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
+  diag = { reconnectsAll: 0, retired: 0, sparse: null as null | { ok: boolean; ms: number }, room: null as null | { needed: number; others: number; holds: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
   /** Lane -> its record for the diagnostics. */
   private laneStats = new Map<number, LaneStat>();
   /** Lane -> when it last received bytes. */
@@ -869,6 +869,14 @@ export class FileTransfer {
 
   /** Download into `partPath` until every byte has landed and checks out. */
   async download(partPath: string, signal: AbortSignal): Promise<void> {
+    try {
+      await this.downloadTo(partPath, signal);
+    } finally {
+      filling.delete(this);
+    }
+  }
+
+  private async downloadTo(partPath: string, signal: AbortSignal): Promise<void> {
     for (;;) {
       this.plan();
       // Ranges never continue a segment whose end was never known (review of Phase 1; learn() already
@@ -938,9 +946,20 @@ export class FileTransfer {
     const empty = fresh && !!s.allowFresh;
     const claimed = s.segments.reduce((n, seg) => (seg.received > 0 ? Math.max(n, seg.start + seg.received) : n), 0);
     if (s.total >= 0 && claimed > s.total) throw new ChangedError(`now ${sizeText(s.total)}, but ${sizeText(claimed)} were already saved`);
-    // A single stream with saved bytes writes the whole new answer next to them ("<part>.new").
-    const needed = s.total <= 0 ? 0 : !s.ranges && !fresh ? s.total : s.total - Math.max(0, fresh ? 0 : size);
-    ensureRoom(PathUtils.parent(partPath) ?? partPath, needed);
+    // A single stream with saved bytes writes the whole new answer next to them ("<part>.new"). A ranged .part is
+    // sparse (below), so it holds only what was written and what lies past its farthest write: the room still
+    // needed is what it does not hold yet, and the other sparse downloads on that disk still need theirs
+    // (review: counting the sized .part as held let a resume or a second download run out of room midway).
+    const dir = PathUtils.parent(partPath) ?? partPath;
+    let needed = s.total <= 0 ? 0 : !s.ranges && !fresh ? s.total : s.total - Math.max(0, fresh ? 0 : size);
+    let holds = -1;
+    if (s.ranges && s.total > 0) {
+      holds = size < 0 || empty ? 0 : await heldBytes(partPath);
+      needed = Math.max(0, s.total - (holds >= 0 ? holds : written(s)));
+    }
+    const others = needed > 0 ? stillNeeded(this, dir) : 0;
+    this.diag.room = { needed, others, holds };
+    ensureRoom(dir, needed > 0 ? needed + others : 0);
     if (s.ranges && s.total > 0) {
       const t0 = Date.now();
       if (size !== s.total || empty) setSize(partPath, s.total, { truncate: empty });
@@ -950,6 +969,7 @@ export class FileTransfer {
       const t1 = Date.now();
       const ok = await sparsePart(partPath);
       this.diag.sparse = { ok, ms: Date.now() - t1 };
+      if (ok) filling.set(this, { dir, left: () => Math.max(0, s.total - written(s)) });
       this.diag.openPartMs = Date.now() - t0;
     } else if (size < 0 || empty) {
       setSize(partPath, 0, { truncate: true });
@@ -1360,8 +1380,10 @@ export class FileTransfer {
     }
     // Slow: far below the others' median while they are busy.
     const rate = (f: Flow): number => f.samples.reduce((a, b) => a + b, 0) / secs;
+    // Only ticks since the body began count (samples restart at the first byte): the wait before it is the
+    // idle timeout's, as for a stall (review: a late body was cut as slow).
     for (const [seg, f] of [...this.flows]) {
-      if (f.samples.length < SLOW_TICKS || held(f, SLOW_TICKS)) continue;
+      if (!f.firstByte || f.samples.length < SLOW_TICKS || held(f, SLOW_TICKS)) continue;
       const median = others(f.lane);
       if (median < BUSY_RATE || rate(f) >= Math.max(SLOW_FLOOR, SLOW_SHARE * median)) continue;
       // Worth a new connection: what is left takes long at this speed, and far longer than at the others'.
@@ -1414,8 +1436,12 @@ export class FileTransfer {
         const flow = this.flows.get(seg);
         if (flow) {
           const now = Date.now();
+          if (!flow.firstByte) {
+            flow.firstByte = true;
+            flow.samples = [];
+            flow.heldSamples = [];
+          }
           flow.bytes += n;
-          flow.firstByte = true;
           flow.stat.bytes += n;
           flow.stat.lastData = now;
           this.moved.set(flow.lane, now);
@@ -1763,7 +1789,31 @@ export function fileFills(s: FileState, n = 8): number[] {
   return out.map((v) => Math.min(1, v / block));
 }
 
-/** Sizing a file reserves no blocks: without this a download on a full disk dies at 100%. */
+/**
+ * Sparse ranged downloads still writing, with the bytes each has left (openPart(); gone when download() ends):
+ * a sparse .part holds no room ahead of its writes.
+ */
+const filling = new Map<FileTransfer, { dir: string; left: () => number }>();
+
+function written(s: FileState): number {
+  return s.segments.reduce((n, seg) => n + seg.received, 0);
+}
+
+/** The drive letter or \\server\share of a path. */
+function volumeOf(path: string): string {
+  const m = /^(?:\\\\\?\\)?([A-Za-z]:)|^(\\\\[^\\]+\\[^\\]+)/.exec(path);
+  return (m?.[1] ?? m?.[2] ?? path).toLowerCase();
+}
+
+/** What the other sparse downloads on `dir`'s disk have left to write. */
+function stillNeeded(self: FileTransfer, dir: string): number {
+  const vol = volumeOf(dir);
+  let n = 0;
+  for (const [t, f] of filling) if (t !== self && volumeOf(f.dir) === vol) n += f.left();
+  return n;
+}
+
+/** A sparse .part or a single stream holds no room ahead of its writes: without this check a download on a full disk dies at 100%. */
 export function ensureRoom(dir: string, bytes: number): void {
   if (bytes <= 0) return;
   const free = freeSpace(dir);

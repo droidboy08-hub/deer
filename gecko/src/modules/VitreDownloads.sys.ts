@@ -2239,8 +2239,11 @@ class Manager {
     else if (existsSync(target)) target = uniquePath(rec.dir, rec.filename, (p) => this.taken(p, rec.id));
     // The .part was sparse while it filled (ranged.ts openPart()); the finished file is an ordinary one, since
     // Windows refuses to mount a sparse ISO, VHD or VHDX. Every range is written by now, so this costs nothing.
-    await unsparsePart(part).catch(() => false);
+    const plain = await unsparsePart(part).catch(() => false);
     await onDisk(IOUtils.move(part, target));
+    // The worker may still be flushing another download (the call timed out, and runs later on a path that is
+    // gone): clear the mark on the file where it is now (review). On FAT or exFAT both just answer false.
+    if (!plain) await unsparsePart(target, 60000).catch(() => false);
     rec.path = target;
     rec.filename = PathUtils.filename(target);
   }
@@ -4125,6 +4128,8 @@ class Manager {
       // RESUME-DESIGN.md 5.7: the decision reaches the record first (flushed).
       await (await this.ledgerOf(rec))?.decision('keep');
       await this.save(true);
+      // The kept file is an ordinary one, as in placeFinished().
+      await unsparsePart(part).catch(() => false);
       if (!ready()) {
         rec.keeping = undefined;
         return;
