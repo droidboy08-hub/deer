@@ -1,0 +1,5 @@
+out-idm/
+out-deer/
+sha-*.txt
+results.jsonl
+__pycache__/

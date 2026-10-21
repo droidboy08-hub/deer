@@ -2,6 +2,8 @@
 
   engine     256 MiB on 8 connections (sha256), sockets per lane, pause/resume with If-Range,
              speed limit, panel and ring captures
+  connections  a big file's .part is sparse; a connection whose part keeps failing steps aside while the
+             others go on (no stop and wait); a crawling connection is cut and asked again
   restart    a download paused by a restart (the quit prompt confirmed) resumes from its segments; a paused
              download whose record is dirty with no seal and 3 MiB of zeros under its claims (what a power
              loss leaves): the zeros are found and fetched again (Phase 5)
@@ -172,6 +174,7 @@ IDM_GUARD = os.path.join(ROOT, 'spikes', 'downloader', 'server', 'idm_guard.py')
 TESTS = {
     # name: (timeout s, with ffmpeg)
     'engine': (240, True),
+    'connections': (720, True),
     'restart': (240, True),
     'takeover': (180, True),
     'crosssite': (120, True),

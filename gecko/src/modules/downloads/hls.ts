@@ -1441,8 +1441,9 @@ export class StreamTransfer {
             continue;
           }
         }
-        // The last connection: a server that asks for a long wait stops the run (net.ts serverStops()).
-        if (attempt >= ATTEMPTS || !isRetryable(err) || (stopsRun(err) && !mayYield?.(Infinity))) throw err;
+        // The last connection: a server that asks for a long wait stops the run (net.ts serverStops()). A wait's
+        // automatic try ends at its first 429 or 5xx, as the playlist fetch does (review).
+        if (attempt >= ATTEMPTS || !isRetryable(err) || (stopsRun(err) && !mayYield?.(Infinity)) || (this.waitTry && stopsRun(err, true))) throw err;
         await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
       }
     }
@@ -1638,7 +1639,7 @@ export class StreamTransfer {
             return crypto.subtle.importKey('raw', buf as Uint8Array<ArrayBuffer>, { name: 'AES-CBC' }, false, ['decrypt']);
           } catch (err) {
             if (signal.aborted) throw new AbortedError();
-            if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+            if (attempt >= ATTEMPTS || !isRetryable(err) || (this.waitTry && stopsRun(err, true))) throw err;
             await sleep(backoff(attempt, null) * 1000, signal);
           }
         }

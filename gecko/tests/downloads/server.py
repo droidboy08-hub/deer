@@ -5,6 +5,9 @@ cookie/Referer checks, request log, and the test pages. Extended from spikes/dow
 
 Routes (GET):
   /blob/big?rate=KBps       big.bin (256 MiB) with Range/ETag; rate throttles EACH connection (0 = none)
+  /blob/big?fail=A-B&failn=K&failcode=S | slow=A-B&slowrate=KBps | reset=A-B&resetafter=N&resetn=K |
+            stall=A-B&stallafter=N | capresp=N   (also on /blob/medium)
+                            big.bin with one misbehaving region (the connections test): see big_faults()
   /blob/medium?rate=        medium.bin (24 MiB)
   /dl/report?rate=          medium.bin as an attachment ("Quarterly report (final).dat"); needs the page's cookie
   /page.html?rate=          sets the cookie; links: attachment, plain, download attribute
@@ -216,6 +219,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import socket
 import struct
 import sys
@@ -226,7 +230,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 LOCK = threading.Lock()
-STATE = {'active': 0, 'peak': 0, 'requests': [], 'ports': set(), 'hedged': set(), 'token': 1, 'rotated': False}
+STATE = {'active': 0, 'peak': 0, 'requests': [], 'ports': set(), 'hedged': set(), 'token': 1, 'rotated': False, 'failed': 0, 'slowed': False, 'resetc': 0, 'stalled': False, 'delayed': False}
 # /expire and /swap: flags set by /flag?k=, request counts per key, cached md5 and swapped sha256 per file.
 FLAGS = set()
 COUNTS = {}
@@ -376,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.text(200, body, 'application/json')
         if p == '/reset':
             with LOCK:
-                STATE.update(active=0, peak=0, requests=[], ports=set(), hedged=set(), token=1, rotated=False)
+                STATE.update(active=0, peak=0, requests=[], ports=set(), hedged=set(), token=1, rotated=False, failed=0, slowed=False, resetc=0, stalled=False, delayed=False)
             return self.text(200, '{}', 'application/json')
         if p == '/cross.html':
             # Served as http://localhost:<port>: its link is on another site (127.0.0.1).
@@ -589,9 +593,13 @@ class Handler(BaseHTTPRequestHandler):
             size = os.path.getsize(path)
             return self.send_part(path, 200, 0, size - 1, rate, [('Content-Length', str(size)), ('Content-MD5', md5)])
         if p == '/blob/big':
+            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay')):
+                return self.big_faults(q, rate)
             return self.send_file(os.path.join(FIX, 'big.bin'), rate)
         if p == '/blob/medium':
             # ctype: another Content-Type for the same bytes (integrity: a text file sniffed as binary).
+            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay')):
+                return self.big_faults(q, rate, 'medium.bin')
             return self.send_file(os.path.join(FIX, 'medium.bin'), rate, ctype=q.get('ctype', 'application/octet-stream'))
         if p == '/dl/report':
             ok = SID in self.headers.get('Cookie', '') and '/page.html' in self.headers.get('Referer', '')
@@ -1719,10 +1727,72 @@ class Handler(BaseHTTPRequestHandler):
             return self.text(503, 'busy', 'text/plain; charset=utf-8', headers=[('Retry-After', busy[1])] if busy[1] else ())
         return self.send_file(path, rate, cut=lambda: self.dropping(key))
 
-    def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0, cut=None):
+    def big_faults(self, q, rate, name='big.bin'):
+        """/blob/big (or /blob/medium) with one misbehaving region (the connections test). Regions are byte
+        offsets A-B: a request counts when its Range starts in [A, B).
+          fail=A-B&failn=K&failcode=S  the first K such requests answer S (default 500): a connection that keeps
+                                       failing while the others work (520, 404 ... for a proxy host's codes);
+                                       with failskip=N the first N are served and the K after them fail
+          slow=A-B&slowrate=KBps       the first one is sent at slowrate, the ones after it at `rate` (a slow
+                                       server edge: a new connection gets a normal one)
+          reset=A-B&resetafter=N&resetn=K  the first K are reset (RST) after N bytes
+          stall=A-B&stallafter=N       the first one sends N bytes, then nothing (socket kept open)
+          capresp=N                    every 206 covers at most N bytes (a host that caps each answer)
+          bodydelay=A-B&bodydelayms=N  the first one sends its head at once and its body N ms later"""
+        path = os.path.join(FIX, name)
+        rng = self.headers.get('Range', '')
+        first = rng[6:].partition('-')[0] if rng.startswith('bytes=') else ''
+        start = int(first) if first.isdigit() else 0
+
+        def within(spec):
+            a, _, b = spec.partition('-')
+            return int(a) <= start < int(b)
+        fault = {}
+        if q.get('capresp'):
+            fault['cap'] = int(q['capresp'])
+        if 'fail' in q and within(q['fail']):
+            with LOCK:
+                STATE['failed'] += 1
+                n = STATE['failed']
+            skip = int(q.get('failskip', '0'))
+            if skip < n <= skip + int(q.get('failn', '4')):
+                code = int(q.get('failcode', '500'))
+                self.record(status=code, start=start, fault='fail')
+                return self.text(code, 'refused by the test server', 'text/plain; charset=utf-8')
+        if 'reset' in q and within(q['reset']):
+            with LOCK:
+                STATE['resetc'] += 1
+                n = STATE['resetc']
+            if n <= int(q.get('resetn', '3')):
+                fault['reset'] = int(q.get('resetafter', str(2 << 20)))
+        if 'stall' in q and within(q['stall']):
+            with LOCK:
+                stall = not STATE['stalled']
+                STATE['stalled'] = True
+            if stall:
+                fault['stall'] = int(q.get('stallafter', str(1 << 20)))
+        if 'bodydelay' in q and within(q['bodydelay']):
+            with LOCK:
+                first = not STATE['delayed']
+                STATE['delayed'] = True
+            if first:
+                fault['bodydelay'] = float(q.get('bodydelayms', '12000')) / 1000
+        if 'slow' in q and within(q['slow']):
+            with LOCK:
+                slow = not STATE['slowed']
+                STATE['slowed'] = True
+            if slow:
+                return self.send_file(path, float(q.get('slowrate', '16')) * 1024, fault=fault)
+        return self.send_file(path, rate, fault=fault)
+
+    def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0, cut=None, fault=None):
         """`path` with Range and If-Range (ETag size-mtime); with `until` (a time), a transfer still running
         then is cut: the connection closes, as a signed address that expired mid-transfer. With `cut` (a
-        function), a transfer still running when it says so is reset (/net's /drop)."""
+        function), a transfer still running when it says so is reset (/net's /drop). `fault` (the connections
+        test): {'cap': N} a 206 covers at most N bytes (Content-Range says so); {'reset': N} the connection is
+        reset after N bytes; {'stall': N} after N bytes nothing more is sent, the socket kept open until the
+        client closes it."""
+        fault = fault or {}
         size = os.path.getsize(path)
         etag = '"%x-%x"' % (size, int(os.path.getmtime(path)))
         start, end, status = 0, size - 1, 200
@@ -1737,6 +1807,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.record(status=416)
                     return self.text(416, '', headers=[('Content-Range', 'bytes */%d' % size)])
                 status = 206
+                if fault.get('cap'):
+                    end = min(end, start + fault['cap'] - 1)
         length = end - start + 1
         probe = length <= 1
         entry = self.record(status=status, start=start, end=end)
@@ -1752,6 +1824,11 @@ class Handler(BaseHTTPRequestHandler):
         for k, v in extra:
             self.send_header(k, v)
         self.end_headers()
+        if fault.get('bodydelay'):
+            # The head at once, the body later (a server that sends headers before it has the bytes).
+            self.wfile.flush()
+            entry['fault'] = 'bodydelay'
+            time.sleep(fault['bodydelay'])
         if not probe:
             with LOCK:
                 STATE['active'] += 1
@@ -1771,7 +1848,26 @@ class Handler(BaseHTTPRequestHandler):
                         entry['dropped'] = True
                         self.reset()
                         break
-                    b = f.read(min(chunk, length - sent))
+                    if fault.get('reset') and sent >= fault['reset']:
+                        entry['fault'] = 'reset'
+                        self.reset()
+                        break
+                    if fault.get('stall') and sent >= fault['stall']:
+                        entry['fault'] = 'stall'
+                        self.wfile.flush()
+                        quiet = time.time()
+                        while time.time() - quiet < 300:
+                            ready, _, _ = select.select([self.connection], [], [], 0.5)
+                            if ready:
+                                try:
+                                    if not self.connection.recv(1, socket.MSG_PEEK):
+                                        break
+                                except OSError:
+                                    break
+                        entry['stalled_secs'] = round(time.time() - quiet, 2)
+                        self.close_connection = True
+                        break
+                    b = f.read(min(chunk, length - sent, fault['reset'] - sent if fault.get('reset') else chunk, fault['stall'] - sent if fault.get('stall') else chunk))
                     if not b:
                         break
                     self.wfile.write(b)

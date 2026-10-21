@@ -16,8 +16,7 @@
 //     other windows only when R3 or R5 does not settle it (about 256 KiB at most).
 // Nothing here changes the download's state.
 import {
-  AbortedError, AddressRefusedError, ChangedError, DownloadError, HttpStatusError, NotTheFileError, Response, ShortBodyError, backoff, isRetryable, open,
-  pageLike, parseContentRange, refusal, retryAfter, sleep, textStart, textual, type Identity,
+  AbortedError, AddressRefusedError, ChangedError, DownloadError, HttpStatusError, NotTheFileError, Response, ShortBodyError, backoff, isRetryable, open, pageLike, parseContentRange, refusal, retryAfter, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
 import { nameFromDisposition } from './naming';
 import { readAt } from './partfile';
@@ -73,6 +72,8 @@ export interface ProofCtx {
   sockets?: Set<string>;
   /** The block hash record, once there is one: windows are compared with its head hashes (Phase 5). */
   heads?: Heads | null;
+  /** A wait's automatic try on its check (ranged.ts waitTry): a 429 or 5xx ends a fetch at once (review). */
+  waitTry?: boolean;
 }
 
 /** What a new address answered, kept for adopting it (renew.ts adopt()) or for Start over. */
@@ -407,7 +408,7 @@ export async function fetchRange(c: ProofCtx, url: string, from: number, to: num
       return bytes;
     } catch (err) {
       if (signal.aborted) throw new AbortedError();
-      if (attempt >= ATTEMPTS || !isRetryable(err)) throw err;
+      if (attempt >= ATTEMPTS || !isRetryable(err) || (c.waitTry === true && stopsRun(err, true))) throw err;
       await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
     }
   }
@@ -446,7 +447,7 @@ export async function fetchWindow(c: ProofCtx, url: string, from: number, to: nu
       return { res, bytes, total: cr.total };
     } catch (err) {
       if (signal.aborted) throw new AbortedError();
-      if (attempt >= attempts || !isRetryable(err)) throw err;
+      if (attempt >= attempts || !isRetryable(err) || (c.waitTry === true && stopsRun(err, true))) throw err;
       await sleep(backoff(attempt, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
     }
   }

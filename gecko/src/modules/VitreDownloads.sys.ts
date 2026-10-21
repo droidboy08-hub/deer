@@ -230,7 +230,7 @@ import { Budget, COLLECT_MS, LOAD_MS, PER_ROW, SIGN_IN, STREAM_SETTLE, STRONG, l
 import { streamKeyOf } from './downloads/streamkey';
 import { DURATION_SLACK, StreamTable, rungFromQuality } from './downloads/table';
 import { checkFinished, damagedFills, editedSince, mediaCheck, repairFinished, restoreFinished, siteCompare, statOf, type RepairOutcome } from './downloads/finished';
-import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, type Header } from './downloads/ledger';
+import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, unsparsePart, type Header } from './downloads/ledger';
 import { AbortedError, ChangedError, DiskError, DownloadError, HttpStatusError, Identity, classify, describeError } from './downloads/net';
 import { existsSync, fileFor, setSize, sizeOf } from './downloads/partfile';
 import type { Segment } from './downloads/ranged';
@@ -997,10 +997,12 @@ class Manager {
   }
 
   /** For tests: the live transfer's measurements. */
-  transferInfo(id: string): { sockets: number; peakLive: number; live: number } | null {
+  transferInfo(id: string): { sockets: number; peakLive: number; live: number; reconnects: number; stepAsides: number; diag: Record<string, unknown> | null } | null {
     const t = this.runs.get(id)?.transfer;
     if (!t) return null;
-    return t instanceof FileTransfer ? { sockets: t.sockets.size, peakLive: t.peakLive, live: t.live } : { sockets: 0, peakLive: t.live, live: t.live };
+    return t instanceof FileTransfer
+      ? { sockets: t.sockets.size, peakLive: t.peakLive, live: t.live, reconnects: t.reconnects, stepAsides: t.stepAsides, diag: t.diagnostics() }
+      : { sockets: 0, peakLive: t.live, live: t.live, reconnects: 0, stepAsides: 0, diag: null };
   }
 
   // ---- starting ----
@@ -2235,6 +2237,9 @@ class Manager {
     let target = rec.path;
     if (rec.overwrite) await IOUtils.remove(target, { ignoreAbsent: true });
     else if (existsSync(target)) target = uniquePath(rec.dir, rec.filename, (p) => this.taken(p, rec.id));
+    // The .part was sparse while it filled (ranged.ts openPart()); the finished file is an ordinary one, since
+    // Windows refuses to mount a sparse ISO, VHD or VHDX. Every range is written by now, so this costs nothing.
+    await unsparsePart(part).catch(() => false);
     await onDisk(IOUtils.move(part, target));
     rec.path = target;
     rec.filename = PathUtils.filename(target);

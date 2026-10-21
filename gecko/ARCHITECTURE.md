@@ -467,7 +467,13 @@ local look-alike type, so a contract change fails `tsc`.
   before opening an executable that is not an .exe, page-derived addresses fetched with the page's
   principal, cookie jar and referrer policy (`principals.ts`, `net.ts`). The quit prompt sits at z 55
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
-  main window from a popup. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
+  main window from a popup. Connections (`ranged.ts`; compared with IDM 6.43 in
+  `spikes/downloader/IDM-BENCH.md`, test `tests/downloads/connections.js`): the .part is sparse while it
+  downloads (no zero-fill wait far into a big file; made ordinary again before it is moved into place),
+  a connection that keeps failing steps aside (10-60 s) or retires instead of pausing the row while
+  others still receive bytes, one that goes silent (10 s) or crawls (a quarter of the others' median)
+  is cut and its part asked again on a new partition, a reset after bytes is asked again at once, and
+  `transferInfo(id).diag` counts all of it. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
   Phases 1 to 8 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row
   as Link expired (`need` 'address', Retry, Copy address) with its bytes; a file that changed on the

@@ -840,6 +840,27 @@ const answers = new Map<number, (ok: boolean) => void>();
  * says so, and the unclean-session rule keeps its margin, 4.2).
  */
 export function flushPart(path: string, timeout = 15000): Promise<boolean> {
+  return fileOp('flush', path, timeout);
+}
+
+/**
+ * Mark the .part sparse (FSCTL_SET_SPARSE, off the main thread: workers/flush.js), so writes far into a
+ * big file never wait while NTFS fills the gap before them with zeros. False where the volume has no
+ * sparse files (FAT, exFAT) or it can't be done: the download goes on as before.
+ */
+export function sparsePart(path: string, timeout = 5000): Promise<boolean> {
+  return fileOp('sparse', path, timeout);
+}
+
+/**
+ * Clear the sparse mark of a finished .part (workers/flush.js 'unsparse'): Windows refuses to mount a sparse
+ * ISO, VHD or VHDX. False where it can't be done (the file stays as it is).
+ */
+export function unsparsePart(path: string, timeout = 5000): Promise<boolean> {
+  return fileOp('unsparse', path, timeout);
+}
+
+function fileOp(op: 'flush' | 'sparse' | 'unsparse', path: string, timeout: number): Promise<boolean> {
   if (workerBroken) return Promise.resolve(false);
   try {
     if (!worker) {
@@ -869,6 +890,6 @@ export function flushPart(path: string, timeout = 15000): Promise<boolean> {
       clearTimeout(timer);
       resolve(ok);
     });
-    worker.postMessage({ id, path });
+    worker.postMessage({ id, path, op });
   });
 }

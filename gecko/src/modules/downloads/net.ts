@@ -91,6 +91,15 @@ export class DiskError extends Error {
 /** 403 is here on purpose: on a CDN it is usually a token that fresh cookies fix. */
 export const RETRYABLE_STATUS = new Set([403, 408, 425, 429, 500, 502, 503, 504, 507, 509]);
 
+/**
+ * A status worth asking again: RETRYABLE_STATUS, and every 5xx but 501 (Not Implemented) and 505 (HTTP Version
+ * Not Supported): the server's or its gateway's moment, not the address (Cloudflare's 520-524 and 530 among
+ * them: a proxy host's connection to its origin).
+ */
+export function isRetryableStatus(status: number): boolean {
+  return RETRYABLE_STATUS.has(status) || (status >= 500 && status <= 599 && status !== 501 && status !== 505);
+}
+
 /** Statuses that mean the address no longer gives the file (RESUME-DESIGN.md 2.4, R1). */
 export const REFUSED_STATUS = new Set([401, 403, 404, 410, 451]);
 
@@ -257,6 +266,11 @@ function partitionedAway(jar: any, uri: any): boolean {
 export interface ChannelOptions {
   /** Own network partition (connection) number; null = share the pool like a page would. */
   lane?: number | null;
+  /**
+   * The lane's generation: a new one is a new partition, so a new connection even where the old one would be
+   * reused (an HTTP/2 session): ranged.ts tick() bumps it when it cuts a silent or slow answer. 0 = as before.
+   */
+  gen?: number;
 }
 
 /** A Necko channel for `url`, dressed with Deer's headers. */
@@ -316,7 +330,8 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
     const cjs = Cc['@mozilla.org/cookieJarSettings;1'].createInstance(Ci.nsICookieJarSettings);
     // The partition key is the SITE of this address (scheme + registrable domain), so the lane name
     // must be in the registrable part: "vitre-lane-3.invalid", never "lane-3.vitre.invalid".
-    cjs.initWithURI(Services.io.newURI(`https://vitre-lane-${lane}.invalid/`), identity.isPrivate);
+    const gen = opts.gen ? `-${opts.gen}` : '';
+    cjs.initWithURI(Services.io.newURI(`https://vitre-lane-${lane}${gen}.invalid/`), identity.isPrivate);
     channel.loadInfo.cookieJarSettings = cjs;
   }
   channel.loadFlags |= Ci.nsIRequest.LOAD_BYPASS_CACHE | Ci.nsIRequest.INHIBIT_CACHING | Ci.nsIChannel.LOAD_BYPASS_SERVICE_WORKER;
@@ -376,7 +391,37 @@ class Exchange {
    * hops a renewal asks again when the final address expires (RESUME-DESIGN.md 5.2, G1 step 1).
    */
   chain: string[] = [];
+  /** When the request went out and its head came back (ranged.ts diagnostics: a slow host's answer time). */
+  readonly startedAt = Date.now();
+  headAt = 0;
+  /**
+   * Milliseconds the channel was held for the disk (back-pressure: {until}) or the speed limit ({wait}),
+   * and the hold running now: ranged.ts tick() leaves out a connection that was held, never cutting one for
+   * being slow while Deer itself slowed it.
+   */
+  held = { disk: 0, limit: 0 };
+  private holdFrom = 0;
+  private holdWhy: 'disk' | 'limit' | '' = '';
   private onAbort = (): void => this.cancel(Cr.NS_BINDING_ABORTED);
+
+  /** The held time so far, the running hold included. */
+  heldNow(): { disk: number; limit: number } {
+    const h = { ...this.held };
+    if (this.holdWhy) h[this.holdWhy] += Date.now() - this.holdFrom;
+    return h;
+  }
+
+  private hold(why: 'disk' | 'limit'): void {
+    if (this.holdWhy) return;
+    this.holdWhy = why;
+    this.holdFrom = Date.now();
+  }
+
+  private release(): void {
+    if (!this.holdWhy) return;
+    this.held[this.holdWhy] += Date.now() - this.holdFrom;
+    this.holdWhy = '';
+  }
 
   constructor(
     readonly channel: any,
@@ -451,6 +496,7 @@ class Exchange {
         /* nothing to resume */
       }
     }
+    this.release();
   }
 
   /** False when the channel can't be suspended (a response with no body that already ended). */
@@ -469,6 +515,7 @@ class Exchange {
   resume(): void {
     if (this.done || this.cancelled || this.suspends <= 0) return;
     this.suspends--;
+    if (this.suspends === 0) this.release();
     this.request.resume();
     this.touch();
   }
@@ -491,6 +538,7 @@ class Exchange {
     } catch {
       /* not an encoded channel */
     }
+    this.headAt = Date.now();
     this.response = new Response(this, http);
     if (!this.cancelled) this.suspend();
     const resolve = this.resolveHead;
@@ -523,9 +571,13 @@ class Exchange {
       this.stopped = true;
       this.cancel();
     } else if ('wait' in verdict) {
-      if (verdict.wait > 0 && this.suspend()) this.pauseTimer = setTimeout(() => this.resume(), verdict.wait);
+      if (verdict.wait > 0 && this.suspend()) {
+        this.hold('limit');
+        this.pauseTimer = setTimeout(() => this.resume(), verdict.wait);
+      }
     } else if ('until' in verdict) {
       if (!this.suspend()) return;
+      this.hold('disk');
       const poll = (): void => {
         if (this.done || this.cancelled) return;
         if (verdict.until()) this.resume();
@@ -537,6 +589,7 @@ class Exchange {
 
   onStopRequest(_request: any, status: number): void {
     this.done = true;
+    this.release();
     if (this.idle) clearTimeout(this.idle);
     if (this.pauseTimer) clearTimeout(this.pauseTimer);
     this.signal?.removeEventListener('abort', this.onAbort);
@@ -580,6 +633,16 @@ export class Response {
     } catch {
       /* not known */
     }
+  }
+
+  /** Milliseconds from the request going out to its head (a slow host's answer time). */
+  get headMs(): number {
+    return this.ex.headAt ? this.ex.headAt - this.ex.startedAt : -1;
+  }
+
+  /** Milliseconds this answer was held for the disk and for the speed limit so far (Exchange.held). */
+  get held(): { disk: number; limit: number } {
+    return this.ex.heldNow();
   }
 
   /** The socket this response came over (tests: distinct local ports = distinct connections). */
@@ -807,7 +870,10 @@ function isSecurityError(result: number): boolean {
 }
 
 export function isRetryable(err: unknown): boolean {
-  if (err instanceof HttpStatusError) return RETRYABLE_STATUS.has(err.status);
+  // Every 5xx but 501 (Not Implemented) and 505 (HTTP Version Not Supported) is the server's or its
+  // gateway's moment, not the address: Cloudflare's 520-524 and 530 among them (a proxy host's connection to
+  // its origin). On one connection it is asked again (ranged.ts: then it steps aside while others receive).
+  if (err instanceof HttpStatusError) return isRetryableStatus(err.status);
   if (err instanceof ShortBodyError) return true;
   if (err instanceof DownloadError || err instanceof AbortedError || err instanceof DiskError) return false;
   // Certificate and TLS failures never get another go; everything else on the network does.
