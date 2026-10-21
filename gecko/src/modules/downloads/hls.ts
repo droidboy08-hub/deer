@@ -1495,10 +1495,13 @@ export class StreamTransfer {
       const now = lm ? v.lm : v.etag;
       if (!current || !now || now === current) break;
       // Another validator: the whole file (an If-Range that did not hold), or a piece of it (none sent yet,
-      // or ignored). The bytes decide (R4), then the piece is asked again.
+      // or ignored). The bytes decide (R4), then the piece is asked again. It counts as a slip only once the
+      // bytes said it is the same file: counted before, the connections that all met a file swapped mid-run
+      // (each with its own 200) took If-Range down to Last-Modified and then to nothing within one swap, and
+      // the next answer of the new file was written unchecked.
       res.destroy();
-      this.slipped(url, lm);
       await this.vouch(url, now, verify);
+      this.slipped(url, lm);
       this.tags.set(url, { etag: v.etag || known.etag, lm: v.lm || known.lm });
     }
     if (range && res.status === 200 && res.contentLength > 64 * 1024 * 1024) {

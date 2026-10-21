@@ -110,6 +110,37 @@ export function freeSpace(dir: string): number {
   }
 }
 
+let held: { ctypes: any; size: (path: string, high: unknown) => number } | null | undefined;
+
+/**
+ * The bytes of disk a file holds (kernel32 GetCompressedFileSizeW): for a sparse .part what was written and
+ * what lies past its farthest write, for an ordinary file its size. A question about the file's metadata,
+ * as freeSpace() is, so it is asked here and at once (review: through the flush worker it waited behind
+ * other downloads' flushes and was then not known). -1 when it can't be told.
+ */
+export function heldBytes(path: string): number {
+  if (held === undefined) {
+    try {
+      const { ctypes } = ChromeUtils.importESModule('resource://gre/modules/ctypes.sys.mjs');
+      // Kept open for the session, as the flush worker's is.
+      const lib = ctypes.open('kernel32.dll');
+      held = { ctypes, size: lib.declare('GetCompressedFileSizeW', ctypes.winapi_abi, ctypes.uint32_t, ctypes.char16_t.ptr, ctypes.uint32_t.ptr) };
+    } catch {
+      held = null;
+    }
+  }
+  if (!held) return -1;
+  try {
+    const high = new held.ctypes.uint32_t(0);
+    const low = held.size(path, high.address());
+    // INVALID_FILE_SIZE is also the low half of a real size: only an error code says it failed.
+    if (low === 0xffffffff && held.ctypes.winLastError) return -1;
+    return high.value * 4294967296 + low;
+  } catch {
+    return -1;
+  }
+}
+
 export class Writer {
   private out: any;
   private pipe: any;

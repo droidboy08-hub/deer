@@ -79,8 +79,8 @@ import {
   REFUSED_STATUS, Response, ShortBodyError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal, refusedConnection,
   retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
-import { blockSize, hashBytes, heldBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
-import { Writer, freeSpace, readAt, setSize, sizeOf, writeAt } from './partfile';
+import { blockSize, hashBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
+import { Writer, freeSpace, heldBytes, readAt, setSize, sizeOf, writeAt } from './partfile';
 import {
   ASK_ABOVE, UNSURE, WINDOW, compareWindows, differs, digestOf, enough, fetchRange, headerChange, judge, notFile, readKind, sizeText, totalOf, validatorsDiffer,
   windows, type Kind, type ProofCtx,
@@ -883,6 +883,8 @@ export class FileTransfer {
       // sees to it): such bytes go the single-stream way, compared before they are replaced.
       if (this.state.ranges && this.state.segments.some((seg) => seg.end < 0)) this.state.ranges = false;
       await this.openPart(partPath);
+      // Pause or Cancel while the .part was readied (review: runRanged's relay never heard an abort before it).
+      if (signal.aborted) throw new AbortedError();
       try {
         if (this.state.total === 0) return;
         if (this.state.ranges && this.state.total > 0) await this.runRanged(partPath, signal);
@@ -948,33 +950,32 @@ export class FileTransfer {
     if (s.total >= 0 && claimed > s.total) throw new ChangedError(`now ${sizeText(s.total)}, but ${sizeText(claimed)} were already saved`);
     // A single stream with saved bytes writes the whole new answer next to them ("<part>.new"). A ranged .part is
     // sparse (below), so it holds only what was written and what lies past its farthest write: the room still
-    // needed is what it does not hold yet, and the other sparse downloads on that disk still need theirs
-    // (review: counting the sized .part as held let a resume or a second download run out of room midway).
+    // needed is what it does not hold yet (heldBytes()), and the other ranged downloads on that disk still need
+    // theirs (review: counting the sized .part as held let a resume or a second download run out of room midway).
     // A .part that is emptied gives its room back before the room is counted (review).
     const dir = PathUtils.parent(partPath) ?? partPath;
     if (empty && size > 0) setSize(partPath, 0, { truncate: true });
     let needed = s.total <= 0 ? 0 : !s.ranges && !fresh ? s.total : s.total - Math.max(0, fresh ? 0 : size);
     let holds = -1;
     if (s.ranges && s.total > 0) {
-      // Untold (the worker busy past flushPart's 15 s, or broken): the count from before sparse parts, since a
-      // .part that worker never answered for was most likely never made sparse either.
-      holds = size < 0 || empty ? 0 : await heldBytes(partPath, 20000);
-      needed = Math.max(0, s.total - (holds >= 0 ? holds : Math.max(0, size)));
+      holds = size < 0 || empty ? 0 : heldBytes(partPath);
+      needed = Math.max(0, s.total - (holds >= 0 ? holds : written(s)));
     }
-    const others = needed > 0 ? await stillNeeded(this, dir) : 0;
+    const others = needed > 0 ? stillNeeded(this, dir) : 0;
     this.diag.room = { needed, others, holds };
     ensureRoom(dir, needed > 0 ? needed + others : 0);
     if (s.ranges && s.total > 0) {
       const t0 = Date.now();
       if (size !== s.total || empty) setSize(partPath, s.total, { truncate: empty });
+      // Counted from now on by the other downloads' room checks, as what its .part does not hold yet: an
+      // ordinary one (no sparse files on the volume, or the mark never set) holds it all and counts nothing.
+      filling.set(this, { dir, path: partPath, total: s.total, written: () => written(s) });
       // Sparse before any connection writes (workers/flush.js): otherwise NTFS fills the gap up to a write far
       // into the file with zeros inside that write, and the connections there wait minutes on a big file.
       // Also for a .part sized by an older run; where the volume has no sparse files it stays as before.
       const t1 = Date.now();
       const ok = await sparsePart(partPath);
       this.diag.sparse = { ok: ok === true, ms: Date.now() - t1 };
-      // No answer in time still counts: the call runs when the worker reaches it (review).
-      if (ok !== false) filling.set(this, { dir, path: partPath, total: s.total, written: () => written(s) });
       this.diag.openPartMs = Date.now() - t0;
     } else if (size < 0 || empty) {
       setSize(partPath, 0, { truncate: true });
@@ -987,6 +988,7 @@ export class FileTransfer {
     const stop = new AbortController();
     const relay = (): void => stop.abort();
     signal.addEventListener('abort', relay);
+    if (signal.aborted) stop.abort();
     let fatal: unknown = null;
     const n = this.connections();
     // Connections still taking segments; a refused one may step aside only while another remains. `active`
@@ -1795,8 +1797,8 @@ export function fileFills(s: FileState, n = 8): number[] {
 }
 
 /**
- * Sparse ranged downloads still writing, with the bytes each has left (openPart(); gone when download() ends):
- * a sparse .part holds no room ahead of its writes.
+ * Ranged downloads still writing (openPart(); gone when download() ends): a sparse .part holds no room ahead
+ * of its writes.
  */
 const filling = new Map<FileTransfer, { dir: string; path: string; total: number; written: () => number }>();
 
@@ -1811,15 +1813,15 @@ function volumeOf(path: string): string {
 }
 
 /**
- * The room the other sparse downloads on `dir`'s disk still need: what each .part does not hold yet (the free
+ * The room the other ranged downloads on `dir`'s disk still need: what each .part does not hold yet (the free
  * space already leaves out what it holds, review), or what it has left to write when the disk can't tell.
  */
-async function stillNeeded(self: FileTransfer, dir: string): Promise<number> {
+function stillNeeded(self: FileTransfer, dir: string): number {
   const vol = volumeOf(dir);
   let n = 0;
-  for (const [t, f] of [...filling]) {
+  for (const [t, f] of filling) {
     if (t === self || volumeOf(f.dir) !== vol) continue;
-    const h = await heldBytes(f.path);
+    const h = heldBytes(f.path);
     n += Math.max(0, f.total - (h >= 0 ? h : f.written()));
   }
   return n;

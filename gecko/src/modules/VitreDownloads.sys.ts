@@ -2242,8 +2242,9 @@ class Manager {
     const plain = await unsparsePart(part).catch(() => false);
     await onDisk(IOUtils.move(part, target));
     // The worker may still be flushing another download (the call timed out, and runs later on a path that is
-    // gone): clear the mark on the file where it is now (review). On FAT or exFAT both just answer false.
-    if (!plain) await unsparsePart(target, 60000).catch(() => false);
+    // gone): clear the mark on the file where it is now, once the worker gets to it, without holding the finish
+    // (review). On FAT or exFAT both just answer false.
+    if (!plain) void unsparsePart(target, 60000).catch(() => false);
     rec.path = target;
     rec.filename = PathUtils.filename(target);
   }
@@ -4159,8 +4160,9 @@ class Manager {
         return;
       }
       // The kept file is an ordinary one, as in placeFinished(); cleared once it is cut to its unbroken beginning,
-      // so no hole is filled first (review: before the cut, every hole that is about to go was zero-filled).
-      await unsparsePart(target, 60000).catch(() => false);
+      // so no hole is filled first (review: before the cut, every hole that is about to go was zero-filled). Not
+      // waited for: the row's last step stays as it was (Cancel and Remove keep their word, review).
+      void unsparsePart(target, 60000).catch(() => false);
       rec.keeping = undefined;
       rec.path = target;
       rec.filename = PathUtils.filename(target);

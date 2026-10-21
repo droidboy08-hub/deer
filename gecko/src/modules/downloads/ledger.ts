@@ -861,22 +861,12 @@ export function unsparsePart(path: string, timeout = 5000): Promise<boolean> {
   return fileOp('unsparse', path, timeout);
 }
 
-/**
- * The bytes of disk `path` holds (GetCompressedFileSizeW, workers/flush.js 'held'): for a sparse .part only
- * the clusters written so far and those past its farthest write, for an ordinary one its size. -1 when it
- * can't be told.
- */
-export async function heldBytes(path: string, timeout = 5000): Promise<number> {
-  const data = await fileAsk('held', path, timeout);
-  return data?.ok && typeof data.size === 'number' ? data.size : -1;
-}
-
 function fileOp(op: 'flush' | 'sparse' | 'unsparse', path: string, timeout: number): Promise<boolean> {
   return fileAsk(op, path, timeout).then((data) => !!data?.ok);
 }
 
-/** The worker's answer ({id, ok, ms, err, size}), or null when it can't be asked or took longer than `timeout`. */
-function fileAsk(op: 'flush' | 'sparse' | 'unsparse' | 'held', path: string, timeout: number): Promise<any> {
+/** The worker's answer ({id, ok, ms, err}), or null when it can't be asked or took longer than `timeout`. */
+function fileAsk(op: 'flush' | 'sparse' | 'unsparse', path: string, timeout: number): Promise<any> {
   if (workerBroken) return Promise.resolve(null);
   try {
     if (!worker) {
