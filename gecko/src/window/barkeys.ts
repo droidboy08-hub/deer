@@ -3,8 +3,12 @@
 //   Left and Right then cross the tabs and the + circle; Enter or Space switches tab or presses the
 //   button (the buttons' own behaviour); Esc returns to the page.
 // The stops are the bar's own buttons: each tab circle, the active pill's address button and the
-// + circle, in the order they are drawn. Feature modules that add a stop to the bar (the downloads
-// ring) give it the attribute data-bar-stop.
+// + circle, in the order they are drawn. In split view (../design/SPLIT-VIEW-SPEC.md "Accessibility":
+// keyboard routes for every gesture) both halves of the split pill and both halves of a pair's
+// capsule are stops: Enter on the unfocused half focuses that side, on the focused half opens its
+// address field (the half stands where the address button does), on a capsule half shows the pair;
+// Shift+F10 or the Menu key opens that half's menu (Swap sides, Separate tabs, Close both tabs).
+// Feature modules that add a stop to the bar (the downloads ring) give it the attribute data-bar-stop.
 // A data-bar-stop element may also live outside #vitre-bar, anywhere in #vitre-root (the downloads
 // ring sits at the window's bottom right in its own layer, keymap.json: "Left and Right then cross
 // the circles, + and the downloads ring"): it joins the row in drawn order (left to right), takes
@@ -12,7 +16,17 @@
 // shown (inert, or no box) is skipped.
 import type { Browser } from './browser';
 
-const STOPS = '.item.tab:not(.active) > .circle-face, .item.tab.active .address, .item.plus > .face, [data-bar-stop]';
+const STOPS = [
+  '.item.tab:not(.active) > .circle-face',
+  '.item.tab.active .address',
+  '.item.tab.pair.active .split-face .half-main',
+  '.item.tab.pair:not(.active) .capsule-face .cap-half',
+  '.item.plus > .face',
+  '[data-bar-stop]',
+].join(', ');
+
+/** The stop that stands for the address field: the pill's address button, or the focused half of a split pill. */
+const isAddressStop = (s: Element): boolean => s.classList.contains('address') || (s.classList.contains('half-main') && !!s.closest('.half.focused'));
 
 export class BarKeys {
   private bar: HTMLElement;
@@ -53,7 +67,7 @@ export class BarKeys {
       this.b.focusPage();
       return;
     }
-    const pill = stops.findIndex((s) => s.classList.contains('address'));
+    const pill = stops.findIndex(isAddressStop);
     const next = pill < 0 ? (direction > 0 ? 0 : stops.length - 1) : (pill + direction + stops.length) % stops.length;
     stops[next].focus({ focusVisible: true } as FocusOptions);
   }

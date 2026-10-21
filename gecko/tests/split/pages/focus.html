@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Focus thief</title>
+<style>body { margin: 0; background: #fff; font: 16px "Segoe UI", sans-serif; } main { padding: 96px 32px; }</style>
+<main>
+  <h1>Focus thief</h1>
+  <input id="field" placeholder="type here">
+  <script>
+    // window.focus() and a field's focus() a while after load, as a page that wants attention would.
+    const wait = Number(new URLSearchParams(location.search).get('after') || 0);
+    if (wait) setTimeout(() => { window.focus(); document.getElementById('field').focus(); document.title = 'Focus thief (asked)'; }, wait);
+  </script>
+</main>

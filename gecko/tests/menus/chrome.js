@@ -43,9 +43,9 @@ spike.main(async () => {
   let at = rightClickEl(pill, 300, 22);
   check("pill: menu opened", await M.waitOpen());
   let st = M.describe("PILL");
-  check("pill rows", JSON.stringify(st.rows.map((r) => r.label)) === JSON.stringify(["Copy address", "Paste and go", "Duplicate tab", "Move tab to new window", "Close other tabs", "Close tab"]), st.rows.map((r) => r.label));
+  check("pill rows", JSON.stringify(st.rows.map((r) => r.label)) === JSON.stringify(["Copy address", "Paste and go", "Duplicate tab", "New tab in split view", "Move tab to new window", "Close other tabs", "Close tab"]), st.rows.map((r) => r.label));
   check("pill: hangs at y 64 from the pointer x - 16", Math.abs(st.rect.top - 64) <= 1 && Math.abs(st.rect.left - (at.x - 16)) <= 1, { menu: [st.rect.left, st.rect.top], x: at.x });
-  check("pill: Close tab prints Ctrl+W", st.rows[5].key === "Ctrl+W", st.rows[5]);
+  check("pill: Close tab prints Ctrl+W", st.rows.find((r) => r.label === "Close tab")?.key === "Ctrl+W", st.rows.map((r) => [r.label, r.key]));
   check("pill keeps its pressed look", pill.classList.contains("vt-menu-owner"));
   await capture("chrome-pill");
   await M.pick("Copy address");
@@ -78,9 +78,10 @@ spike.main(async () => {
   check("circle: menu opened", await M.waitOpen());
   st = M.describe("CIRCLE");
   check("circle: caption names the tab", st.captions[0] === "Counter - Field Notes · 127.0.0.1", st.captions);
-  check("circle rows", JSON.stringify(st.rows.map((r) => r.label)) === JSON.stringify(["Reload tab", "Duplicate tab", "Copy address", "Move tab to new window", "Close other tabs", "Close tab"]), st.rows.map((r) => r.label));
-  check("circle: Close tab has no key (Ctrl+W closes the active tab)", st.rows[5].key === "", st.rows[5]);
-  check("circle: height has the 28 px caption", Math.abs(st.rect.height - (12 + 28 + 9 + 6 * 34 + 9)) <= 1, st.rect.height);
+  check("circle rows", JSON.stringify(st.rows.map((r) => r.label)) === JSON.stringify(["Open in split view", "Reload tab", "Duplicate tab", "Copy address", "Move tab to new window", "Close other tabs", "Close tab"]), st.rows.map((r) => r.label));
+  check("circle: Close tab has no key (Ctrl+W closes the active tab)", st.rows.find((r) => r.label === "Close tab")?.key === "", st.rows.map((r) => [r.label, r.key]));
+  // The caption, a separator, Open in split view (CtxMenu circlesplit: 264x305), a separator, six rows, a separator.
+  check("circle: height has the 28 px caption", Math.abs(st.rect.height - (12 + 28 + 9 + 34 + 9 + 6 * 34 + 9)) <= 1, st.rect.height);
   check("circle: hangs at y 64", Math.abs(st.rect.top - 64) <= 1 && Math.abs(st.rect.left - (at.x - 16)) <= 1, st.rect);
   await capture("chrome-circle");
   await M.pick("Copy address");

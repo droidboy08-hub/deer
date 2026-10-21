@@ -357,7 +357,8 @@ export class VideoUI {
   }
 
   private onHover(tab: Tab, video: PageVideo | null): void {
-    if (tab.id !== this.b.activeId) return;
+    // Either page of a split pair is on screen: the pill works over both (b.shown).
+    if (!this.b.shown(tab)) return;
     if (!video) {
       // The pointer went onto the pill (or the picker): the page lost it, the pill keeps its video.
       if (this.overPill || this.picker.isOpen) {
@@ -467,7 +468,7 @@ export class VideoUI {
     this.letGoOfEnded();
     const t = this.target();
     const { mode, dl } = this.modeFor(t ? this.offer : null);
-    if (!t || !mode || this.b.root.classList.contains('element-fullscreen') || t.tabId !== this.b.activeId) {
+    if (!t || !mode || this.b.root.classList.contains('element-fullscreen') || !this.b.shown(t.tabId)) {
       this.setShown(false);
       return;
     }

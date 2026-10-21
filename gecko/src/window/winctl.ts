@@ -18,6 +18,7 @@ import { el, fill, svg } from './dom';
 import * as fx from './firefox';
 import { glass, lens } from './glass';
 import { icons } from './icons';
+import type { Theme } from './model';
 
 const WIDTH = 108;
 const HEIGHT = 32;
@@ -68,6 +69,14 @@ export class WindowControls {
   get reserve(): number {
     const label = this.label ? (this.labelWidth || 72) + 8 : 0;
     return RIGHT + WIDTH + label + 16;
+  }
+
+  /**
+   * Split view: the controls sample the page under them (spec "Where the bar sits": Theme), which
+   * may differ from the bar's (the focused side's). null: the bar's theme (no class of their own).
+   */
+  setTheme(theme: Theme | null): void {
+    for (const t of ['light', 'dark', 'clear'] as const) this.element.classList.toggle(`theme-${t}`, theme === t);
   }
 
   /** Maximize shows Restore while the window is maximized or in full screen. */

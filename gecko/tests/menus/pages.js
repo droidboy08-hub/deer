@@ -33,12 +33,12 @@ spike.main(async () => {
   let at = await M.openOn("#link1");
   check("link: menu opened", at.ok);
   M.describe("LINK");
-  rowsAre("link", ["Open link in new tab", "Peek link", "Open link in new window", "Open link in new private window", "Copy link address", "Download linked file", "Inspect"]);
+  rowsAre("link", ["Open link in new tab", "Peek link", "Open link in split view", "Open link in new window", "Open link in new private window", "Copy link address", "Download linked file", "Inspect"]);
   anatomy("link");
   let st = M.state();
   check("link: top-left at the pointer", Math.abs(st.rect.left - at.x) <= 1 && Math.abs(st.rect.top - at.y) <= 1, { rect: st.rect, at: [at.x, at.y] });
   check("link: Peek link prints Shift+click", st.rows[1].key === "Shift+click", st.rows[1]);
-  check("link: icons on the rows that have one", st.rows.map((r) => r.icon).join(",") === "newtab,peek,newwindow,newwindow,link,download,inspect", st.rows.map((r) => r.icon));
+  check("link: icons on the rows that have one", st.rows.map((r) => r.icon).join(",") === "newtab,peek,split,newwindow,newwindow,link,download,inspect", st.rows.map((r) => r.icon));
   check("link: target wash over the link", st.wash === 1, st.wash);
   const wash = document.querySelector("#layer-menus .vt-wash");
   const wr = wash.getBoundingClientRect();
@@ -581,8 +581,8 @@ spike.main(async () => {
   // ---- services that are not installed: their rows are left out ----
   for (const name of ["peek", "find", "downloads", "settings"]) b.provide(name, undefined);
   await M.openOn("#link1");
-  rowsAre("link without Peek / downloads", ["Open link in new tab", "Open link in new window", "Open link in new private window", "Copy link address", "Inspect"]);
-  check("link without Peek: Shift+click printed on new window", M.state().rows[1].key === "Shift+click", M.state().rows[1]);
+  rowsAre("link without Peek / downloads", ["Open link in new tab", "Open link in split view", "Open link in new window", "Open link in new private window", "Copy link address", "Inspect"]);
+  check("link without Peek: Shift+click printed on new window", M.state().rows.find((r) => r.label === "Open link in new window")?.key === "Shift+click", M.state().rows.map((r) => [r.label, r.key]));
   await close();
   await M.openOn("#img1");
   rowsAre("image without Peek / downloads", ["Open image in new tab", "Copy image", "Copy image address", "Inspect"]);

@@ -512,9 +512,10 @@ export class PillFace extends FieldView {
     copy('.back', '.vf-back');
     copy('.forward', '.vf-fwd');
     copy('.reload', '.vf-reload');
-    const fav = part('.address .fav')?.getBoundingClientRect();
+    // Split view: the split pill's focused half stands for the address (its favicon and host).
+    const fav = part('.half.focused .fav, .address .fav')?.getBoundingClientRect();
     if (fav) this.el.style.setProperty('--vf-fav-dx', `${fav.x + fav.width / 2 - 8 - box.x - 16}px`);
-    const host = part('.host');
+    const host = part('.half.focused .host') ?? part('.host');
     const domain = this.q('.vf-domain');
     if (host) {
       const r = host.getBoundingClientRect();
@@ -565,7 +566,7 @@ export class PillFace extends FieldView {
   syncTab(t: Tab): void {
     this.el.classList.toggle('vf-loading', t.loading);
     setTip(this.fav, t.url || null);
-    const src = this.b.bar.item(t.id)?.querySelector<HTMLElement>('.address .fav');
+    const src = this.b.bar.item(t.id)?.querySelector<HTMLElement>('.half.focused .fav, .address .fav');
     const key = src?.dataset.src ?? '';
     if (src && key !== this.favSrc) {
       this.favSrc = key;

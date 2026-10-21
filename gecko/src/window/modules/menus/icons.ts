@@ -29,6 +29,9 @@ const PATHS: Record<string, [string, string?]> = {
   folder: ['M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 1.5h6A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z'],
   opentab: ['M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12M11 4.5h4.5V9M15.5 4.5 9.5 10.5'],
   check: ['M5 10.5 8.5 14 15 6.5'],
+  // Split view (CtxMenu.dc.html split rows): the split glyph and Swap sides.
+  split: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11'],
+  swap: ['M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3'],
   /** Submenu arrow in the accelerator column (not part of the board set: Deer's own menus have no submenus). */
   chevron: ['M8 5.5 12.5 10 8 14.5'],
 };

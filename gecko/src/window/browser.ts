@@ -13,6 +13,9 @@
 //             instead: find's face) (see bar.ts). While the
 //             bar is in hiding mode (auto-hide, F11) the window's pages are listed as "under a
 //             hidden bar" for the page modules (pagearea.ts): no top strip, no PDF offset.
+//   Split     b.split(other? | 'home'), b.separate(ref?), b.swapSides(ref?), b.splitRatio(ref?, r?),
+//             b.units(), b.shown(tab), b.pairOf(ref), b.splitView (split.ts: two pages side by side,
+//             Firefox's own split view; 'split-changed'; contract in the header of split.ts)
 //   Tabs      b.newTab(url?, { background, index }), b.closeTab(tab), b.activate(tab),
 //             b.navigate(tab, url), b.moveTab(tab, index), b.tab(id), b.tabFor(browserElement),
 //             b.toggleMute(tab), b.moveToNewWindow(tab), b.forgetClosed(),
@@ -109,8 +112,10 @@ import { HIDDEN_TAB_VALUE, startTheme, Tab, type Theme } from './model';
 import { installModules } from './modules';
 import { Omnibox } from './omnibox';
 import { PageArea } from './pagearea';
+import { SplitView, titleOf, type Pair, type Unit } from './split';
 
 export { HIDDEN_TAB_VALUE, Tab, type Theme } from './model';
+export type { Pair, Side, Unit } from './split';
 
 /** Where a page message came from. `tab` is undefined for a browser outside b.tabs (a peek). */
 export interface PageSource {
@@ -123,7 +128,8 @@ export interface PageSource {
 export interface BrowserEvents {
   /** A tab appeared in b.tabs (opened, restored, or a hidden tab was shown). */
   'tab-created': [tab: Tab];
-  'tab-activated': [tab: Tab];
+  /** withinPair: focus moved between the two sides of one split pair (split.ts). */
+  'tab-activated': [tab: Tab, info: { withinPair: boolean }];
   /** A tab left b.tabs (closed, or hidden). */
   'tab-closed': [tab: Tab];
   /** Title, URL, favicon, loading, navigation state, zoom, sound or pinned state changed. */
@@ -145,6 +151,11 @@ export interface BrowserEvents {
   'tab-crashed': [tab: Tab | undefined, browser: XULBrowser];
   /** After every render of the bar. */
   render: [];
+  /**
+   * Split view changed: a pair formed or ended, its sides swapped, its focused side or ratio
+   * changed, or a narrow window collapsed or restored it (split.ts).
+   */
+  'split-changed': [];
   settings: [settings: Settings, changed: string[]];
   /**
    * The Ctrl key was released (the switcher commits): reason 'key' for the Control keyup, 'blur'
@@ -184,6 +195,11 @@ export interface OpenOptions extends fx.LoadPrincipals {
   /** For 'tab': position in b.tabs (default: the newTabPosition setting) and background. */
   index?: number;
   background?: boolean;
+  /**
+   * For 'current': the page to load into instead of the active tab's (split view's "Open link on
+   * the right side" loads into the other side; spec "How to start split view").
+   */
+  targetBrowser?: XULBrowser;
   /** For 'window'. */
   private?: boolean;
 }
@@ -224,6 +240,8 @@ export class Browser {
   readonly root: HTMLElement;
   readonly bar: Bar;
   readonly omni: Omnibox;
+  /** Split view (split.ts): two pages side by side. */
+  readonly splitView: SplitView;
   /** The key router (keys.ts). Set during boot, before the feature modules install. */
   keys!: Keys;
   homeTheme: Theme = 'clear';
@@ -289,6 +307,7 @@ export class Browser {
   constructor() {
     this.whenReady = new Promise((resolve) => (this.resolveReady = resolve));
     this.root = this.mountRoot();
+    this.splitView = new SplitView(this);
     this.bar = new Bar(this, {
       activate: (id) => this.activate(id),
       close: (id) => this.closeTab(id),
@@ -311,6 +330,8 @@ export class Browser {
       closed: () => this.focusPage(),
       // A permission prompt (a separate always-on-top window) would cover the field: hidden while open.
       visibility: () => fx.refreshDoorhangers(),
+      // Split view: a tab chosen for the empty Home side takes that side (split.ts replaces the Home tab).
+      showHere: (tabId) => void this.split(tabId),
     });
   }
 
@@ -337,6 +358,8 @@ export class Browser {
       this.cleanups.push(home.onTheme((theme) => this.setHomeTheme(theme)));
     });
     this.step('tabs', () => this.attachTabs());
+    // Before the key router: its AppCommand listener must come after split view's (split.ts).
+    this.step('split', () => this.splitView.install());
     this.step('window state', () => this.watchWindowState());
     this.step('page area', () => (this.pageArea = new PageArea(this, () => this.bar.hiding)));
     this.step('title', () => fx.takeOverWindowTitle((browser) => this.windowTitle(browser)));
@@ -349,6 +372,7 @@ export class Browser {
       // A tab switch must not blur the address field (Ctrl+T while typing, a new tab's field).
       fx.guardTabSwitchFocus(() => this.omni.focused);
       this.watchZoom();
+      this.splitView.installKeys();
     });
     this.step('anchors', () => installAnchors(this));
     this.step('window.open', () => this.watchWindowOpen());
@@ -744,7 +768,8 @@ export class Browser {
   receivePageMessage(browser: XULBrowser, name: string, data: unknown, from: { isTop: boolean; browsingContext: any }): void {
     const tab = this.tabFor(browser);
     if (from.isTop && (name === 'core:paint' || name === 'core:pageshow' || (name === 'core:ready' && (data as { styled?: boolean } | null)?.styled))) this.unpainted.delete(browser);
-    if (tab && tab.id === this.activeId && from.isTop) {
+    // Both pages of a split are sampled (spec "With the rest of Deer": theme sampling per pane).
+    if (tab && this.shown(tab) && from.isTop) {
       if (name === 'core:scroll') this.sampleThrottled();
       else if (name === 'core:pageshow' || name === 'core:ready') this.sampleSoon(0);
       else if (name === 'core:paint') this.sampleFromPaint();
@@ -804,7 +829,7 @@ export class Browser {
 
   private addTab(url: string, opts: { background: boolean; index?: number; principals?: fx.LoadPrincipals }): Tab | undefined {
     const activeIndex = this.tabs.findIndex((x) => x.id === this.activeId);
-    const index = opts.index ?? (this.settings.newTabPosition === 'next' && activeIndex >= 0 ? activeIndex + 1 : this.tabs.length);
+    const index = this.besidePairs(opts.index ?? (this.settings.newTabPosition === 'next' && activeIndex >= 0 ? activeIndex + 1 : this.tabs.length));
     const node = fx.addTab(url, { background: opts.background, tabIndex: this.engineIndex(index), principals: opts.principals });
     if (!this.byNode.has(node)) this.syncTabs();
     const t = this.byNode.get(node);
@@ -868,7 +893,7 @@ export class Browser {
       fx.newWindow({ private: opts.private ?? this.isPrivate, url, principals });
       return undefined;
     }
-    fx.openLinkIn(url, 'current', { ...principals, targetBrowser: this.active()?.browser });
+    fx.openLinkIn(url, 'current', { ...principals, targetBrowser: opts.targetBrowser ?? this.active()?.browser });
     return undefined;
   }
 
@@ -901,7 +926,7 @@ export class Browser {
   adopt(node: XULTab, opts: { index?: number; activate?: boolean } = {}): Tab | undefined {
     fx.setTabValue(node, HIDDEN_TAB_VALUE, null);
     const activeIndex = this.tabs.findIndex((x) => x.id === this.activeId);
-    const index = opts.index ?? (activeIndex >= 0 ? activeIndex + 1 : this.tabs.length);
+    const index = this.besidePairs(opts.index ?? (activeIndex >= 0 ? activeIndex + 1 : this.tabs.length));
     this.syncHeld++;
     try {
       fx.showTab(node);
@@ -998,7 +1023,113 @@ export class Browser {
     this.closePanels();
     // The field opens where the pill is: bring the bar back first if it is hidden.
     this.bar.reveal();
-    this.omni.show(this.bar.layout.pillRect, this.active(), { query });
+    const t = this.active();
+    // In split view the field is for the focused side: it grows from that half, with a side glyph
+    // (spec "Split pill": Address field for one side). Centred in the window as today.
+    const side = this.splitView.sideOf(t);
+    const from = side ? (this.bar.halfRect(this.activeId) ?? this.bar.layout.pillRect) : this.bar.layout.pillRect;
+    this.omni.show(from, t, { query, side: side ?? undefined });
+  }
+
+  // ---- split view (split.ts) ----
+
+  /**
+   * Pair the active tab with `other` (a Tab or its id; it keeps its side of the bar and focus
+   * stays), or with a new Home side ('home': "New tab in split view", the Home side focused with
+   * its field open). With a pair active, `other` replaces its Home side, else its unfocused side.
+   * Null when refused (popup window, a window under 648 px, Home with Home, pinned tabs).
+   */
+  split(other: TabRef | 'home' = 'home'): Pair | null {
+    if (other === 'home') return this.splitView.start('home');
+    const t = this.tab(other);
+    return t ? this.splitView.start(t) : null;
+  }
+
+  /** End the pair `ref` belongs to (default: the active one): both tabs stay, the focused side stays active. */
+  separate(ref?: TabRef): void {
+    const p = ref === undefined ? this.splitView.active() : this.splitView.pairOf(this.tab(ref));
+    if (p) this.splitView.separate(p);
+  }
+
+  /** The pages of the pair trade places; the divider stays where it is. */
+  swapSides(ref?: TabRef): void {
+    const p = ref === undefined ? this.splitView.active() : this.splitView.pairOf(this.tab(ref));
+    if (p) this.splitView.swap(p);
+  }
+
+  /** The pair's ratio (the left pane's share), or set it; null when `ref` is in no pair. */
+  splitRatio(ref?: TabRef, value?: number): number | null {
+    const p = ref === undefined ? this.splitView.active() : this.splitView.pairOf(this.tab(ref));
+    if (!p) return null;
+    return value === undefined ? this.splitView.ratio(p) : this.splitView.setRatio(p, value);
+  }
+
+  /** The bar's units in bar order: a tab, or a pair as one unit. */
+  units(): Unit[] {
+    return this.splitView.units();
+  }
+
+  /** The tab's page is on screen: the active tab, or the other side of the active pair (not while collapsed). */
+  shown(ref: TabRef | undefined): boolean {
+    const t = this.tab(ref);
+    if (!t) return false;
+    if (t.id === this.activeId) return true;
+    const p = this.splitView.showing();
+    return !!p && (p.left === t || p.right === t);
+  }
+
+  /** The split pair a tab belongs to, or null. */
+  pairOf(ref: TabRef | undefined): Pair | null {
+    return this.splitView.pairOf(this.tab(ref));
+  }
+
+  /** A position in b.tabs that falls between the two sides of a pair moves after the pair (new tabs open after it). */
+  private besidePairs(index: number): number {
+    const before = this.tabs[index - 1];
+    const at = this.tabs[index];
+    if (!before || !at) return index;
+    const p = this.splitView.pairOf(before);
+    return p && p.left === before && p.right === at ? index + 1 : index;
+  }
+
+  /** Tab ids with each pair counted once: the side that comes first in `ids` stands for it (Ctrl+Tab's unit). */
+  private oncePerPair(ids: number[]): number[] {
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const partner = this.splitView.partner(this.tab(id));
+      if (partner) seen.add(partner.id);
+      out.push(id);
+    }
+    return out;
+  }
+
+  /**
+   * F6 / Shift+F6 in split view (spec "Keys"): left page -> right page -> address pill -> left page
+   * (Shift reverses). Moving into a page focuses that side. False when the pill is the next stop
+   * (the caller opens the field) or no split is showing.
+   */
+  private f6Ring(): boolean {
+    const p = this.splitView.showing();
+    if (!p) return false;
+    const back = this.keys?.current?.spec === 'Shift+F6';
+    if (this.omni.focused) {
+      this.omni.close(false);
+      this.splitView.focusSide(back ? p.right : p.left, { keyboard: true });
+      return true;
+    }
+    const left = this.active() === p.left;
+    if (!back && left) {
+      this.splitView.focusSide(p.right, { keyboard: true });
+      return true;
+    }
+    if (back && !left) {
+      this.splitView.focusSide(p.left, { keyboard: true });
+      return true;
+    }
+    return false;
   }
 
   /** Position in b.tabs -> position in gBrowser.tabs (which also counts hidden tabs). */
@@ -1126,6 +1257,9 @@ export class Browser {
     this.syncTabs();
     const t = this.byNode.get(fx.selectedTab());
     if (!t || !this.tabs.includes(t)) return;
+    const before = this.tab(this.activeId);
+    const pair = this.splitView.pairOf(t);
+    const withinPair = !!pair && !!before && before !== t && this.splitView.pairOf(before) === pair;
     this.activeId = t.id;
     this.resetPaintBackoff();
     if (!this.mruCycle) this.mru = [t.id, ...this.mru.filter((m) => m !== t.id)];
@@ -1135,7 +1269,8 @@ export class Browser {
     this.closePanels();
     this.renderSoon();
     this.sampleSoon(0);
-    this.emit('tab-activated', t);
+    if (withinPair) this.splitView.announce(`${this.splitView.sideOf(t) === 'left' ? 'Left' : 'Right'} page, ${titleOf(t)}`);
+    this.emit('tab-activated', t, { withinPair });
   }
 
   private onChanged(node: XULTab, force = false): void {
@@ -1313,10 +1448,12 @@ export class Browser {
       }
       return;
     }
+    // The other side of a split: its theme decides the mixed tint, its rim and the window controls over it.
+    const pair = this.splitView.showing();
+    if (pair) void this.sampleOther(pair.left === t ? pair.right : pair.left);
     if (t.deferred || t.crashed || this.unpainted.has(t.browser)) return;
     const seq = ++this.sampleSeq;
-    const l = this.bar.layout;
-    const strip = { left: Math.max(0, l.left - 16), right: (l.right || window.innerWidth) + 16, height: 64 };
+    const strip = this.underBar(t.browser, false);
     let luma: number | null = null;
     try {
       luma = await fx.lumaUnderBar(t.browser, strip);
@@ -1335,6 +1472,60 @@ export class Browser {
       t.theme = theme;
       if (t.id === this.activeId) this.render();
     }
+  }
+
+  /**
+   * The strip of a page under the bar: the bar group's span with 16 px to spare, 64 px tall. In a
+   * split a pane the bar does not reach is read across its own width; `toRight` takes the strip on
+   * to the window's right edge (the window controls sample the pane under them).
+   */
+  private underBar(browser: XULBrowser, toRight: boolean): { left: number; right: number; height: number } {
+    const l = this.bar.layout;
+    let left = Math.max(0, l.left - 16);
+    let right = toRight ? window.innerWidth : (l.right || window.innerWidth) + 16;
+    if (this.splitView.showing()) {
+      const box = browser.getBoundingClientRect();
+      if (Math.min(right, box.right) <= Math.max(left, box.left)) {
+        left = box.left;
+        right = box.right;
+      }
+    }
+    return { left, right, height: 64 };
+  }
+
+  /** The unfocused side of a split: its theme (spec "Theme sampling runs for each pane"). */
+  private async sampleOther(o: Tab): Promise<void> {
+    if (o.url === HOME_URL) {
+      if (o.theme !== this.homeTheme) {
+        o.theme = this.homeTheme;
+        this.render();
+      }
+      return;
+    }
+    if (o.deferred || o.crashed || this.unpainted.has(o.browser)) return;
+    let luma: number | null = null;
+    try {
+      luma = await fx.lumaUnderBar(o.browser, this.underBar(o.browser, true));
+    } catch {
+      luma = null;
+    }
+    if (luma === null || this.destroyed || !this.shown(o)) return;
+    const theme: Theme = luma > LIGHT_ABOVE ? 'light' : 'dark';
+    this.sampled.add(o);
+    if (theme !== o.theme) {
+      o.theme = theme;
+      this.render();
+    }
+  }
+
+  /**
+   * Sample the glass theme again soon (split view: the panes moved, so the strip of each page under
+   * the bar changed). A sample already due (a tab switch asks for one at once) is not put off; a
+   * deferred paint sample gives way.
+   */
+  resample(): void {
+    if (this.sampleTimer && !this.pendingFromPaint) return;
+    this.sampleSoon(60);
   }
 
   // ---- actions ----
@@ -1396,6 +1587,17 @@ export class Browser {
       case 'newPrivateWindow': this.openWindow(undefined, { private: true }); break;
       case 'closeWindow': fx.closeWindow(); break;
       case 'quit': fx.quit(); break;
+      case 'splitView': {
+        // Ctrl+Shift+U toggles split view (owner's decision 2026-10-20): Separate tabs in a pair,
+        // "New tab in split view" on a single tab; nothing on Home (split.ts refuses narrow windows).
+        if (!t) break;
+        // An extension that bound the same chord to its own command keeps it (its <key> runs too).
+        const route = this.keys?.current;
+        if (route && route.how !== 'app-command' && fx.extensionKeyFor(route.spec)) break;
+        if (this.splitView.active()) this.splitView.separate();
+        else if (t.kind !== 'home') this.splitView.start('home');
+        break;
+      }
       case 'nextTabMru': this.cycleMru(1); break;
       case 'prevTabMru': this.cycleMru(-1); break;
       case 'nextTab':
@@ -1417,14 +1619,23 @@ export class Browser {
       }
       case 'moveTabLeft':
       case 'moveTabRight': {
+        // By units: a pair moves as one, and a tab steps over a whole pair (spec "Keys").
         if (!t) break;
-        const j = this.tabs.indexOf(t) + (action === 'moveTabLeft' ? -1 : 1);
-        if (j >= 0 && j < this.tabs.length) this.moveTab(t, j);
+        const units = this.units();
+        const i = units.findIndex((u) => u.tabs.includes(t));
+        const j = i + (action === 'moveTabLeft' ? -1 : 1);
+        if (i < 0 || j < 0 || j >= units.length) break;
+        const target = units[j].tabs;
+        if (action === 'moveTabLeft') fx.moveTab(t.node, target[0].node, 'before');
+        else fx.moveTab(t.node, target[target.length - 1].node, 'after');
+        this.flushRender();
         break;
       }
       case 'focusAddress':
-        // F6 and Shift+F6 (arg 6) move focus between the page and the address pill, both ways.
+        // F6 and Shift+F6 (arg 6) move focus between the page and the address pill, both ways
+        // (in split view through both pages first: f6Ring).
         // Ctrl+L, Alt+D and the Search key always open the field (and select the address).
+        if (arg === 6 && this.f6Ring()) break;
         if (arg === 6 && this.omni.focused) this.omni.close();
         else this.editAddress();
         break;
@@ -1529,9 +1740,10 @@ export class Browser {
   private cycleMru(dir: 1 | -1): void {
     if (this.tabs.length < 2) return;
     if (!this.mruCycle) {
-      let order = [...this.mru];
+      // A split pair is one entry, standing for the side that last had focus (spec "Keys": Ctrl+Tab).
+      let order = this.oncePerPair([...this.mru]);
       if (this.settings.tabOrder === 'bar') {
-        const ids = this.tabs.map((x) => x.id);
+        const ids = this.units().map((u) => (u.kind === 'tab' ? u.tab.id : (order.find((id) => u.tabs.some((x) => x.id === id)) ?? u.tabs[0].id)));
         const at = Math.max(0, ids.indexOf(this.activeId));
         order = [...ids.slice(at), ...ids.slice(0, at)];
       }

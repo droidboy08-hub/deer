@@ -48,7 +48,7 @@ import type { Browser } from '../../browser';
 import type { Tab } from '../../model';
 import type { MenuRecord } from '../../../actors/page/menus';
 import { BAR_ITEM, BAR_TOP } from '../../../shared/geometry';
-import { circleRows, fieldRows, isTextField, pillRows, plusRows } from './chrome-items';
+import { capsuleRows, circleRows, fieldRows, isTextField, pillRows, plusRows, splitHalfRows } from './chrome-items';
 import { MENU_CSS } from './css';
 import * as gecko from './gecko';
 import { extensionRows, isHome, kindOf, pageMenu, withExtensions, type PageEnv, type PageKind, type SelectionHit } from './page-items';
@@ -471,9 +471,31 @@ export function install(b: Browser): void {
     let end: (() => void) | null = null;
     /** The page whose navigation makes this menu stale: the tab it names (the + circle names none). */
     let page: XULBrowser | null = null;
+    /** What the menu hangs from and marks pressed (a half of the split pill, else the item). */
+    let owner: HTMLElement = barItem;
     if (barItem.classList.contains('plus')) {
       rows = plusRows(b);
       label = 'New tab';
+    } else if (barItem.classList.contains('pair')) {
+      // Split view: a half of the split pill gets that half's menu without moving focus; the pair
+      // capsule its own (spec "Menus").
+      const half = target.closest('.split-face .half') as HTMLElement | null;
+      if (barItem.classList.contains('active')) {
+        const t = b.tab(Number(half?.dataset.id ?? b.activeId));
+        if (!t) return false;
+        page = t.deferred ? null : t.browser;
+        rows = splitHalfRows(b, t);
+        label = 'Tab';
+        const ext = tabExtensions(t);
+        if (ext.rows.length) rows = tidy([...rows, SEP, ...ext.rows]);
+        end = ext.end;
+        if (half) owner = half;
+      } else {
+        const p = b.pairOf(Number((barItem.querySelector('.cap-slot') as HTMLElement | null)?.dataset.id));
+        if (!p) return false;
+        rows = capsuleRows(b, p);
+        label = rows.find((r): r is { caption: string } => 'caption' in r)?.caption ?? 'Split view';
+      }
     } else if (barItem.classList.contains('tab')) {
       const t = b.tab(Number(barItem.dataset.id));
       if (!t) return false;
@@ -492,9 +514,9 @@ export function install(b: Browser): void {
       {
         rows,
         label,
-        anchor: hangFrom(barItem, keyboard, e.clientX),
+        anchor: hangFrom(owner, keyboard, e.clientX),
         source: keyboard ? 'keyboard' : 'mouse',
-        owner: barItem,
+        owner,
         backdrop: activePage(),
         onClose: end ? () => end?.() : undefined,
       },

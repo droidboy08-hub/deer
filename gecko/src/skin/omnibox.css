@@ -30,6 +30,7 @@
 #vitre-root.omni-open #vitre-bar .item > .rim,
 #vitre-root.omni-open #vitre-bar .item .pill-face,
 #vitre-root.omni-open #vitre-bar .item .circle-face,
+#vitre-root.omni-open #vitre-bar .item .capsule-face,
 #vitre-root.omni-open #vitre-bar .item .load-line { opacity: 0; }
 #vitre-root.omni-open #vitre-bar .item > .lens,
 #vitre-root.omni-open #vitre-bar .row-lens { visibility: hidden; transition: visibility 0s linear 200ms; }
@@ -48,6 +49,10 @@
 #vitre-root.theme-dark #vitre-omni-field > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.38); }
 /* Board: over a photo the dim does the darkening. */
 #vitre-root.theme-clear #vitre-omni-field > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); }
+/* Split view (spec "Split pill": Mixed tint): the field spans both pages; when one is light and the
+ * other is not, it takes its theme's mixed tint. */
+#vitre-root.theme-light #vitre-omni-field.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-omni-field.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
 #vitre-root:is(.theme-dark, .theme-clear) #vitre-omni-field > .rim {
   background: linear-gradient(165deg, rgba(255,255,255,0.75), rgba(255,255,255,0.14) 30%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.38));
 }

@@ -81,9 +81,11 @@ export class Thumbs {
     if (b.isPopup) return;
     const store = this.store();
     store?.init();
-    b.on('tab-activated', (t) => {
+    b.on('tab-activated', (t, info) => {
       const before = this.lastActive;
       this.lastActive = t.id;
+      // Focus moved between the two sides of a split pair: both stay on screen, nothing to picture.
+      if (info?.withinPair) return;
       const prev = before !== undefined ? b.tab(before) : undefined;
       if (prev && prev !== t) void this.capture(prev, 'leave');
       this.later(t.id, AFTER_SHOW, () => {

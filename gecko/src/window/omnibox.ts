@@ -32,6 +32,11 @@
 // tabs of every window of the same kind, never a private window's tabs in a normal window or the
 // other way round), then history. Tabs are instant; history is asked 60 ms after the last
 // keystroke and a newer search cancels the one that is running.
+// Split view (../design/SPLIT-VIEW-SPEC.md "Split pill", "How to start split view"): the field is for
+// the focused side (show(..., { side })): it grows from that half, its leading icon is the side
+// glyph and it is named "Address for the left page"; over pages that disagree (light and dark) it
+// takes the mixed tint. On an empty Home side, this window's tabs that match read "Show here":
+// choosing one moves that tab into the side and drops the Home tab (handlers.showHere).
 import { displayHost, looksLikeAddress, resolveInput, searchUrl, stripUrl } from '../shared/url';
 import type { Browser } from './browser';
 import { el, fill, svg } from './dom';
@@ -59,6 +64,8 @@ export interface OmniHandlers {
   closed(): void;
   /** The field opened or closed: native popups that hide while it is open re-check (doorhangers). */
   visibility(): void;
+  /** Split view: move this window's tab `tabId` into the empty Home side the field is for. */
+  showHere(tabId: number): void;
 }
 
 interface Row {
@@ -71,6 +78,8 @@ interface Row {
   win?: Window;
   tabId?: number;
   removable?: boolean;
+  /** A tab of this window offered for the empty split side: "Show here". */
+  here?: boolean;
 }
 
 export class Omnibox {
@@ -93,6 +102,9 @@ export class Omnibox {
   private timer = 0;
   private growTimer = 0;
   private historyRows: Row[] = [];
+  private icon: HTMLElement;
+  /** The side the field is for in split view, or null. */
+  private side: 'left' | 'right' | null = null;
 
   constructor(
     private b: Browser,
@@ -113,7 +125,8 @@ export class Omnibox {
       'aria-label': 'Search or enter address',
       placeholder: 'Search or enter address',
     });
-    this.field = el('div', { id: 'vitre-omni-field' }, el('div', { class: 'omni-row' }, el('span', { class: 'omni-icon', 'aria-hidden': 'true' }, svg(icons.search)), this.input));
+    this.icon = el('span', { class: 'omni-icon', 'aria-hidden': 'true' }, svg(icons.search));
+    this.field = el('div', { id: 'vitre-omni-field' }, el('div', { class: 'omni-row' }, this.icon, this.input));
     this.fieldLens = glass(this.field).lens;
     this.field.hidden = true;
 
@@ -170,6 +183,15 @@ export class Omnibox {
     window.addEventListener('resize', () => {
       if (this.open) this.place(null);
     });
+    // The split changed while the field is open (Ctrl+Shift+U separated it, the sides swapped, the
+    // divider moved): its side glyph, its name and the mixed tint follow the active tab's side now,
+    // so Narrator never names a side that is gone.
+    b.on('split-changed', () => {
+      if (!this.open) return;
+      const side = this.b.splitView.sideOf(this.b.active());
+      this.setSide(side);
+      this.field.classList.toggle('mixed', !!side && this.b.splitView.mixed());
+    });
   }
 
   /** Does the field hold keyboard focus right now? */
@@ -195,9 +217,11 @@ export class Omnibox {
     });
   }
 
-  show(from: DOMRect | null, tab: Tab | undefined, opts: { query?: string } = {}): void {
+  show(from: DOMRect | null, tab: Tab | undefined, opts: { query?: string; side?: 'left' | 'right' } = {}): void {
     this.original = tab && tab.kind === 'web' ? tab.url : '';
     this.input.value = opts.query ?? this.original;
+    this.setSide(opts.side ?? null);
+    this.field.classList.toggle('mixed', !!opts.side && this.b.splitView.mixed());
     if (!this.open) {
       this.open = true;
       this.field.hidden = false;
@@ -213,6 +237,14 @@ export class Omnibox {
     this.moved = false;
     this.historyRows = [];
     this.refresh(true);
+  }
+
+  /** Split view: the field is for one side (its glyph and name), or for the one page (null). */
+  private setSide(side: 'left' | 'right' | null): void {
+    if (side === this.side) return;
+    this.side = side;
+    fill(this.icon, svg(side === 'left' ? icons.sideLeft : side === 'right' ? icons.sideRight : icons.search));
+    this.input.setAttribute('aria-label', side ? `Address for the ${side} page` : 'Search or enter address');
   }
 
   /** Close the field. `refocus` hands focus back to the page (not wanted when focus already moved on). */
@@ -373,7 +405,8 @@ export class Omnibox {
     const row = this.sel >= 0 ? this.rows[this.sel] : undefined;
     const text = this.input.value;
     this.close();
-    if (row?.kind === 'switch' && row.win && row.tabId !== undefined && where === 'current') this.h.switchTo(row.win, row.tabId);
+    if (row?.kind === 'switch' && row.here && row.tabId !== undefined && where === 'current') this.h.showHere(row.tabId);
+    else if (row?.kind === 'switch' && row.win && row.tabId !== undefined && where === 'current') this.h.switchTo(row.win, row.tabId);
     else if (row) this.h.go(row.url, where);
     else if (text.trim()) this.h.go(resolveInput(text), where);
   }
@@ -383,6 +416,10 @@ export class Omnibox {
   /** Tabs of this window and of other windows of the same kind (normal or private) that match every word. */
   private openTabs(tokens: string[]): Row[] {
     const out: Row[] = [];
+    // An empty Home side of a split: this window's other tabs are offered for that side instead.
+    const active = this.b.active();
+    const pair = this.b.splitView.pairOf(active);
+    const emptySide = !!pair && active?.kind === 'home';
     let wins: Window[] = [window];
     try {
       wins = [window, ...[...this.b.sys('VitreShell').windows].filter((w) => w !== window)];
@@ -396,7 +433,9 @@ export class Omnibox {
         if (t.kind !== 'web' || (win === window && t.id === this.b.activeId)) continue;
         const hay = `${t.url} ${t.title}`.toLowerCase();
         if (!tokens.every((k) => hay.includes(k))) continue;
-        out.push({ kind: 'switch', title: t.title || displayHost(t.url), detail: displayHost(t.url), url: t.url, icon: t.favicon, win, tabId: t.id });
+        if (win === window && pair && (t === pair.left || t === pair.right)) continue;
+        const here = emptySide && win === window && !this.b.splitView.pairOf(t);
+        out.push({ kind: 'switch', title: t.title || displayHost(t.url), detail: displayHost(t.url), url: t.url, icon: t.favicon, win, tabId: t.id, here });
         if (out.length >= MAX_SWITCH) return out;
       }
     }
@@ -470,7 +509,7 @@ export class Omnibox {
       if (group && group !== lastGroup) nodes.push(el('div', { class: 'omni-group' }, group));
       lastGroup = group;
       const item = el('div', { class: 'omni-item', role: 'option', 'data-i': i, id: `vitre-omni-row-${i}` }, this.glyph(r), el('span', { class: 'omni-title' }, r.title), el('span', { class: 'omni-detail' }, r.detail));
-      if (r.kind === 'switch') item.append(el('span', { class: 'omni-tail' }, 'Switch to tab', svg(icons.switchTab)));
+      if (r.kind === 'switch') item.append(el('span', { class: 'omni-tail' }, r.here ? 'Show here' : 'Switch to tab', svg(icons.switchTab)));
       nodes.push(item);
     });
     fill(this.list, ...nodes);

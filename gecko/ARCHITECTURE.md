@@ -231,6 +231,11 @@ Same shape as the Electron `Browser` so modules port directly (the full contract
   A tab's `url` is its pending address from the moment the load is asked for (`browser.userTypedValue`,
   when it is an absolute URL: Firefox's search-terms persistence writes a results page's terms there),
   and it counts as `loading` until a document arrives: `t.url === target && !t.loading` means loaded.
+- Split view (`split.ts`, below): `split(other? | 'home')`, `separate(ref?)`, `swapSides(ref?)`,
+  `splitRatio(ref?, r?)`, `units()` (the bar's units: a tab, or a pair as one), `shown(tab)` (on screen:
+  the active tab or the other side of the active pair), `pairOf(ref)`, `splitView` (the model), the
+  event `split-changed`, and `tab-activated`'s second argument `{ withinPair }`. `openLink(..., 'current',
+  { targetBrowser })` loads into another page than the active one (the other side of a pair).
 - Windows: `openWindow(url?, { private, ...principals })`. In a popup window (`isPopup`) `newTab`,
   `openLink('tab')` and `reopenClosed` act on the most recent normal window; the tab-strip actions do
   nothing there.
@@ -301,6 +306,83 @@ address field's Enter, a menu's arrows) are handled by that surface on keydown w
 Hardware browser keys and mouse side buttons arrive as `AppCommand` and run the same actions.
 Page actions act on the topmost page: `window.vitrePeek` (`{ browser(), close(), open?(url) }`, set by
 the Peek module) while its page has focus, else the active tab.
+
+### Split view (`src/window/split.ts`)
+
+Two pages side by side, left and right only (`../design/SPLIT-VIEW-SPEC.md`, approved by the owner
+2026-10-20; boards on the canvas page "Split view"). Deer drives Firefox 157's own split view and hides
+its chrome: `gBrowser.addTabSplitView` makes a `<tab-split-view-wrapper>` holding the two `<tab>`s,
+Firefox keeps both docshells active while the pair shows (`showSplitViewPanels`), the selected tab is the
+focused side (keys, the address field, find, Reload and Back act on it with no new routing), notification
+bars go per pane, element full screen comes from one pane and SessionStore saves and restores pairs
+(restoring both sides on `TabSplitViewActivate`). Every Firefox internal used is in split.ts with its
+source. Its header is the contract.
+
+- Model: `SplitView.pairs()` from the wrappers (`{ id, wrapper, left, right }`), synced on
+  `SplitViewCreated / Removed`, `TabSplitViewActivate / Deactivate`, `SplitViewTabChange` and the tab
+  events; it sets `setSuccessor` both ways (closing a side focuses its partner) and emits `split-changed`.
+  Starting a split never moves focus (except "New tab in split view", whose Home side takes it); the
+  joining tab keeps its side of the bar and the pair takes the active tab's place. With a pair active a
+  new start replaces its Home side, else its unfocused side (the pair is taken apart and made again in
+  one task: Firefox's `replaceTab` would close the tab it replaces).
+- Content area: CSS on `#tabbrowser-tabpanels[splitview]` (not in DOM full screen): column 0 is
+  `clamp(320px, round(--vitre-split x (W - 8)), W - 328px)` with an 8 px gutter in the Appearance mode's
+  colour (#202020 / #F3F3F3), column 1 the rest, inner corners 8 px; Firefox's splitter, footers and
+  outline are hidden. `div#vitre-split` (rims, divider, crash card) is appended to the tab panels the
+  first time a split shows, like Peek's dim (z 2: above the pages, under the dim at 3), and never moved
+  again (the deck keeps its selection as a child index); without a split it is not displayed. The
+  live region for the announcements is in `#vitre-root`. The ratio is
+  saved per pair as the column-0 tab's session value `vitre-split-ratio` (3 decimals; exact in the
+  session), stored as set: the 320 px minimums apply only at layout, so a narrow or collapsed window
+  never rewrites it. A closing column-0 side drops the value before SessionStore records it (a window
+  capture listener for `TabClose`), so Ctrl+Shift+T never brings a ratio back; a new pair starts at 50/50.
+  Under 648 px the split collapses to the focused side (`[vitre-collapsed]`) and comes back at 680 px.
+  Each paired panel is a `region` named "Left page: ..." / "Right page: ..." while its pair exists.
+- Divider: the gutter is the hit area; grip after a 120 ms rest; live drag at most once per frame,
+  ghost mode (only the gutter moves, the pages resize on release) once a re-layout costs over 50 ms
+  (`ghostThreshold`): its synchronous part, or the frame that carried it measured to the next frame,
+  which is asked for at once (a pause in the drag never counts; the pages' own reflow in their content
+  processes is not seen from the parent); 320 px minimums; one magnet at 50/50 (+-8 px); double-click
+  50/50; Esc cancels (a first key hook and Esc layer 5); Left/Right 16 px, Shift 64 px, Home/End, Enter
+  (a step that moves nothing keeps the stored ratio, as does a press that never moved it). It is a Tab
+  stop whose accent grip and ring show for keyboard focus only (class `focused`, never for a press): the
+  focus a press or double-click gives it goes back to the page at once. Keyboard focus in `#vitre-split` goes to the page
+  when the layer hides (the pair ended, another tab, a collapse). Every move of the panes emits
+  `split-changed` (at most once per frame in a drag) and, once no drag is running, `b.resample()`.
+- Bar (`bar.ts`): a pair is one unit of `arrange()`: active, the split pill in the pill's slot (480,
+  giving way to 360 before circles shrink); in the background the capsule (two circles and a gap). The
+  group stays centred exactly as for one tab and never follows the divider. `b.bar.item(id)` of either
+  side is the pair's `.item.tab.pair`; `b.bar.halfRect(id)`; the 'site' anchor is the focused half. The
+  root's theme is the focused side's; items over the other page get `mixed` when one page is light and
+  the other is not; the window controls carry their own `theme-*` (glass.css matches `#vitre-root
+  .theme-*` too). Both follow `split-changed` (every divider move) without a layout of the bar; an open
+  address field re-reads its side then (omnibox.ts). Both panes are sampled (`browser.ts sample()` /
+  `sampleOther()`). The split pill's halves and a capsule's halves are stops of the bar (`barkeys.ts`:
+  Tab from the field lands beside the focused half; Shift+F10 / the Menu key opens a half's menu or the
+  capsule's). A focused Home side keeps Back / Forward / Reload (dimmed by `aria-disabled`).
+- Fixes for "only the active tab is on screen": `fx.moveTab` moves `node.splitview ?? node`; new tabs
+  (`addTab`, `adopt`) never land between two sides; `cycleMru` and the switcher count a pair once (the
+  side used last); `tab-activated { withinPair }` (the switcher skips its picture); `b.shown()` in
+  `downloads/video.ts` and `extensions/pageactions.ts`; Peek's Open as tab keeps both panes on screen;
+  `framefocusrequested` from the unfocused pane is dropped unless it had input in the last second, while
+  a page dialog from it takes focus; the crash card over an unfocused pane whose process died (Firefox
+  shows its crash page only for the selected tab); a mouse side button (AppCommand Back / Forward only)
+  over the unfocused pane focuses it first: the pane is the paired panel in the live hover chain
+  (`:hover`; leaving the window clears it, and the bar or a dim above a pane is not in it), and every
+  other hardware key acts on the focused side; the shown unfocused side is never discarded
+  (`fx.guardDiscard` wraps `gBrowser.discardBrowser`: TabUnloader moves on to its next candidate, an
+  extension's `tabs.discard` gets false); F6 cycles left page, right page, address pill; the address
+  field for a side (side glyph, "Address for the left page", grows from that half) and "Show here" on an
+  empty Home side (also in a collapsed window: replacing a side is not a start).
+- Ways in and out: the circle menu ("Open in split view", "... instead of <tab>"), the link menu ("Open
+  link in split view", "Open link on the right side" in a pair; not for image links), the pill menu's
+  "New tab in split view", Ctrl+Shift+U (page-first, `splitView`, rebindable; an extension that binds
+  the same chord keeps it), a half's menu (Swap sides, Separate tabs), the capsule's menu (Close both
+  tabs), a half's x or middle-click, Ctrl+W on the focused side.
+- Not yet (phase 2): dragging a circle to an edge after a 300 ms hold, and the full motion (morphs,
+  slides, the plate's glide, the theme cross-fade).
+- Tests: `python tests/split/all.py [--app build-x]` (start, end, bar, panes, divider, keys, narrow,
+  fixes, restore).
 
 ## Feature modules and their services
 

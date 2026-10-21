@@ -11,7 +11,8 @@
  *   - frost for panels, menus and popovers: class "frost" on the glass element,
  *   - frost while the element changes size: class "morphing".
  * The theme class on #vitre-root follows the page under the bar: theme-light | theme-dark |
- * theme-clear (clear = over a photo or the wallpaper).
+ * theme-clear (clear = over a photo or the wallpaper). An element inside #vitre-root may carry its
+ * own theme class (split view: the window controls sample the page under them, src/window/winctl.ts).
  */
 
 #vitre-root {
@@ -22,7 +23,8 @@
 }
 
 /* Glass themes for the chrome: follow the page under the bar. */
-#vitre-root.theme-light {
+#vitre-root.theme-light,
+#vitre-root .theme-light {
   --g-tint: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.22));
   --g-rim: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8));
   --g-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18);
@@ -33,7 +35,8 @@
   --g-press: rgba(22,24,29,0.1);
   --g-placeholder: rgba(22,24,29,0.5);
 }
-#vitre-root.theme-dark {
+#vitre-root.theme-dark,
+#vitre-root .theme-dark {
   --g-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.3);
   --g-rim: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35));
   --g-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3);
@@ -44,7 +47,8 @@
   --g-press: rgba(255,255,255,0.16);
   --g-placeholder: rgba(255,255,255,0.6);
 }
-#vitre-root.theme-clear {
+#vitre-root.theme-clear,
+#vitre-root .theme-clear {
   --g-tint: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
   --g-rim: linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35));
   --g-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.22);
@@ -57,7 +61,8 @@
 }
 
 /* Board (HomeBrowse over a photo): the window capsule's rim is a touch quieter than the bar's. */
-#vitre-root.theme-clear #vitre-winctl > .rim {
+#vitre-root.theme-clear #vitre-winctl:not(.theme-light, .theme-dark) > .rim,
+#vitre-root #vitre-winctl.theme-clear > .rim {
   background: linear-gradient(165deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.3));
 }
 

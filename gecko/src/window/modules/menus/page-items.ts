@@ -264,7 +264,50 @@ function isFileLink(cm: any, url: string): boolean {
   }
 }
 
-/** The link rows; `withInspect` false when image rows follow. */
+/**
+ * Split view's link row, third after Peek link (spec "How to start split view": From a link). On a
+ * single page: "Open link in split view" opens the link as a new tab on the right, focus staying on
+ * the page. In a pair: "Open link on the right side" (or left) loads it into the other side's tab, so
+ * Back there returns; a collapsed window then shows that side. Not in a peek's menu, a popup window,
+ * image links (their menu is full: owner's decision 2026-10-20) or for links that are not web pages.
+ * Under a 648 px window a start greys out with "Window too narrow".
+ */
+function linkSplitRow(env: PageEnv, url: string): MenuCommand | null {
+  const { b, tab } = env;
+  if (env.inPeek || !tab || b.isPopup || !peekable(url)) return null;
+  const p = gecko.linkParams(env.cm);
+  const principals = {
+    triggeringPrincipal: p.triggeringPrincipal,
+    originPrincipal: p.originPrincipal,
+    originStoragePrincipal: p.originStoragePrincipal,
+    referrerInfo: p.referrerInfo,
+    policyContainer: p.policyContainer,
+    userContextId: env.cm.contentData?.userContextId,
+  };
+  const pair = b.pairOf(tab);
+  if (pair) {
+    const other = pair.left === tab ? pair.right : pair.left;
+    const side = pair.left === other ? 'left' : 'right';
+    return item(`Open link on the ${side} side`, 'split', '', 'S', () => {
+      b.openLink(url, 'current', { ...principals, targetBrowser: other.browser });
+      if (b.splitView.collapsed) b.activate(other);
+    });
+  }
+  const narrow = b.splitView.refusal() === 'narrow';
+  return item(
+    'Open link in split view',
+    'split',
+    narrow ? 'Window too narrow' : '',
+    'S',
+    () => {
+      const t = b.openLink(url, 'tab', { ...principals, background: true, index: nextTo(env) });
+      if (t) b.split(t);
+    },
+    { disabled: narrow }
+  );
+}
+
+/** The link rows; `withInspect` false when image rows follow (an image link: no split row either). */
 function linkRows(env: PageEnv, withInspect: boolean): MenuItem[] {
   const { b, cm } = env;
   const url: string = cm.linkURL;
@@ -290,6 +333,7 @@ function linkRows(env: PageEnv, withInspect: boolean): MenuItem[] {
           peekService(b)?.open(requestFor(env, url), origin ? { origin } : {});
         })
       : null,
+    withInspect ? linkSplitRow(env, url) : null,
     item('Open link in new window', 'newwindow', !shiftPeeks && !env.inPeek ? 'Shift+click' : '', 'W', () => openWindow(env, url)),
     // In a private window the row above already opens a private one (Firefox shows neither twice).
     env.b.isPrivate ? null : item('Open link in new private window', 'newwindow', '', 'R', () => openWindow(env, url, true)),

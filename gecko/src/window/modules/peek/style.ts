@@ -54,6 +54,14 @@ export const PEEK_CSS = `
   -moz-subtree-hidden-only-visually: 0 !important;
   visibility: inherit !important;
 }
+/* Split view: both panes stay where they were (src/window/split.ts), pinned inline by holdUnder. */
+#tabbrowser-tabpanels > .vitre-peek-under.vitre-peek-under-pane {
+  display: flex !important;
+  position: absolute !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+}
 
 #vitre-root #layer-peek > .vp-sheet {
   position: absolute;

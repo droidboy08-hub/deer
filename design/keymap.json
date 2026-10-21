@@ -18,7 +18,7 @@
      "action": "Close the active tab",
      "scope": "anywhere in the window",
      "priority": "browser-first",
-     "note": "If a panel or peek is open, it closes that instead; in the switcher, it closes the selected card (see those groups). Ctrl+F4 is the Windows tab convention.",
+     "note": "If a panel or peek is open, it closes that instead; in the switcher, it closes the selected card (see those groups). Ctrl+F4 is the Windows tab convention. In split view it closes the focused side (a peek or panel on top closes first); the other side fills the window and takes focus.",
      "isNew": true
     },
     {
@@ -63,7 +63,7 @@
      "action": "Next / previous tab in tab-bar order, wrapping around, with no switcher",
      "scope": "anywhere in the window",
      "priority": "browser-first",
-     "note": "Always positional, whatever 'Order of tabs' is set to",
+     "note": "Always positional, whatever 'Order of tabs' is set to. In split view the two sides are two stops, left then right.",
      "isNew": true
     },
     {
@@ -72,7 +72,7 @@
      "action": "Go to tab 1–8, counting the bar from the left (Home counts as a tab)",
      "scope": "anywhere in the window",
      "priority": "page-first",
-     "note": "Matched by the physical digit key, so AZERTY needs no Shift. Zoom wins only where a digit key is the layout’s only - or + (AZERTY 6).",
+     "note": "Matched by the physical digit key, so AZERTY needs no Shift. Zoom wins only where a digit key is the layout’s only - or + (AZERTY 6). In split view each side counts (count the favicons from the left).",
      "isNew": true
     },
     {
@@ -81,7 +81,7 @@
      "action": "Go to the last tab",
      "scope": "anywhere in the window",
      "priority": "page-first",
-     "note": "",
+     "note": "In split view the last favicon: the right side of a pair at the end.",
      "isNew": true
     },
     {
@@ -90,7 +90,16 @@
      "action": "Move the active tab one place left / right",
      "scope": "anywhere in the window",
      "priority": "page-first",
-     "note": "The keyboard way to reorder the bar",
+     "note": "The keyboard way to reorder the bar. A split pair moves as one, and a tab steps over a whole pair.",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Shift+U",
+     "alt": "",
+     "action": "Toggle split view (two pages side by side). On a single tab it runs 'New tab in split view': the page goes left and an empty Home opens on the right with its field open and focused. In a split pair it runs Separate tabs: both tabs stay and the focused side stays active.",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Owner's decision 2026-10-20 (SPLIT-VIEW-SPEC.md). Printed beside 'New tab in split view' (the tab pill's menu) and 'Separate tabs' (a split pill half's menu). Does nothing on a single Home tab or in a popup window; under a 648 px window it does nothing and Narrator says 'Window too narrow for split view'. Ignores key repeat; the AltGr and IME guards apply. F6 then Ctrl+Shift+U, or the pill's menu, is the route a page can't block. Rebindable (Settings › Keyboard shortcuts: Split view). An extension that binds the same chord keeps it.",
      "isNew": true
     },
     {
@@ -574,7 +583,7 @@
      "action": "Switch straight to the previous tab without showing the switcher",
      "scope": "anywhere in the window",
      "priority": "browser-first",
-     "note": "Released within 150 ms",
+     "note": "Released within 150 ms. A split pair is one entry: the quick tap from one side goes to the previous tab, never to the other side.",
      "isNew": false
     },
     {
@@ -583,7 +592,7 @@
      "action": "Open the switcher with the previous tab selected. The deck is the default; Grid and Strip are in Settings › Tabs.",
      "scope": "anywhere in the window",
      "priority": "browser-first",
-     "note": "With 'Order of tabs: Tab bar order' it starts at the tab on the right. Ignored while Alt or AltGr is down (AltGr+Tab is Windows' task switcher).",
+     "note": "With 'Order of tabs: Tab bar order' it starts at the tab on the right. Ignored while Alt or AltGr is down (AltGr+Tab is Windows' task switcher). A split pair is one entry (one card), standing for the side that last had focus; landing on it restores that side. Switching sides is not recorded.",
      "isNew": false
     },
     {
@@ -797,10 +806,10 @@
     {
      "keys": "F6",
      "alt": "Shift+F6 (the other way)",
-     "action": "Move focus from the page to the address pill (or to the find field while find is open), and back. With a peek open, it cycles peek page → peek header → address pill.",
+     "action": "Move focus from the page to the address pill (or to the find field while find is open), and back. With a peek open, it cycles peek page → peek header → address pill. In split view it cycles left page → right page → address pill → left page (Shift+F6 the other way); moving into a page focuses that side, and the new side's rim pulses.",
      "scope": "anywhere in the window",
      "priority": "browser-first",
-     "note": "The one key a page can never keep, so focus can’t be trapped. A later per-site list may hand F6 to web IDEs (off by default).",
+     "note": "The one key a page can never keep, so focus can’t be trapped. A later per-site list may hand F6 to web IDEs (off by default). In split view 'F6 always leaves the page' still holds: it moves to the other page or to the pill.",
      "isNew": true
     },
     {
@@ -810,6 +819,15 @@
      "scope": "address field, tab bar",
      "priority": "local",
      "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Left / Right",
+     "alt": "Shift+Left / Shift+Right (64 px); Home / End; Enter",
+     "action": "Move the split divider 16 px (Shift: 64 px); Home and End move it to the 320 px minimums; Enter puts it back to 50/50.",
+     "scope": "the split divider (one Tab stop between the tab bar and the focused page)",
+     "priority": "local",
+     "note": "Double-click (double-tap by touch) is 50/50 too. Esc while dragging the divider cancels the drag.",
      "isNew": true
     }
    ]
@@ -1051,7 +1069,7 @@
  "rules": [
   "Every shortcut is local to the Vitre window and works only while Vitre has focus. Never use Electron globalShortcut or RegisterHotKey, and never install a low-level keyboard hook.",
   "Browser-first keys never reach the page. They are Chrome's reserved set: Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up and Ctrl+Page Down. Vitre adds three: F6 and Shift+F6; Esc Esc and Ctrl+W while a peek is open; and Esc or F11 to leave full screen or pointer lock. Shift+right-click is the mouse equivalent. Electron doesn't inherit Chrome's reserved list, so catch these keys in before-input-event on every WebContents (tab, peek, PDF guest, chrome view, menu layer) and call preventDefault.",
-  "Page-first keys go to the page first, and Vitre acts only if the page didn't call preventDefault. This covers every other key Vitre binds outside its own surfaces: Ctrl+F, F3, Shift+F3, Ctrl+G, Ctrl+Shift+G, Ctrl+L, Alt+D, Ctrl+H, Ctrl+J, Ctrl+Shift+D, Ctrl+Shift+A, Ctrl+Q, Alt+Enter in a peek, Alt+Left, Alt+Right, Ctrl+R, F5, the hard-reload keys, Ctrl+P, Ctrl+S, Ctrl+U, Ctrl+1 to Ctrl+9, Ctrl+Shift+Page Up/Down, the zoom keys, Ctrl+comma, F1, Ctrl+Shift+Delete, F11 to enter, F12, Ctrl+Shift+I/J/C, a single Esc, Shift+F10, the Menu key, and Shift+click and the other link clicks. They run on Chromium's unhandled-key path through hidden application-menu accelerators. The fallback is a preload that reads event.defaultPrevented after dispatch.",
+  "Page-first keys go to the page first, and Vitre acts only if the page didn't call preventDefault. This covers every other key Vitre binds outside its own surfaces: Ctrl+F, F3, Shift+F3, Ctrl+G, Ctrl+Shift+G, Ctrl+L, Alt+D, Ctrl+H, Ctrl+J, Ctrl+Shift+D, Ctrl+Shift+A, Ctrl+Shift+U, Ctrl+Q, Alt+Enter in a peek, Alt+Left, Alt+Right, Ctrl+R, F5, the hard-reload keys, Ctrl+P, Ctrl+S, Ctrl+U, Ctrl+1 to Ctrl+9, Ctrl+Shift+Page Up/Down, the zoom keys, Ctrl+comma, F1, Ctrl+Shift+Delete, F11 to enter, F12, Ctrl+Shift+I/J/C, a single Esc, Shift+F10, the Menu key, and Shift+click and the other link clicks. They run on Chromium's unhandled-key path through hidden application-menu accelerators. The fallback is a preload that reads event.defaultPrevented after dispatch.",
   "Local keys work only while focus is in a Vitre surface: the address field, find field, switcher, menus, panels, peek header, tab bar or Home. They never reach a page. While a menu or the latched switcher is open, global keys are swallowed.",
   "Pages can never block these: F6, which always takes focus out of the page; the reserved tab and window keys (Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up/Down); Esc Esc and Ctrl+W on a peek; leaving full screen or pointer lock; and Shift+right-click. From the address pill (F6), every page-first key goes straight to Vitre, so F6 then the key is the general route; menus add Reload, Find on page…, Print…, Inspect, Show downloads, Full screen and Settings.",
   "Only keyboard lock (navigator.keyboard.lock in element full screen) sends the browser-first keys to the page first. Plain element full screen and pointer lock keep them browser-first. Esc (held, under keyboard lock) and F11 always leave. F11 window full screen is not element full screen.",
@@ -1059,8 +1077,8 @@
   "IME guard: no shortcut fires while isComposing is true or keyCode is 229. Esc closes the IME first.",
   "Layouts: match letters by virtual key, which follows the key's label, so QWERTZ, AZERTY and Dvorak behave like every Windows app and Cyrillic or Greek layouts still give Ctrl+C. Match digits by virtual key or physical code. Match Plus, Minus and Equals by the character the active layout types, with VK_OEM_PLUS/MINUS and the numpad as fallbacks; zoom wins when a digit key types - or +. Only letters, digits, F keys, navigation keys, Enter, Esc, Tab, Backspace, Delete, Plus, Minus, Equals and comma carry shortcuts. Comma is matched by VK_OEM_COMMA.",
   "Held-Ctrl states: no chord that holds Ctrl may rely on Esc, because Ctrl+Esc opens Start. The switcher latches, staying open with Ctrl up, on the first typed character, on Ctrl+Shift+A, when opened by mouse, and when Sticky Keys is on. Losing window focus (Start, Alt+Tab, the Win key) cancels back to the starting tab.",
-  "Key repeat is ignored for anything that closes, opens, reopens or toggles: Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+N, F11, F12, F1, Ctrl+J, Ctrl+comma, Ctrl+Shift+A, Ctrl+Shift+D, Alt+Enter, Ctrl+Q, every Esc step, and Alt+Left or Browser Back when it closes a peek.",
-  "Esc unwinds one layer per fresh keydown (key repeat never steps the ladder), in this order: the IME; a Vitre menu; a Vitre popover, prompt or page dialog; the latched switcher; element full screen or pointer lock; the Settings or Downloads panel; the focused Vitre field (the address field first puts the address back, then returns to the page; the find field closes find); the page; parked find; the peek; and finally stop loading. An Esc used by any layer never counts toward a peek’s Esc Esc.",
+  "Key repeat is ignored for anything that closes, opens, reopens or toggles: Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+N, F11, F12, F1, Ctrl+J, Ctrl+comma, Ctrl+Shift+A, Ctrl+Shift+D, Ctrl+Shift+U, Alt+Enter, Ctrl+Q, every Esc step, and Alt+Left or Browser Back when it closes a peek.",
+  "Esc unwinds one layer per fresh keydown (key repeat never steps the ladder), in this order: the IME; a split divider drag or a lifted tab circle (cancelled back to where it started); a Vitre menu; a Vitre popover, prompt or page dialog; the latched switcher; element full screen or pointer lock; the Settings or Downloads panel; the focused Vitre field (the address field first puts the address back, then returns to the page; the find field closes find); the page; parked find; the peek; and finally stop loading. An Esc used by any layer never counts toward a peek’s Esc Esc.",
   "Topmost surface: Ctrl+W, Esc, Ctrl+F and the page keys (reload, print, save, source, zoom, developer tools) act on an open panel first, then a peek, then the tab — the same order as the Esc ladder and as they are drawn. Tab and window keys always act on the window, and leaving a tab warm-closes its peek.",
   "Peek's Shift+click and Shift+Enter come only from setWindowOpenHandler, and only when all of these hold: the disposition is 'new-window'; details.features is empty, so sign-in, payment and call pop-ups stay real pop-ups; within about 500 ms the preload saw a trusted Shift+click or Shift+Enter on a link whose href equals the URL; the URL is http, https or file and isn't only a #fragment change; and the Shift+click setting is on. Otherwise Vitre behaves exactly like Chrome, and it never adds a Shift+click listener of its own.",
   "Windows conventions keep working. Alt+F4 closes the window, and Alt+Space opens the system menu on the frameless window. Alt or F10 pressed alone only closes an open Vitre menu: there is no native menu bar, no & mnemonics, autoHideMenuBar stays off, and handled Alt chords don't beep. Shift+F10 and the Menu key open the context menu. CUA keys, Ctrl+Backspace and Ctrl+Left/Right Shift text direction work in every Vitre field.",
@@ -1069,7 +1087,7 @@
   "Display: keys appear only as plain dim text in menus, tooltips and Settings › Keyboard shortcuts, never as chips, badges or key tips. Windows spelling, no spaces (Ctrl+Shift+T, Shift+click, Page Up, Delete). Letters and digits print by their Latin key names; comma, Plus, Minus and Equals print the active layout’s label. Modifier names are localized with the UI.",
   "Held switcher: while the switcher is open, held or latched, every Ctrl+letter except Ctrl+W is a search character and never its global command (so Ctrl+T, Ctrl+N, Ctrl+R, Ctrl+Shift+T and Ctrl+Shift+W do nothing there). The first key is translated with the active layout as if Ctrl were up; with an IME on, it only latches and the IME takes the next key.",
   "Address field: Shift+Delete removes a history suggestion only when the user moved onto that row with Up/Down or the pointer is on it; the default top match never counts, and otherwise Shift+Delete cuts.",
-  "Hardware keys: Browser Back/Forward/Refresh/Stop/Search/Home and the mouse side buttons arrive through app-command and act like Alt+Left, Alt+Right, Ctrl+R, Esc (stop), Ctrl+L and the Home tab, on the peek first where that applies."
+  "Hardware keys: Browser Back/Forward/Refresh/Stop/Search/Home and the mouse side buttons arrive through app-command and act like Alt+Left, Alt+Right, Ctrl+R, Esc (stop), Ctrl+L and the Home tab, on the peek first where that applies. In split view the mouse side buttons and hardware Back/Forward act on the pane under the pointer and focus it (not when the pointer is over the tab bar or outside the window); every other hardware key acts on the focused side, as its keyboard chord does."
  ],
  "changes": [
   "TabMotion 'Esc while switching': in the held deck, cancel is now 'Ctrl+Shift+Tab back to the card you started on, then release Ctrl', a click on the wallpaper, or switching away from Vitre (any loss of focus cancels). Esc cancels only once the switcher is latched. Why: with Ctrl held, Esc is Ctrl+Esc, which Windows takes to open Start.",
@@ -1103,9 +1121,10 @@
   "Latched switcher with a query: Left/Right edit the text, Up/Down and Tab move the selection. Sticky Keys opens the switcher latched.",
   "Ctrl+Shift+T reopens a peek only while it is warm and its source tab is active.",
   "Hardware browser keys and mouse side buttons are mapped. Shift+click on the pill’s reload button is a hard reload.",
-  "Ctrl+Shift+D is printed beside Download video… and in the download mark’s tooltip."
+  "Ctrl+Shift+D is printed beside Download video… and in the download mark’s tooltip.",
+  "Split view (owner's decision 2026-10-20, SPLIT-VIEW-SPEC.md): Ctrl+Shift+U toggles it (page-first, ignores key repeat, rebindable); F6 cycles both pages; a pair is one Ctrl+Tab entry and moves as one with Ctrl+Shift+Page Up/Down while its sides are two stops for Ctrl+Page Up/Down and Ctrl+1–9; Ctrl+W closes the focused side; the divider has local keys; a drag is cancelled by Esc right after the IME on the ladder."
  ],
- "customization": "Settings › Keyboard shortcuts sits in the Settings sidebar; F1 or Ctrl+, opens it. It lists every key in this map, grouped the same way, as plain dim text in Windows spelling, with labels taken from the active keyboard layout (navigator.keyboard.getLayoutMap) and localized modifier names. The panel's 'Find a setting' field searches the page by action or by key. Page-first keys carry a dim note, 'Sites can use this first'. A short 'Different from Chrome' section lists the deviations: Shift+click peeks; Shift+Enter in the address field peeks; Ctrl+Tab uses most-recent order; F6 always leaves the page; Ctrl+Q peeks. The page also has a switch, 'Shift+click a link: Peek / Open in new window', and a 'Caret browsing' switch, which has no key. Only Vitre's own verbs can be rebound, one key each: Peek (Ctrl+Q), Open as tab (Alt+Enter), Search tabs (Ctrl+Shift+A) and Download this video (Ctrl+Shift+D). Chrome-standard tab and window keys, find, navigation and editing keys are fixed. To rebind, click the key text and press the new keys; Esc cancels the capture. Each changed row gets a dim 'Reset', and the page has 'Reset all shortcuts'. The editor refuses some keys with a one-line reason: reserved keys ('Windows uses Ctrl+Shift+1 to switch input language', 'Ctrl+Alt types characters on many keyboards', 'Win keys belong to Windows', 'Microsoft Pinyin uses Ctrl+Shift+B', 'Ctrl+Esc opens Start'); single letters, bare modifiers and layout-dependent punctuation; and keys another Vitre command already uses ('Already used by Show downloads'). It warns but allows GPU-overlay defaults ('Radeon Software may use this on some PCs') and keys popular sites use ('Slack, GitHub and Notion use Ctrl+K; sites get it first'). Not in v1: a per-site 'Let this site use Ctrl+W, Ctrl+T and Ctrl+N' list for web IDEs and terminals. If it ships, it is off by default, set per site, and never covers Ctrl+Tab, F6 or Esc Esc. The refusals also cover Shift+printable keys (‘Types a character’) and Alt+letter (‘Pages use Alt+letter for access keys’), count every scope-local use as already used, and rebinding Peek or Open as tab changes every place it applies (page, peek, address field, find field). ‘Different from Chrome’ also lists Ctrl+H (recent history in the address field), F1 (keyboard shortcuts), Ctrl+Shift+D (download this video), Ctrl+Shift+T (also reopens a warm peek) and Ctrl+J (a panel, not a page). Keys some Radeon installs take (Ctrl+Shift+R, Ctrl+Shift+I) carry a dim warning.",
+ "customization": "Settings › Keyboard shortcuts sits in the Settings sidebar; F1 or Ctrl+, opens it. It lists every key in this map, grouped the same way, as plain dim text in Windows spelling, with labels taken from the active keyboard layout (navigator.keyboard.getLayoutMap) and localized modifier names. The panel's 'Find a setting' field searches the page by action or by key. Page-first keys carry a dim note, 'Sites can use this first'. A short 'Different from Chrome' section lists the deviations: Shift+click peeks; Shift+Enter in the address field peeks; Ctrl+Tab uses most-recent order; F6 always leaves the page; F6 cycles both pages in split view; Ctrl+Q peeks. The page also has a switch, 'Shift+click a link: Peek / Open in new window', and a 'Caret browsing' switch, which has no key. Only Vitre's own verbs can be rebound, one key each: Peek (Ctrl+Q), Open as tab (Alt+Enter), Search tabs (Ctrl+Shift+A), Download this video (Ctrl+Shift+D) and Split view (Ctrl+Shift+U). Chrome-standard tab and window keys, find, navigation and editing keys are fixed. To rebind, click the key text and press the new keys; Esc cancels the capture. Each changed row gets a dim 'Reset', and the page has 'Reset all shortcuts'. The editor refuses some keys with a one-line reason: reserved keys ('Windows uses Ctrl+Shift+1 to switch input language', 'Ctrl+Alt types characters on many keyboards', 'Win keys belong to Windows', 'Microsoft Pinyin uses Ctrl+Shift+B', 'Ctrl+Esc opens Start'); single letters, bare modifiers and layout-dependent punctuation; and keys another Vitre command already uses ('Already used by Show downloads'). It warns but allows GPU-overlay defaults ('Radeon Software may use this on some PCs') and keys popular sites use ('Slack, GitHub and Notion use Ctrl+K; sites get it first'). Not in v1: a per-site 'Let this site use Ctrl+W, Ctrl+T and Ctrl+N' list for web IDEs and terminals. If it ships, it is off by default, set per site, and never covers Ctrl+Tab, F6 or Esc Esc. The refusals also cover Shift+printable keys (‘Types a character’) and Alt+letter (‘Pages use Alt+letter for access keys’), count every scope-local use as already used, and rebinding Peek or Open as tab changes every place it applies (page, peek, address field, find field). ‘Different from Chrome’ also lists Ctrl+H (recent history in the address field), F1 (keyboard shortcuts), Ctrl+Shift+D (download this video), Ctrl+Shift+T (also reopens a warm peek) and Ctrl+J (a panel, not a page). Keys some Radeon installs take (Ctrl+Shift+R, Ctrl+Shift+I) carry a dim warning.",
  "boards": [
   "KeyMap: the whole map as a reference sheet (fills the empty Keyboard map frame): every group as a table (keys, action, where it works), a quiet text marker for Vitre first / Page first / Inside Vitre, new keys marked, and the reserved list by owner.",
   "KeyRouting: how one keydown travels (guards, browser-first, the page, page-first), the Esc ladder as a stack, the F6 focus cycle with and without a peek or find, and “What pages can never block”.",

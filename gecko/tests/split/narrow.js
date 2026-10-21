@@ -1,0 +1,158 @@
+// Split view in a narrow window (../design/SPLIT-VIEW-SPEC.md "Rules for every route": Too narrow,
+// "Edge cases": Collapsed window): under 648 px every start is refused (rows greyed with "Window too
+// narrow", Ctrl+Shift+U says so); an open split collapses to the focused side and comes back at 680.
+/* global spike, SL, gBrowser */
+Services.scriptloader.loadSubScript("resource://vitre-boot/slib.js", window);
+spike.main(async () => {
+  const { b, http } = SL;
+  const { check, log, sleep } = spike;
+  await spike.activate();
+  const size = async (w) => {
+    // Outer size: the inner width is a few px less (the window's borders).
+    await spike.resize(w + (window.outerWidth - window.innerWidth), 760);
+    await sleep(600);
+  };
+
+  log("--- 1. under 648 px: every start is refused");
+  await size(1000);
+  let [fn, tl, ln] = await SL.scene(["dark.html", "links.html"]);
+  await size(620);
+  check("set-up: the window is under 648 px", window.innerWidth < 648, window.innerWidth);
+  check("b.split refuses", b.split(tl) === null && !b.splitView.active());
+  b.focusPage();
+  await sleep(200);
+  spike.press("Ctrl+Shift+U");
+  await sleep(500);
+  check("Ctrl+Shift+U does nothing and Narrator hears Window too narrow for split view", !b.splitView.active() && b.splitView.announced === "Window too narrow for split view", b.splitView.announced);
+  await SL.menuAt(b.bar.item(b.activeId).querySelector(".address"));
+  let row = SL.rows().find((r) => r.label === "New tab in split view");
+  check("the pill menu's row greys out with Window too narrow in the accelerator column", !!row && row.disabled && row.key === "Window too narrow", SL.rows().map((r) => [r.label, r.key, r.disabled]));
+  SL.closeMenu();
+  await sleep(150);
+  const circle = b.bar.item(tl.id)?.querySelector(".circle-face");
+  if (circle) {
+    await SL.menuAt(circle);
+    row = SL.rows().find((r) => r.label === "Open in split view");
+    check("the circle menu's row too", !!row && row.disabled && row.key === "Window too narrow", SL.rows().map((r) => [r.label, r.key, r.disabled]));
+    SL.closeMenu();
+  } else log("no circle drawn at this width (step 4 of the bar)");
+  await sleep(150);
+  await SL.load(http("links.html"), fn);
+  const r = await SL.pageRect("#plain");
+  SL.rightClick(r.cx, r.cy);
+  await SL.until(() => SL.menuOpen(), 4000);
+  await sleep(260);
+  row = SL.rows().find((x) => x.label === "Open link in split view");
+  check("the link menu's row too", !!row && row.disabled && row.key === "Window too narrow", SL.rows().map((x) => [x.label, x.key, x.disabled]));
+  SL.closeMenu();
+  await sleep(150);
+
+  log("--- 2. an open split collapses to the focused side below 648 and comes back at 680");
+  await size(1000);
+  await SL.load(http("light.html"), fn);
+  b.split(tl);
+  await SL.shown();
+  b.splitRatio(undefined, 0.4);
+  await sleep(300);
+  await size(620);
+  await SL.until(() => b.splitView.collapsed, 3000);
+  const lp = SL.panel(fn).getBoundingClientRect();
+  const rp = getComputedStyle(SL.panel(tl)).display;
+  check("collapsed: only the focused side shows, filling the window; the divider hides", b.splitView.collapsed && Math.round(lp.width) === Math.round(gBrowser.tabpanels.getBoundingClientRect().width) && rp === "none" && (!SL.divider() || getComputedStyle(SL.divider()).display === "none"), { lp: lp.width, rp });
+  check("the pill keeps both halves; b.shown is the focused side only", !!SL.half("left") && !!SL.half("right") && b.shown(fn) && !b.shown(tl));
+  await sleep(100);
+  check("Narrator: Window too narrow: showing Field Notes", b.splitView.announced === "Window too narrow: showing Field Notes", b.splitView.announced);
+  await spike.capture("narrow-1-collapsed");
+  spike.click(SL.half("right").querySelector(".half-main"));
+  await SL.until(() => b.active() === tl, 3000);
+  await sleep(300);
+  check("clicking the other half shows that side instead", b.active() === tl && getComputedStyle(SL.panel(fn)).display === "none" && Math.round(SL.panel(tl).getBoundingClientRect().width) === Math.round(gBrowser.tabpanels.getBoundingClientRect().width), getComputedStyle(SL.panel(fn)).display);
+  await size(660);
+  check("at 660 px it stays collapsed (32 px of hysteresis)", b.splitView.collapsed);
+  await size(700);
+  await SL.until(() => !b.splitView.collapsed, 3000);
+  await sleep(300);
+  const panes = SL.panes();
+  const area = gBrowser.tabpanels.getBoundingClientRect().width - 8;
+  check("at 680 px or wider the split comes back at its ratio, clamped to the 320 px minimums", !b.splitView.collapsed && !!panes && panes.left.w === Math.max(320, Math.min(area - 320, Math.round(0.4 * area))) && panes.right.w >= 320, { panes, area });
+  await spike.capture("narrow-2-back");
+
+  log("--- 3. while collapsed, Open link on the other side also shows that side");
+  b.activate(fn);
+  await SL.load(http("links.html"), fn);
+  await size(620);
+  await SL.until(() => b.splitView.collapsed, 3000);
+  const r2 = await SL.pageRect("#dark");
+  SL.rightClick(r2.cx, r2.cy);
+  await SL.until(() => SL.menuOpen(), 4000);
+  await sleep(260);
+  check("in a collapsed pair the row is Open link on the right side (not greyed)", SL.rows()[2]?.label === "Open link on the right side" && !SL.rows()[2]?.disabled, SL.labels());
+  await SL.pick("Open link on the right side");
+  await SL.until(() => b.active() === tl && SL.loaded(tl, http("dark.html?from-links")), 8000);
+  check("the link loaded into the right side, which now shows", b.active() === tl && tl.url === http("dark.html?from-links"), { active: b.active()?.title, url: tl.url });
+
+  log("--- 4. a narrow window never rewrites the pair's ratio (spec Panes: kept through resizes, clamped at layout)");
+  await size(1000);
+  [fn, tl, ln] = await SL.scene(["dark.html", "links.html"]);
+  b.split(tl);
+  await SL.shown();
+  b.splitRatio(undefined, 0.25);
+  await sleep(200);
+  const kept = () => Math.abs(b.splitRatio() - 0.25) < 0.0015;
+  await size(700);
+  check("set-up: at 700 px the 0.25 pair is laid out at the 320 px minimum", SL.panes()?.left.w === 320 && kept(), { panes: SL.panes(), ratio: b.splitRatio() });
+  b.swapSides();
+  await sleep(300);
+  check("Swap sides at 700 px: the ratio moves to the new left tab unchanged", b.pairOf(fn)?.left === tl && kept(), b.splitRatio());
+  const d4 = SL.rect(SL.divider());
+  spike.EU.synthesizeMouseAtPoint(d4.x + 4, 500, { type: "mousedown" }, window);
+  spike.EU.synthesizeMouseAtPoint(d4.x + 4, 500, { type: "mouseup" }, window);
+  await sleep(300);
+  check("a press on the divider that does not move it keeps the ratio", kept(), b.splitRatio());
+  SL.divider().focus({ focusVisible: true });
+  spike.press("Left");
+  spike.press("Home");
+  await sleep(300);
+  check("Left and Home at the minimum move nothing and keep the ratio", kept() && SL.panes()?.left.w === 320, { ratio: b.splitRatio(), panes: SL.panes() });
+  b.focusPage();
+  await size(620);
+  await SL.until(() => b.splitView.collapsed, 3000);
+  b.swapSides();
+  await sleep(300);
+  check("Swap sides while collapsed keeps the ratio", b.pairOf(fn)?.left === fn && kept(), b.splitRatio());
+  await size(1440);
+  await SL.until(() => !b.splitView.collapsed && SL.panes(), 3000);
+  await sleep(300);
+  const area4 = gBrowser.tabpanels.getBoundingClientRect().width - 8;
+  check("back at 1440 px the pair is laid out at its 0.25", kept() && Math.abs(SL.panes().left.w - Math.round(0.25 * area4)) <= 1, { ratio: b.splitRatio(), panes: SL.panes(), area4 });
+
+  log("--- 5. keyboard focus on the divider goes to the page when the window collapses");
+  SL.divider().focus({ focusVisible: true });
+  await sleep(150);
+  check("set-up: the divider has keyboard focus", document.activeElement === SL.divider());
+  await size(620);
+  await SL.until(() => b.splitView.collapsed, 3000);
+  await sleep(300);
+  check("collapsed: keyboard focus is in the shown page, not stranded on the window", document.activeElement === b.active().browser, document.activeElement?.localName + "." + document.activeElement?.className);
+
+  log("--- 6. Show here on a collapsed Home side: the chosen tab takes that side and shows");
+  await size(1000);
+  [fn, tl, ln] = await SL.scene(["dark.html", "links.html"]);
+  b.split("home");
+  await SL.until(() => b.active()?.kind === "home" && b.splitView.showing(), 5000);
+  await sleep(500);
+  b.omni.close();
+  await size(620);
+  await SL.until(() => b.splitView.collapsed, 3000);
+  const homeSide = b.active();
+  b.editAddress();
+  await SL.until(() => b.omni.focused, 2000);
+  spike.type("Links");
+  await SL.until(() => [...document.querySelectorAll("#vitre-omni-list .omni-tail")].some((x) => x.textContent.includes("Show here")), 4000);
+  const here = [...document.querySelectorAll("#vitre-omni-list .omni-tail")].find((x) => x.textContent.includes("Show here"))?.closest(".omni-item");
+  if (here) spike.EU.synthesizeMouseAtCenter(here, { type: "mousedown" }, window);
+  await SL.until(() => b.splitView.active()?.right === ln, 4000);
+  await sleep(300);
+  const p6 = b.splitView.active();
+  check("Show here while collapsed: Links took the empty right side, Home is gone, Links shows", !!here && p6?.left === fn && p6?.right === ln && !b.tabs.includes(homeSide) && b.active() === ln && b.splitView.collapsed, { offered: !!here, pair: p6 && [p6.left.title, p6.right.title], active: b.active()?.title, announced: b.splitView.announced });
+});

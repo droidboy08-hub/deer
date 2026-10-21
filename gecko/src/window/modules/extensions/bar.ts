@@ -62,6 +62,12 @@ const MIN_ADDRESS_SQUEEZED = 100;
  * address margins 10+6, download mark 28+4, Reload 28+10, the cluster's own 2 px margin.
  */
 const PILL_FIXED = 154;
+/**
+ * A split pill (../design/SPLIT-VIEW-SPEC.md "Split pill": Extensions): Back and Forward 70, the mark
+ * and Reload 70, the cluster's 2 px; its two halves share the address room and today's rule applies
+ * to each half.
+ */
+const SPLIT_FIXED = 142;
 const BUTTON = 28;
 const GAP = 2;
 
@@ -228,14 +234,17 @@ export class ExtBar {
     if (this.lent.size) return; // the panel is open with some of them: refit when it closes
     const nodes = [...this.toolbar.children].filter((n) => n.localName === 'toolbaritem' || n.id);
     const pill = this.b.bar.layout.pillRect?.width ?? 480;
+    const split = !!this.b.pairOf(this.b.activeId);
+    const fixed = split ? SPLIT_FIXED : PILL_FIXED;
+    const halves = split ? 2 : 1;
     // A very narrow pill (small window, many tabs) keeps its address: the cluster steps out and
     // its popups hang from the pill (hangOver's fallback).
-    this.cluster.classList.toggle('vx-squeezed', pill - PILL_FIXED - BUTTON < MIN_ADDRESS_SQUEEZED);
+    this.cluster.classList.toggle('vx-squeezed', (pill - fixed - BUTTON) / halves < MIN_ADDRESS_SQUEEZED);
     // Page actions come first (they cannot go into the panel), as long as the address keeps
     // MIN_ADDRESS_SQUEEZED; pinned buttons share what is left above MIN_ADDRESS.
-    const paSlots = Math.max(0, Math.floor((pill - PILL_FIXED - BUTTON - MIN_ADDRESS_SQUEEZED) / (BUTTON + GAP)));
+    const paSlots = Math.max(0, Math.floor((pill - fixed - BUTTON - halves * MIN_ADDRESS_SQUEEZED) / (BUTTON + GAP)));
     const shownPa = this.pageActions.fitTo(paSlots);
-    const room = pill - PILL_FIXED - MIN_ADDRESS - BUTTON;
+    const room = pill - fixed - halves * MIN_ADDRESS - BUTTON;
     const slots = Math.max(0, Math.floor(room / (BUTTON + GAP)));
     const forPins = Math.max(0, slots - shownPa);
     this.overflowed.clear();

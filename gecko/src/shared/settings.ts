@@ -85,7 +85,7 @@ export function settingPref(key: Exclude<keyof Settings, 'homeBackground'>): str
 }
 
 /** Only Deer's own verbs can be rebound (Settings › Keyboard shortcuts); the ids are ActionIds of shortcuts.ts. */
-export const REBINDABLE_ACTIONS = ['peekLink', 'openAsTab', 'switcherSearch', 'downloadVideo'] as const;
+export const REBINDABLE_ACTIONS = ['peekLink', 'openAsTab', 'switcherSearch', 'downloadVideo', 'splitView'] as const;
 
 /**
  * A rebind map as stored: only rebindable actions, each with a non-empty "Ctrl+Shift+K" style

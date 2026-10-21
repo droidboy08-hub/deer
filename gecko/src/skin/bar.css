@@ -290,8 +290,139 @@
 #layer-tips .vitre-tip .k { flex: none; color: rgba(255,255,255,0.6); }
 #layer-tips .vitre-tip .k[hidden] { display: none; }
 
+/* ---- Split view: a pair's item (src/window/bar.ts; SplitPill board, spec "Split pill", "Pair capsule") ----
+ * One .item.tab.pair with two faces: the split pill while one of its sides is active, the 96x44
+ * capsule (two circles and a gap) while another tab is. Phase 1 motion: the faces cross-fade. */
+#vitre-bar .item.pair.entering-fade { opacity: 0; transition: none; }
+#vitre-bar .item.pair .split-face { gap: 0; }
+#vitre-bar .item.pair.active .capsule-face { opacity: 0; pointer-events: none; }
+#vitre-bar .item.pair .capsule-face { position: absolute; inset: 0; border-radius: inherit; transition: opacity 160ms ease; }
+#vitre-bar .item.pair:not(.active) .capsule-face:hover { background: var(--g-hover); }
+#vitre-bar .item.pair .split-face .back { margin-left: 8px; }
+/* Halves: left 70..240 and right 240..410 at 480; they share what Back/Forward and the right end leave. */
+#vitre-bar .item.pair .half { position: relative; flex: 1 1 0; min-width: 0; height: 44px; }
+#vitre-bar .item.pair .half.left { margin-left: 4px; }
+#vitre-bar .item.pair .split-face .accessories { margin-left: 0; }
+#vitre-bar .item.pair .split-face .dl-mark { margin-left: 0; }
+/* The seam: 1x20 at y 12, in the bar's theme; not aligned with the gutter. */
+#vitre-bar .item.pair .half.right::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.16);
+  pointer-events: none;
+}
+#vitre-root.theme-light #vitre-bar .item.pair .half.right::before { background: rgba(22,24,29,0.12); }
+#vitre-bar .item.pair .half > .plate {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 6px;
+  height: 32px;
+  border-radius: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+/* The focused half: Deer's "on" plate in the bar's theme. */
+#vitre-bar .item.pair .half.focused > .plate { opacity: 1; background: rgba(76,194,255,0.18); box-shadow: inset 0 0 0 1px rgba(76,194,255,0.45); }
+#vitre-root.theme-light #vitre-bar .item.pair .half.focused > .plate { background: rgba(0,95,184,0.10); box-shadow: inset 0 0 0 1px rgba(0,95,184,0.35); }
+#vitre-root.theme-clear #vitre-bar .item.pair .half.focused > .plate { background: rgba(255,255,255,0.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45); }
+#vitre-bar .item.pair .half:not(.focused):hover > .plate { opacity: 1; background: var(--g-hover); }
+#vitre-bar .item.pair .half.vt-menu-owner:not(.focused) > .plate { opacity: 1; background: var(--g-press); }
+#vitre-bar .item.pair .half-main { position: absolute; inset: 0; border-radius: 16px; text-align: left; }
+#vitre-bar .item.pair .half .fav { position: absolute; left: 14px; top: 14px; width: 16px; height: 16px; }
+#vitre-bar .item.pair .half .fav img, #vitre-bar .item.pair .half .fav svg { width: 16px; height: 16px; }
+#vitre-bar .item.pair .half .host {
+  position: absolute;
+  left: 38px;
+  right: 12px;
+  top: 0;
+  height: 44px;
+  line-height: 44px;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--g-icon);
+  transition: color 150ms ease;
+}
+#vitre-bar .item.pair .half.focused .host { color: var(--g-text); font-weight: 500; }
+#vitre-bar .item.pair .half.home .host, #vitre-bar .item.pair .half.home .fav { color: var(--g-placeholder); }
+/* A cut host ends in a 12 px fade; beside the hover x it ends 22 px sooner, and is measured for that too (cut-hover). */
+#vitre-bar .item.pair .half .host.cut, #vitre-bar .item.pair .half:hover .host.cut-hover { mask-image: linear-gradient(90deg, #000 calc(100% - 12px), transparent); }
+#vitre-bar .item.pair .half:hover .host { right: 34px; }
+#vitre-bar .item.pair .half-x {
+  position: absolute;
+  right: 6px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--g-icon);
+}
+#vitre-bar .item.pair .half:hover .half-x { display: flex; }
+#vitre-bar .item.pair .half-x:hover { background: var(--g-hover); }
+#vitre-bar .item.pair .half-main:focus-visible { outline: 2px solid var(--g-text); outline-offset: -2px; }
+/* A load line per half that is loading: x+12, 2 px, at y 40. */
+#vitre-bar .item.pair .half-load {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 40px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+#vitre-root.theme-light #vitre-bar .item.pair .half-load { background: #005fb8; }
+#vitre-bar .item.pair.active .half.loading .half-load { animation: vt-load 1.6s var(--expand) infinite; opacity: 1; }
+/* A focused Home side keeps Back, Forward and Reload in their slots (SplitSpec "Home side", SplitPill): Back and
+ * Forward are dimmed by aria-disabled while it has no history; nothing is hidden. */
+/* Capsule: favicons centred on each circle's footprint, a 1x16 hairline between them. */
+#vitre-bar .item.pair .capsule-face .hair {
+  position: absolute;
+  left: calc(50% - 0.5px);
+  top: calc(50% - 8px);
+  width: 1px;
+  height: 16px;
+  background: var(--g-text);
+  opacity: 0.12;
+  pointer-events: none;
+}
+#vitre-bar .item.pair .cap-slot { position: absolute; top: 0; height: 100%; left: 0; }
+#vitre-bar .item.pair .cap-half { position: absolute; inset: 0; color: var(--g-icon); }
+#vitre-bar .item.pair .cap-slot.left .cap-half { border-radius: 22px 0 0 22px; }
+#vitre-bar .item.pair .cap-slot.right .cap-half { border-radius: 0 22px 22px 0; }
+#vitre-bar .item.pair .cap-half .fav { position: absolute; }
+#vitre-bar .item.pair .cap-slot.right .cap-x { left: auto; right: auto; }
+#vitre-bar .item.pair .cap-slot.left .cap-x { left: -5px; right: auto; }
+/* Only the hovered half's badge (the circle rule would show both). */
+#vitre-bar:not(.close-always) .item.pair:not(.active) .cap-slot:not(:hover) .close-badge { display: none; }
+#vitre-bar.close-always .item.pair:not(.active) .cap-slot .close-badge { display: flex; opacity: 1; transform: none; }
+#vitre-bar .item.pair.active .close-badge { display: none; }
+
+/* Mixed tint (spec "Split pill": Mixed tint): glass over the other page of a split whose pages
+ * disagree, light over dark or the other way round, keeps its text at 4.5:1. */
+#vitre-root.theme-light #vitre-bar .item.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-bar .item.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
+
+@media (forced-colors: active) {
+  #vitre-bar .item.pair .half.focused > .plate { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
 /* Reduced motion (DESIGN-NOTES: 150 ms cross-fades; TabMotion board: no scaling or sliding). */
 @media (prefers-reduced-motion: reduce) {
+  #vitre-bar .item.pair.active .half.loading .half-load { animation: none; opacity: 1; transform: scaleX(0.6); }
   #vitre-bar .item, #vitre-root #vitre-bar, #vitre-root #vitre-winctl, #vitre-root #vitre-private {
     transition-property: opacity !important;
     transition-duration: 150ms !important;

@@ -786,14 +786,47 @@ export class Switcher {
     };
   }
 
-  /** Most recently used first (the current tab, then the one before it), or tab-bar order. */
+  /**
+   * Most recently used first (the current tab, then the one before it), or tab-bar order. A split
+   * pair is one entry (../design/SPLIT-VIEW-SPEC.md "Keys": Ctrl+Tab), standing for the side that
+   * last had focus, so landing on it brings that side back.
+   */
   private order(): number[] {
     const ids = this.b.tabs.map((t) => t.id);
+    const recent = [this.b.activeId, ...this.b.mru.filter((id) => id !== this.b.activeId)];
     // Tab bar order: the cards stand as the bar does; Ctrl+Tab starts at the tab on the right.
-    if (this.b.settings.tabOrder === 'bar') return ids;
+    if (this.b.settings.tabOrder === 'bar') return this.oncePerPair(ids.map((id) => this.recentSide(id, recent)));
     const out = [this.b.activeId];
     for (const id of [...this.b.mru, ...ids]) if (!out.includes(id) && ids.includes(id)) out.push(id);
-    return out.filter((id) => ids.includes(id));
+    return this.oncePerPair(out.filter((id) => ids.includes(id)));
+  }
+
+  /** A side of a pair stands for the side of it that was used last. */
+  private recentSide(id: number, recent: number[]): number {
+    const p = this.b.pairOf(id);
+    if (!p) return id;
+    const l = recent.indexOf(p.left.id);
+    const r = recent.indexOf(p.right.id);
+    if (l < 0) return r < 0 ? id : p.right.id;
+    if (r < 0) return p.left.id;
+    return l < r ? p.left.id : p.right.id;
+  }
+
+  /** Each split pair once: the first of its sides in `ids` stands for it. */
+  private oncePerPair(ids: number[]): number[] {
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const p = this.b.pairOf(id);
+      if (p) {
+        seen.add(p.left.id);
+        seen.add(p.right.id);
+      }
+      out.push(id);
+    }
+    return out;
   }
 
   private makeView(style: Style, m: Model): View {

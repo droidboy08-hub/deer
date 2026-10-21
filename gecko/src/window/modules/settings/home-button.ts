@@ -69,9 +69,12 @@ export class HomeButton {
     return this.b.active()?.url === HOME_URL;
   }
 
-  /** Shown only on Home. */
+  /**
+   * Shown only on Home, and not on a Home side of split view, which shows the wallpaper and nothing
+   * else (../design/SPLIT-VIEW-SPEC.md "With the rest of Deer": Home).
+   */
   private sync(): void {
-    const onHome = this.onHome();
+    const onHome = this.onHome() && !this.b.pairOf(this.b.activeId);
     this.circle.classList.toggle('off', !onHome);
     this.face.tabIndex = onHome ? 0 : -1;
     if (!onHome && this.pop) this.close(false);

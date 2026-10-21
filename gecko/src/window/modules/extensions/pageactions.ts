@@ -54,7 +54,7 @@ export class PageActions {
     this.cleanups.push(this.b.on('tab-activated', () => this.paint()));
     this.cleanups.push(
       this.b.on('tab-navigated', (tab) => {
-        if (tab && tab.id === this.b.activeId) this.paint();
+        if (tab && this.b.shown(tab)) this.paint();
       })
     );
   }

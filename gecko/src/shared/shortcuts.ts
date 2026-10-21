@@ -28,7 +28,8 @@ export type ActionId =
   | 'peekLink' | 'openAsTab'
   | 'downloads' | 'downloadVideo'
   | 'settings' | 'shortcutsHelp' | 'clearData'
-  | 'switcherSearch';
+  | 'switcherSearch'
+  | 'splitView';
 
 export interface KeyInput {
   key: string;
@@ -136,6 +137,9 @@ export const BINDINGS: Binding[] = [
   B('shortcutsHelp', 'F1', 'page'),
   B('clearData', 'Ctrl+Shift+Delete', 'page'),
   B('switcherSearch', 'Ctrl+Shift+A', 'page'),
+  // Split view (owner's decision 2026-10-20, ../design/SPLIT-VIEW-SPEC.md "Keys"): toggles it.
+  // Page-first like Ctrl+Shift+A; ignores key repeat.
+  B('splitView', 'Ctrl+Shift+U', 'page'),
 ];
 
 const DEFAULT_BINDINGS = BINDINGS.map((b) => ({ ...b }));

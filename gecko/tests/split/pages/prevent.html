@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Keeps its keys</title>
+<style>body { margin: 0; background: #fff; font: 16px "Segoe UI", sans-serif; } main { padding: 96px 32px; }</style>
+<main><h1>This page uses every key</h1><p id="seen"></p></main>
+<script>
+  // A page that keeps every key it gets (preventDefault on keydown): page-first keys stay its own.
+  addEventListener('keydown', (e) => { e.preventDefault(); document.getElementById('seen').textContent += e.key + ' '; }, true);
+</script>

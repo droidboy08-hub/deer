@@ -8,6 +8,7 @@
 //   b.bar.layout            { pillRect, left, right } in window coordinates. pillRect is the active
 //                           pill's slot even while the bar is hidden (auto-hide, full screen).
 //   b.bar.item(tabId)       the tab's element (.item.glass.tab), or undefined when it is not drawn.
+//                           A side of a split pair answers with the pair's element (.item.tab.pair).
 //   b.bar.accessories()     the active pill's <span class="accessories" role="group"
 //                           aria-label="Extensions">: pinned extension buttons go here. Every tab
 //                           item has its own (empty) slot; move your node on 'render' when the
@@ -41,27 +42,55 @@
 //                           below) instead of the pill: it keeps what the window would give it next
 //                           to three circles, so only a narrow window narrows it. The bar re-renders
 //                           at once on claim and release.
-//   Anchors                 b.anchor('site') is the active pill, b.anchor('menu') the + circle.
+//   b.bar.halfRect(tabId)   split view: the half of the split pill that shows that side (the address
+//                           field grows from it), or null.
+//   Anchors                 b.anchor('site') is the active pill (in split view its focused half),
+//                           b.anchor('menu') the + circle.
 //   Tooltips                setTip(el, label, key) from ./tips (title attributes show nothing).
-//   Classes on .item        tab | plus, active, loading, home, morphing, entering; a closed tab's
-//                           item stays for 400 ms as .item.leaving (no longer .tab).
+//   Classes on .item        tab | plus, active, loading, home, morphing, entering, mixed; a closed
+//                           tab's item stays for 400 ms as .item.leaving (no longer .tab). A split
+//                           pair is one item, .item.tab.pair, with two faces: the split pill
+//                           (.pill-face.split-face, while one of its sides is active) and the
+//                           capsule (.capsule-face, 2 circles + gap wide, while another tab is).
+//
+// Split view (../design/SPLIT-VIEW-SPEC.md, boards SplitPill, SplitSpec; split.ts has the model)
+//   - A pair is one unit of the layout: active, it takes the pill's slot (480, giving way to 360
+//     before circles shrink); in the background it is a capsule exactly as wide as two circles and a
+//     gap. The group is centred exactly as for one tab and never follows the divider (owner's
+//     decision 2026-10-20).
+//   - Split pill (pill-local, 480): Back 8..36, Forward 38..66, left half 70..240, seam at 240, right
+//     half 240..410, mark 410..438, Reload 442..470; extension buttons sit between the right half and
+//     the mark and both halves give way equally. A half: favicon 16 px at 14, host from 38 with a
+//     12 px fade when cut, a 24 px x at h-30 on hover; the focused half has the "on" plate (inset
+//     2 px, radius 16), the other a hover plate; a click on the unfocused half focuses that side, on
+//     the focused half opens the address field for it; middle-click or x closes that side. With a
+//     Home side focused Back, Forward and Reload stay (Back and Forward dimmed: SplitSpec "Home side").
+//   - Capsule: favicons 18 px centred on each circle's footprint, a 1x16 hairline between, a close
+//     badge at the hovered half's outer top corner; a click shows the pair with that side focused.
+//   - Keyboard: both halves of the split pill and both halves of a capsule are stops of the bar
+//     (barkeys.ts); Shift+F10 or the Menu key on one opens its menu (splitpill, capsule).
+//   - Mixed tint: when one page of the showing pair is light and the other is not, every glass item
+//     that sits (even partly) over the other page gets class "mixed" (skin/bar.css). The window
+//     controls take the theme of the page under them (class theme-* on #vitre-winctl). Both follow
+//     the panes on 'split-changed' (every divider move), without a layout of the bar.
 //
 // Glass (see ./glass)
 //   - The active pill has its own lens element: lens(w, 44, { blur: 2.4 }).
 //   - All circles (and +) share ONE row-lens element per 24 shapes: div.row-lens under the items,
 //     clipped to the union of the circles, with one shared filter (rowLens). It is rebuilt when the
-//     layout settles.
+//     layout settles. A background pair's capsule is one wider shape of the same row.
 //   - While anything moves (420 ms spring) the row lens cannot follow, so it is removed and each
 //     circle's own .lens carries the plain blur (class "moving" on #vitre-bar); an item whose width
 //     changes (circle <-> pill) carries the morph frost (class "morphing"). 440 ms after the last
 //     change the lenses for the final layout are installed.
 //
 // Many tabs (the Electron build only shrinks the pill; the rest is this build's answer, see render):
-//   1. the pill gives way from 480 down to 220 px (not below a claimPill width), the group stays centred;
+//   1. the pill gives way from 480 down to 220 px (360 for a split pill; not below a claimPill
+//      width), the group stays centred;
 //   2. the group moves left of centre, into the room beside the window controls;
 //   3. the circles shrink from 44 to 30 px (gaps 8 -> 4);
 //   4. only the tabs nearest the active one are drawn (the rest stay reachable by keys and the
-//      switcher).
+//      switcher); a background pair counts as two circles.
 //
 // Window move: pressing on a bar item and dragging more than 5 px starts a native window move
 // (fx.beginWindowMove); a plain click still does what the control does.
@@ -70,8 +99,9 @@ import { el, fill, svg } from './dom';
 import * as fx from './firefox';
 import { glass, lens, lensCount, MAX_ROW_SHAPES, rowLens, type RowLens } from './glass';
 import { icons } from './icons';
-import type { Tab } from './model';
+import type { Tab, Theme } from './model';
 import { Reveal } from './reveal';
+import { titleOf, type Pair, type Unit } from './split';
 import { setTip, Tips } from './tips';
 import { WindowControls } from './winctl';
 import { BAR_ITEM, BAR_TOP } from '../shared/geometry';
@@ -79,6 +109,11 @@ import { displayHost } from '../shared/url';
 
 const PILL = 480;
 const PILL_MIN = 220;
+/** Spec "Split pill": Give-way. The split pill narrows to 360 (halves 170 -> 110) before circles shrink. */
+const PAIR_MIN = 360;
+/** A half's host starts at 38 and ends 12 px from the half's end at rest, 34 beside the hover x (skin/bar.css). */
+const HALF_TEXT_REST = 38 + 12;
+const HALF_TEXT_HOVER = 38 + 34;
 /** claimPill: the pill keeps what the window gives it beside this many circles (the + included). */
 const CLAIM_CIRCLES = 3;
 const CIRCLE = BAR_ITEM;
@@ -117,8 +152,8 @@ interface Place {
   pill: number;
   x0: number;
   total: number;
-  /** The tabs that are drawn, in order. */
-  shown: Tab[];
+  /** The units that are drawn, in order (a tab, or a split pair). */
+  shown: Unit[];
 }
 
 type Tone = 'light' | 'dark' | 'ok';
@@ -161,6 +196,32 @@ function toneOf(img: HTMLImageElement): Tone {
   }
 }
 
+/** Fill a .fav span with `want` ('home', 'search', or the tab's favicon URL), once per change. */
+function paintFav(fav: HTMLElement, t: Tab, want: string): void {
+  if (fav.dataset.src === want) return;
+  fav.dataset.src = want;
+  delete fav.dataset.tone;
+  if (want === 'search') fill(fav, svg(icons.search));
+  else if (want === 'home') fill(fav, svg(icons.home));
+  else if (t.favicon) {
+    const src = t.favicon;
+    const img = el('img', { src, alt: '', draggable: 'false' });
+    img.addEventListener('error', () => {
+      if (fav.dataset.src === src) fill(fav, svg(icons.globe));
+    });
+    img.addEventListener('load', () => {
+      let tone = tones.get(src);
+      if (!tone) {
+        tone = toneOf(img);
+        tones.set(src, tone);
+        if (tones.size > 400) tones.delete(tones.keys().next().value as string);
+      }
+      if (fav.dataset.src === src && tone !== 'ok') fav.dataset.tone = tone;
+    });
+    fill(fav, img);
+  } else fill(fav, svg(icons.globe));
+}
+
 export class Bar {
   layout: BarLayout = { pillRect: null, left: 0, right: 0 };
   /** Starts the native window move; a test may replace it. */
@@ -175,7 +236,8 @@ export class Bar {
   readonly tips: Tips;
 
   private host: HTMLElement;
-  private items = new Map<number | 'plus', HTMLElement>();
+  /** Tab items by tab id, split pairs by their unit key ('pair-<splitViewId>'), the + circle. */
+  private items = new Map<number | string, HTMLElement>();
   /** The width each item was last given (to tell a morph from a slide). */
   private widths = new WeakMap<HTMLElement, number>();
   private controls: WindowControls;
@@ -186,6 +248,8 @@ export class Bar {
   private started = false;
   private place: Place = { size: CIRCLE, gap: GAP, pill: PILL, x0: 0, total: 0, shown: [] };
   private activeId = 0;
+  /** The key of the active unit's item (the tab id, or a pair's key). */
+  private activeKey: number | string = 0;
   /** The tabs of the last render (claimPill re-renders with them). */
   private lastTabs: Tab[] = [];
   /** Widths the active pill must keep (claimPill). */
@@ -216,23 +280,44 @@ export class Bar {
     this.controls = new WindowControls(b, layer);
     this.visibility = new Reveal(b, this.host);
     this.tips = new Tips(b);
-    b.setAnchor('site', () => this.items.get(this.activeId) ?? null);
+    // In split view native popups hang from the focused half (spec "Prompts and other per-pane surfaces").
+    b.setAnchor('site', () => this.activeItem()?.querySelector<HTMLElement>('.half.focused') ?? this.activeItem() ?? null);
     b.setAnchor('menu', () => this.items.get('plus') ?? null);
+    // The panes moved (a divider drag, a key, a double-click, a resize) or the pair changed: the mixed
+    // tint goes to the glass over the other page now, and the window controls take the theme of the
+    // page under them (spec "Where the bar sits": Theme). Nothing in the bar moves for it.
+    b.on('split-changed', () => this.paintSplitTheme());
     this.watchDrag();
   }
 
   // ---- for other authors ----
 
   item(id: number): HTMLElement | undefined {
-    return this.items.get(id);
+    return this.items.get(id) ?? this.pairItem(id);
   }
 
   accessories(): HTMLElement | null {
-    return this.items.get(this.activeId)?.querySelector<HTMLElement>('.accessories') ?? null;
+    return this.activeItem()?.querySelector<HTMLElement>('.accessories') ?? null;
   }
 
   downloadMark(): HTMLButtonElement | null {
-    return this.items.get(this.activeId)?.querySelector<HTMLButtonElement>('.dl-mark') ?? null;
+    return this.activeItem()?.querySelector<HTMLButtonElement>('.dl-mark') ?? null;
+  }
+
+  /** The half of a split pill that shows tab `id` (window coordinates), or null. */
+  halfRect(id: number): DOMRect | null {
+    const half = this.pairItem(id)?.querySelector<HTMLElement>(`.split-face .half[data-id="${id}"]`);
+    const r = half?.getBoundingClientRect();
+    return r && r.width > 0 ? r : null;
+  }
+
+  private pairItem(id: number): HTMLElement | undefined {
+    const p = this.b.pairOf(id);
+    return p ? this.items.get(`pair-${p.id}`) : undefined;
+  }
+
+  private activeItem(): HTMLElement | undefined {
+    return this.items.get(this.activeKey) ?? this.item(this.activeId);
   }
 
   get hidden(): boolean {
@@ -289,22 +374,27 @@ export class Bar {
 
   // ---- layout ----
 
-  /** Where everything goes for this many tabs in this window. */
-  private arrange(tabs: Tab[], activeId: number): Place {
+  /** Where everything goes for these units in this window. */
+  private arrange(units: Unit[], activeId: number): Place {
     const W = Math.floor(window.innerWidth); // fractional at 125 % / 150 % scaling
     const popup = this.b.isPopup;
     const reserve = this.controls.reserve;
-    const activeIndex = Math.max(0, tabs.findIndex((t) => t.id === activeId));
+    const activeIndex = Math.max(0, units.findIndex((u) => u.tabs.some((t) => t.id === activeId)));
+    const activeUnit = units[activeIndex];
     // A popup window shows its one page: a read-only pill and the window controls.
-    let shown = popup ? tabs.slice(activeIndex, activeIndex + 1) : tabs;
-    const circles = (n: number): number => Math.max(0, n - 1) + (popup ? 0 : 1); // other tabs and +
-    const width = (n: number, size: number, gap: number, pill: number): number => pill + circles(n) * (size + gap);
+    let shown = popup ? units.slice(activeIndex, activeIndex + 1) : units;
+    // Circle slots beside the pill: the other units (a background pair is two circles and the gap
+    // between them, i.e. two slots) and the + circle.
+    const weight = (u: Unit): number => (u.kind === 'pair' ? 2 : 1);
+    const circles = (list: Unit[]): number => list.reduce((n, u) => n + (u === activeUnit ? 0 : weight(u)), 0) + (popup ? 0 : 1);
+    const width = (list: Unit[], size: number, gap: number, pill: number): number => pill + circles(list) * (size + gap);
+    const pillMin = activeUnit?.kind === 'pair' ? PAIR_MIN : PILL_MIN;
 
     let size = CIRCLE;
     let gap = GAP;
     // 1. As designed: centred between two equal margins that clear the window controls.
     const centred = W - 2 * reserve;
-    let pill = Math.max(PILL_MIN, Math.min(PILL, centred - circles(shown.length) * (CIRCLE + GAP)));
+    let pill = Math.max(pillMin, Math.min(PILL, centred - circles(shown) * (CIRCLE + GAP)));
     // 2. Beyond that the group may use all the room left of the window controls.
     const room = W - LEFT_MARGIN - reserve;
     // A claimed width (find's face) is not given up to the number of tabs: the pill keeps what the
@@ -313,30 +403,26 @@ export class Bar {
     // into the field menu).
     const claim = popup ? 0 : Math.max(0, ...[...this.claims].map((c) => c.width));
     if (claim > pill) {
-      const afforded = Math.min(centred - Math.min(circles(shown.length), CLAIM_CIRCLES) * (CIRCLE + GAP), room - (CIRCLE_MIN + 4));
+      const afforded = Math.min(centred - Math.min(circles(shown), CLAIM_CIRCLES) * (CIRCLE + GAP), room - (CIRCLE_MIN + 4));
       pill = Math.max(pill, Math.min(claim, afforded));
     }
-    let total = width(shown.length, size, gap, pill);
+    let total = width(shown, size, gap, pill);
     if (total > room) {
       if (popup) {
         pill = Math.max(120, room);
       } else {
         // 3. Smaller circles.
-        while (size > CIRCLE_MIN && width(shown.length, size, gap, pill) > room) {
+        while (size > CIRCLE_MIN && width(shown, size, gap, pill) > room) {
           size -= 2;
           gap = size >= 38 ? 8 : size >= 34 ? 6 : 4;
         }
-        if (width(shown.length, size, gap, pill) > room) {
-          // 4. Draw the tabs nearest the active one.
-          const fit = Math.max(1, Math.floor((room - pill) / (size + gap))); // circles that fit, + included
-          const others = Math.max(0, fit - 1);
-          let before = Math.min(activeIndex, Math.floor(others / 2));
-          const after = Math.min(tabs.length - 1 - activeIndex, others - before);
-          before = Math.min(activeIndex, others - after);
-          shown = tabs.slice(activeIndex - before, activeIndex + after + 1);
+        if (width(shown, size, gap, pill) > room) {
+          // 4. Draw the units nearest the active one.
+          const fit = Math.max(1, Math.floor((room - pill) / (size + gap))); // circle slots that fit, + included
+          shown = nearest(units, activeIndex, Math.max(0, fit - 1), weight);
         }
       }
-      total = width(shown.length, size, gap, pill);
+      total = width(shown, size, gap, pill);
     }
     let x0 = Math.round((W - total) / 2);
     if (x0 + total > W - reserve) x0 = W - reserve - total;
@@ -347,7 +433,8 @@ export class Bar {
   render(tabs: Tab[], activeId: number): void {
     const popup = this.b.isPopup;
     const first = !this.started;
-    const p = this.arrange(tabs, activeId);
+    const units = this.b.units();
+    const p = this.arrange(units, activeId);
     const circleTop = TOP + (CIRCLE - p.size) / 2;
     this.lastTabs = tabs;
     this.place = p;
@@ -356,7 +443,7 @@ export class Bar {
     this.host.classList.toggle('compact', p.size < CIRCLE);
 
     let x = p.x0;
-    const seen = new Set<number | 'plus'>();
+    const seen = new Set<number | string>();
     const shapes: string[] = [`${p.size}`];
     this.layout = { pillRect: null, left: x, right: x + p.total };
 
@@ -367,32 +454,36 @@ export class Bar {
       item.style.height = `${active ? CIRCLE : p.size}px`;
     };
 
-    for (const t of p.shown) {
-      seen.add(t.id);
-      const active = t.id === activeId;
-      const width = active ? p.pill : p.size;
-      let item = this.items.get(t.id);
+    for (const u of p.shown) {
+      const key = u.key;
+      seen.add(key);
+      const active = u.tabs.some((t) => t.id === activeId);
+      if (active) this.activeKey = key;
+      const width = active ? p.pill : u.kind === 'pair' ? 2 * p.size + p.gap : p.size;
+      let item = this.items.get(key);
       if (!item) {
-        item = this.createTab(t.id);
+        item = u.kind === 'pair' ? this.createPair(u.key) : this.createTab(u.tab.id);
         if (!first) {
-          // Grow from a circle at the middle of the slot.
-          put(item, x + (width - p.size) / 2, p.size, false);
-          item.classList.add('entering');
+          // Grow from a circle at the middle of the slot (a split pair fades in: phase 1 motion).
+          if (u.kind === 'pair') put(item, x, width, active);
+          else put(item, x + (width - p.size) / 2, p.size, false);
+          item.classList.add(u.kind === 'pair' ? 'entering-fade' : 'entering');
         }
         this.host.append(item);
         if (!first) {
           void item.offsetWidth; // the start state must be computed for the transition to run
-          item.classList.remove('entering');
-          this.widths.set(item, p.size);
+          item.classList.remove('entering', 'entering-fade');
+          this.widths.set(item, u.kind === 'pair' ? width : p.size);
         }
       }
-      this.updateTab(item, t, active, popup);
+      if (u.kind === 'pair') this.updatePair(item, u.pair, active, p);
+      else this.updateTab(item, u.tab, active, popup);
       const before = this.widths.get(item);
       if (before !== undefined && before !== width) item.classList.add('morphing');
       this.widths.set(item, width);
       put(item, x, width, active);
       if (active) this.layout.pillRect = new DOMRect(x, TOP, width, CIRCLE);
-      shapes.push(`${t.id}${active ? 'P' : 'c'}${x}:${width}`);
+      shapes.push(`${key}${active ? 'P' : 'c'}${x}:${width}`);
       x += width + p.gap;
     }
 
@@ -415,8 +506,7 @@ export class Bar {
     for (const [id, item] of this.items) {
       if (seen.has(id)) continue;
       this.items.delete(id);
-      const slot = item.querySelector('.accessories');
-      if (slot) this.accessoriesWatch.unobserve(slot);
+      for (const slot of item.querySelectorAll('.accessories')) this.accessoriesWatch.unobserve(slot);
       // No longer a tab: it only fades out (selectors for tabs must not find it).
       item.classList.remove('tab');
       item.classList.add('leaving');
@@ -424,6 +514,7 @@ export class Bar {
       window.setTimeout(() => item.remove(), 400);
     }
 
+    this.paintSplitTheme();
     this.controls.sync();
     this.visibility.update();
 
@@ -435,6 +526,40 @@ export class Bar {
       else this.unsettle();
     }
     if (p.shown.length) this.started = true;
+  }
+
+  /**
+   * Split view's glass (spec "Where the bar sits": Theme). The group takes the focused side's theme
+   * (the root's, set by the Browser); when one page is light and the other is not, every item over
+   * the other page, even partly, takes the mixed tint. The window controls take the theme of the
+   * page under them. Without a showing pair nothing is set (the bar is as it always was).
+   */
+  private paintSplitTheme(): void {
+    const split = this.b.splitView;
+    const pair = split.showing();
+    const rects = pair ? split.paneRects() : null;
+    const active = this.b.active();
+    let other: { l: number; r: number } | null = null;
+    let mixed = false;
+    let controls: Theme | null = null;
+    if (pair && rects && active) {
+      const o = pair.left === active ? pair.right : pair.left;
+      const or = o === pair.left ? rects.left : rects.right;
+      other = { l: or.left, r: or.right };
+      mixed = (active.theme === 'light') !== (o.theme === 'light');
+      // The capsule's place: 12 px from the right, 108 wide.
+      const mid = window.innerWidth - 12 - 54;
+      const under = mid >= or.left && mid < or.right ? o : active;
+      // A module's hold (the switcher's deck) is read by the controls too: no theme of their own then.
+      if (this.b.theme() === active.theme && under.theme !== active.theme) controls = under.theme;
+    }
+    for (const [, item] of this.items) {
+      if (item.classList.contains('leaving')) continue;
+      const left = parseFloat(item.style.left) || 0;
+      const w = parseFloat(item.style.width) || 0;
+      item.classList.toggle('mixed', mixed && !!other && left < other.r && left + w > other.l);
+    }
+    this.controls.setTheme(controls);
   }
 
   /** Something moves: per-item filters until it stops. */
@@ -449,7 +574,7 @@ export class Bar {
     this.settleTimer = window.setTimeout(() => this.settle(), reduced ? SETTLE_REDUCED : this.settleDelay);
   }
 
-  /** The layout is at rest: the pill gets its lens, the circles share row lenses. */
+  /** The layout is at rest: the pill gets its lens, the circles (and capsules) share row lenses. */
   private settle(): void {
     window.clearTimeout(this.settleTimer);
     this.settleTimer = 0;
@@ -463,11 +588,11 @@ export class Bar {
       item.classList.remove('morphing');
       const own = glassLens(item);
       const left = parseFloat(item.style.left) || 0;
-      if (id === this.activeId) {
+      if (id === this.activeKey) {
         own.style.backdropFilter = lens(p.pill, CIRCLE, { blur: 2.4 });
       } else {
         own.style.backdropFilter = '';
-        circles.push({ x: left, w: p.size });
+        circles.push({ x: left, w: item.classList.contains('pair') ? 2 * p.size + p.gap : p.size });
       }
     }
     circles.sort((a, c) => a.x - c.x);
@@ -556,29 +681,7 @@ export class Bar {
 
     const key = home ? 'home' : t.favicon ?? 'globe';
     for (const fav of item.querySelectorAll<HTMLElement>('.fav')) {
-      const want = home && fav.parentElement?.classList.contains('address') ? 'search' : key;
-      if (fav.dataset.src === want) continue;
-      fav.dataset.src = want;
-      delete fav.dataset.tone;
-      if (want === 'search') fill(fav, svg(icons.search));
-      else if (want === 'home') fill(fav, svg(icons.home));
-      else if (t.favicon) {
-        const src = t.favicon;
-        const img = el('img', { src, alt: '', draggable: 'false' });
-        img.addEventListener('error', () => {
-          if (fav.dataset.src === src) fill(fav, svg(icons.globe));
-        });
-        img.addEventListener('load', () => {
-          let tone = tones.get(src);
-          if (!tone) {
-            tone = toneOf(img);
-            tones.set(src, tone);
-            if (tones.size > 400) tones.delete(tones.keys().next().value as string);
-          }
-          if (fav.dataset.src === src && tone !== 'ok') fav.dataset.tone = tone;
-        });
-        fill(fav, img);
-      } else fill(fav, svg(icons.globe));
+      paintFav(fav, t, home && fav.parentElement?.classList.contains('address') ? 'search' : key);
     }
 
     const host = item.querySelector('.host') as HTMLElement;
@@ -604,6 +707,170 @@ export class Bar {
     }
   }
 
+  // ---- split pairs (spec "Split pill", "Pair capsule") ----
+
+  private createPair(key: string): HTMLElement {
+    const back = el('button', { type: 'button', class: 'nav back', 'aria-label': 'Back' }, svg(icons.back));
+    const forward = el('button', { type: 'button', class: 'nav forward', 'aria-label': 'Forward' }, svg(icons.forward));
+    const reload = el('button', { type: 'button', class: 'nav reload', 'aria-label': 'Reload' });
+    const mark = el('button', { type: 'button', class: 'nav dl-mark empty', 'aria-hidden': 'true', tabindex: '-1' });
+    const accessories = el('span', { class: 'accessories', role: 'group', 'aria-label': 'Extensions' });
+    const idOf = (node: HTMLElement): number => Number(node.dataset.id);
+    const half = (side: 'left' | 'right'): HTMLElement => {
+      const main = el('button', { type: 'button', class: 'half-main' }, el('span', { class: 'fav' }), el('span', { class: 'host' }));
+      const x = el('button', { type: 'button', class: 'half-x' }, svg(icons.closeHalf));
+      setTip(x, 'Close this side');
+      const node = el('div', { class: `half ${side}` }, el('div', { class: 'plate' }), main, x, el('div', { class: 'half-load' }));
+      // The unfocused half works like a circle, the focused one like the pill (spec "Split pill": Clicks).
+      main.addEventListener('click', () => {
+        const id = idOf(node);
+        if (id === this.activeId) this.h.editAddress();
+        else this.h.activate(id);
+      });
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.close(idOf(node));
+      });
+      node.addEventListener('auxclick', (e) => {
+        if (e.button !== 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.h.close(idOf(node));
+      });
+      return node;
+    };
+    const face = el('div', { class: 'pill-face split-face', role: 'group' }, back, forward, half('left'), half('right'), accessories, mark, reload);
+    const capHalf = (side: 'left' | 'right'): HTMLElement => {
+      const button = el('button', { type: 'button', class: 'cap-half' }, el('span', { class: 'fav' }));
+      const x = el('button', { type: 'button', class: 'close-badge cap-x' }, svg(icons.closeSmall));
+      const slot = el('div', { class: `cap-slot ${side}` }, button, x);
+      button.addEventListener('click', () => this.h.activate(idOf(slot)));
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.close(idOf(slot));
+      });
+      slot.addEventListener('auxclick', (e) => {
+        if (e.button !== 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.h.close(idOf(slot));
+      });
+      return slot;
+    };
+    const capsule = el('div', { class: 'capsule-face', role: 'group' }, el('span', { class: 'hair', 'aria-hidden': 'true' }), capHalf('left'), capHalf('right'));
+    const item = el('div', { class: 'item tab pair', 'data-pair': key }, face, capsule);
+    glass(item);
+    this.accessoriesWatch.observe(accessories);
+    setTip(back, 'Back', 'Alt+Left');
+    setTip(forward, 'Forward', 'Alt+Right');
+    back.addEventListener('click', () => this.h.back());
+    forward.addEventListener('click', () => this.h.forward());
+    reload.addEventListener('click', (e) => this.h.reloadOrStop(e.shiftKey));
+    item.addEventListener('mousedown', (e) => {
+      if (e.button === 1) e.preventDefault(); // no autoscroll cursor
+    });
+    this.items.set(key, item);
+    return item;
+  }
+
+  private updatePair(item: HTMLElement, pair: Pair, active: boolean, p: Place): void {
+    const { left, right } = pair;
+    item.classList.toggle('active', active);
+    item.classList.remove('home');
+    const face = item.querySelector('.split-face') as HTMLElement;
+    const capsule = item.querySelector('.capsule-face') as HTMLElement;
+    if (active) {
+      face.removeAttribute('inert');
+      capsule.setAttribute('inert', '');
+    } else {
+      face.setAttribute('inert', '');
+      capsule.removeAttribute('inert');
+    }
+    const names = `${titleOf(left)}, left; ${titleOf(right)}, right`;
+    face.setAttribute('aria-label', `Split view: ${names}`);
+    capsule.setAttribute('aria-label', `${titleOf(left)} and ${titleOf(right)}, split view`);
+    // Two pages of one site show their titles instead of the host (spec "What a half shows").
+    const sameHost = left.kind === 'web' && right.kind === 'web' && displayHost(left.url) === displayHost(right.url);
+    const focusedTab = active ? this.b.active() : undefined;
+
+    for (const side of ['left', 'right'] as const) {
+      const t = pair[side];
+      const node = item.querySelector(`.split-face .half.${side}`) as HTMLElement;
+      node.dataset.id = String(t.id);
+      const focused = !!focusedTab && focusedTab === t;
+      const home = t.kind === 'home';
+      node.classList.toggle('focused', focused);
+      node.classList.toggle('home', home);
+      node.classList.toggle('loading', t.loading);
+      paintFav(node.querySelector('.fav') as HTMLElement, t, home ? 'search' : t.favicon ?? 'globe');
+      const label = home ? 'Search' : t.zoomFlash > Date.now() ? `${Math.round(t.zoom * 100)}%` : sameHost ? t.title || displayHost(t.url) : displayHost(t.url) || titleOf(t);
+      const host = node.querySelector('.host') as HTMLElement;
+      if (host.textContent !== label) host.textContent = label;
+      const main = node.querySelector('.half-main') as HTMLElement;
+      const named = home ? 'Search' : sameHost ? t.title || displayHost(t.url) : displayHost(t.url) || titleOf(t);
+      main.setAttribute('aria-label', `${named}, ${side} page${focused ? ', edit address' : ''}`);
+      main.setAttribute('aria-pressed', String(focused));
+      setTip(main, home ? null : t.title || displayHost(t.url) || null);
+      (node.querySelector('.half-x') as HTMLElement).setAttribute('aria-label', `Close ${side} page, ${titleOf(t)}`);
+
+      const slot = item.querySelector(`.capsule-face .cap-slot.${side}`) as HTMLElement;
+      slot.dataset.id = String(t.id);
+      paintFav(slot.querySelector('.fav') as HTMLElement, t, home ? 'home' : t.favicon ?? 'globe');
+      const button = slot.querySelector('.cap-half') as HTMLElement;
+      button.setAttribute('aria-label', `${titleOf(t)}, ${side} page`);
+      setTip(button, titleOf(t));
+      (slot.querySelector('.cap-x') as HTMLElement).setAttribute('aria-label', `Close ${side} page, ${titleOf(t)}`);
+    }
+
+    // The capsule: two circles' footprint (spec "Pair capsule": favicons centred at s/2 and s+gap+s/2).
+    const s = p.size;
+    const g = p.gap;
+    const capW = 2 * s + g;
+    const ls = item.querySelector('.cap-slot.left') as HTMLElement;
+    const rs = item.querySelector('.cap-slot.right') as HTMLElement;
+    ls.style.width = `${capW / 2}px`;
+    rs.style.left = `${capW / 2}px`;
+    rs.style.width = `${capW / 2}px`;
+    (ls.querySelector('.fav') as HTMLElement).style.left = `${s / 2 - 9}px`;
+    (rs.querySelector('.fav') as HTMLElement).style.left = `${s + g + s / 2 - 9 - capW / 2}px`;
+    for (const fav of [ls, rs].map((x) => x.querySelector('.fav') as HTMLElement)) fav.style.top = `${s / 2 - 9}px`;
+    (rs.querySelector('.cap-x') as HTMLElement).style.left = `${capW / 2 - 13}px`;
+
+    // Back, Forward, Reload act on the focused side; their names carry it (spec "Accessibility").
+    const f = focusedTab ?? left;
+    const where = pair.left === f ? 'left' : 'right';
+    const back = item.querySelector('.split-face .back') as HTMLElement;
+    const forward = item.querySelector('.split-face .forward') as HTMLElement;
+    const reload = item.querySelector('.split-face .reload') as HTMLElement;
+    back.setAttribute('aria-disabled', String(!f.canBack));
+    forward.setAttribute('aria-disabled', String(!f.canForward));
+    back.setAttribute('aria-label', `Back, ${where} page`);
+    forward.setAttribute('aria-label', `Forward, ${where} page`);
+    item.classList.toggle('focus-home', f.kind === 'home');
+    const reloadKey = `${f.loading ? 'stop' : 'reload'}-${where}`;
+    if (reload.dataset.icon !== reloadKey) {
+      reload.dataset.icon = reloadKey;
+      fill(reload, svg(f.loading ? icons.stop : icons.reload));
+      reload.setAttribute('aria-label', `${f.loading ? 'Stop' : 'Reload'}, ${where} page`);
+      setTip(reload, f.loading ? 'Stop' : 'Reload', f.loading ? 'Esc' : 'Ctrl+R');
+    }
+    // A host that is cut ends in a 12 px fade (measured once laid out), at rest and beside the
+    // hover x, where it ends 22 px sooner (SplitPill board: the mask whenever the label is wider than
+    // the text box, h - 12 - 38 at rest and h - 34 - 38 on hover): class cut, and cut-hover.
+    requestAnimationFrame(() => {
+      for (const host of item.querySelectorAll<HTMLElement>('.split-face .host')) {
+        const half = host.closest('.half') as HTMLElement | null;
+        if (!half) continue;
+        const range = document.createRange();
+        range.selectNodeContents(host);
+        const text = range.getBoundingClientRect().width;
+        const w = half.getBoundingClientRect().width;
+        host.classList.toggle('cut', text > w - HALF_TEXT_REST + 0.5);
+        host.classList.toggle('cut-hover', text > w - HALF_TEXT_HOVER + 0.5);
+      }
+    });
+  }
+
   // ---- dragging the bar moves the window ----
 
   private watchDrag(): void {
@@ -613,7 +880,7 @@ export class Bar {
       dragged = false;
       if (e.button !== 0 || window.fullScreen) return;
       const target = e.target as Element;
-      if (!target.closest('.item') || target.closest('.close-badge, .accessories, input')) return;
+      if (!target.closest('.item') || target.closest('.close-badge, .half-x, .accessories, input')) return;
       this.press = { x: e.screenX, y: e.screenY };
     });
     window.addEventListener(
@@ -646,6 +913,28 @@ export class Bar {
       true
     );
   }
+}
+
+/**
+ * Step 4 of the layout: the units around the active one that fit in `slots` circle slots (a pair
+ * in the background takes two), about half before and the rest after, as many as fit.
+ */
+function nearest(units: Unit[], active: number, slots: number, weight: (u: Unit) => number): Unit[] {
+  const take = (from: number, dir: -1 | 1, limit: number): { n: number; used: number } => {
+    let n = 0;
+    let used = 0;
+    for (let i = from + dir; i >= 0 && i < units.length; i += dir) {
+      const w = weight(units[i]);
+      if (used + w > limit) break;
+      used += w;
+      n++;
+    }
+    return { n, used };
+  };
+  const first = take(active, -1, Math.floor(slots / 2));
+  const after = take(active, 1, slots - first.used);
+  const before = take(active, -1, slots - after.used);
+  return units.slice(active - before.n, active + after.n + 1);
 }
 
 function glassLens(item: HTMLElement): HTMLElement {

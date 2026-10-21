@@ -17,6 +17,11 @@ export const icons = {
   closeSmall: svg(10, '<path d="M6 6l8 8M14 6l-8 8"/>', 'stroke-width="2.2"'),
   switchTab: svg(14, '<path d="M16 4.5v6a2 2 0 0 1-2 2H5"/><path d="m8 9.5-3 3 3 3"/>'),
   history: svg(16, '<circle cx="10" cy="10" r="6.5"/><path d="M10 6.5V10l2.4 1.5"/>'),
+  // Split view (SplitPill board): a half's 24 px close button (10 px glyph, 1.6 px stroke) and the
+  // address field's side glyph, the edited half filled at 0.35 (spec "Address field for one side").
+  closeHalf: svg(10, '<path d="M4 4l12 12M16 4 4 16"/>', 'stroke-width="3.2"'),
+  sideLeft: svg(16, '<path d="M5 4.5h5v11H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z" fill="currentColor" fill-opacity="0.35" stroke="none"/><path d="M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11"/>'),
+  sideRight: svg(16, '<path d="M10 4.5h5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-5z" fill="currentColor" fill-opacity="0.35" stroke="none"/><path d="M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11"/>'),
   minimize: '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"/></svg>',
   maximize: '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"/></svg>',
   restore: '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="6.5" width="9.5" height="9.5" rx="1.8"/><path d="M7 6.5V5.8A1.8 1.8 0 0 1 8.8 4h5.4A1.8 1.8 0 0 1 16 5.8v5.4a1.8 1.8 0 0 1-1.8 1.8h-.7"/></svg>',

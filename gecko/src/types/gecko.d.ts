@@ -94,7 +94,19 @@ interface XULTab extends HTMLElement {
   readonly closing: boolean;
   readonly lastAccessed: number;
   readonly userContextId: number;
+  /** The <tab-split-view-wrapper> holding this tab, or null (tabbrowser/tab.js get splitview). */
+  readonly splitview: XULSplitView | null;
   toggleMuteAudio(): void;
+}
+/** Firefox's split view of two tabs (browser/.../tabbrowser/tabsplitview.mjs MozTabSplitViewWrapper). */
+interface XULSplitView extends HTMLElement {
+  readonly splitViewId: number;
+  /** Its <tab>s, column 0 first. */
+  readonly tabs: XULTab[];
+  readonly hasActiveTab: boolean;
+  unsplitTabs(trigger?: string | null): void;
+  reverseTabs(trigger?: string | null): void;
+  close(trigger?: string | null): void;
 }
 
 /**

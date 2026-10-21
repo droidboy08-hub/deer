@@ -3,7 +3,7 @@
 // Engine-independent: the same table as app/src/renderer/modules/settings/keymap.ts. The defaults
 // in REBINDABLE are the specs src/shared/shortcuts.ts binds; tests/settings/rebind.js checks that.
 
-export type RebindId = 'peekLink' | 'openAsTab' | 'switcherSearch' | 'downloadVideo';
+export type RebindId = 'peekLink' | 'openAsTab' | 'switcherSearch' | 'downloadVideo' | 'splitView';
 
 export interface KeyRow {
   label: string;
@@ -31,6 +31,7 @@ export const REBINDABLE: Record<RebindId, { label: string; spec: string }> = {
   openAsTab: { label: 'Open as tab', spec: 'Alt+Enter' },
   switcherSearch: { label: 'Search tabs', spec: 'Ctrl+Shift+A' },
   downloadVideo: { label: 'Download this video', spec: 'Ctrl+Shift+D' },
+  splitView: { label: 'Split view', spec: 'Ctrl+Shift+U' },
 };
 
 export const KEY_GROUPS: KeyGroup[] = [
@@ -62,6 +63,7 @@ export const KEY_GROUPS: KeyGroup[] = [
       { label: 'Go to the last tab', keys: 'Ctrl+9', page: true },
       { label: 'Move the tab left', keys: 'Ctrl+Shift+Page Up', page: true },
       { label: 'Move the tab right', keys: 'Ctrl+Shift+Page Down', page: true },
+      { label: 'Split view: a new tab beside this one, or separate the two', keys: '{splitView}', page: true, rebind: 'splitView' },
       { label: 'Full screen', keys: 'F11', page: true },
     ],
   },
@@ -182,6 +184,7 @@ export const DIFFERENT_FROM_CHROME: { text: string; link?: { label: string; sect
   { text: 'Shift+click peeks instead of opening a window', when: 'shiftClickPeek' },
   { text: 'Ctrl+Tab goes in most-recent order', link: { label: 'Change in Tabs', section: 'tabs' }, when: 'mruOrder' },
   { text: 'F6 always leaves the page' },
+  { text: 'F6 cycles both pages in split view' },
   { text: 'Shift+Enter in the address field peeks' },
   { text: '{peekLink} peeks the focused link' },
   { text: 'Ctrl+H shows recent history in the address field' },

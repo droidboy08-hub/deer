@@ -848,10 +848,9 @@ class Peek {
     const from: Pose = this.sheet.current ?? { box: sheetBox(), off: HEADER };
     const to: Pose = { box: windowBox(), off: 0 };
     this.sheet.filling(true);
-    // The page under the sheet stays on screen (and rendering) until the sheet covers the window.
-    const underPanel = gk.panelOf(src.node);
-    underPanel?.classList.add('vitre-peek-under');
-    gk.keepActive(src.browser);
+    // The page under the sheet stays on screen (and rendering) until the sheet covers the window; in
+    // split view both panes do (../design/SPLIT-VIEW-SPEC.md "Peek": Both panes stay on screen).
+    const release = this.holdUnder(src);
     // Adopt now, so the bar re-flows while the sheet grows.
     const at = this.b.tabs.indexOf(src);
     this.adopting = true;
@@ -868,17 +867,16 @@ class Peek {
       fade: reduced ? { from: 1, to: 0, ms: 150 } : { from: 1, to: 1, ms: 0 },
       pages: [{ panel: live.panel, layout: to.box, lift: (k) => shift * (1 - k) }],
       pageFade: { from: 1, to: 1, ms: 0 },
-      done: () => this.promoted(live, src, underPanel),
+      done: () => this.promoted(live, src, release),
     });
     this.sheet.dimmed(false, reduced ? 150 : 240);
     if (rise) this.rise(rise, live);
   }
 
   /** The sheet fills the window: the page is an ordinary tab from here on. */
-  private promoted(live: Live, src: Tab, underPanel: HTMLElement | null): void {
+  private promoted(live: Live, src: Tab, release: () => void): void {
     this.detach(live);
-    underPanel?.classList.remove('vitre-peek-under');
-    if (src.node.isConnected && !src.node.selected) gk.letSleep(src.browser);
+    release();
     this.sheet.hide();
     this.holdBar(false);
     this.live = null;
@@ -891,6 +889,39 @@ class Peek {
     gk.refreshDoorhangers();
     this.b.focusPage();
     this.announce();
+  }
+
+  /**
+   * Keep the page under the sheet on screen and rendering while Open as tab grows the sheet: the
+   * source tab's panel, or in split view both panes, pinned where they are (a split pair's panels
+   * leave the layout once another tab is selected: Firefox's [splitview] rule hides suspended panels).
+   * Returns the release.
+   */
+  private holdUnder(src: Tab): () => void {
+    const pair = this.b.pairOf(src);
+    const both = !!pair && this.b.shown(pair.left) && this.b.shown(pair.right);
+    const tabs = pair && both ? [pair.left, pair.right] : [src];
+    const held = tabs.map((t) => {
+      const panel = gk.panelOf(t.node);
+      const r = panel?.getBoundingClientRect();
+      panel?.classList.add('vitre-peek-under');
+      if (panel && r && both) {
+        panel.classList.add('vitre-peek-under-pane');
+        panel.style.left = `${r.left}px`;
+        panel.style.top = `${r.top}px`;
+        panel.style.width = `${r.width}px`;
+        panel.style.height = `${r.height}px`;
+      }
+      gk.keepActive(t.browser);
+      return { t, panel };
+    });
+    return () => {
+      for (const { t, panel } of held) {
+        panel?.classList.remove('vitre-peek-under', 'vitre-peek-under-pane');
+        if (both) for (const p of ['left', 'top', 'width', 'height']) panel?.style.removeProperty(p);
+        if (t.node.isConnected && !t.node.selected && !this.b.shown(t)) gk.letSleep(t.browser);
+      }
+    };
   }
 
   /**

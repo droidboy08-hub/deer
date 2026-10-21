@@ -115,10 +115,16 @@ export function showTab(node: XULTab): void {
 
 export const tabForBrowser = (browser: XULBrowser): XULTab | null => gb().getTabForBrowser(browser) ?? null;
 
-/** moveTabBefore / moveTabAfter(tab, target). */
+/**
+ * moveTabBefore / moveTabAfter(tab, target). A tab of a split pair moves with its pair: Firefox's
+ * #moveTabNextTo moves exactly the element it is given, so a lone tab would leave its wrapper
+ * (moveTabTo redirects to tab.splitview, #moveTabNextTo does not); a target inside a pair stands
+ * for its wrapper there already (Tabbrowser.sys.mjs).
+ */
 export function moveTab(node: XULTab, target: XULTab, where: 'before' | 'after'): void {
-  if (where === 'before') gb().moveTabBefore(node, target);
-  else gb().moveTabAfter(node, target);
+  const element = node.splitview ?? node;
+  if (where === 'before') gb().moveTabBefore(element, target);
+  else gb().moveTabAfter(element, target);
 }
 
 /** replaceTabWithWindow(tab): tears the tab off into a new window; returns that window. */
@@ -609,6 +615,24 @@ export function parkKeysets(): number {
   return parked;
 }
 
+/**
+ * An extension's command is bound to this chord ("Ctrl+Shift+U"): a <key> in one of the keysets
+ * ExtensionShortcuts makes (gre/modules/ExtensionShortcuts.sys.mjs: keyset id "ext-keyset-id-...",
+ * key attribute, modifiers "accel,shift"). Those keysets are never parked (parkKeysets), so the
+ * extension's command runs on that key: Deer's own action for it then stays out of the way.
+ */
+export function extensionKeyFor(spec: string): boolean {
+  const parts = spec.split('+');
+  const key = (parts.pop() ?? '').toLowerCase();
+  const want = new Set(parts.map((p) => (p === 'Ctrl' ? 'accel' : p.toLowerCase())));
+  for (const k of Array.from(doc.querySelectorAll('keyset[id^="ext-keyset-id-"] key'))) {
+    if ((k.getAttribute('key') ?? '').toLowerCase() !== key) continue;
+    const mods = new Set((k.getAttribute('modifiers') ?? '').split(/[,\s]+/).filter(Boolean).map((m) => (m === 'control' ? 'accel' : m)));
+    if (mods.size === want.size && [...want].every((m) => mods.has(m))) return true;
+  }
+  return false;
+}
+
 let shortcutUtils: any = null;
 /**
  * The tab action Firefox's tabbox and tabbrowser would run for this key on their own (Ctrl+Tab,
@@ -716,6 +740,38 @@ export function guardTabSwitchFocus(owns: () => boolean): void {
       return original.apply(this, args);
     };
   }
+}
+
+/**
+ * Never discard a tab while `keep(tab)` says so. Every discard goes through gBrowser.discardBrowser
+ * (Tabbrowser.sys.mjs): TabUnloader's low-memory unloading (TabUnloader.sys.mjs
+ * unloadLeastRecentlyUsedTab, which then tries its next candidate), an extension's tabs.discard
+ * (parent/ext-tabs.js) and explicitUnloadTabs; Firefox itself only spares the selected tab
+ * (#mayDiscardBrowser). Refused like Firefox refuses one: discardBrowser returns false. Wrapped once
+ * per window (an own property over the class method).
+ */
+export function guardDiscard(keep: (node: XULTab) => boolean): void {
+  const g = gb();
+  if (!g) return;
+  if (g.vitreDiscardGuards) {
+    g.vitreDiscardGuards.push(keep);
+    return;
+  }
+  const guards: ((node: XULTab) => boolean)[] = [keep];
+  g.vitreDiscardGuards = guards;
+  const original = g.discardBrowser;
+  if (typeof original !== 'function') return;
+  g.discardBrowser = function (this: unknown, node: XULTab, ...rest: unknown[]) {
+    const kept = guards.some((fn) => {
+      try {
+        return fn(node);
+      } catch {
+        return false;
+      }
+    });
+    if (kept) return false;
+    return original.call(this, node, ...rest);
+  };
 }
 
 /**

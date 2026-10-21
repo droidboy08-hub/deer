@@ -38,6 +38,7 @@ spike.main(async () => {
     ["Ctrl+5", "goTab(5)", "page"], ["Ctrl+6", "goTab(6)", "page"], ["Ctrl+7", "goTab(7)", "page"], ["Ctrl+8", "goTab(8)", "page"],
     ["Ctrl+9", "goLastTab", "page"],
     ["Ctrl+Shift+PageUp", "moveTabLeft", "page"], ["Ctrl+Shift+PageDown", "moveTabRight", "page"],
+    ["Ctrl+Shift+U", "splitView", "page"],
     ["F11", "fullscreen", "page"],
     // Address and search
     ["Ctrl+L", "focusAddress", "page"], ["Alt+D", "focusAddress", "page"], ["Ctrl+H", "history", "page"],

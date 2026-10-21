@@ -41,8 +41,9 @@ spike.main(async () => {
   check("keyboard: access keys underlined", st.classes.includes("keys"), st.classes);
   check("keyboard: 4 px below the link, left-aligned to it", Math.abs(st.rect.left - link.x) <= 2 && Math.abs(st.rect.top - (link.bottom + 4)) <= 2, { menu: [st.rect.left, st.rect.top], link: [link.x, link.bottom] });
   const underlined = [...document.querySelectorAll("#layer-menus .vt-menu.keys .vt-ak")].map((e) => e.textContent).join("");
-  // R: Open link in new private window (2026-10-10, under Open link in new window).
-  check("keyboard: the designed access letters", underlined.toUpperCase() === "TPWREDN", underlined);
+  // R: Open link in new private window (2026-10-10, under Open link in new window); S: Open link in
+  // split view (2026-10-20, the third row).
+  check("keyboard: the designed access letters", underlined.toUpperCase() === "TPSWREDN", underlined);
   await capture("keyboard-link");
 
   // ---- moving ----
@@ -79,8 +80,9 @@ spike.main(async () => {
   M.key("KEY_ArrowDown");
   M.key("KEY_ArrowDown");
   M.key("KEY_ArrowDown");
+  M.key("KEY_ArrowDown");
   M.setClipboard("before");
-  check("Down x4 lands on Copy link address (past the separator)", M.labels()[M.state().active] === "Copy link address", M.state().active);
+  check("Down x5 lands on Copy link address (past the separator)", M.labels()[M.state().active] === "Copy link address", M.state().active);
   M.key("KEY_Enter");
   check("Enter runs it", (await M.clipboardIs(M.page("counter.html"))) === M.page("counter.html"));
   await M.waitClosed();
@@ -218,7 +220,7 @@ spike.main(async () => {
   await M.waitOpen();
   st = M.describe("KBD CIRCLE");
   const ir = item.getBoundingClientRect();
-  check("circle by keyboard: the circle menu with its caption", st.captions[0]?.includes("Counter") && st.rows[0]?.label === "Reload tab", { captions: st.captions, rows: st.rows.map((r) => r.label) });
+  check("circle by keyboard: the circle menu with its caption", st.captions[0]?.includes("Counter") && st.rows[0]?.label === "Open in split view" && st.rows[1]?.label === "Reload tab", { captions: st.captions, rows: st.rows.map((r) => r.label) });
   check("circle by keyboard: left-aligned to the circle, hanging at y 64", Math.abs(st.rect.left - ir.left) <= 1 && Math.abs(st.rect.top - 64) <= 1, { menu: [st.rect.left, st.rect.top], circle: ir.left });
   check("circle by keyboard: first item focused, keys shown", st.active === 0 && st.classes.includes("keys"), st);
   check("circle keeps its pressed look while the menu is open", item.classList.contains("vt-menu-owner") && item.getAttribute("aria-expanded") === "true");

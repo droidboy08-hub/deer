@@ -3,8 +3,13 @@
 // app/src/renderer/modules/menus/chrome-items.ts. The Home wallpaper's menu is a page menu here
 // (Home is a page in a tab: page-items.ts); the peek's header and the downloads ring are drawn by
 // their modules, which show their rows through the 'menus' service.
-import type { Browser } from '../../browser';
+// Split view (../design/SPLIT-VIEW-SPEC.md "Menus", CtxMenu kinds pillsplit, circlesplit, circlepair,
+// splitpill, capsule): "New tab in split view" in the pill's menu, "Open in split view" (or "... instead
+// of <tab>") first in a circle's, a half of the split pill's menu and the pair capsule's menu. Below a
+// 648 px window the split rows grey out with "Window too narrow" in the accelerator column.
+import type { Browser, Pair } from '../../browser';
 import type { Tab } from '../../model';
+import { titleOf } from '../../split';
 import { displayHost } from '../../../shared/url';
 import * as gecko from './gecko';
 import { pasteAndGo } from './page-items';
@@ -35,6 +40,28 @@ function muteRow(b: Browser, t: Tab): MenuCommand | null {
 
 const isWeb = (t: Tab): boolean => t.kind === 'web' && !!t.url && !/^about:blank$/i.test(t.url);
 
+/** The key that toggles split view, as printed (Settings › Keyboard shortcuts may rebind it). */
+export const splitKey = (b: Browser): string => b.settings.rebind?.splitView || 'Ctrl+Shift+U';
+
+/**
+ * A row that starts split view; under a 648 px window it greys out with "Window too narrow" where
+ * the key would be (spec "Rules for every route": Too narrow). Popup windows never split.
+ */
+export function splitStartRow(b: Browser, label: string, access: string, key: string, run: () => void): MenuCommand | null {
+  if (b.isPopup) return null;
+  const narrow = b.splitView.refusal() === 'narrow';
+  return item(label, 'split', narrow ? 'Window too narrow' : key, access, run, { disabled: narrow });
+}
+
+/** Up to 20 characters of a title, then an ellipsis (spec "How to start": "... instead of Tideline"). */
+const short = (text: string): string => (text.length > 20 ? `${text.slice(0, 20).trimEnd()}…` : text);
+
+/** Close every tab but the pair's two (Close other tabs on a half or a capsule keeps both sides). */
+function closeOthersOfPair(b: Browser, p: Pair, keep: Tab): void {
+  for (const other of [...b.tabs]) if (other !== p.left && other !== p.right) b.closeTab(other);
+  b.activate(keep);
+}
+
 /** The active tab pill at rest (hangs at y 64). */
 export function pillRows(b: Browser, t: Tab): MenuItem[] {
   const web = isWeb(t);
@@ -54,11 +81,68 @@ export function pillRows(b: Browser, t: Tab): MenuItem[] {
     pasteAndGo((url) => b.navigate(t, url)),
     SEP,
     web ? item('Duplicate tab', '', '', 'D', () => duplicate(t)) : null,
+    // Not on Home (the empty side would be the page itself).
+    web ? splitStartRow(b, 'New tab in split view', 'N', splitKey(b), () => b.split('home')) : null,
     muteRow(b, t),
     web ? moveRow(b, t) : null,
     SEP,
     item('Close other tabs', '', '', 'O', () => closeOthers(b, t), { disabled: b.tabs.length < 2 }),
     item('Close tab', 'close', 'Ctrl+W', 'C', () => b.closeTab(t)),
+  ]);
+}
+
+/**
+ * "Open in split view" for a background circle: pairs it with the active tab. With a pair active it
+ * reads "Open in split view instead of <the side it replaces>" (its Home side, else its unfocused
+ * side). Left out where it would pair Home with Home, and for pinned tabs.
+ */
+function circleSplitRow(b: Browser, t: Tab): MenuCommand | null {
+  const a = b.active();
+  if (!a || t.pinned || a.pinned) return null;
+  const pair = b.splitView.active();
+  if (pair) {
+    const out = b.splitView.replaced(pair);
+    const kept = out === pair.left ? pair.right : pair.left;
+    if (!out || (kept.kind === 'home' && t.kind === 'home')) return null;
+    return splitStartRow(b, `Open in split view instead of ${short(titleOf(out))}`, 'S', '', () => b.split(t));
+  }
+  if (a.kind === 'home' && t.kind === 'home') return null;
+  return splitStartRow(b, 'Open in split view', 'S', '', () => b.split(t));
+}
+
+/**
+ * A half of the split pill (splitpill): it acts on that half's side. Separate tabs acts on the whole
+ * pair, so its key is printed on both halves; Ctrl+W only on the focused half.
+ */
+export function splitHalfRows(b: Browser, t: Tab): MenuItem[] {
+  const web = isWeb(t);
+  const p = b.pairOf(t);
+  if (!p) return pillRows(b, t);
+  const focused = t.id === b.activeId;
+  return tidy([
+    web ? item('Copy address', 'link', '', 'A', () => gecko.copyText(t.url)) : null,
+    pasteAndGo((url) => b.navigate(t, url)),
+    SEP,
+    item('Swap sides', 'swap', '', 'P', () => b.swapSides(t)),
+    item('Separate tabs', '', splitKey(b), 'E', () => b.separate(t)),
+    muteRow(b, t),
+    SEP,
+    item('Close other tabs', '', '', 'O', () => closeOthersOfPair(b, p, t), { disabled: b.tabs.length <= 2 }),
+    item('Close tab', 'close', focused ? 'Ctrl+W' : '', 'C', () => b.closeTab(t)),
+  ]);
+}
+
+/** The pair capsule (a pair while another tab is active). Ctrl+Shift+U acts on the active tab, not here. */
+export function capsuleRows(b: Browser, p: Pair): MenuItem[] {
+  const keep = b.mru.map((id) => b.tab(id)).find((x) => x === p.left || x === p.right) ?? p.left;
+  return tidy([
+    { caption: `${titleOf(p.left)} · ${titleOf(p.right)}` },
+    SEP,
+    item('Swap sides', 'swap', '', 'P', () => b.swapSides(p.left)),
+    item('Separate tabs', '', '', 'E', () => b.separate(p.left)),
+    SEP,
+    item('Close other tabs', '', '', 'O', () => closeOthersOfPair(b, p, keep), { disabled: b.tabs.length <= 2 }),
+    item('Close both tabs', 'close', '', 'C', () => b.splitView.closeBoth(p)),
   ]);
 }
 
@@ -73,8 +157,11 @@ export function circleCaption(t: Tab): string {
 /** A background tab circle. Close tab has no key: Ctrl+W closes the active tab. */
 export function circleRows(b: Browser, t: Tab): MenuItem[] {
   const web = isWeb(t);
+  const split = circleSplitRow(b, t);
   return tidy([
     { caption: circleCaption(t) },
+    SEP,
+    split,
     SEP,
     web ? item('Reload tab', 'reload', '', 'R', () => gecko.reloadTab(t.node)) : null,
     web ? item('Duplicate tab', '', '', 'D', () => duplicate(t)) : null,

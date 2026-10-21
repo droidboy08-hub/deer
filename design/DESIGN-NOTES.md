@@ -50,6 +50,7 @@ Working name: **Vitre**, a Windows browser with a liquid-glass interface. The de
 | Find in page | FindOpen, FindMotion (interactive, 12.3 s loop with a caption strip), FindStates (every state on light, dark and photo), FindContexts (peek, hidden bar, PDF, Home), FindSpec | done, reviewed (34 findings fixed), published (version 28) |
 | Right-click menus | MenuSelection, MenuMotion (interactive), MenuGallery (flip left), MenuSpelling (Shift+F10, flip up), MenuChrome (pill, circle, ring, Home), MenuSpec (anatomy, materials, placement, keys), MenuReference (all 26 menus); PeekDiscover updated to the final link menu | done, reviewed, published (version 28) |
 | Keyboard | KeyMap (every shortcut), KeyRouting (how a key travels, the Esc ladder, F6), SwitcherKeys (held vs latched), SettingsKeys (Settings › Keyboard shortcuts) | done, reviewed (29 findings fixed), published (version 30) |
+| Split view | SplitOpen, SplitMotion (interactive), SplitStart, SplitDrop, SplitSpec; part SplitPill; CtxMenu's split kinds (linksplit, linkpair, circlesplit, circlepair, pillsplit, splitpill, capsule) | done, approved by the owner 2026-10-20 (version 36); spec `design/SPLIT-VIEW-SPEC.md` |
 | Parts | Article, VideoPage, RefPage, IssuesPage, GalleryPage, PeekIssue, FindPill, CtxMenu | mock sites and shared components used inside scenes |
 
 Mock tabs everywhere, in this order: Field Notes (fieldnotes.press), Tideline (tideline.fm), Refract (refract.wiki), vitre-shell (code.vitre.dev), Long Exposure Club "Slow light" (longexposure.club), Home.
@@ -186,6 +187,10 @@ Three concepts ("pill", "reading", "keyboard"); both judges put find inside the 
 - Local preview: the scratchpad `render.js` + headless Edge renders any board to PNG (blobs map to local copies); not part of the project.
 - `design/tools/dccheck.py` checks any board: tag balance, holes against renderVals, sizes against canvas.json, imports and filters.
 
+## Split view (approved by the owner 2026-10-20)
+
+Two pages side by side in one window, left and right only, on Firefox 157's own split view. The agreed spec, with the owner's decisions of 2026-10-20 that override the rest, is `design/SPLIT-VIEW-SPEC.md`; the boards are on the canvas page "Split view". In short: one split pill (two halves, the focused side outlined with a plate and its pane with a 1 px accent rim) in the active pill's slot, a 96×44 capsule while another tab is active; the bar stays centred exactly as for one tab and never follows the 8 px divider; the bar's glass takes the focused side's theme, with the mixed tint over the other page when one is light and the other is not; Ctrl+Shift+U toggles split view; ways in from the tab circle's menu, the link menu ("Open link in split view", "Open link on the right side" in a pair), the tab pill's "New tab in split view", and (phase 2) a circle dragged to an edge after a 300 ms hold; under a 648 px window it collapses to the focused side. Build: `gecko/src/window/split.ts` (and its section in `gecko/ARCHITECTURE.md`).
+
 ## Keyboard map (agreed: inventory + Windows audit + web-app audit, synthesized and checked by a skeptic)
 
 The full map is `design/keymap.json` (105 entries in 11 groups, the reserved list by owner, 21 routing rules, every change versus earlier boards, and what Settings › Keyboard shortcuts offers). It is the source of truth for the boards and, later, for the Electron build. Highlights:
@@ -218,3 +223,4 @@ New maps: `python design/tools/lensmap.py out.png W H radius bezel 2.2`, then up
    - ~~The keyboard map boards~~ (KeyMap, KeyRouting, SwitcherKeys, SettingsKeys; source of truth design/keymap.json).
 3. ~~Remove the old Concept page placeholders~~ (done, version 31).
 4. Then build: a bare Electron window with the glass tab bar, then tabs and the switcher, then the downloader port.
+5. ~~Split view~~ (designed and approved 2026-10-20, canvas version 36; spec `design/SPLIT-VIEW-SPEC.md`). Building in two phases on Gecko: the core (phase 1), then dragging a circle to an edge and the full motion (phase 2). Still to update on the canvas: the Menus page (MenuChrome, MenuSpec, MenuReference, PeekDiscover, MenuMotion) with the split rows, and the keyboard boards with Ctrl+Shift+U.
