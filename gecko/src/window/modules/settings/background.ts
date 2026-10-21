@@ -13,13 +13,15 @@
 //   bg.deerWallpapers()  Deer wallpapers (VitreWallpapers, a process singleton): the "Deer wallpapers"
 //                        group of the Photo tab (photos) and of the Video tab (videos); null when it
 //                        could not be loaded
+//   bg.menus()           the 'menus' service (a tile's right-click menu), or null in a build without it
+//   bg.openCredits()     the collection's credits (CREDITS.md on GitHub) in a new tab, Settings closed
 //   bg.error             why the last choice could not be shown, or null
 //   bg.onChange(fn)      the choice or the error changed
 // The recent list is a per-profile convenience, not a setting: the pref vitre.home.recent (a JSON
 // array of { kind, path }), outside the Settings schema so VitreSettings never reports it.
 // A Deer wallpaper is an ordinary 'image' or 'video' background whose path is its copy in the profile
-// (<profile>\deer-wallpapers\<id>.jpg or <id>.mp4): it shows in its own group, never among your recent
-// photos or videos. Any choice here supersedes a Deer wallpaper still downloading (it is never applied).
+// (<profile>\deer-wallpapers\wallpapers\<id>.jpg or live-wallpapers\<id>.mp4, or a file Deer 0.1.5-0.1.8
+// downloaded): it shows in its own group, never among your recent photos or videos.
 import type { WallpaperTile } from '../../../modules/VitreWallpapers.sys';
 import type { Settings } from '../../../shared/settings';
 import type { Browser } from '../../browser';
@@ -32,7 +34,7 @@ export interface Tile {
   kind: BgKind;
   path: string;
   label: string;
-  /** A Deer wallpaper (kind 'image' or 'video', path its copy in the profile, which may not be downloaded yet). */
+  /** A Deer wallpaper (kind 'image' or 'video', path its copy in the profile). */
   deer?: WallpaperTile;
 }
 
@@ -95,7 +97,6 @@ export class HomeBackground {
 
   /** Store a background; `fromDisk` files (picked in the dialog) join the recent list. */
   choose(bg: HomeBg, fromDisk = false): void {
-    this.deerWallpapers()?.supersede();
     if (fromDisk && (bg.kind === 'image' || bg.kind === 'video') && !this.deerWallpapers()?.isDeerPath(bg.path)) this.remember(bg);
     this.error = null;
     this.pending.push({ kind: bg.kind, path: bg.path });
@@ -113,22 +114,32 @@ export class HomeBackground {
     }
   }
 
+  /** The 'menus' service (src/window/modules/menus), or null when the build has none. */
+  menus(): VitreServices['menus'] | null {
+    const s = this.b.service('menus');
+    return s && typeof s.show === 'function' ? s : null;
+  }
+
+  /** The collection's credits in a new tab; Settings steps aside so the page shows (Home's popover goes by itself). */
+  openCredits(): void {
+    const url = this.deerWallpapers()?.CREDITS;
+    if (!url) return;
+    this.b.service('settings')?.close();
+    this.b.newTab(url);
+  }
+
   /**
    * Choose a tile, unless its file has gone (then say so and keep what Home shows). A Deer wallpaper
-   * is downloaded first (once) by VitreWallpapers, which sets it when it is here and checked; its tile
-   * shows the download, or a failure, and nothing else changes meanwhile.
+   * is here already (a Get downloaded it): VitreWallpapers sets it, by id and kind.
    */
   async chooseTile(t: Tile): Promise<void> {
     if (t.deer) {
-      if (this.error) {
-        this.error = null;
-        this.changed();
-      }
-      // By id and kind: a collection may list the same id as a photo and later as a video.
-      await this.deerWallpapers()?.choose(t.deer.id, t.deer.kind);
+      this.error = null;
+      const done = await this.deerWallpapers()?.choose(t.deer.id, t.deer.kind);
+      if (done !== 'applied') this.error = `Couldn’t open ${t.label}`;
+      this.changed();
       return;
     }
-    this.deerWallpapers()?.supersede();
     if ((t.kind === 'image' || t.kind === 'video') && !(await exists(t.path))) {
       this.error = `Couldn’t open ${baseName(t.path)}`;
       this.forget(t.path);

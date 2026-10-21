@@ -27,6 +27,8 @@ export class HomeButton {
   private offEsc: (() => void) | null = null;
   private onDown = (e: MouseEvent): void => {
     const t = e.target as Node;
+    // A glass menu over the popover (a Deer wallpaper's Remove) belongs to it while it is open.
+    if ((t as Element)?.closest?.('.vt-menus')) return;
     if (this.pop && !this.pop.contains(t) && !this.circle.contains(t)) this.close(false);
   };
 

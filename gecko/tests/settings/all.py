@@ -10,29 +10,29 @@
              the downloads folder through the real folder dialog
   appicon    Appearance › App icon: the tiles, open and new windows switching icon, a test shortcut
              following (never a real one)
-  wallpapers the picker's Deer wallpapers group against a local stand-in for GitHub Pages
-             (wallpaper_server.py on 127.0.0.1:<port>, default 47981; nothing listens on <port>+1):
-             no request before a Photo tab shows; the site down, empty, a manifest over 1 MiB, a
-             redirect: no group; a slow manifest asked once though Settings closed before it
-             answered; bad entries skipped; thumbnails checked, 3 at a time, one that cannot be
-             decoded tried once; choose, download, check, Home shows it, not among the recent photos,
-             downloaded once; progress and a superseded download; wrong hash / size / not a JPEG /
-             404 refused with the tile's line and nothing written; a note, then a Deer wallpaper: the
-             Photo tab stays; the popover; the open picker following changes made elsewhere, its tab
-             stops through a download; the manifest once per 10 minutes; Find a setting; a wallpaper
-             taken out of the collection; pruning; no Cookie / Referer / Origin sent, no cookie
-             stored; after a restart: leftovers of cut-short writes removed, with the site down the
-             cached group; then live wallpapers (videos, the clip live-wallpaper.mp4): the Video
-             tab's own group (no "Add a video" note meanwhile), a clip three days long listed,
-             choose, download, check, Home plays it muted and looping (wrapping past the end),
-             progress and a superseded download, not an MP4 / an AVIF picture / wrong hash / endless
-             body refused, the 2 videos chosen last kept, a video taken out of the collection; after
-             another restart Home plays it again on the entry's colour, the popover's focus on its
-             tile wholly in view, and an id listed as a photo, then a video, then the photo again:
-             each tab's tile fetches, applies and keeps only its own kind's file
+  wallpapers the picker's Deer wallpapers group (the "Get wallpapers" flow of 2026-10-21) against a
+             local stand-in for GitHub Pages (wallpaper_server.py on 127.0.0.1:<port>, default
+             47981; nothing listens on <port>+1): nothing asked before a Get button is clicked (Home,
+             both tabs, Find a setting, the popover); Credits; the site down, a 1.2 MB index, a
+             redirect, a version 1 index: one plain failure line, nothing written; Get on the main
+             collection item after item ("Getting N of 8…"), checked thumbnails as faces, names and
+             credits, "Check for new wallpapers"; a tile applied at once; a double-click and a quick
+             second click do not stop a Get; switching to the Video tab does not either; a second
+             click and leaving (Settings closed) stop it; the network failing mid-way (a body cut off
+             before its Content-Length) stops it; downloads that do not check out refused; the owner
+             changing the collection (new, changed, no longer listed: removed but the current
+             background); Remove from the right-click menu, Shift+F10 and the Menu key; the popover;
+             live wallpapers (videos: posters, Home playing one muted and looping, bad videos refused,
+             one stopped while it streams, a tile whose file has gone chosen during a Get of its kind);
+             no Cookie / Referer / Origin sent, no cookie stored. After a restart (the site down):
+             offline tiles, leftovers gone, Deer 0.1.5-0.1.8's files moved into the new layout when its
+             wallpapers.json vouches for them (the rest gone), its current background kept until a
+             Get brings the same file. After another restart: a video of that version as Home's
+             background, Remove on it; a junction in the folder: nothing written or removed through it
 
-The module is built alone into build-settings (node tools/build.mjs --out=build-settings
---modules=settings) so other authors' half-written modules cannot get in the way; --no-build skips it.
+The module is built with the menus module only (a Deer wallpaper's Remove menu) into build-settings
+(node tools/build.mjs --out=build-settings --modules=settings,menus), so other authors' half-written
+modules cannot get in the way; --no-build skips it.
 --app build-x builds into (and runs) build-x instead, with profile names ending in -build-x, so two
 sessions can run this at once (give each its own --port too). Without names all of them run. Each
 run prints only its failures and a summary line; logs and captures are in tests/settings/out/. No
@@ -77,7 +77,7 @@ def main():
         return 2
     picked = [t for t in TESTS if not names or t[0] in names]
     if '--no-build' not in args:
-        r = subprocess.run('node tools/build.mjs --out=%s --modules=settings' % app, cwd=ROOT, shell=True, capture_output=True, text=True)
+        r = subprocess.run('node tools/build.mjs --out=%s --modules=settings,menus' % app, cwd=ROOT, shell=True, capture_output=True, text=True)
         print((r.stdout + r.stderr).strip().splitlines()[-1] if (r.stdout + r.stderr).strip() else 'build: no output')
         if r.returncode != 0:
             print(r.stdout + r.stderr)

@@ -7,53 +7,55 @@ The pictures are made here with Pillow (deterministic, a few hundred KB each); t
 clip live-wallpaper.mp4 next to this file (3 s, 320x180, H.264 yuv420p, faststart, no sound: made
 once with ffmpeg), each made a file of its own by a 'free' box at its end (players skip it).
 
-Collections, by the first part of the path (the test points vitre.wallpapers.base at one of them):
-  /main/      wallpapers.json as add.py writes it (Deer 0.1.5's format: photos, no "kind"), with
-                good pictures   lake-at-dawn, hills, quiet-bay, red-rocks, snow-field, city-lights,
-                                old-pier, bad-thumb (its thumbnail is not the one listed), odd-thumb
-                                (its thumbnail passes every check, a frame header of 320x180 and no
-                                picture: it cannot be decoded), slow-forest (sent in small pieces over
-                                about 4 s)
-                bad downloads   wrong-hash, short-file (fewer bytes than listed), long-file (more
-                                bytes than listed), not-jpeg (a PNG, size and hash right), wrong-dims
-                                (a JPEG of another size), gone-file (404)
-                bad entries     an id with capitals, a path out of full/, another file name, an address
-                                elsewhere, 26 MB declared, a 600 KB thumbnail, a colour name, an empty
-                                title, a title with a bidi override, a 100000 px width, a string, an id
-                                listed twice, a retired id, a thumbnail path out of thumbs/
-  /main2/     the same without lake-at-dawn (taken out of the collection)
-  /live/      photos and videos mixed (live wallpapers):
-                photos          lake-at-dawn, hills ("kind": "photo"), quiet-bay (the files of /main/)
-                good videos     night-river, surf (the owner's own: no credit), drift, slow-clip (a 1.5 MiB
-                                'free' box, sent in small pieces over about 7 s); long-take (three days,
-                                100 MiB declared: listed, never downloaded; there is no length limit)
-                bad downloads   not-mp4 (a JPEG, size and hash right), avif-picture (an AVIF picture: an
-                                ISO file whose 'ftyp' box names avif / mif1 / miaf, size and hash right),
-                                video-wrong-hash, video-endless (no length, bytes without end)
-                bad entries     "kind": "gif" (full/<id>.gif, and full/<id>.mp4), "kind": "Video", a video
-                                whose file is full/<id>.jpg, a duration of 0, none, a string, a width of
-                                4000, 101 MiB declared
-  /live2/     the same without drift (taken out of the collection)
-  /kswap1/    one wallpaper, "shift", a photo (full/shift.jpg)
-  /kswap2/    "shift" again, now a video (full/shift.mp4, another thumbnail): an id reused for the
-              other kind
-  /kswap3/    /kswap1/ again (the photo)
-  /empty/     {"version": 1, "wallpapers": []}
-  /huge/      a manifest of 1.2 MB (over Deer's 1 MiB limit)
-  /redirect/  wallpapers.json is a 302 to /main/wallpapers.json
-  /slow/      the empty collection, answered after 3 s
+Every collection is an index.json of version 2 (the layout of the owner's plan of 2026-10-21):
+wallpapers/<id>.jpg + wallpapers/thumbs/<id>.jpg (photos), live-wallpapers/<id>.mp4 +
+live-wallpapers/thumbs/<id>.jpg (videos). Collections, by the first part of the path (the test points
+vitre.wallpapers.base at one of them):
+  /good/      photos   lake-at-dawn, hills, quiet-bay (the owner's own: no credit), red-rocks,
+                       snow-field, city-lights, old-pier, odd-thumb (its thumbnail passes every check,
+                       a frame header of 320x180 and no picture: it cannot be decoded)
+              videos   night-river, surf (the owner's own), drift, long-take (three days long: there is
+                       no length limit)
+              skipped  an id with capitals, a path out of wallpapers/, another file name, an address
+                       elsewhere, the v1 path full/<id>.jpg, 26 MB declared, a 600 KB thumbnail, a
+                       colour name, an empty title, a title with a bidi override, a 100000 px width, a
+                       string, an id listed twice (also across the lists), a retired id, a thumbnail
+                       path out of thumbs/, half a credit; a video whose file is wallpapers/<id>.jpg,
+                       a photo whose file is live-wallpapers/<id>.mp4, a duration of 0, none, a
+                       string, a width of 4000, 101 MiB declared
+  /good2/     the owner changed it: lake-at-dawn and hills gone (hills retired), new-dawn new (first),
+              snow-field another picture under the same id; drift gone, new-wave new
+  /bad/       /good/ plus downloads that do not check out: bad-thumb (its thumbnail is not the one
+              listed), wrong-hash, short-file (fewer bytes than listed), long-file (more bytes than
+              listed, no length sent), not-jpeg (a PNG, size and hash right), wrong-dims (a JPEG of
+              another size), gone-file (404); not-mp4 (a JPEG, size and hash right), avif-picture (an
+              ISO file whose 'ftyp' box names avif / mif1 / miaf, size and hash right),
+              video-wrong-hash, video-endless (no length, bytes without end)
+  /slow/      /good/ plus slow-a, slow-b, slow-c (photos sent in small pieces over about 3 s each) and
+              slow-clip (a video with a 2.5 MiB 'free' box, sent over about 11 s)
+  /legacy/    /good/ plus old-pick, the photo test-legacy.jpg (GET /__legacy) under that id
+  /empty/     {"version": 2, "wallpapers": [], "live": [], "retired": []}
+  /huge/      an index of 1.2 MB (over Deer's 1 MiB limit)
+  /redirect/  index.json is a 302 to /good/index.json
+  /v1/        index.json of version 1 (Deer 0.1.5's wallpapers.json), and wallpapers.json
 Every answer carries Set-Cookie (wptrack=<n>) and a long Cache-Control max-age: Deer must store no
-cookie, send none, and take nothing from its HTTP cache. Thumbnails are answered after 150 ms, so the
-number of them asked at once can be measured.
+cookie, send none, and take nothing from its HTTP cache. Thumbnails are answered after 150 ms (so a
+Get's progress can be watched).
 
 Control (never logged):
   GET /__log               every request since the last reset: path, query, headers (as sent)
   GET /__reset             forget the log and the measurements
-  GET /__stats             {"thumbsAtOnce": the most thumbnail requests open at the same time}
-  GET /__info              {id: {bytes, sha256}} of the good pictures and videos as served (videos: color too)
+  GET /__stats             {"atOnce": the most file requests open at the same time}
+  GET /__info              {id: {bytes, sha256, color}} of the good files as served (good2's own
+                           snow-field as "snow-field@good2")
+  GET /__legacy            the photo old-pick as served by /legacy/ (the test plants it as a file of
+                           Deer 0.1.5-0.1.8), with {bytes, sha256} in /__info under "old-pick"
   GET /__drop?prefix=P     close every connection for a path starting with P without an answer (the
-                           site down); an empty prefix ends it
-  GET /__plant             answers with Set-Cookie: planted=1 (a cookie the jar really holds)
+                           site down, the network failing); an empty prefix ends it
+  GET /__file?path=P       a file as the collections serve it (P: wallpapers/<id>.jpg ...), unlogged:
+                           the test plants it as a file of Deer 0.1.5-0.1.8
+  GET /__entry?site=S&id=I the entry of I in collection S's index.json (to build that version's
+                           wallpapers.json record from)
 """
 import argparse
 import hashlib
@@ -72,12 +74,12 @@ from PIL import Image, ImageDraw, ImageFilter
 
 LOCK = threading.Lock()
 LOG = []
-STATE = {'drop': '', 'thumbs_open': 0, 'thumbs_max': 0, 'cookie': 0}
-FILES = {}      # 'full/x.jpg' -> bytes (shared by every collection)
-SITE_FILES = {}  # ('kswap1', 'thumbs/shift.jpg') -> bytes: a collection's own (asked first)
-MANIFESTS = {}  # 'main' -> bytes
+STATE = {'drop': '', 'open': 0, 'max': 0, 'cookie': 0}
+FILES = {}       # 'wallpapers/x.jpg' -> bytes (shared by every collection)
+SITE_FILES = {}  # ('good2', 'wallpapers/snow-field.jpg') -> bytes: a collection's own (asked first)
+INDEXES = {}     # 'good' -> bytes
 INFO = {}
-SITES = ('main', 'main2', 'live', 'live2', 'kswap1', 'kswap2', 'kswap3', 'empty', 'huge', 'redirect', 'slow')
+SITES = ('good', 'good2', 'bad', 'slow', 'legacy', 'empty', 'huge', 'redirect', 'v1')
 
 
 def sha(b):
@@ -124,7 +126,11 @@ def thumb_of(img):
     return img.resize((tw, max(1, round(img.height * tw / img.width))), Image.LANCZOS)
 
 
-GOOD = [
+def mean(img):
+    return '#%02x%02x%02x' % img.resize((1, 1), Image.BILINEAR).getpixel((0, 0))
+
+
+PHOTOS = [
     # id, title, author, license, size, sky, ground, sun
     ('lake-at-dawn', 'Lake at dawn', 'Ada Park', 'CC0-1.0', (1600, 900), ((236, 168, 120), (120, 150, 190)), (52, 70, 92), (255, 226, 170)),
     ('hills', 'Hills after rain', 'Ben Ortiz', 'CC-BY-4.0', (1600, 1000), ((150, 180, 210), (215, 220, 215)), (70, 104, 70), (250, 250, 235)),
@@ -134,11 +140,16 @@ GOOD = [
     ('snow-field', 'Snow field', 'Eva Lind', 'CC0-1.0', (1600, 900), ((200, 215, 235), (245, 248, 252)), (225, 232, 240), (255, 255, 250)),
     ('city-lights', 'City lights', 'Finn Moss', 'CC0-1.0', (1600, 900), ((10, 14, 40), (60, 40, 80)), (20, 20, 30), (250, 220, 120)),
     ('old-pier', 'Old pier', 'Gia Bell', 'CC-BY-4.0', (1600, 900), ((180, 190, 200), (120, 130, 140)), (60, 60, 64), (230, 230, 230)),
-    ('bad-thumb', 'Grey morning', 'Hal Ito', 'CC0-1.0', (1600, 900), ((160, 160, 165), (110, 115, 120)), (70, 72, 76), (210, 210, 210)),
     ('odd-thumb', 'Odd thumbnail', 'Jo Kim', 'CC0-1.0', (1600, 900), ((200, 180, 150), (150, 130, 110)), (90, 80, 70), (240, 230, 210)),
-    ('slow-forest', 'Slow forest', 'Ivy Cho', 'CC0-1.0', (2400, 1500), ((120, 160, 120), (40, 70, 50)), (20, 50, 30), (230, 240, 200)),
 ]
-BAD = [
+NEW_PHOTO = ('new-dawn', 'New dawn', 'Kim Vale', 'CC0-1.0', (1600, 900), ((250, 190, 140), (140, 160, 200)), (60, 80, 100), (255, 235, 190))
+SLOW_PHOTOS = [
+    ('slow-a', 'Slow A', 'Ivy Cho', 'CC0-1.0', (2400, 1500), ((120, 160, 120), (40, 70, 50)), (20, 50, 30), (230, 240, 200)),
+    ('slow-b', 'Slow B', 'Ivy Cho', 'CC0-1.0', (2400, 1500), ((160, 120, 120), (70, 40, 50)), (50, 20, 30), (240, 230, 200)),
+    ('slow-c', 'Slow C', 'Ivy Cho', 'CC0-1.0', (2400, 1500), ((120, 120, 160), (40, 50, 70)), (20, 30, 50), (200, 230, 240)),
+]
+BAD_PHOTOS = [
+    ('bad-thumb', 'Grey morning', ((160, 160, 165), (110, 115, 120))),
     ('wrong-hash', 'Wrong hash', ((120, 120, 200), (60, 60, 120))),
     ('short-file', 'Short file', ((200, 120, 120), (120, 60, 60))),
     ('long-file', 'Long file', ((120, 200, 120), (60, 120, 60))),
@@ -146,42 +157,58 @@ BAD = [
     ('wrong-dims', 'Wrong size', ((120, 200, 200), (60, 120, 120))),
     ('gone-file', 'Gone', ((180, 140, 200), (90, 70, 120))),
 ]
-SLOW = {'slow-forest', 'slow-clip'}
 # Bytes sent every 70 ms by a slow answer.
-SLOW_PIECE = {'slow-forest': 8 * 1024, 'slow-clip': 16 * 1024}
+SLOW_PIECE = {'slow-a': 12 * 1024, 'slow-b': 12 * 1024, 'slow-c': 12 * 1024, 'slow-clip': 16 * 1024}
 CLIP = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'live-wallpaper.mp4'), 'rb').read()
-GOOD_VIDEOS = [
-    # id, title, author, license, poster sky, ground, sun, 'free' box padding
-    ('night-river', 'Night river', 'Kai Lund', 'CC-BY-4.0', ((20, 30, 60), (40, 60, 90)), (20, 30, 40), (230, 230, 200), 0),
-    ('surf', 'Surf', None, None, ((90, 150, 200), (200, 220, 230)), (40, 90, 120), (250, 250, 240), 0),
-    ('drift', 'Drift', 'Lea Moor', 'CC0-1.0', ((180, 120, 160), (90, 60, 110)), (50, 40, 70), (250, 220, 230), 0),
-    ('slow-clip', 'Slow clip', 'Max Roe', 'CC0-1.0', ((100, 140, 100), (40, 70, 50)), (30, 50, 40), (230, 240, 200), 1536 * 1024),
+VIDEOS = [
+    # id, title, author, license, poster sky, ground, sun, 'free' box padding, duration
+    ('night-river', 'Night river', 'Kai Lund', 'CC-BY-4.0', ((20, 30, 60), (40, 60, 90)), (20, 30, 40), (230, 230, 200), 0, 3.0),
+    ('surf', 'Surf', None, None, ((90, 150, 200), (200, 220, 230)), (40, 90, 120), (250, 250, 240), 0, 3.0),
+    ('drift', 'Drift', 'Lea Moor', 'CC0-1.0', ((180, 120, 160), (90, 60, 110)), (50, 40, 70), (250, 220, 230), 0, 3.0),
+    ('long-take', 'Long take', 'Ned Oak', 'CC0-1.0', ((40, 40, 70), (90, 90, 120)), (30, 30, 50), (220, 220, 240), 0, 3 * 86400),
 ]
+NEW_VIDEO = ('new-wave', 'New wave', 'Ola Penn', 'CC0-1.0', ((60, 120, 170), (160, 200, 220)), (30, 70, 100), (250, 250, 240), 0, 3.0)
+SLOW_VIDEO = ('slow-clip', 'Slow clip', 'Max Roe', 'CC0-1.0', ((100, 140, 100), (40, 70, 50)), (30, 50, 40), (230, 240, 200), 2560 * 1024, 3.0)
 BAD_VIDEOS = [
     ('not-mp4', 'Not an MP4', ((200, 160, 120), (120, 90, 60))),
     ('avif-picture', 'An AVIF picture', ((160, 120, 200), (90, 60, 120))),
     ('video-wrong-hash', 'Video wrong hash', ((120, 160, 200), (60, 90, 120))),
     ('video-endless', 'Video endless', ((160, 200, 120), (90, 120, 60))),
 ]
+SLOW = set(SLOW_PIECE)
 ENDLESS = {'video-endless'}
+NO_LENGTH = {'long-file', 'video-endless'}
 # SOI, a baseline frame header (SOF0) of 320x180 with three components, EOI: Deer's checks pass (size,
 # SHA-256, FF D8 FF, a frame within 2048 px), but there is no picture to decode.
 ODD_THUMB = bytes([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0xb4, 0x01, 0x40, 0x03,
                    0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xff, 0xd9])
-SLOW_MANIFEST_S = 3
 
 
-def entry(wid, title, author, lic, full, th, color=None, w=None, h=None, **over):
+def photo_entry(wid, title, author, lic, full, th, color, w, h, **over):
+    """A photo as the collection's Action lists it."""
     e = {
-        'id': wid, 'title': title, 'author': author, 'license': lic, 'added': '2026-10-16',
-        'color': color or '#405060', 'width': w, 'height': h,
-        'file': 'full/%s.jpg' % wid, 'bytes': len(full), 'sha256': sha(full),
-        'thumb': 'thumbs/%s.jpg' % wid, 'thumbBytes': len(th), 'thumbSha256': sha(th),
+        'id': wid, 'title': title, 'added': '2026-10-21', 'color': color, 'width': w, 'height': h,
+        'file': 'wallpapers/%s.jpg' % wid, 'bytes': len(full), 'sha256': sha(full),
+        'thumb': 'wallpapers/thumbs/%s.jpg' % wid, 'thumbBytes': len(th), 'thumbSha256': sha(th),
+        'originSha256': sha(full + b'origin'),
     }
+    if author:
+        e.update({'author': author, 'license': lic, 'source': 'https://example.org/%s' % wid})
     e.update(over)
-    for k in ('author', 'license'):
-        if e[k] is None:
-            del e[k]
+    return e
+
+
+def video_entry(wid, title, author, lic, full, th, color, duration=3.0, **over):
+    """A live wallpaper as the Action lists it: live-wallpapers/<id>.mp4, the frame size and duration."""
+    e = {
+        'id': wid, 'title': title, 'added': '2026-10-21', 'color': color, 'width': 320, 'height': 180,
+        'duration': duration, 'file': 'live-wallpapers/%s.mp4' % wid, 'bytes': len(full), 'sha256': sha(full),
+        'thumb': 'live-wallpapers/thumbs/%s.jpg' % wid, 'thumbBytes': len(th), 'thumbSha256': sha(th),
+        'originSha256': sha(full + b'origin'),
+    }
+    if author:
+        e.update({'author': author, 'license': lic, 'source': 'https://example.org/%s' % wid})
+    e.update(over)
     return e
 
 
@@ -200,30 +227,123 @@ def avif_like(tag):
     return box(b'ftyp', b'avif' + struct.pack('>I', 0) + b'avifmif1miaf') + box(b'meta', bytes(4) + tag.encode() + bytes(4000))
 
 
-def video_entry(wid, title, author, lic, full, th, color, **over):
-    """A live wallpaper as add.py writes it: kind, full/<id>.mp4, the frame size and duration."""
-    e = entry(wid, title, author, lic, full, th, color, 320, 180)
-    e.update({'kind': 'video', 'file': 'full/%s.mp4' % wid, 'duration': 3.0})
-    e.update(over)
-    return e
+def make_photo(seed, spec, files, grain=10, quality=86):
+    wid, title, author, lic, (w, h), sky, ground, sun = spec
+    img = landscape(seed, w, h, sky, ground, sun, grain=grain)
+    full = jpeg(img, quality)
+    th = ODD_THUMB if wid == 'odd-thumb' else jpeg(thumb_of(img), 80)
+    files['wallpapers/%s.jpg' % wid] = full
+    files['wallpapers/thumbs/%s.jpg' % wid] = th
+    return photo_entry(wid, title, author, lic, full, th, mean(img), w, h), full
 
 
-def build_live(photos):
-    """/live/ and /live2/: photos and videos mixed, with bad video downloads and bad video entries."""
+def make_video(seed, spec, files):
+    wid, title, author, lic, sky, ground, sun, pad, duration = spec
+    full = with_free_box(CLIP, wid, pad)
+    poster = landscape(seed, 480, 270, sky, ground, sun)
+    th = jpeg(poster, 80)
+    files['live-wallpapers/%s.mp4' % wid] = full
+    files['live-wallpapers/thumbs/%s.jpg' % wid] = th
+    return video_entry(wid, title, author, lic, full, th, mean(poster), duration), full
+
+
+def index(photos, videos, retired=()):
+    return json.dumps({'version': 2, 'wallpapers': photos, 'live': videos, 'retired': list(retired)}, indent=2).encode()
+
+
+def build():
+    photos = []
+    for i, spec in enumerate(PHOTOS):
+        e, full = make_photo(i + 1, spec, FILES)
+        photos.append(e)
+        INFO[spec[0]] = {'bytes': len(full), 'sha256': sha(full), 'color': e['color']}
     videos = []
-    for k, (wid, title, author, lic, sky, ground, sun, pad) in enumerate(GOOD_VIDEOS):
-        full = with_free_box(CLIP, wid, pad)
-        poster = landscape(200 + k, 480, 270, sky, ground, sun)
-        th = jpeg(poster, 80)
-        color = '#%02x%02x%02x' % poster.resize((1, 1), Image.BILINEAR).getpixel((0, 0))
-        FILES['full/%s.mp4' % wid] = full
-        FILES['thumbs/%s.jpg' % wid] = th
-        videos.append(video_entry(wid, title, author, lic, full, th, color))
-        INFO[wid] = {'bytes': len(full), 'sha256': sha(full), 'color': color}
+    for k, spec in enumerate(VIDEOS):
+        e, full = make_video(200 + k, spec, FILES)
+        videos.append(e)
+        INFO[spec[0]] = {'bytes': len(full), 'sha256': sha(full), 'color': e['color']}
+    by_id = {e['id']: e for e in photos + videos}
+    good, river = photos[0], videos[0]
+    skipped_photos = [
+        dict(good, id='Bad_ID', file='wallpapers/Bad_ID.jpg', thumb='wallpapers/thumbs/Bad_ID.jpg'),
+        dict(good, id='evil', file='wallpapers/../../evil.jpg', thumb='wallpapers/thumbs/evil.jpg'),
+        dict(good, id='other', file='wallpapers/someone-else.jpg', thumb='wallpapers/thumbs/other.jpg'),
+        dict(good, id='abs', file='https://evil.example/wallpapers/abs.jpg', thumb='wallpapers/thumbs/abs.jpg'),
+        dict(good, id='v1-path', file='full/v1-path.jpg', thumb='thumbs/v1-path.jpg'),
+        dict(good, id='huge', file='wallpapers/huge.jpg', thumb='wallpapers/thumbs/huge.jpg', bytes=26 * 1024 * 1024),
+        dict(good, id='bigthumb', file='wallpapers/bigthumb.jpg', thumb='wallpapers/thumbs/bigthumb.jpg', thumbBytes=600 * 1024),
+        dict(good, id='badcolor', file='wallpapers/badcolor.jpg', thumb='wallpapers/thumbs/badcolor.jpg', color='red'),
+        dict(good, id='notitle', file='wallpapers/notitle.jpg', thumb='wallpapers/thumbs/notitle.jpg', title=''),
+        dict(good, id='bidi', file='wallpapers/bidi.jpg', thumb='wallpapers/thumbs/bidi.jpg', title='Evil‮gpj.exe'),
+        dict(good, id='hugewidth', file='wallpapers/hugewidth.jpg', thumb='wallpapers/thumbs/hugewidth.jpg', width=100000),
+        'a string, not an entry',
+        dict(by_id['hills'], title='Hills listed twice'),
+        dict(good, id='retired-one', file='wallpapers/retired-one.jpg', thumb='wallpapers/thumbs/retired-one.jpg'),
+        dict(good, id='thumbpath', file='wallpapers/thumbpath.jpg', thumb='wallpapers/thumbs/../thumbpath.jpg'),
+        {k: v for k, v in dict(good, id='halfcredit', file='wallpapers/halfcredit.jpg', thumb='wallpapers/thumbs/halfcredit.jpg').items() if k != 'license'},
+        dict(river, id='video-in-photos'),  # a video's file in the photos' list
+    ]
+    skipped_videos = [
+        dict(river, id='photo-in-live', file='wallpapers/photo-in-live.jpg', thumb='wallpapers/thumbs/photo-in-live.jpg'),
+        dict(river, id='as-jpg', file='live-wallpapers/as-jpg.jpg', thumb='live-wallpapers/thumbs/as-jpg.jpg'),
+        dict(river, id='no-length', file='live-wallpapers/no-length.mp4', thumb='live-wallpapers/thumbs/no-length.jpg', duration=0),
+        {k: v for k, v in dict(river, id='no-duration', file='live-wallpapers/no-duration.mp4', thumb='live-wallpapers/thumbs/no-duration.jpg').items() if k != 'duration'},
+        dict(river, id='text-duration', file='live-wallpapers/text-duration.mp4', thumb='live-wallpapers/thumbs/text-duration.jpg', duration='3'),
+        dict(river, id='wide-video', file='live-wallpapers/wide-video.mp4', thumb='live-wallpapers/thumbs/wide-video.jpg', width=4000),
+        dict(river, id='huge-video', file='live-wallpapers/huge-video.mp4', thumb='live-wallpapers/thumbs/huge-video.jpg', bytes=101 * 1024 * 1024),
+        dict(by_id['quiet-bay'], file='live-wallpapers/quiet-bay.mp4', thumb='live-wallpapers/thumbs/quiet-bay.jpg', duration=3.0),  # listed twice, across the lists
+    ]
+    good_photos = photos[:3] + skipped_photos[:8] + photos[3:] + skipped_photos[8:]
+    good_videos = videos[:2] + skipped_videos[:4] + videos[2:] + skipped_videos[4:]
+    INDEXES['good'] = index(good_photos, good_videos, ['retired-one'])
+
+    # good2: the owner changed the collection.
+    new_dawn, full = make_photo(50, NEW_PHOTO, FILES)
+    INFO['new-dawn'] = {'bytes': len(full), 'sha256': sha(full), 'color': new_dawn['color']}
+    own = {}
+    snow2, full = make_photo(51, ('snow-field', 'Snow field', 'Eva Lind', 'CC0-1.0', (1600, 900), ((180, 200, 230), (235, 240, 250)), (210, 220, 235), (255, 255, 240)), own)
+    for k, v in own.items():
+        SITE_FILES[('good2', k)] = v
+    INFO['snow-field@good2'] = {'bytes': len(full), 'sha256': sha(full), 'color': snow2['color']}
+    new_wave, full = make_video(250, NEW_VIDEO, FILES)
+    INFO['new-wave'] = {'bytes': len(full), 'sha256': sha(full), 'color': new_wave['color']}
+    photos2 = [new_dawn] + [snow2 if e['id'] == 'snow-field' else e for e in photos if e['id'] not in ('lake-at-dawn', 'hills')]
+    videos2 = [new_wave] + [e for e in videos if e['id'] != 'drift']
+    INDEXES['good2'] = index(photos2, videos2, ['retired-one', 'hills'])
+
+    # bad: downloads that do not check out.
+    bad_photos = []
+    for j, (wid, title, sky) in enumerate(BAD_PHOTOS):
+        img = landscape(100 + j, 1600, 900, sky, (60, 60, 60), (240, 240, 240))
+        full = jpeg(img)
+        th = jpeg(thumb_of(img), 80)
+        FILES['wallpapers/thumbs/%s.jpg' % wid] = th
+        kw = {}
+        listed = full
+        if wid == 'bad-thumb':
+            FILES['wallpapers/%s.jpg' % wid] = full
+            kw = {'thumbSha256': sha(b'another thumbnail')}
+        elif wid == 'wrong-hash':
+            FILES['wallpapers/%s.jpg' % wid] = full
+            kw = {'sha256': sha(full + b'x')}
+        elif wid == 'short-file':
+            listed = full + bytes(1000)       # listed 1000 bytes longer than what is served
+            FILES['wallpapers/%s.jpg' % wid] = full
+        elif wid == 'long-file':
+            FILES['wallpapers/%s.jpg' % wid] = full + bytes(5000)  # 5000 bytes more than listed
+        elif wid == 'not-jpeg':
+            listed = png(img.resize((400, 225)))
+            FILES['wallpapers/%s.jpg' % wid] = listed
+        elif wid == 'wrong-dims':
+            listed = jpeg(img.resize((1280, 720)))
+            FILES['wallpapers/%s.jpg' % wid] = listed
+        # gone-file: listed, never served
+        bad_photos.append(photo_entry(wid, title, 'Test Person', 'CC0-1.0', listed, th, '#506070', 1600, 900, **kw))
+    bad_videos = []
     for k, (wid, title, sky) in enumerate(BAD_VIDEOS):
         poster = landscape(300 + k, 480, 270, sky, (60, 60, 60), (240, 240, 240))
         th = jpeg(poster, 80)
-        FILES['thumbs/%s.jpg' % wid] = th
+        FILES['live-wallpapers/thumbs/%s.jpg' % wid] = th
         kw = {}
         if wid == 'not-mp4':
             listed = jpeg(poster, 90)  # a JPEG where an MP4 is listed, size and hash right
@@ -234,122 +354,29 @@ def build_live(photos):
             kw = {'sha256': sha(listed + b'x')}
         else:  # video-endless: the listed bytes, then more without end (do_GET)
             listed = with_free_box(CLIP, wid, 0)
-        FILES['full/%s.mp4' % wid] = listed
-        videos.append(video_entry(wid, title, 'Test Person', 'CC0-1.0', listed, th, '#304050', **kw))
-    river = videos[0]
-    # long-take: three days, 100 MiB declared (both allowed: there is no length limit); never downloaded.
-    FILES['thumbs/long-take.jpg'] = FILES['thumbs/night-river.jpg']
-    long_take = dict(river, id='long-take', title='Long take', file='full/long-take.mp4', thumb='thumbs/long-take.jpg', duration=3 * 86400, bytes=100 * 1024 * 1024)
-    bad = [
-        dict(river, id='gif-one', kind='gif', file='full/gif-one.gif', thumb='thumbs/gif-one.jpg'),
-        dict(river, id='gif-two', kind='gif', file='full/gif-two.mp4', thumb='thumbs/gif-two.jpg'),
-        dict(river, id='capital-kind', kind='Video', file='full/capital-kind.mp4', thumb='thumbs/capital-kind.jpg'),
-        dict(river, id='video-as-jpg', file='full/video-as-jpg.jpg', thumb='thumbs/video-as-jpg.jpg'),
-        dict(river, id='no-length', file='full/no-length.mp4', thumb='thumbs/no-length.jpg', duration=0),
-        {k: v for k, v in dict(river, id='no-duration', file='full/no-duration.mp4', thumb='thumbs/no-duration.jpg').items() if k != 'duration'},
-        dict(river, id='text-duration', file='full/text-duration.mp4', thumb='thumbs/text-duration.jpg', duration='3'),
-        dict(river, id='wide-video', file='full/wide-video.mp4', thumb='thumbs/wide-video.jpg', width=4000),
-        dict(river, id='huge-video', file='full/huge-video.mp4', thumb='thumbs/huge-video.jpg', bytes=101 * 1024 * 1024),
-    ]
-    by_id = {e['id']: e for e in photos}
-    lake, quiet = by_id['lake-at-dawn'], by_id['quiet-bay']
-    hills = dict(by_id['hills'], kind='photo')
-    v = {e['id']: e for e in videos}
-    listed = ([v['night-river'], lake, v['surf'], hills] + bad[:4] + [v['drift'], quiet, long_take] + bad[4:]
-              + [v['slow-clip'], v['not-mp4'], v['avif-picture'], v['video-wrong-hash'], v['video-endless']])
-    MANIFESTS['live'] = json.dumps({'version': 1, 'wallpapers': listed}, indent=2).encode()
-    MANIFESTS['live2'] = json.dumps({'version': 1, 'wallpapers': [e for e in listed if e['id'] != 'drift']}, indent=2).encode()
+        FILES['live-wallpapers/%s.mp4' % wid] = listed
+        bad_videos.append(video_entry(wid, title, 'Test Person', 'CC0-1.0', listed, th, '#304050', **kw))
+    INDEXES['bad'] = index(photos + bad_photos, videos + bad_videos, ['retired-one'])
 
+    # slow: three slow photos and a slow video after the good ones.
+    slow_photos = []
+    for i, spec in enumerate(SLOW_PHOTOS):
+        e, full = make_photo(60 + i, spec, FILES, grain=40, quality=92)
+        slow_photos.append(e)
+        INFO[spec[0]] = {'bytes': len(full), 'sha256': sha(full), 'color': e['color']}
+    slow_clip, full = make_video(260, SLOW_VIDEO, FILES)
+    INFO['slow-clip'] = {'bytes': len(full), 'sha256': sha(full), 'color': slow_clip['color']}
+    INDEXES['slow'] = index(photos + slow_photos, videos + [slow_clip], ['retired-one'])
 
-def build_kswap():
-    """/kswap1/ to /kswap3/: the id "shift" listed as a photo, then as a video, then as the photo again."""
-    img = landscape(400, 1600, 900, ((210, 170, 120), (110, 120, 160)), (60, 70, 80), (255, 230, 180))
-    photo, photo_th = jpeg(img), jpeg(thumb_of(img), 80)
-    photo_color = '#%02x%02x%02x' % img.resize((1, 1), Image.BILINEAR).getpixel((0, 0))
-    poster = landscape(401, 480, 270, ((30, 50, 90), (70, 90, 130)), (20, 40, 60), (230, 230, 240))
-    video, video_th = with_free_box(CLIP, 'shift', 0), jpeg(poster, 80)
-    video_color = '#%02x%02x%02x' % poster.resize((1, 1), Image.BILINEAR).getpixel((0, 0))
-    as_photo = entry('shift', 'Shift', 'Nia Shore', 'CC0-1.0', photo, photo_th, photo_color, 1600, 900)
-    as_video = video_entry('shift', 'Shift', 'Nia Shore', 'CC0-1.0', video, video_th, video_color)
-    for site in ('kswap1', 'kswap3'):
-        SITE_FILES[(site, 'full/shift.jpg')] = photo
-        SITE_FILES[(site, 'thumbs/shift.jpg')] = photo_th
-        MANIFESTS[site] = json.dumps({'version': 1, 'wallpapers': [as_photo]}, indent=2).encode()
-    SITE_FILES[('kswap2', 'full/shift.mp4')] = video
-    SITE_FILES[('kswap2', 'thumbs/shift.jpg')] = video_th
-    MANIFESTS['kswap2'] = json.dumps({'version': 1, 'wallpapers': [as_video]}, indent=2).encode()
-    INFO['shift'] = {'photo': {'bytes': len(photo), 'sha256': sha(photo)}, 'video': {'bytes': len(video), 'sha256': sha(video), 'color': video_color}}
+    # legacy: a photo Deer 0.1.5-0.1.8 downloaded, now in the new layout under the same id.
+    old, full = make_photo(70, ('old-pick', 'Old pick', 'Pia Lund', 'CC0-1.0', (1600, 900), ((220, 200, 160), (130, 140, 170)), (70, 80, 90), (255, 240, 200)), FILES)
+    INFO['old-pick'] = {'bytes': len(full), 'sha256': sha(full), 'color': old['color']}
+    INDEXES['legacy'] = index([old] + photos, videos, ['retired-one'])
 
-
-def build():
-    entries = []
-    for i, (wid, title, author, lic, (w, h), sky, ground, sun) in enumerate(GOOD):
-        img = landscape(i + 1, w, h, sky, ground, sun, grain=40 if wid in SLOW else 10)
-        full = jpeg(img, 92 if wid in SLOW else 86)
-        th = ODD_THUMB if wid == 'odd-thumb' else jpeg(thumb_of(img), 80)
-        mean = img.resize((1, 1), Image.BILINEAR).getpixel((0, 0))
-        color = '#%02x%02x%02x' % mean
-        FILES['full/%s.jpg' % wid] = full
-        if wid == 'bad-thumb':
-            FILES['thumbs/%s.jpg' % wid] = th
-            entries.append(entry(wid, title, author, lic, full, th, color, w, h, thumbSha256=sha(b'another thumbnail')))
-        else:
-            FILES['thumbs/%s.jpg' % wid] = th
-            entries.append(entry(wid, title, author, lic, full, th, color, w, h))
-        INFO[wid] = {'bytes': len(full), 'sha256': sha(full)}
-    for j, (wid, title, sky) in enumerate(BAD):
-        img = landscape(100 + j, 1600, 900, sky, (60, 60, 60), (240, 240, 240))
-        full = jpeg(img)
-        th = jpeg(thumb_of(img), 80)
-        FILES['thumbs/%s.jpg' % wid] = th
-        kw = {}
-        if wid == 'wrong-hash':
-            FILES['full/%s.jpg' % wid] = full
-            kw = {'sha256': sha(full + b'x')}
-            listed = full
-        elif wid == 'short-file':
-            listed = full + bytes(1000)       # listed 1000 bytes longer than what is served
-            FILES['full/%s.jpg' % wid] = full
-        elif wid == 'long-file':
-            listed = full
-            FILES['full/%s.jpg' % wid] = full + bytes(5000)  # 5000 bytes more than listed
-        elif wid == 'not-jpeg':
-            listed = png(img.resize((400, 225)))
-            FILES['full/%s.jpg' % wid] = listed
-        elif wid == 'wrong-dims':
-            listed = jpeg(img.resize((1280, 720)))
-            FILES['full/%s.jpg' % wid] = listed
-        else:  # gone-file: listed, never served
-            listed = full
-        entries.append(entry(wid, title, 'Test Person', 'CC0-1.0', listed, th, '#506070', 1600, 900, **kw))
-    good = entries[0]
-    hills = next(e for e in entries if e['id'] == 'hills')
-    bad = [
-        dict(good, id='Bad_ID', file='full/Bad_ID.jpg', thumb='thumbs/Bad_ID.jpg'),
-        dict(good, id='evil', file='full/../../evil.jpg', thumb='thumbs/evil.jpg'),
-        dict(good, id='other', file='full/someone-else.jpg', thumb='thumbs/other.jpg'),
-        dict(good, id='abs', file='https://evil.example/full/abs.jpg', thumb='thumbs/abs.jpg'),
-        dict(good, id='huge', file='full/huge.jpg', thumb='thumbs/huge.jpg', bytes=26 * 1024 * 1024),
-        dict(good, id='bigthumb', file='full/bigthumb.jpg', thumb='thumbs/bigthumb.jpg', thumbBytes=600 * 1024),
-        dict(good, id='badcolor', file='full/badcolor.jpg', thumb='thumbs/badcolor.jpg', color='red'),
-        dict(good, id='notitle', file='full/notitle.jpg', thumb='thumbs/notitle.jpg', title=''),
-        dict(good, id='bidi', file='full/bidi.jpg', thumb='thumbs/bidi.jpg', title='Evil‮gpj.exe'),
-        dict(good, id='hugewidth', file='full/hugewidth.jpg', thumb='thumbs/hugewidth.jpg', width=100000),
-        'a string, not an entry',
-        dict(hills, title='Hills listed twice'),
-        dict(good, id='retired-one', file='full/retired-one.jpg', thumb='thumbs/retired-one.jpg'),
-        dict(good, id='thumbpath', file='full/thumbpath.jpg', thumb='thumbs/../thumbpath.jpg'),
-        {k: v for k, v in dict(good, id='halfcredit', file='full/halfcredit.jpg', thumb='thumbs/halfcredit.jpg').items() if k != 'license'},
-    ]
-    main = {'version': 1, 'wallpapers': entries[:3] + bad[:7] + entries[3:] + bad[7:], 'retired': ['retired-one']}
-    MANIFESTS['main'] = json.dumps(main, indent=2).encode()
-    main2 = dict(main, wallpapers=[e for e in main['wallpapers'] if not (isinstance(e, dict) and e.get('id') == 'lake-at-dawn')])
-    MANIFESTS['main2'] = json.dumps(main2, indent=2).encode()
-    MANIFESTS['empty'] = b'{\n  "version": 1,\n  "wallpapers": []\n}\n'
-    MANIFESTS['slow'] = MANIFESTS['empty']
-    MANIFESTS['huge'] = json.dumps({'version': 1, 'wallpapers': entries[:1], 'padding': 'x' * (1200 * 1024)}).encode()
-    build_live(entries)
-    build_kswap()
+    INDEXES['empty'] = b'{\n  "version": 2,\n  "wallpapers": [],\n  "live": [],\n  "retired": []\n}\n'
+    INDEXES['huge'] = json.dumps({'version': 2, 'wallpapers': photos[:1], 'live': [], 'padding': 'x' * (1200 * 1024)}).encode()
+    v1 = {'version': 1, 'wallpapers': [dict(e, file='full/%s.jpg' % e['id'], thumb='thumbs/%s.jpg' % e['id']) for e in photos]}
+    INDEXES['v1'] = json.dumps(v1, indent=2).encode()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -396,53 +423,57 @@ class Handler(http.server.BaseHTTPRequestHandler):
         site, rest = parts[1], parts[2]
         if site not in SITES:
             return self.wfile.write(self.send(404, b'not here', 'text/plain'))
-        if rest == 'wallpapers.json':
+        if rest == 'index.json':
             if site == 'redirect':
-                return self.wfile.write(self.send(302, b'', 'text/plain', {'Location': '/main/wallpapers.json'}))
-            if site == 'slow':
-                time.sleep(SLOW_MANIFEST_S)
+                return self.wfile.write(self.send(302, b'', 'text/plain', {'Location': '/good/index.json'}))
             try:
-                self.wfile.write(self.send(200, MANIFESTS[site], 'application/json'))
+                self.wfile.write(self.send(200, INDEXES[site], 'application/json'))
             except OSError:
                 pass  # Deer stopped reading
             return
-        body = SITE_FILES.get((site, rest)) if site.startswith('kswap') else FILES.get(rest)
-        if body is None or site in ('empty', 'huge', 'redirect', 'slow'):
+        if rest == 'wallpapers.json' and site == 'v1':
+            return self.wfile.write(self.send(200, INDEXES['v1'], 'application/json'))
+        body = SITE_FILES.get((site, rest), FILES.get(rest))
+        if body is None or site in ('empty', 'huge', 'redirect', 'v1'):
             return self.wfile.write(self.send(404, b'not here', 'text/plain'))
-        if rest.startswith('thumbs/'):
+        with LOCK:
+            STATE['open'] += 1
+            STATE['max'] = max(STATE['max'], STATE['open'])
+        try:
+            self.serve_file(path, rest, body)
+        except OSError:
+            pass  # Deer stopped reading
+        finally:
             with LOCK:
-                STATE['thumbs_open'] += 1
-                STATE['thumbs_max'] = max(STATE['thumbs_max'], STATE['thumbs_open'])
-            try:
-                time.sleep(0.15)
-                self.wfile.write(self.send(200, body, 'image/jpeg'))
-            except OSError:
-                pass  # Deer stopped reading
-            finally:
-                with LOCK:
-                    STATE['thumbs_open'] -= 1
-            return
-        wid = rest[len('full/'):-len('.jpg')]
+                STATE['open'] -= 1
+
+    def serve_file(self, path, rest, body):
+        if '/thumbs/' in rest:
+            time.sleep(0.15)
+            return self.wfile.write(self.send(200, body, 'image/jpeg'))
+        wid = rest.rsplit('/', 1)[-1].rsplit('.', 1)[0]
         ctype = 'video/mp4' if rest.endswith('.mp4') else 'image/jpeg'
         # long-file and video-endless say nothing of their length (HTTP/1.0: the body ends when the
         # connection does), so Deer's limit is met while the bytes arrive, not from a header.
-        try:
-            self.send(200, body, ctype, length=wid not in ('long-file', 'video-endless'))
-            if wid in ENDLESS:
-                self.wfile.write(body)
-                for _ in range(64 * 16):  # never more than 64 MiB, should Deer not stop reading
-                    self.wfile.write(bytes(64 * 1024))
-                    self.wfile.flush()
-            elif wid in SLOW:
-                step = SLOW_PIECE[wid]
-                for i in range(0, len(body), step):
-                    self.wfile.write(body[i:i + step])
-                    self.wfile.flush()
-                    time.sleep(0.07)
-            else:
-                self.wfile.write(body)
-        except OSError:
-            pass  # Deer stopped reading
+        self.send(200, body, ctype, length=wid not in NO_LENGTH)
+        if wid in ENDLESS:
+            self.wfile.write(body)
+            for _ in range(64 * 16):  # never more than 64 MiB, should Deer not stop reading
+                self.wfile.write(bytes(64 * 1024))
+                self.wfile.flush()
+        elif wid in SLOW:
+            step = SLOW_PIECE[wid]
+            for i in range(0, len(body), step):
+                with LOCK:
+                    drop = STATE['drop']
+                if drop and path.startswith(drop):
+                    self.connection.shutdown(2)  # the network failing mid-way
+                    return
+                self.wfile.write(body[i:i + step])
+                self.wfile.flush()
+                time.sleep(0.07)
+        else:
+            self.wfile.write(body)
 
     def control(self, path, q):
         if path == '/__log':
@@ -452,20 +483,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/__reset':
             with LOCK:
                 LOG.clear()
-                STATE['thumbs_max'] = 0
+                STATE['max'] = 0
             return self.wfile.write(self.send(200, b'{}', 'application/json', cookie=False))
         if path == '/__stats':
             with LOCK:
-                body = json.dumps({'thumbsAtOnce': STATE['thumbs_max']}).encode()
+                body = json.dumps({'atOnce': STATE['max']}).encode()
             return self.wfile.write(self.send(200, body, 'application/json', cookie=False))
         if path == '/__info':
             return self.wfile.write(self.send(200, json.dumps(INFO).encode(), 'application/json', cookie=False))
+        if path == '/__legacy':
+            return self.wfile.write(self.send(200, FILES['wallpapers/old-pick.jpg'], 'image/jpeg', cookie=False))
+        if path == '/__file':
+            body = FILES.get((q.get('path') or [''])[0])
+            if body is None:
+                return self.wfile.write(self.send(404, b'', 'text/plain', cookie=False))
+            return self.wfile.write(self.send(200, body, 'application/octet-stream', cookie=False))
+        if path == '/__entry':
+            site, wid = (q.get('site') or [''])[0], (q.get('id') or [''])[0]
+            idx = json.loads(INDEXES.get(site, b'{}'))
+            found = [e for k in ('wallpapers', 'live') for e in idx.get(k, []) if isinstance(e, dict) and e.get('id') == wid]
+            if not found:
+                return self.wfile.write(self.send(404, b'', 'text/plain', cookie=False))
+            return self.wfile.write(self.send(200, json.dumps(found[0]).encode(), 'application/json', cookie=False))
         if path == '/__drop':
             with LOCK:
                 STATE['drop'] = (q.get('prefix') or [''])[0]
             return self.wfile.write(self.send(200, b'{}', 'application/json', cookie=False))
-        if path == '/__plant':
-            return self.wfile.write(self.send(200, b'{}', 'application/json', {'Set-Cookie': 'planted=1; Path=/; Max-Age=86400'}, cookie=False))
         return self.wfile.write(self.send(404, b'', 'text/plain', cookie=False))
 
 

@@ -5,21 +5,30 @@
 // open, and Gecko decodes an image at the size it is drawn), no thumbnail service.
 //
 // The Photo and Video tabs end with one more group, "Deer wallpapers" (VitreWallpapers: the collection
-// hosted on GitHub Pages; the Photo tab shows its photos, the Video tab its videos), under its own
-// caption and radio group, shown only when it has a tile. Its tiles look and behave as the others
-// (sizes, check, focus ring, arrows, Home / End); a tile's face is its thumbnail (a video's poster
-// frame; the mean colour until it is in), its name and tooltip give the title and the credit
-// ("Photo: <author> · <license>", "Video: …"). Choosing one that is not downloaded yet moves nothing:
-// the tile dims and shows a thin progress line while the file downloads, and the check moves once
-// Home has it; another choice meanwhile supersedes it. A download that fails or does not check out
-// leaves a short line on the tile ("Couldn’t download this wallpaper.", also said to screen readers)
-// and changes nothing. The picker asks for the collection only while its Photo or Video tab is shown
-// (VitreWallpapers.watch), and never as one of Find a setting's results (`offline`: it shows what
-// this session already has). A tile is an id and a kind (the collection may list an id as a photo,
-// later as a video): its download, failure and choice are of its own kind only. The Video tab's note
-// ("Add a video…") is for a tab with no video at all: it waits while the collection is being read or
-// asked for, so it never shows to be taken back as the Deer videos arrive.
-import type { WallpaperRef, WallpaperState, WallpaperTile } from '../../../modules/VitreWallpapers.sys';
+// hosted on GitHub; the Photo tab shows its photos, the Video tab its live wallpapers), under its own
+// caption with a small "Credits" link (the collection's CREDITS.md, in a new tab). Nothing is asked
+// of the network until the group's button is clicked (owner's plan of 2026-10-21): "Get wallpapers"
+// (Photo tab) or "Get live wallpapers" (Video tab) downloads every item of that kind not here yet;
+// meanwhile the button reads "Getting 12 of 49…" (its tooltip: "Click to stop") and a click on it
+// stops the Get, but not the second click of a double-click, nor one within half a second of the
+// start (a double-click must not start and stop it at once, with nothing said). Closing the picker
+// (Settings, the popover) stops it too, a second later (VitreWallpapers.watch: the picker watches both
+// kinds while it is open, so switching to the Video tab to get live wallpapers as well does not stop
+// the photos). Once everything is here it reads "Check for new wallpapers": a click
+// then fetches only what is new ("No new wallpapers." when nothing is). A Get that fails leaves one
+// plain line, "Couldn’t get wallpapers. Try again." (also said to screen readers), and what came in
+// stays. The group's tiles are the items downloaded; they look and behave as the others (sizes,
+// check, focus ring, arrows, Home / End), a face is the thumbnail (a video's poster frame) on the mean
+// colour, a name and tooltip give the title and the credit ("Photo: <author> · <license>", "Video:
+// …"), and choosing one applies it at once. Right-click on a tile, or Shift+F10 / the Menu key on a
+// focused one, offers "Remove" (the 'menus' service): the copy is deleted from this computer and
+// later Gets skip it; removing the current background sets Home back to its default, the picker
+// staying on its tab with focus on the next tile. A tile is an id and a kind: the Photo tab's are
+// photos, the Video tab's videos. The Video tab's note ("Add a video…") is for a tab with no video at
+// all; it waits until the folder has been read.
+import type { GetState, WallpaperTile } from '../../../modules/VitreWallpapers.sys';
+import type { WallpaperKind } from '../../../modules/wallpapers/manifest';
+import { DEFAULT_SETTINGS } from '../../../shared/settings';
 import { setTip } from '../../tips';
 import type { HomeBackground, Tile } from './background';
 import { h, uid } from './controls';
@@ -34,8 +43,29 @@ const TABS: { id: Tab; label: string; group: string }[] = [
   { id: 'none', label: 'None', group: 'No picture' },
 ];
 
-/** What a failed Deer wallpaper's tile says. */
-export const WALLPAPER_FAILED = 'Couldn’t download this wallpaper.';
+/** What the Deer group says, by kind: the button's three faces and the line under a Get. */
+export const WALLPAPER_WORDS: Record<WallpaperKind, { get: string; check: string; getting: string; stop: string; stopTip: string; none: string; failed: string; added: (n: number) => string }> = {
+  photo: {
+    get: 'Get wallpapers',
+    check: 'Check for new wallpapers',
+    getting: 'Getting wallpapers…',
+    stop: 'Click again to stop.',
+    stopTip: 'Click to stop',
+    none: 'No new wallpapers.',
+    failed: 'Couldn’t get wallpapers. Try again.',
+    added: (n) => `${n} new wallpaper${n === 1 ? '' : 's'}.`,
+  },
+  video: {
+    get: 'Get live wallpapers',
+    check: 'Check for new live wallpapers',
+    getting: 'Getting live wallpapers…',
+    stop: 'Click again to stop.',
+    stopTip: 'Click to stop',
+    none: 'No new live wallpapers.',
+    failed: 'Couldn’t get live wallpapers. Try again.',
+    added: (n) => `${n} new live wallpaper${n === 1 ? '' : 's'}.`,
+  },
+};
 
 export interface Picker {
   el: HTMLElement;
@@ -51,26 +81,25 @@ function tabFor(kind: string): Tab {
   return kind === 'video' ? 'video' : kind === 'none' ? 'none' : 'photo';
 }
 
-/** "Photo: <author> · <license>" ("Video: …" for a video), or '' when the credit is not known. */
+/** "Photo: <author> · <license>" ("Video: …" for a video), or '' when there is no credit. */
 function creditOf(w: WallpaperTile): string {
   return w.author ? `${w.kind === 'video' ? 'Video' : 'Photo'}: ${w.author}${w.license ? ` · ${w.license}` : ''}` : '';
 }
 
 /** The Deer wallpapers a tab shows: the Photo tab's photos, the Video tab's videos. */
-function deerKindOf(tab: Tab): WallpaperTile['kind'] | null {
+function deerKindOf(tab: Tab): WallpaperKind | null {
   return tab === 'photo' ? 'photo' : tab === 'video' ? 'video' : null;
 }
 
 /** A Deer wallpaper as a tile of the picker: a photo is an 'image' background, a video a 'video' one. */
 const deerTile = (w: WallpaperTile): Tile => ({ kind: w.kind === 'video' ? 'video' : 'image', path: w.path, label: w.title, deer: w });
 
-/** The download or failure `r` is this tile's: the same id and the same kind. */
-const isOf = (r: WallpaperRef, w: WallpaperTile): boolean => r.id === w.id && r.kind === w.kind;
-
 /** Beyond a tile's face, its focus ring (styles.ts: a 2 px outline 4 px out). */
 const RING = 6;
+/** A click on the Get button this soon after it started a Get does not stop it (a double-click's second half). */
+const STOP_GRACE_MS = 500;
 
-export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover', opts: { offline?: boolean } = {}): Picker {
+export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover'): Picker {
   const columns = variant === 'panel' ? 3 : 2;
   const panelId = uid('hb-panel');
   const wp = bg.deerWallpapers();
@@ -79,19 +108,26 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   /** What `tiles` show, in order. */
   let shown: Tile[] = [];
   let deerTiles: HTMLElement[] = [];
+  /** What `deerTiles` show, in order. */
+  let deerShown: WallpaperTile[] = [];
   let build = 0;
   let shownKey = '';
   let deerKey = '';
-  /** This picker watches the collection and it may still change by itself (WallpaperState.pending). */
-  let deerPending = false;
-  let unwatch: (() => void) | null = null;
+  /** The folder of Deer wallpapers has been read (the Video tab's note waits for it). */
+  let deerReady = !wp;
+  // Both kinds are watched while the picker is open, whichever tab shows: closing it is leaving.
+  const unwatch: (() => void)[] = wp ? (['photo', 'video'] as const).map((k) => wp.watch(k)) : [];
+  /** When this picker's button last started a Get (performance.now()). */
+  let startedAt = -Infinity;
   /**
    * A tile chosen here that HomeBackground has not answered yet (it looks for the file first): it is
-   * the one checked meanwhile, whatever repaints come (a download superseded, a thumbnail arriving).
+   * the one checked meanwhile, whatever repaints come (a Get's progress, a tile arriving).
    */
   let picking: { kind: string; path: string } | null = null;
   /** The background the tab last followed ("kind|path"): only a new one moves the tab. */
   let followed = `${bg.current().kind}|${bg.current().path}`;
+  /** A Deer tile removed while it had focus: the tile to focus once the group is drawn again ('' = the button). */
+  let refocus: string | null = null;
 
   const tabButtons = TABS.map((t) =>
     h('button', { type: 'button', role: 'tab', id: uid('hb-tab'), class: 'vs-seg-btn', 'aria-controls': panelId, 'data-tab': t.id, 'data-label': t.label, text: t.label }),
@@ -99,12 +135,23 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   const tabList = h('div', { class: 'vs-seg hb-tabs', role: 'tablist', 'aria-label': 'Background' }, ...tabButtons);
   const grid = h('div', { class: `hb-grid cols-${columns}`, role: 'radiogroup' });
   const deerTitle = h('p', { class: 'hb-group', id: uid('hb-group'), text: 'Deer wallpapers' });
-  const deerGrid = h('div', { class: `hb-grid cols-${columns}`, role: 'radiogroup', 'aria-labelledby': deerTitle.id });
-  const deerBox = h('div', { class: 'hb-deer', hidden: true }, deerTitle, deerGrid);
+  const credits = h('button', { type: 'button', class: 'vs-link hb-credits', text: 'Credits', 'aria-label': 'Credits, opens in a new tab' });
+  setTip(credits, 'Who made these wallpapers', 'Opens in a new tab');
+  const getBtn = h('button', { type: 'button', class: 'vs-btn hb-get' });
+  // A Get's outcome: the failure, or nothing new (screen readers hear it).
+  const getNote = h('p', { class: 'hb-get-note', role: 'status', hidden: true });
+  const deerGrid = h('div', { class: `hb-grid cols-${columns}`, role: 'radiogroup', 'aria-labelledby': deerTitle.id, hidden: true });
+  const deerBox = h(
+    'div',
+    { class: 'hb-deer', hidden: true },
+    h('div', { class: 'hb-deer-head' }, deerTitle, credits),
+    h('div', { class: 'hb-get-row' }, getBtn, getNote),
+    deerGrid,
+  );
   const note = h('p', { class: 'hb-note', role: 'status' });
-  // A failed download, for screen readers (the tile shows it).
+  // What a Get brought, for screen readers (the tiles show it).
   const live = h('p', { class: 'hb-live', role: 'status' });
-  const panel = h('div', { class: 'hb-panel', role: 'tabpanel', id: panelId }, grid, deerBox, note, live);
+  const panel = h('div', { class: 'hb-panel', role: 'tabpanel', id: panelId }, grid, note, deerBox, live);
   const el = h('div', { class: `hb-picker hb-${variant}` }, ...(variant === 'popover' ? [tabList] : []), panel);
 
   const isCurrent = (t: Tile): boolean => {
@@ -128,9 +175,9 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     paintGroup(deerTiles);
   };
   /**
-   * Each tile's check as the background is now, for the repaints Deer wallpapers bring (every
-   * thumbnail, ten a second while a picture downloads): a group is painted again only when one of its
-   * checks moved, so its tab stop stays where the arrows put it.
+   * Each tile's check as the background is now, for the repaints Deer wallpapers bring (each item a
+   * Get brings): a group is painted again only when one of its checks moved, so its tab stop stays
+   * where the arrows put it.
    */
   const syncGroup = (group: HTMLElement[], list: Tile[]): void => {
     let moved = false;
@@ -161,23 +208,10 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     return media;
   };
 
-  const fillFace = (face: HTMLElement, t: Tile): void => {
-    const url = fileURL(t.path);
-    if (url) face.append(faceMedia(url, t.kind === 'video'));
-  };
-
   const tileEl = (t: Tile): HTMLElement => {
     const face = h('span', { class: `hb-face${t.kind === 'none' ? ' hb-plain' : ''}` });
     const w = t.deer;
     const credit = w ? creditOf(w) : '';
-    if (w) {
-      // Drawn by paintDeer: the veil and progress line while it downloads, the line when it failed.
-      face.append(
-        h('span', { class: 'hb-veil', 'aria-hidden': 'true' }),
-        h('span', { class: 'hb-progress', 'aria-hidden': 'true' }, h('span', { class: 'hb-bar' })),
-        h('span', { class: 'hb-fail', 'aria-hidden': 'true', hidden: true, text: WALLPAPER_FAILED }),
-      );
-    }
     const btn = h(
       'button',
       { type: 'button', role: 'radio', class: 'hb-tile', 'aria-label': credit ? `${t.label}, ${credit}` : t.label, 'data-kind': t.kind, 'data-path': t.path, 'data-id': w?.id },
@@ -185,20 +219,29 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
       h('span', { class: 'hb-badge', 'aria-hidden': 'true' }, icon(ico.check)),
       variant === 'panel' ? h('span', { class: 'hb-cap', text: t.label, 'aria-hidden': 'true' }) : null,
     );
-    if (w) setTip(btn, t.label, credit || undefined);
+    if (w) {
+      setTip(btn, t.label, credit || undefined);
+      // The face: the thumbnail (a video's poster), or the file itself for one of Deer 0.1.5-0.1.8's,
+      // on the mean colour.
+      face.style.backgroundColor = w.color;
+      const src = fileURL(w.thumb || w.path);
+      if (src) face.append(faceMedia(src, !w.thumb && w.kind === 'video'));
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        // The keyboard's (Shift+F10, the Menu key: WM_CONTEXTMENU) comes with button 0.
+        tileMenu(btn, w, e.button === 0 ? null : { x: e.clientX, y: e.clientY });
+      });
+    }
     btn.dataset.current = String(isCurrent(t));
     btn.addEventListener('click', () => choose(btn, t));
-    if (!w && t.kind !== 'none' && t.path) fillFace(face, t);
+    if (!w && t.kind !== 'none' && t.path) {
+      const url = fileURL(t.path);
+      if (url) face.append(faceMedia(url, t.kind === 'video'));
+    }
     return btn;
   };
 
   const choose = (btn: HTMLElement, t: Tile): void => {
-    if (t.deer) {
-      // The check stays where it is until the picture is here and Home has it.
-      btn.focus();
-      void bg.chooseTile(t);
-      return;
-    }
     picking = { kind: t.kind, path: t.path };
     for (const x of [...tiles, ...deerTiles]) x.dataset.current = String(x === btn);
     paintChecks();
@@ -208,99 +251,110 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
 
   const paintNote = (): void => {
     const error = bg.error ?? bg.homeError();
-    // No video of yours and no Deer video listed, nor any on the way (the collection being read or
-    // asked for in this tab: the note would show, be read out, and go again as the group comes).
-    const empty = tab === 'video' && !tiles.length && deerBox.hidden && !deerPending;
-    note.textContent = error ?? (empty ? 'Add a video to play it behind Home. It plays muted and loops.' : tab === 'none' ? 'Home shows a plain dark background.' : '');
+    // No video of yours and no Deer video here (once the folder is read: the note would show, be
+    // read out, and go again as the tiles come).
+    const empty = tab === 'video' && !tiles.length && !deerTiles.length && deerReady;
+    const text = error ?? (empty ? 'Add a video to play it behind Home. It plays muted and loops.' : tab === 'none' ? 'Home shows a plain dark background.' : '');
+    // Only a change is written: the line is a status, read out each time it is set.
+    if (note.textContent !== text) note.textContent = text;
     note.classList.toggle('error', !!error);
-    note.hidden = !note.textContent;
+    note.hidden = !text;
   };
 
   // ---- Deer wallpapers ----
 
-  /** The collection is asked for only while the Photo or the Video tab is shown. */
-  const follow = (): void => {
-    const want = !!deerKindOf(tab) && !!wp && !opts.offline;
-    if (want && !unwatch) unwatch = wp!.watch();
-    else if (!want && unwatch) {
-      unwatch();
-      unwatch = null;
-    }
-  };
-
-  /** A Deer tile as the state says: face, download, failure (touching only what changed). */
-  const paintDeer = (btn: HTMLElement, w: WallpaperTile, st: WallpaperState): void => {
-    const face = btn.querySelector('.hb-face') as HTMLElement;
-    // The thumbnail; a file no longer listed shows itself (a video as the recent videos do: a frame);
-    // the mean colour until then. A source is tried once per face: one that does not decode (it passed
-    // every check and still holds no picture) leaves the colour, and is not tried again on each repaint.
-    const own = !w.thumb && !w.listed && w.local;
-    const src = w.thumb ? fileURL(w.thumb) : own ? fileURL(w.path) : '';
-    if (face.dataset.src !== src) {
-      face.dataset.src = src;
-      face.querySelector(':scope > :is(img, video)')?.remove();
-      if (src) face.prepend(faceMedia(src, own && w.kind === 'video'));
-    }
-    if (face.dataset.color !== w.color) {
-      face.dataset.color = w.color;
-      face.style.backgroundColor = w.color;
-    }
-    // The download and the failure are this tile's only when the kind matches too (the same id may be
-    // listed as the other kind, in the other tab).
-    const d = st.downloading && isOf(st.downloading, w) ? st.downloading : null;
-    if (d) {
-      const p = d.total ? Math.min(1, d.received / d.total) : 0;
-      btn.setAttribute('aria-busy', 'true');
-      btn.dataset.progress = p.toFixed(3);
-      (face.querySelector('.hb-bar') as HTMLElement).style.width = `${(p * 100).toFixed(1)}%`;
-    } else if (btn.hasAttribute('aria-busy')) {
-      btn.removeAttribute('aria-busy');
-      delete btn.dataset.progress;
-      (face.querySelector('.hb-bar') as HTMLElement).style.width = '0';
-    }
-    const failed = !!st.failed && isOf(st.failed, w);
-    const line = face.querySelector('.hb-fail') as HTMLElement;
-    if (line.hidden === failed) line.hidden = !failed;
-    btn.dataset.failed = String(failed);
+  /** The button and the line, as the tab's kind's Get is. */
+  const paintGet = (kind: WallpaperKind, g: GetState): void => {
+    const words = WALLPAPER_WORDS[kind];
+    const text = g.running ? (g.of ? `Getting ${g.at} of ${g.of}…` : words.getting) : g.complete ? words.check : words.get;
+    if (getBtn.textContent !== text) getBtn.textContent = text;
+    const name = g.running ? `${text} ${words.stop}` : null;
+    if (name) getBtn.setAttribute('aria-label', name);
+    else getBtn.removeAttribute('aria-label');
+    // The stop, for sighted people too: the tooltip while it runs.
+    setTip(getBtn, g.running ? words.stopTip : null);
+    getBtn.dataset.state = g.running ? 'running' : g.complete ? 'complete' : 'idle';
+    const line = g.outcome === 'failed' ? words.failed : g.outcome === 'nothing-new' ? words.none : '';
+    if (getNote.textContent !== line) getNote.textContent = line;
+    getNote.classList.toggle('error', g.outcome === 'failed');
+    getNote.hidden = !line;
+    const said = g.outcome === 'added' ? words.added(g.added) : '';
+    if (live.textContent !== said) live.textContent = said;
   };
 
   const renderDeer = (): void => {
     const kind = deerKindOf(tab);
     const st = kind && wp ? wp.state() : null;
     const list = st?.tiles.filter((w) => w.kind === kind) ?? [];
-    const key = list.map((w) => `${w.id}|${w.kind}|${w.listed}|${w.title}|${w.author}|${w.license}`).join('\n');
+    const key = `${kind}\n${list.map((w) => `${w.id}|${w.path}|${w.thumb}|${w.color}|${w.title}|${w.author}|${w.license}`).join('\n')}`;
     if (key !== deerKey) {
       const was = (document.activeElement as HTMLElement | null)?.dataset?.id;
       const hadFocus = deerGrid.contains(document.activeElement);
       deerKey = key;
+      deerShown = list;
       deerTiles = list.map((w) => tileEl(deerTile(w)));
       deerGrid.replaceChildren(...deerTiles);
+      deerGrid.hidden = !deerTiles.length;
       paintGroup(deerTiles);
-      if (hadFocus) {
+      if (refocus !== null) {
+        // A tile removed with focus on it: the next one (or the one before, or the button).
+        const target = (refocus && deerTiles.find((t) => t.dataset.id === refocus)) || deerTiles[0] || getBtn;
+        refocus = null;
+        target.focus();
+        if (target !== getBtn) paintGroup(deerTiles, true);
+      } else if (hadFocus) {
         (deerTiles.find((t) => t.dataset.id === was) ?? deerTiles.find((t) => t.tabIndex === 0))?.focus();
         paintGroup(deerTiles, true); // the tab stop where focus came back
       }
     }
-    // Only a picker that asks for the collection waits for it (Find a setting's shows what is here).
-    const pending = !!unwatch && !!st?.pending;
-    if (deerBox.hidden !== !list.length || deerPending !== pending) {
-      deerBox.hidden = !list.length;
-      deerPending = pending;
+    const boxHidden = !st;
+    const ready = !wp || !!st?.ready || deerReady;
+    if (deerBox.hidden !== boxHidden || deerReady !== ready || el.dataset.deer !== String(list.length)) {
+      deerBox.hidden = boxHidden;
+      deerReady = ready;
       paintNote(); // the Video tab's note is for a tab with no video at all
     }
-    list.forEach((w, i) => paintDeer(deerTiles[i], w, st!));
-    syncGroup(deerTiles, list.map(deerTile));
+    if (kind && st) paintGet(kind, st.get[kind]);
+    syncGroup(deerTiles, deerShown.map(deerTile));
     // A Deer wallpaper just applied (or one taken off): the other group's check moves at the same
     // moment (its own render waits for its tiles).
     syncGroup(tiles, shown);
-    const said = st?.failed && list.some((w) => isOf(st.failed!, w)) ? WALLPAPER_FAILED : '';
-    if (live.textContent !== said) live.textContent = said;
     el.dataset.deer = String(list.length);
+  };
+
+  /** The tile's menu: Remove (the 'menus' service; a build without it offers none). */
+  const tileMenu = (btn: HTMLElement, w: WallpaperTile, point: { x: number; y: number } | null): void => {
+    const menus = bg.menus();
+    if (!menus || !wp) return;
+    const keyboard = !point;
+    const focused = keyboard || document.activeElement === btn;
+    menus.show([{ label: 'Remove', access: 'r', run: () => removeTile(btn, w, focused) }], point ?? btn, {
+      label: w.title,
+      keyboard,
+      owner: btn,
+      onClose: () => {
+        if (keyboard && btn.isConnected && document.activeElement !== btn) btn.focus();
+      },
+    });
+  };
+
+  /** "Remove": the copy goes from this computer; the current background's removal leaves the tab where it is. */
+  const removeTile = (btn: HTMLElement, w: WallpaperTile, moveFocus: boolean): void => {
+    if (!wp) return;
+    const i = deerTiles.indexOf(btn);
+    if (moveFocus && i >= 0) refocus = deerTiles[i + 1]?.dataset.id ?? deerTiles[i - 1]?.dataset.id ?? '';
+    if (btn.getAttribute('aria-checked') === 'true') {
+      // Home goes back to its default background: the tab stays (only a background chosen elsewhere moves it).
+      const d = DEFAULT_SETTINGS.homeBackground;
+      followed = `${d.kind}|${d.path}`;
+    }
+    void wp.remove(w.id, w.kind).then((done) => {
+      if (!done) refocus = null;
+    });
   };
 
   const render = async (): Promise<void> => {
     const mine = ++build;
-    follow();
     for (const b of tabButtons) {
       const on = b.dataset.tab === tab;
       b.setAttribute('aria-selected', String(on));
@@ -369,6 +423,28 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
   };
   gridKeys(grid, () => tiles);
   gridKeys(deerGrid, () => deerTiles);
+  // Shift+F10 and the Menu key on a focused Deer tile: its menu (also when no contextmenu follows the key).
+  deerGrid.addEventListener('keydown', (e) => {
+    if (!((e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.altKey) || (e.key === 'ContextMenu' && !e.shiftKey && !e.ctrlKey && !e.altKey))) return;
+    const i = deerTiles.indexOf(document.activeElement as HTMLElement);
+    if (i < 0 || !deerShown[i]) return;
+    e.preventDefault();
+    tileMenu(deerTiles[i], deerShown[i], null);
+  });
+
+  getBtn.addEventListener('click', (e) => {
+    const kind = deerKindOf(tab);
+    if (!kind || !wp) return;
+    // The second click of a double-click (detail 2 and up; a key's click is 0) is not a second click.
+    if (e.detail > 1) return;
+    if (wp.state().get[kind].running) {
+      if (performance.now() - startedAt >= STOP_GRACE_MS) wp.stop(kind);
+    } else {
+      startedAt = performance.now();
+      void wp.get(kind);
+    }
+  });
+  credits.addEventListener('click', () => bg.openCredits());
 
   /**
    * A tile wholly inside the popover's scroll area, its focus ring too: Gecko's focus() scrolls only a
@@ -396,7 +472,7 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     }
     void render();
   });
-  // The collection, thumbnails arriving, a download's progress.
+  // The folder read, a Get's progress and outcome, a tile coming or going.
   const offDeer = wp?.onChange(renderDeer) ?? ((): void => undefined);
 
   const first = render();
@@ -407,7 +483,7 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
       void first.then(async () => {
         const checked = (): HTMLElement | undefined => [...tiles, ...deerTiles].find((t) => t.getAttribute('aria-checked') === 'true');
         const was = document.activeElement;
-        // A Deer wallpaper's tile comes once the collection is read, a moment after the first render.
+        // A Deer wallpaper's tile comes once the folder is read, a moment after the first render.
         if (!checked() && wp?.isDeerPath(bg.current().path)) {
           await new Promise<void>((resolve) => {
             const done = (): void => {
@@ -429,8 +505,7 @@ export function backgroundPicker(bg: HomeBackground, variant: 'panel' | 'popover
     dispose: () => {
       off();
       offDeer();
-      unwatch?.();
-      unwatch = null;
+      for (const done of unwatch.splice(0)) done();
     },
   };
 }

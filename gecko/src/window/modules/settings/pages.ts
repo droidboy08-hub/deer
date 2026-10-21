@@ -273,9 +273,9 @@ const home: SectionDef = {
           // wallpapers", "animated": its videos. Not "download": that search is for the Downloads settings.
           keywords: 'wallpaper picture photo video image home none deer wallpapers gallery collection live animated',
           build: (ctx) => {
-            // In Find a setting's results the picker shows what is here but never asks the site: a
-            // letter typed is not a visit to Home and background.
-            const picker = backgroundPicker(ctx.bg, 'panel', { offline: !!ctx.inSearch });
+            // Deer wallpapers ask the site for nothing until their Get button is clicked, here and in
+            // Find a setting's results alike.
+            const picker = backgroundPicker(ctx.bg, 'panel');
             ctx.cleanup(picker.dispose);
             const head = row({ icon: ico.picture, title: 'Background', desc: 'What Home shows behind the tab bar', control: () => picker.tabs });
             return h('div', { class: 'vs-rows' }, head, h('div', { class: 'vs-block' }, picker.el));

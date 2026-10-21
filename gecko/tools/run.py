@@ -93,8 +93,8 @@ PREFS = {
     # (src/modules/downloads/reputation.ts).
     'browser.safebrowsing.downloads.remote.enabled': False,
     # Deer wallpapers (src/modules/VitreWallpapers.sys.ts) would read the collection from GitHub Pages
-    # whenever a test shows the background picker's Photo tab: a port nothing serves instead (Necko
-    # refuses port 9 outright), so the group stays away. tests/settings/wallpapers.js sets its own.
+    # when a test clicks the background picker's "Get wallpapers": a port nothing serves instead (Necko
+    # refuses port 9 outright), so a Get fails at once. tests/settings/wallpapers.js sets its own.
     'vitre.wallpapers.base': 'http://127.0.0.1:9/',
 }
 

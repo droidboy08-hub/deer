@@ -328,20 +328,21 @@ ${R} .hb-face.hb-plain, ${R} .hb-popover .hb-face.hb-plain { background: #2b2a2e
 ${R} .hb-tile[aria-checked="true"] .hb-face { box-shadow: 0 0 0 2px var(--vs-accent), 0 0 0 5px var(--vs-accent-soft); }
 ${R} .hb-cap { font-size: 12px; line-height: 16px; color: var(--vs-text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 ${R} .hb-tile[aria-checked="true"] .hb-cap { color: var(--vs-text); }
-${R} .hb-note { margin: 10px 2px 0; font-size: 12.5px; line-height: 18px; color: var(--vs-intro); }
+${R} .hb-note { margin: 12px 2px 0; font-size: 12.5px; line-height: 18px; color: var(--vs-intro); }
 ${R} .hb-note.error { color: var(--vs-error); }
-${R} .hb-panel .hb-grid:not([hidden]) + .hb-deer[hidden] + .hb-note, ${R} .hb-panel .hb-deer:not([hidden]) + .hb-note { margin-top: 12px; }
-/* Deer wallpapers: the group's caption; on a tile, a download (dimmed, a thin line filling at the
- * foot of the face) and a failure (one plain line over a shade at the foot). No chips, no icons. */
-${R} .hb-group { margin: 20px 2px 10px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--vs-text2); }
-${R} .hb-grid[hidden] + .hb-deer .hb-group { margin-top: 0; }
-${R} .hb-veil { position: absolute; inset: 0; display: none; background: rgba(0,0,0,0.32); pointer-events: none; }
-${R} .hb-tile[aria-busy="true"] .hb-veil { display: block; }
-${R} .hb-progress { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 3px; border-radius: 2px; display: none; overflow: hidden; background: rgba(255,255,255,0.3); pointer-events: none; }
-${R} .hb-tile[aria-busy="true"] .hb-progress { display: block; }
-${R} .hb-bar { display: block; width: 0; height: 100%; border-radius: inherit; background: #ffffff; transition: width 160ms linear; }
-${R} .hb-fail { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 10px 8px; background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0)); color: #ffffff; font-size: 12px; line-height: 16px; pointer-events: none; }
-${R} .hb-fail[hidden] { display: none; }
+${R} .hb-grid[hidden] + .hb-note { margin-top: 0; }
+/* Deer wallpapers: the group's caption with its Credits link, its Get button and the line a Get
+ * leaves, then its tiles. No chips, no icons. */
+${R} .hb-deer-head { margin: 20px 2px 8px; min-height: 24px; display: flex; align-items: center; gap: 12px; }
+${R} .hb-grid[hidden] + .hb-note[hidden] + .hb-deer .hb-deer-head { margin-top: 0; }
+${R} .hb-group { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--vs-text2); }
+${R} .hb-credits { margin-right: -6px; padding: 2px 6px; font-size: 12px; line-height: 18px; }
+${R} .hb-get-row { margin: 0 0 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+${R} .hb-get-row:has(+ .hb-grid[hidden]) { margin-bottom: 0; }
+${R} .hb-get { font-variant-numeric: tabular-nums; }
+${R} .hb-get-note { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--vs-intro); }
+${R} .hb-get-note.error { color: var(--vs-error); }
+${R} .hb-get-note[hidden] { display: none; }
 ${R} .hb-live { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Home: the background circle and popover (board Home / HomeBackground) */
@@ -384,9 +385,19 @@ ${R} .hb-popover .hb-face { aspect-ratio: auto; height: 94px; background: rgba(2
 ${R} .hb-popover .hb-face::after { display: none; }
 ${R} .hb-popover .hb-tile[aria-checked="true"] .hb-face { box-shadow: 0 0 0 2px #ffffff; }
 ${R} .hb-popover .hb-badge { right: 6px; top: 6px; background: #ffffff; color: #16181d; }
-${R} .hb-popover .hb-note { margin: 4px 2px 0; }
-${R} .hb-popover .hb-group { margin: 14px 2px 8px; color: rgba(255,255,255,0.72); }
-${R} .hb-popover .hb-grid[hidden] + .hb-deer .hb-group { margin-top: 0; }
+${R} .hb-popover .hb-note { margin: 8px 2px 0; }
+${R} .hb-popover .hb-grid[hidden] + .hb-note { margin-top: 0; }
+${R} .hb-popover .hb-deer-head { margin: 14px 2px 6px; }
+${R} .hb-popover .hb-grid[hidden] + .hb-note[hidden] + .hb-deer .hb-deer-head { margin-top: 0; }
+${R} .hb-popover .hb-group { color: rgba(255,255,255,0.72); }
+${R} .hb-popover .hb-credits { color: rgba(255,255,255,0.72); }
+${R} .hb-popover .hb-credits:hover { background: rgba(255,255,255,0.1); color: #fff; }
+${R} .hb-popover .hb-get-row { margin-bottom: 8px; }
+${R} .hb-popover .hb-get { height: 30px; padding: 0 12px; border-radius: 8px; background: rgba(255,255,255,0.1); box-shadow: none; color: #fff; }
+${R} .hb-popover .hb-get:hover { background: rgba(255,255,255,0.14); }
+${R} .hb-popover .hb-get:active { background: rgba(255,255,255,0.08); }
+${R} .hb-popover .hb-get-note { color: rgba(255,255,255,0.72); }
+${R} .hb-popover .hb-get-note.error { color: var(--vs-error); }
 ${R} .hb-add { margin-top: 8px; height: 36px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; }
 ${R} .hb-add:hover { background: rgba(255,255,255,0.14); }
 ${R} .hb-add:active { background: rgba(255,255,255,0.08); }
@@ -395,7 +406,7 @@ ${R} .hb-add:active { background: rgba(255,255,255,0.08); }
   ${R} :is(.vs-sheet, .hb-pop) { scale: none !important; transition: box-shadow 150ms ease !important; }
   ${R} :is(.vs-tint, .vs-rim, .vs-body, .hb-pop-tint, .hb-pop-rim, .hb-pop-body, .vs-scrim, .hb-circle) { transition: opacity 150ms ease !important; transform: none !important; }
   ${R} .vs-pop { animation: none; }
-  ${R} :is(.vs-knob, .vs-switch, .vs-style-preview, .hb-face, .hb-bar) { transition: none !important; }
+  ${R} :is(.vs-knob, .vs-switch, .vs-style-preview, .hb-face) { transition: none !important; }
 }
 @media (forced-colors: active) {
   ${R} :is(.vs-tint, .hb-pop-tint) { background: Canvas; }
@@ -408,9 +419,5 @@ ${R} .hb-add:active { background: rgba(255,255,255,0.08); }
   ${R} :is(.vs-navitem[aria-current="page"], .vs-opt[aria-selected="true"])::before { forced-color-adjust: none; background: Highlight; }
   ${R} .vs-seg-btn:is([aria-checked="true"], [aria-selected="true"]) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   ${R} :is(.vs-style, .hb-tile)[aria-checked="true"] :is(.vs-style-preview, .hb-face) { outline: 3px solid Highlight; outline-offset: 2px; }
-  ${R} :is(.hb-progress, .hb-bar, .hb-fail) { forced-color-adjust: none; }
-  ${R} .hb-progress { background: Canvas; outline: 1px solid CanvasText; }
-  ${R} .hb-bar { background: Highlight; }
-  ${R} .hb-fail { background: Canvas; color: CanvasText; padding-top: 8px; }
 }
 `;
