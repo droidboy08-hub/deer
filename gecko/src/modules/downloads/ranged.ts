@@ -76,9 +76,10 @@ import { throttle, type RateLimiter } from './limiter';
 import { nameFromDisposition } from './naming';
 import {
   AbortedError, AddressRefusedError, ChangedError, ChecksumError, ConnectionRefusedError, DiskError, DownloadError, HttpStatusError, NetError, NotTheFileError,
-  REFUSED_STATUS, Response, ShortBodyError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal, refusedConnection,
+  REFUSED_STATUS, Response, ShortBodyError, backoff, isRetryable, isRetryableStatus, open, parseContentRange, refusal,
   retryAfter, serverStops, sleep, stopsRun, textStart, textual, type Identity,
 } from './net';
+import { CUT_CODES, HOLD_AFTER_MS, classOf, delayOf, waitToAsk, type RetryClass } from './retry';
 import { blockSize, hashBytes, sha256Hex, sparsePart, type Ledger } from './ledger';
 import { Writer, freeSpace, heldBytes, readAt, setSize, sizeOf, writeAt } from './partfile';
 import {
@@ -116,9 +117,7 @@ const SPOT_MS = 5 * 60 * 1000;
 const HASH_EVERY = 4 * 1024 * 1024;
 /**
  * Connections that keep up (compared with IDM 6.43 on a local bench, 2026-10-20: gecko/spikes/downloader/
- * IDM-BENCH.md). A connection that used up its attempts steps aside while another one received bytes within
- * MOVING_MS: its segment is free for the others and it tries again after STEP_ASIDE_MS, the run going on
- * meanwhile (it used to stop every connection and wait). tick() looks at every answer each TICK_MS:
+ * IDM-BENCH.md). tick() looks at every answer each TICK_MS:
  *   - stall: no bytes for STALL_TICKS ticks while another answer got some: cut (the idle timeout takes 30 s);
  *   - slow: below max(SLOW_FLOOR, SLOW_SHARE x the others' median) for SLOW_TICKS ticks while the others ran
  *     at BUSY_RATE or more, when what is left (RECUT_MIN or more) would take more than RECUT_SECS at its own
@@ -128,12 +127,12 @@ const HASH_EVERY = 4 * 1024 * 1024;
  * silent or slow is left for a new one. At most once per RECUT_GAP per connection. An answer Deer itself
  * held for more than HELD_SHARE of a tick (the disk, the speed limit) is never judged on that stretch, and
  * nothing is judged while a speed limit holds the speed down.
- * A connection cut after it brought PROGRESS_MIN bytes or ran PROGRESS_MS (a reset, an interrupted or short
- * body, the idle timeout) is asked again after PROGRESS_RETRY_MS, no failure: IDM retries at once (0.01 s,
- * measured) where Deer waited 2 s each time.
+ * Failures are asked again as IDM does (retry.ts, the owner's decision of 2026-10-21): never giving up on a
+ * cut, an unreachable site, a site error or a connection turned away, the run going on meanwhile (it no longer
+ * stops into a wait). MOVING_MS still decides whether a refused address on one connection is that connection's
+ * (it stands by while another received bytes that recently) or everyone's (Link expired).
  */
 const MOVING_MS = 10 * 1000;
-const STEP_ASIDE_MS = [10, 20, 40, 60].map((s) => s * 1000);
 const TICK_MS = 2000;
 const STALL_TICKS = 5;
 const SLOW_TICKS = 8;
@@ -146,15 +145,17 @@ const RECUT_SECS = 8;
 const HELD_SHARE = 0.5;
 /** A lone answer (the others finished or between answers) is judged against the last busy median this long. */
 const BUSY_MEMORY_MS = 30 * 1000;
+/** An answer that brought this much, or brought bytes this long, made progress: its connection's count of failures starts again. */
 const PROGRESS_MIN = 1024 * 1024;
 const PROGRESS_MS = 5000;
-const PROGRESS_RETRY_MS = 100;
-/** Necko failures that mean the connection was cut (not refused): asked again at once after progress. */
-const CUT_CODES = new Set(['NS_ERROR_NET_RESET', 'NS_ERROR_NET_INTERRUPT', 'NS_ERROR_NET_PARTIAL_TRANSFER', 'NS_ERROR_NET_TIMEOUT', 'NS_ERROR_NET_TIMEOUT_EXTERNAL']);
 
 class RangeIgnoredError extends Error {}
-/** A connection used up its attempts while others still receive: it steps aside (runRanged()). */
-class StepAsideError extends Error {}
+/** A connection gives its part back and asks again after `ms` (retry.ts: turned away, or a refused address while others receive). */
+class StandbyError extends Error {
+  constructor(readonly ms: number) {
+    super('standby');
+  }
+}
 
 /** One connection's record for the diagnostics (transferInfo()). */
 interface LaneStat {
@@ -173,14 +174,25 @@ interface LaneStat {
 
 /** A connection of a ranged run (runRanged() worker). */
 interface Conn {
-  accepted: boolean;
   lane: number;
-  /** It left the run (refused, retired, or its worker ended). */
+  /** It left the run (its worker ended, or it gave up on a failure that asking again can't fix). */
   left: boolean;
-  /** Another connection is still fetching (not resting, not gone). */
+  /** Another connection is still fetching (not standing by, not gone). */
   mayYield: () => boolean;
   /** Leave the run now, in the same step as the decision (runRanged()). */
   leave: (err: unknown) => void;
+  /** Failures since its last answer that made progress (shown as the wait's tries), and per class (retry.ts delayOf(): a
+   * site error's or a refusal's gaps count only failures of their own class, review: an outage's thousands of cuts
+   * made the next 503 wait for hours). */
+  k: number;
+  steps: Partial<Record<RetryClass, number>>;
+  /** The address it last stood by on after a refusal of its own (the run's renewal budget is not spent on it again). */
+  refusedUrl: string;
+  /** Its latest failure and when (0: none since its last bytes), its class and status, and when it asks next. */
+  failedAt: number;
+  cls: RetryClass | '';
+  status: number;
+  nextAt: number;
 }
 
 /** An answer streaming into a segment: its connection, the bytes it brought this tick, per-tick bytes and held ms. */
@@ -207,10 +219,6 @@ function endOf(err: unknown): string {
   return 'other';
 }
 
-/** The connection was cut (not refused): asked again at once after progress. */
-function isCut(err: unknown): boolean {
-  return err instanceof ShortBodyError || (err instanceof NetError && CUT_CODES.has(err.code));
-}
 class RangeMismatchError extends Error {
   constructor() {
     super('The server sent a different part of the file than was asked for.');
@@ -354,15 +362,16 @@ export class FileTransfer {
   peakLive = 0;
   /** Sockets the responses came over (tests: distinct = separate connections). */
   sockets = new Set<string>();
-  /** Silent or slow connections tick() cut to reconnect, and failing ones that stepped aside, in this transfer (tests). */
+  /** Silent or slow connections tick() cut to reconnect, and connections that stood by after a failure, in this transfer (tests). */
   reconnects = 0;
-  stepAsides = 0;
+  standbys = 0;
   /**
    * Diagnostics (transferInfo()): every reconnect (tick() cuts and cut answers asked again at once), connections
-   * a refusal retired, the sparse mark, the .part's sizing time, the slowest Writer open, and how long answers
-   * were held for the disk and the speed limit. O(connections); nothing here decides anything.
+   * that stood by, failures by class (retry.ts) and nudges, the checks after a quiet stretch (rejoin()), the
+   * sparse mark, the .part's sizing time, the slowest Writer open, and how long answers were held for the disk and
+   * the speed limit. O(connections); nothing here decides anything.
    */
-  diag = { reconnectsAll: 0, retired: 0, sparse: null as null | { ok: boolean; ms: number }, room: null as null | { needed: number; others: number; holds: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
+  diag = { reconnectsAll: 0, retired: 0, failures: {} as Record<string, number>, nudges: 0, rejoins: 0, sparse: null as null | { ok: boolean; ms: number }, room: null as null | { needed: number; others: number; holds: number }, openPartMs: 0, writerOpenMaxMs: 0, heldDiskMs: 0, heldLimitMs: 0 };
   /** Lane -> its record for the diagnostics. */
   private laneStats = new Map<number, LaneStat>();
   /** Lane -> when it last received bytes. */
@@ -381,6 +390,16 @@ export class FileTransfer {
   private laneSeen = new Map<number, number>();
   /** The busy lanes' last median and when it was taken (BUSY_MEMORY_MS). */
   private busy = { median: 0, at: 0 };
+  /** The run's connections (retrying()), when the run started, and when any connection last received bytes. */
+  private conns: Conn[] = [];
+  private runAt = 0;
+  private lastByteAt = 0;
+  /** Aborted when an answer that brought bytes ends (nudge()), or on Try now (poke()): connections waiting to ask, ask. */
+  private nudger = new AbortController();
+  private poker = new AbortController();
+  /** The check after a quiet stretch (rejoin()), while it runs, and when the last one passed. */
+  private rejoining: Promise<void> | null = null;
+  private provedAt = 0;
 
   /** A lane's diagnostics record (made on first use). */
   private lane(lane: number): LaneStat {
@@ -398,7 +417,7 @@ export class FileTransfer {
     return {
       ...this.diag,
       reconnects: this.reconnects,
-      stepAsides: this.stepAsides,
+      standbys: this.standbys,
       lanes: [...this.laneStats].map(([lane, s]) => ({ lane, ...s, ends: { ...s.ends }, quietMs: s.lastData ? now - s.lastData : -1 })),
     };
   }
@@ -991,13 +1010,12 @@ export class FileTransfer {
     if (signal.aborted) stop.abort();
     let fatal: unknown = null;
     const n = this.connections();
-    // Connections still taking segments; a refused one may step aside only while another remains. `active`
-    // leaves out the ones resting after a step-aside: the last connection actually fetching never yields
-    // to resting ones (review: nobody downloaded until they woke).
+    // Connections still taking segments. `active` leaves out the ones standing by after a failure (retry.ts): the
+    // last connection actually fetching decides for a refused address (Link expired) and never waits on them.
     let alive = n;
     let active = n;
-    // Resting connections wake when a connection finds no work left (review: a finished download sat at
-    // 100% while one rested for up to a minute). One controller per wake-up: later rests wait again.
+    // Connections standing by wake when a connection finds no work left (review: a finished download sat at
+    // 100% while one rested). One controller per wake-up: later waits wait again.
     let wake = new AbortController();
     const rouse = (): void => {
       const w = wake;
@@ -1013,11 +1031,12 @@ export class FileTransfer {
     // The last refusal a connection left on: what the run reports if every one of them left (review: never
     // "Some parts of the file didn't arrive." where the address was refused).
     let lastRefusal: unknown = null;
+    this.conns = [];
+    this.runAt = Date.now();
     const worker = async (lane: number): Promise<void> => {
       // leave(): the decision to leave and the counts that let the next connection decide are one synchronous
       // step (review: lanes woken by one shared renewal all saw "others still here" and all left together).
       const conn: Conn = {
-        accepted: false,
         lane,
         left: false,
         mayYield: () => active > 1,
@@ -1029,9 +1048,15 @@ export class FileTransfer {
           this.moved.delete(lane);
           lastRefusal = err;
         },
+        k: 0,
+        steps: {},
+        refusedUrl: '',
+        failedAt: 0,
+        cls: '',
+        status: 0,
+        nextAt: 0,
       };
-      // Step-asides in a row with no bytes in between: each waits longer (STEP_ASIDE_MS).
-      let asides = 0;
+      this.conns.push(conn);
       try {
         for (;;) {
           if (fatal !== null || stop.signal.aborted) return;
@@ -1041,20 +1066,14 @@ export class FileTransfer {
             return;
           }
           owned.add(seg);
-          const movedBefore = this.moved.get(lane) ?? 0;
-          let aside = false;
+          let standby = -1;
           try {
             await this.fetchSegment(seg, partPath, stop.signal, conn);
-            asides = 0;
           } catch (err) {
-            // Its segment is left for the connections the server does accept.
+            // A failure asking again can't fix on this connection: its segment is left for the others.
             if (err instanceof ConnectionRefusedError) return;
-            if (err instanceof StepAsideError) {
-              // Its segment is free for the others meanwhile; the run goes on.
-              aside = true;
-              asides = (this.moved.get(lane) ?? 0) > movedBefore ? 1 : asides + 1;
-              this.stepAsides++;
-            } else {
+            if (err instanceof StandbyError) standby = err.ms;
+            else {
               if (fatal === null) fatal = err;
               stop.abort();
               return;
@@ -1062,13 +1081,26 @@ export class FileTransfer {
           } finally {
             owned.delete(seg);
           }
-          if (aside) {
+          if (standby >= 0) {
+            // Turned away (429, 503), or its address refused while others receive: its part is free for the others
+            // meanwhile and it asks again at its time, or at once when an answer that brought bytes ends (IDM re-sends
+            // then: a place may have come free), on Try now, or when a connection finds no work left (then it looks
+            // again and leaves). A nudged ask that is turned away again keeps the connection's own schedule.
+            this.standbys++;
             active--;
             try {
-              await sleep(STEP_ASIDE_MS[Math.min(asides, STEP_ASIDE_MS.length) - 1], AbortSignal.any([stop.signal, wake.signal]));
-            } catch {
-              // Woken: a connection found no work left, so this one looks again (and leaves when there is none).
-              if (stop.signal.aborted) return;
+              const due = conn.nextAt;
+              for (;;) {
+                const left = due - Date.now();
+                if (left <= 0) break;
+                try {
+                  await sleep(left, AbortSignal.any([stop.signal, wake.signal, this.nudger.signal, this.poker.signal]));
+                  break;
+                } catch {
+                  if (stop.signal.aborted) return;
+                  break;
+                }
+              }
             } finally {
               active++;
             }
@@ -1135,58 +1167,50 @@ export class FileTransfer {
   }
 
   /**
-   * One segment, with backoff. A retry that made progress earns a fresh budget. A host that allows
-   * only one or two connections per client refuses the rest (429, 503): a connection it never
-   * accepted steps aside at once, one it did accept after its retries, while another remains.
-   * A disk error ends the download at once (nothing on the network can fix it). An address that
-   * refused or isn't the file goes to the renewal hook (afterRefusal()); a new address does not use up
-   * an attempt (RESUME-DESIGN.md 3.0).
+   * One segment, asked again after every failure as IDM does (retry.ts; the owner's decision of 2026-10-21): a cut
+   * or an unreachable site at once, a site error at the same spot after 4 s, 8 s, 12 s ... on a new connection,
+   * without limit; a connection turned away (429, 503) gives its part back and stands by on the same gaps
+   * (StandbyError). An address that refused or isn't the file goes to the renewal hook (afterRefusal()) as before;
+   * then, while another connection received bytes within MOVING_MS and the address's expiry has not passed, this
+   * connection stands by too, and otherwise the run stops on it (Link expired, for everyone). A disk error, a
+   * changed file and a challenge end the run at once; any other failure gets ATTEMPTS, then this connection
+   * leaves (the last one ends the run as before).
    */
   private async fetchSegment(seg: Segment, partPath: string, signal: AbortSignal, conn: Conn): Promise<void> {
-    let failures = 0;
+    let others = 0;
     let retried = false;
     const stat = this.lane(conn.lane);
     const ended = (why: string): void => {
       stat.ends[why] = (stat.ends[why] ?? 0) + 1;
     };
-    // When this connection's current run of failures began: another connection counts as still receiving only
-    // when it got bytes after that (review: in an outage every lane saw the others' last bytes as recent).
-    let streakAt = 0;
-    // A refusal on this connection while others still receive and the address's expiry has not passed: this
-    // connection leaves for the run (its segment is free for the others) instead of stopping them all; the run
-    // stops on the refusal of the last one, as before (a link that expired for everyone). Deciding and leaving
-    // are one step (conn.leave()).
-    const retire = (asked: string, err: unknown): boolean => {
-      // Another connection received bytes within MOVING_MS (not 'since this failure': a refusal is decided at once,
-      // and at the end of a piece the others sit between answers). The last connection never retires (leave()), so
-      // when every one is refused, the last reports it (Link expired).
-      if (expiredAt(asked) || !conn.mayYield() || !this.othersMoving(conn.lane)) return false;
-      conn.leave(err);
-      this.diag.retired++;
-      return true;
-    };
     while (remaining(seg) > 0) {
       const before = seg.received;
       const asked = this.state.finalUrl;
       const began = Date.now();
+      // An ask before the connection's own time is a nudged one (an answer ended, Try now): refused again, it keeps
+      // that time and its count, as IDM's scheduled asks did through its bursts.
+      const nudged = began < conn.nextAt;
       // A cut mark belongs to one answer: never to the next attempt (review: a stale mark swallowed an error).
       this.recut.delete(seg);
       try {
         if (this.state.etagUnstable || (this.state.dateUnstable && !this.ifRange())) await this.spotCheck(partPath, signal);
+        // After a quiet stretch (every connection failing, no bytes for HOLD_AFTER_MS: an outage, a site that stopped
+        // answering), the saved bytes are proved against the address before any is written again.
+        await this.rejoin(partPath, signal);
         await this.pull(seg, partPath, signal, conn.lane);
         this.recut.delete(seg);
-        conn.accepted = true;
         ended('done');
         // An answer that brought bytes (a capped 206 included) ends any run of failures.
         if (seg.received > before) {
-          failures = 0;
+          others = 0;
           retried = false;
+          conn.k = 0;
+          conn.steps = {};
+          conn.refusedUrl = '';
+          conn.failedAt = 0;
         }
       } catch (err) {
-        if (seg.received > before) {
-          conn.accepted = true;
-          retried = false;
-        }
+        if (seg.received > before) retried = false;
         if (signal.aborted) throw new AbortedError();
         // tick() cut a connection that went silent or ran far slower than the others: ask again at once, no
         // failure. Only for the cancel the cut itself caused: any other error is handled as such.
@@ -1195,49 +1219,176 @@ export class FileTransfer {
         if (cut && err instanceof AbortedError) {
           ended(cut);
           this.diag.reconnectsAll++;
-          failures = 0;
+          conn.k = 0;
+          conn.steps = {};
+          conn.failedAt = 0;
           continue;
         }
         ended(endOf(err));
         if (err instanceof DiskError || err instanceof RangeIgnoredError || err instanceof ChangedError) throw err;
-        // Cut after it brought bytes (a reset, an interrupted or short body, the idle timeout): asked again at once,
-        // as IDM does, no failure (it used to wait 2 s every time).
         const progressed = seg.received - before;
-        if (progressed > 0 && isCut(err) && (progressed >= PROGRESS_MIN || Date.now() - began >= PROGRESS_MS)) {
+        const progress = progressed >= PROGRESS_MIN || (progressed > 0 && Date.now() - began >= PROGRESS_MS);
+        if (progress) {
+          conn.k = 0;
+          conn.steps = {};
+          conn.refusedUrl = '';
+          others = 0;
+        }
+        const step = (c: RetryClass): number => (conn.steps[c] = (conn.steps[c] ?? 0) + 1);
+        const cls: RetryClass = err instanceof RangeMismatchError ? 'other' : classOf(err);
+        this.diag.failures[cls] = (this.diag.failures[cls] ?? 0) + 1;
+        const after = err instanceof HttpStatusError ? err.retryAfter : null;
+        const failed = (): void => {
+          conn.failedAt = Date.now();
+          conn.cls = cls;
+          conn.status = err instanceof HttpStatusError ? err.status : 0;
+        };
+        if (cls === 'fatal' || cls === 'challenge') throw err;
+        if (cls === 'cut' || cls === 'network') {
+          // Asked again at once (IDM: 0.01 s), without limit; a cut after progress is no failure at all.
+          if (!progress) {
+            conn.k++;
+            failed();
+          }
           this.diag.reconnectsAll++;
-          failures = 0;
-          await sleep(PROGRESS_RETRY_MS, signal);
+          conn.nextAt = Date.now() + delayOf(cls, conn.k, null);
+          await waitToAsk(cls, conn.nextAt - Date.now(), signal, this.poker.signal);
           continue;
         }
-        failures = seg.received > before ? 1 : failures + 1;
-        if (failures === 1) streakAt = Date.now();
-        const next = await this.afterRefusal(err, asked, retried);
-        if (next === 'stop') {
-          if (retire(asked, err)) throw new ConnectionRefusedError();
+        if (cls === 'server') {
+          // The same spot again after 4 s x k, on a new connection (IDM uses a new one for every ask), while the
+          // others go on; they may take half of this segment meanwhile (claim()).
+          conn.k++;
+          failed();
+          this.laneGen.set(conn.lane, (this.laneGen.get(conn.lane) ?? 0) + 1);
+          conn.nextAt = Date.now() + delayOf(cls, step(cls), after);
+          await waitToAsk(cls, conn.nextAt - Date.now(), signal, this.poker.signal);
+          continue;
+        }
+        if (cls === 'refused-start') {
+          if (!nudged) {
+            conn.k++;
+            conn.nextAt = Date.now() + delayOf(cls, step(cls), after);
+          } else if (after !== null) conn.nextAt = Math.max(conn.nextAt, Date.now() + delayOf(cls, conn.steps[cls] ?? 1, after));
+          failed();
+          throw new StandbyError(conn.nextAt - Date.now());
+        }
+        if (cls === 'refused-address') {
+          // Its address refused while another connection still receives and the address's expiry has not passed:
+          // this connection's own limit (a host that refuses extra connections with 403), so it stands by on the
+          // site error's gaps. The last connection fetching stops the run on it (Link expired), as before.
+          const mayStand = (): boolean => !expiredAt(asked) && conn.mayYield() && this.othersMoving(conn.lane);
+          // Already stood by on this address: the run's renewal budget (renew.ts Gate) is not spent on it again (review).
+          const next = conn.refusedUrl === asked && mayStand() ? 'stop' : await this.afterRefusal(err, asked, retried);
+          if (next === 'renewed') continue;
+          if (next === 'retry') {
+            retried = true;
+            await sleep(backoff(1, after) * 1000, signal);
+            continue;
+          }
+          // Nothing saved yet, or no renewal hook: a retryable refusal (403) keeps its ATTEMPTS first, as before (review:
+          // a fresh download failed at once on a 403 that came before any connection's first byte).
+          if (next === null && isRetryable(err) && ++others < ATTEMPTS) {
+            failed();
+            await sleep(backoff(others, after) * 1000, signal);
+            continue;
+          }
+          if (mayStand()) {
+            if (!nudged) {
+              conn.k++;
+              conn.nextAt = Date.now() + delayOf('server', step(cls), after);
+            }
+            failed();
+            conn.refusedUrl = asked;
+            throw new StandbyError(conn.nextAt - Date.now());
+          }
           throw err;
         }
-        if (next === 'renewed') {
-          failures = Math.max(0, failures - 1);
-          continue;
-        }
-        if (next === 'retry') retried = true;
-        else {
-          if (refusedConnection(err) && conn.mayYield() && (!conn.accepted || failures >= ATTEMPTS)) {
+        // Any other failure (a blocked port, a redirect loop, a 206 at another place ...): ATTEMPTS, then this
+        // connection leaves; the last one ends the run as before.
+        others++;
+        failed();
+        if (others >= ATTEMPTS) {
+          if (conn.mayYield()) {
             conn.leave(err);
+            this.diag.retired++;
             throw new ConnectionRefusedError();
           }
-          // Its attempts used up while another connection is still fetching and received bytes since this one's
-          // failures began: it steps aside instead of stopping them all (runRanged()). Otherwise (an outage, the
-          // last connection) the run stops and waits as before (G4).
-          if (failures >= ATTEMPTS && (isRetryable(err) || err instanceof RangeMismatchError) && conn.mayYield() && this.othersMoving(conn.lane, streakAt)) throw new StepAsideError();
-          // A refusal the renewal does not take (nothing saved yet, no renewal hook): as with 'stop' above.
-          if ((err instanceof AddressRefusedError || err instanceof NotTheFileError) && !isRetryable(err) && retire(asked, err)) throw new ConnectionRefusedError();
-          // The last connection: a server that asks for a long wait stops the run (net.ts serverStops()).
-          if (failures >= ATTEMPTS || !(isRetryable(err) || err instanceof RangeMismatchError) || (!conn.mayYield() && stopsRun(err))) throw err;
+          throw err;
         }
-        await sleep(backoff(next === 'retry' ? 1 : failures, err instanceof HttpStatusError ? err.retryAfter : null) * 1000, signal);
+        await sleep(backoff(others, null) * 1000, signal);
       }
     }
+  }
+
+  /**
+   * The check after a quiet stretch: when every connection kept failing and no byte arrived for HOLD_AFTER_MS,
+   * the first ask that follows proves one window of the saved bytes against the address (one at a time, every
+   * connection waits for it), so a file swapped during an outage is never written into (IDM only compared 64
+   * overlapping bytes, and started over from zero on a mismatch). A failure to ask is the connection's failure
+   * (asked again as such); another file stops the download (File changed); a window that can't be compared lets
+   * the run go on, as a spot check does.
+   */
+  private rejoin(partPath: string, signal: AbortSignal): Promise<void> {
+    if (this.rejoining) return this.rejoining;
+    // The quiet stretch counts from the last byte, the run's start (review: a stretch before the run's first byte was
+    // never proved), or the last proof (review: a proof that passed with no byte after it covered a second outage).
+    const last = Math.max(this.lastByteAt, this.runAt, this.provedAt);
+    if (!last || Date.now() - last < HOLD_AFTER_MS || this.saved <= 0) return Promise.resolve();
+    const wins = windows(this.provable(), this.env.seed ?? this.state.url, this.ledger);
+    if (!wins.length) return Promise.resolve();
+    const run = (async () => {
+      const r = await compareWindows(this.proofCtx(), this.state.finalUrl, [wins[0]], partPath, signal, this.state.total, 1);
+      if (r.verdict === 'whole') r.res.destroy();
+      if (r.verdict === 'changed') throw r.err;
+      this.provedAt = Date.now();
+      this.diag.rejoins++;
+    })();
+    this.rejoining = run;
+    const done = (): void => {
+      if (this.rejoining === run) this.rejoining = null;
+    };
+    run.then(done, done);
+    return run;
+  }
+
+  /** An answer that brought bytes ended: connections standing by ask once now (IDM re-sends then). */
+  private nudge(): void {
+    const n = this.nudger;
+    this.nudger = new AbortController();
+    n.abort();
+    this.diag.nudges++;
+  }
+
+  /** Try now: every connection waiting to ask again asks now. */
+  poke(): void {
+    const p = this.poker;
+    this.poker = new AbortController();
+    p.abort();
+  }
+
+  /**
+   * The run has received nothing for HOLD_AFTER_MS and every connection still in it is failing (the row shows
+   * Waiting for network or Retrying, with its next ask; the run goes on): null otherwise.
+   */
+  retrying(): { for: 'network' | 'server'; since: number; tries: number; nextAt: number; status: number } | null {
+    const live = this.conns.filter((c) => !c.left);
+    if (!live.length) return null;
+    const since = Math.max(this.lastByteAt, this.runAt);
+    if (!since || Date.now() - since < HOLD_AFTER_MS) return null;
+    if (!live.every((c) => c.failedAt >= since && c.failedAt > (this.moved.get(c.lane) ?? 0))) return null;
+    const server = live.some((c) => c.cls === 'server' || c.cls === 'refused-start' || c.cls === 'refused-address');
+    let latest = live[0];
+    for (const c of live) if (c.failedAt > latest.failedAt) latest = c;
+    const nextAt = Math.min(...live.map((c) => c.nextAt || Date.now()));
+    return { for: server ? 'server' : 'network', since, tries: Math.max(1, ...live.map((c) => c.k)), nextAt, status: latest.status };
+  }
+
+  /** retrying() as it was when the run was asked to stop (a quit reads it after every connection has left). */
+  atStop: ReturnType<FileTransfer['retrying']> = null;
+  /** Called by the engine before it aborts the run. */
+  noteStop(): void {
+    this.atStop = this.retrying();
   }
 
   private async pull(seg: Segment, partPath: string, signal: AbortSignal, lane: number): Promise<void> {
@@ -1288,6 +1439,7 @@ export class FileTransfer {
     }
     const flow: Flow = { res, lane, stat, bytes: 0, samples: [], heldSamples: [], heldLast: 0, firstByte: false };
     this.flows.set(seg, flow);
+    const had = seg.received;
     try {
       await this.stream(res, seg, partPath, res.status === 206 ? to + 1 : -1, null, 0, servedEnd);
     } finally {
@@ -1295,6 +1447,8 @@ export class FileTransfer {
       const held = res.held;
       this.diag.heldDiskMs += held.disk;
       this.diag.heldLimitMs += held.limit;
+      // An answer that brought bytes ended (done, capped, or cut): a place may have come free at the site.
+      if (seg.received > had) this.nudge();
     }
   }
 
@@ -1452,6 +1606,7 @@ export class FileTransfer {
           flow.stat.bytes += n;
           flow.stat.lastData = now;
           this.moved.set(flow.lane, now);
+          this.lastByteAt = now;
         }
         // A fast transfer has its blocks hashed while it runs, not all at its end (4.1); a very fast one has
         // its hashing wait instead (ledger.ts HOLD_ABOVE: took() measures how fast it goes).

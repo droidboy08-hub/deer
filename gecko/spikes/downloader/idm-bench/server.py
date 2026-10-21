@@ -16,9 +16,13 @@ GET/HEAD /f/<scenario>/<name>?<knobs>    a synthetic file (deterministic bytes b
   norange=1             Range ignored: always 200 with the whole file
   nolength=1            no Content-Length (close-delimited), implies norange
 GET /log                every request so far (JSON); /timeline bytes sent per 250 ms; /reset clears both
-Each request entry: t (arrival), th (headers sent), te (end), port, method, range, start, end, status, sent,
-outcome (done | client-closed | reset | stalled-closed | refused), headers (User-Agent, Connection, Accept-Encoding,
-If-Range, Range, Referer).
+GET /swap?scen=S&mode=M  the file of scenario S changes from now on (a resume test): silent = other bytes, same size
+                        and the same ETag and Last-Modified; dated = other bytes, a new ETag and Last-Modified; size =
+                        other bytes, 1 MiB longer, new validators; off = the original again
+GET /outage?scen=S&secs=N  for N seconds every answer of S is reset, the ones running included (a network outage)
+Each request entry: t (arrival), th (headers sent), te (end), port, method, range, start, end, status, sent, ver
+(the swap mode it was served under), outcome (done | client-closed | reset | stalled-closed | refused | outage),
+headers (User-Agent, Connection, Accept-Encoding, If-Range, Range, Referer and the other conditional headers).
 """
 import argparse
 import json
@@ -33,21 +37,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 LOCK = threading.Lock()
-STATE = {'log': [], 'timeline': {}, 'counts': {}, 'active': {}, 'first': {}}
+STATE = {'log': [], 'timeline': {}, 'counts': {}, 'active': {}, 'first': {}, 'swap': {}, 'outage': {}}
 ARGS = None
 MiB = 1 << 20
 # Deterministic content: a 1 MiB + 7 random pattern repeated (offset-dependent alignment).
 _rng = random.Random(20261020)
 PATTERN = bytes(_rng.getrandbits(8) for _ in range(MiB + 7))
 PLEN = len(PATTERN)
+# The changed file of /swap: every byte differs from the original at the same offset.
+PATTERN2 = bytes(b ^ 0x5A for b in PATTERN)
 
 
-def content(off, n):
+def content(off, n, pattern=PATTERN):
     out = bytearray()
     while n > 0:
         i = off % PLEN
         k = min(n, PLEN - i)
-        out += PATTERN[i:i + k]
+        out += pattern[i:i + k]
         off += k
         n -= k
     return bytes(out)
@@ -78,8 +84,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(sorted(STATE['timeline'].items()))
         if u.path == '/reset':
             with LOCK:
-                STATE.update(log=[], timeline={}, counts={}, active={}, first={})
+                STATE.update(log=[], timeline={}, counts={}, active={}, first={}, swap={}, outage={})
             return self.send_json({})
+        if u.path in ('/swap', '/outage'):
+            q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            with LOCK:
+                if u.path == '/swap':
+                    STATE['swap'][q['scen']] = q.get('mode', 'silent')
+                else:
+                    STATE['outage'][q['scen']] = time.time() + float(q.get('secs', '10'))
+            return self.send_json({'ok': True})
         self.handle_file(head=False)
 
     def send_json(self, obj):
@@ -92,7 +106,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def entry(self, **kw):
         e = {'t': round(time.time(), 3), 'port': self.client_address[1], 'method': self.command, 'path': self.path,
-             'headers': {k: self.headers.get(k, '') for k in ('User-Agent', 'Connection', 'Accept-Encoding', 'If-Range', 'Range', 'Referer')}}
+             'headers': {k: self.headers.get(k, '') for k in ('User-Agent', 'Connection', 'Accept-Encoding', 'If-Range', 'Range', 'Referer',
+                                                              'If-Modified-Since', 'If-Unmodified-Since', 'If-None-Match', 'If-Match')}}
         e.update(kw)
         with LOCK:
             STATE['log'].append(e)
@@ -115,6 +130,14 @@ class Handler(BaseHTTPRequestHandler):
         scen = parts[2]
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         size = int(float(q.get('size', '256')) * MiB)
+        with LOCK:
+            ver = STATE['swap'].get(scen, 'off')
+            down = time.time() < STATE['outage'].get(scen, 0)
+        if ver == 'size':
+            size += MiB
+        pattern = PATTERN if ver == 'off' else PATTERN2
+        etag = '"bench-%d"' % size if ver in ('off', 'silent') else '"bench-%d-v2"' % size
+        modified = 'Mon, 19 Oct 2026 10:00:00 GMT' if ver in ('off', 'silent') else 'Wed, 21 Oct 2026 08:00:00 GMT'
         rate = float(q.get('rate', '0')) * 1024
         norange = q.get('norange') == '1' or q.get('nolength') == '1'
         rng = self.headers.get('Range', '')
@@ -129,9 +152,11 @@ class Handler(BaseHTTPRequestHandler):
                 start = max(0, size - int(b))
             ranged = True
             ir = self.headers.get('If-Range')
-            if ir and ir != '"bench-%d"' % size:
+            if ir and ir != etag and ir != modified:
                 start, end, ranged = 0, size - 1, False
-        e = self.entry(range=rng, start=start, end=end)
+        e = self.entry(range=rng, start=start, end=end, ver=ver)
+        if down:
+            return self.drop(e)
         now = time.time()
         with LOCK:
             STATE['first'].setdefault(scen, now)
@@ -162,8 +187,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/octet-stream')
         self.send_header('Accept-Ranges', 'none' if norange else 'bytes')
-        self.send_header('ETag', '"bench-%d"' % size)
-        self.send_header('Last-Modified', 'Mon, 19 Oct 2026 10:00:00 GMT')
+        self.send_header('ETag', etag)
+        self.send_header('Last-Modified', modified)
         if q.get('nolength') == '1':
             self.close_connection = True
             self.send_header('Connection', 'close')
@@ -193,8 +218,19 @@ class Handler(BaseHTTPRequestHandler):
                 n = min(chunk, length - sent)
                 if stop_at >= 0 and sent + n > stop_at:
                     n = stop_at - sent
+                with LOCK:
+                    cut = time.time() < STATE['outage'].get(scen, 0)
+                if cut:
+                    self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+                    outcome = 'outage'
+                    self.close_connection = True
+                    try:
+                        self.connection.close()
+                    except OSError:
+                        pass
+                    break
                 if n > 0:
-                    self.wfile.write(content(start + sent, n))
+                    self.wfile.write(content(start + sent, n, pattern))
                     sent += n
                     b = int(time.time() * 4)
                     with LOCK:
@@ -234,6 +270,16 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 STATE['active'][scen] -= 1
             e.update(sent=sent, outcome=outcome, te=round(time.time(), 3), crawl=crawl, stall=stall, reset=reset)
+
+    def drop(self, e):
+        """The connection is reset before any answer (an outage)."""
+        e.update(status=0, sent=0, outcome='outage', te=round(time.time(), 3))
+        self.close_connection = True
+        try:
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+            self.connection.close()
+        except OSError:
+            pass
 
     def refuse(self, e, code, retry_after=None):
         body = b'refused'

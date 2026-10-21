@@ -5,6 +5,7 @@ cookie/Referer checks, request log, and the test pages. Extended from spikes/dow
 
 Routes (GET):
   /blob/big?rate=KBps       big.bin (256 MiB) with Range/ETag; rate throttles EACH connection (0 = none)
+  /huge?size=N              a file of N bytes of zeros with Range (at most 1 MiB of a body is sent): checks before any byte
   /blob/big?fail=A-B&failn=K&failcode=S | slow=A-B&slowrate=KBps | reset=A-B&resetafter=N&resetn=K |
             stall=A-B&stallafter=N | capresp=N   (also on /blob/medium)
                             big.bin with one misbehaving region (the connections test): see big_faults()
@@ -230,7 +231,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 LOCK = threading.Lock()
-STATE = {'active': 0, 'peak': 0, 'requests': [], 'ports': set(), 'hedged': set(), 'token': 1, 'rotated': False, 'failed': 0, 'slowed': False, 'resetc': 0, 'stalled': False, 'delayed': False}
+STATE = {'active': 0, 'peak': 0, 'requests': [], 'ports': set(), 'hedged': set(), 'token': 1, 'rotated': False, 'failed': 0, 'slowed': False, 'resetc': 0, 'stalled': False, 'delayed': False, 'capheld': 0, 'cappeak': 0}
 # /expire and /swap: flags set by /flag?k=, request counts per key, cached md5 and swapped sha256 per file.
 FLAGS = set()
 COUNTS = {}
@@ -376,11 +377,11 @@ class Handler(BaseHTTPRequestHandler):
     def route(self, p, q):
         if p == '/stats':
             with LOCK:
-                body = json.dumps({'peak': STATE['peak'], 'active': STATE['active'], 'connections': len(STATE['ports']), 'requests': STATE['requests']})
+                body = json.dumps({'peak': STATE['peak'], 'active': STATE['active'], 'cappeak': STATE['cappeak'], 'connections': len(STATE['ports']), 'requests': STATE['requests']})
             return self.text(200, body, 'application/json')
         if p == '/reset':
             with LOCK:
-                STATE.update(active=0, peak=0, requests=[], ports=set(), hedged=set(), token=1, rotated=False, failed=0, slowed=False, resetc=0, stalled=False, delayed=False)
+                STATE.update(active=0, peak=0, requests=[], ports=set(), hedged=set(), token=1, rotated=False, failed=0, slowed=False, resetc=0, stalled=False, delayed=False, capheld=0, cappeak=0)
             return self.text(200, '{}', 'application/json')
         if p == '/cross.html':
             # Served as http://localhost:<port>: its link is on another site (127.0.0.1).
@@ -592,13 +593,40 @@ class Handler(BaseHTTPRequestHandler):
             md5 = self.digest(path, 'md5') if q.get('good', '1') == '1' else base64.b64encode(hashlib.md5(b'not this file').digest()).decode()
             size = os.path.getsize(path)
             return self.send_part(path, 200, 0, size - 1, rate, [('Content-Length', str(size)), ('Content-MD5', md5)])
+        if p == '/huge':
+            # A file of any size (size=N bytes) with Range: zeros, for the checks made before any byte (the layout test's
+            # FAT32 limit); a body is sent only up to 1 MiB of what is asked.
+            size = int(q.get('size', str(1 << 30)))
+            rng = self.headers.get('Range', '')
+            start, end = 0, size - 1
+            status = 200
+            if rng.startswith('bytes='):
+                a, _, b = rng[6:].partition('-')
+                start = int(a) if a else 0
+                end = min(size - 1, int(b)) if b else size - 1
+                status = 206
+            n = min(end - start + 1, 1 << 20)
+            self.record(status=status, start=start, end=end)
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', str(n))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('ETag', '"huge-%x"' % size)
+            if status == 206:
+                self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, start + n - 1, size))
+            self.end_headers()
+            try:
+                self.wfile.write(bytes(n))
+            except OSError:
+                pass
+            return None
         if p == '/blob/big':
-            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay')):
+            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay', 'cap')):
                 return self.big_faults(q, rate)
             return self.send_file(os.path.join(FIX, 'big.bin'), rate)
         if p == '/blob/medium':
             # ctype: another Content-Type for the same bytes (integrity: a text file sniffed as binary).
-            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay')):
+            if any(k in q for k in ('fail', 'slow', 'reset', 'stall', 'capresp', 'bodydelay', 'cap')):
                 return self.big_faults(q, rate, 'medium.bin')
             return self.send_file(os.path.join(FIX, 'medium.bin'), rate, ctype=q.get('ctype', 'application/octet-stream'))
         if p == '/dl/report':
@@ -1732,7 +1760,13 @@ class Handler(BaseHTTPRequestHandler):
         offsets A-B: a request counts when its Range starts in [A, B).
           fail=A-B&failn=K&failcode=S  the first K such requests answer S (default 500): a connection that keeps
                                        failing while the others work (520, 404 ... for a proxy host's codes);
-                                       with failskip=N the first N are served and the K after them fail
+                                       with failskip=N the first N are served and the K after them fail; with
+                                       failra=N they carry Retry-After: N; with failstyle=challenge they are
+                                       Cloudflare's "checking your browser" answer (cf-mitigated: challenge, an
+                                       HTML page, Server: cloudflare)
+          cap=N&capcode=S&capra=R      a site that allows N bodies at once: a request while N are being sent is
+                                       answered S (default 503), with Retry-After: R when given; /stats says the
+                                       most sent at once (cappeak)
           slow=A-B&slowrate=KBps       the first one is sent at slowrate, the ones after it at `rate` (a slow
                                        server edge: a new connection gets a normal one)
           reset=A-B&resetafter=N&resetn=K  the first K are reset (RST) after N bytes
@@ -1758,7 +1792,11 @@ class Handler(BaseHTTPRequestHandler):
             if skip < n <= skip + int(q.get('failn', '4')):
                 code = int(q.get('failcode', '500'))
                 self.record(status=code, start=start, fault='fail')
-                return self.text(code, 'refused by the test server', 'text/plain; charset=utf-8')
+                hdrs = [('Retry-After', q['failra'])] if q.get('failra') else []
+                if q.get('failstyle') == 'challenge':
+                    page = '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body><div id="challenge-platform">Checking your browser</div></body></html>'
+                    return self.text(code, page, 'text/html; charset=UTF-8', headers=[('cf-mitigated', 'challenge'), ('Server', 'cloudflare'), *hdrs])
+                return self.text(code, 'refused by the test server', 'text/plain; charset=utf-8', headers=hdrs)
         if 'reset' in q and within(q['reset']):
             with LOCK:
                 STATE['resetc'] += 1
@@ -1783,6 +1821,21 @@ class Handler(BaseHTTPRequestHandler):
                 STATE['slowed'] = True
             if slow:
                 return self.send_file(path, float(q.get('slowrate', '16')) * 1024, fault=fault)
+        if q.get('cap'):
+            with LOCK:
+                full = STATE['capheld'] >= int(q['cap'])
+                if not full:
+                    STATE['capheld'] += 1
+                    STATE['cappeak'] = max(STATE['cappeak'], STATE['capheld'])
+            if full:
+                code = int(q.get('capcode', '503'))
+                self.record(status=code, start=start, fault='cap')
+                return self.text(code, 'too many connections', 'text/plain; charset=utf-8', headers=[('Retry-After', q['capra'])] if q.get('capra') else ())
+            try:
+                return self.send_file(path, rate, fault=fault)
+            finally:
+                with LOCK:
+                    STATE['capheld'] -= 1
         return self.send_file(path, rate, fault=fault)
 
     def send_file(self, path, rate, extra=(), ctype='application/octet-stream', until=0, cut=None, fault=None):

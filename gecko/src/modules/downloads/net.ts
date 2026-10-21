@@ -115,6 +115,7 @@ export class AddressRefusedError extends HttpStatusError {
     readonly hint = ''
   ) {
     super(status, retryAfter);
+    if (hint === 'challenge') this.message = 'The site wants to check the browser first. Open its page, then try again.';
   }
 }
 
@@ -768,12 +769,27 @@ const EXPIRED_BODY = /ExpiredToken|Request has expired|Signature|expired/i;
  * decides whether the address expired.
  */
 export async function refusal(res: Response, wait: number | null): Promise<HttpStatusError> {
+  // A "checking your browser" page or a block (Cloudflare): asking again can never pass it, and asking again and
+  // again raises the address's bot score (retry.ts 'challenge'). It goes the refused address's way (Link expired:
+  // the renewal steps, the page step), never the site error's (asked again every few seconds).
+  if (await challenged(res)) {
+    res.destroy();
+    return new AddressRefusedError(res.status, wait, 'challenge');
+  }
   if (res.status === 400) {
     const body = new TextDecoder('utf-8').decode(await res.head(4096));
     return EXPIRED_BODY.test(body) ? new AddressRefusedError(400, wait, 'expired') : new HttpStatusError(400, wait);
   }
   res.destroy();
   return REFUSED_STATUS.has(res.status) ? new AddressRefusedError(res.status, wait) : new HttpStatusError(res.status, wait);
+}
+
+/** Cloudflare's mark on a challenge (cf-mitigated), or its challenge or block page on a 403, 429 or 503. */
+async function challenged(res: Response): Promise<boolean> {
+  if (res.header('cf-mitigated').trim().toLowerCase() === 'challenge') return true;
+  if (![403, 429, 503].includes(res.status) || !/cloudflare/i.test(res.header('server')) || !/html/i.test(res.header('content-type'))) return false;
+  const body = new TextDecoder('utf-8').decode(await res.head(4096));
+  return /cf-chl|challenge-platform|cf_chl_opt|Just a moment\.\.\.|Attention Required!|error code: 10\d\d|cf-error-code/i.test(body);
 }
 
 /**

@@ -528,9 +528,17 @@ local look-alike type, so a contract change fails `tsc`.
   downloads (no zero-fill wait far into a big file; made ordinary again before it is moved into place or
   kept as a partial file; the room check counts what a .part does not hold yet, GetCompressedFileSizeW,
   and what other sparse downloads on that disk still need),
-  a connection that keeps failing steps aside (10-60 s) or retires instead of pausing the row while
-  others still receive bytes, one that goes silent (10 s) or crawls (a quarter of the others' median)
-  is cut and its part asked again on a new partition, a reset after bytes is asked again at once, and
+  failures are asked again as IDM 6.43 does (`retry.ts`, the owner's decision of 2026-10-21; design
+  `spikes/downloader/IDM-WAY-DESIGN.md`): a cut or an unreachable site at once (10 ms, Deer as a whole at most
+  150 asks a second after failures, about IDM's rate at the server once Necko's own resends are counted; once every
+  30 s while Windows says offline), a site error at the same spot
+  after 4 s, 8 s, 12 s ... on a new partition, a connection turned away (429, 503) or refused (403/404 while others
+  receive) standing by on the same gaps and once more whenever an answer ends, Retry-After honoured, never giving
+  up; the run no longer stops into a wait: after 10 s with nothing coming in and every connection failing it reads
+  Waiting for network or Retrying (view(), `FileTransfer.retrying()`; Try now asks at once), and the first answer
+  after such a stretch is preceded by a proof of one saved window (`rejoin()`); a Cloudflare challenge goes the
+  refused address's way (Link expired, the page step), never asked again and again; one that goes silent (10 s)
+  or crawls (a quarter of the others' median) is cut and its part asked again on a new partition, and
   `transferInfo(id).diag` counts all of it. Resuming never loses or mixes bytes (`spikes/downloader/RESUME-DESIGN.md`,
   Phases 1 to 8 built): the resume probe judges the answer before it changes the saved state; an address
   that refuses (401/403/404/410/451, an expired-signature 400) or answers with a page pauses the row

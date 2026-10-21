@@ -332,6 +332,9 @@ Manual choices:
 What the person sees: "File changed", an evidence caption, two buttons, and a line saying exactly what each button deletes or keeps.
 
 G4. Restarts, sleep and lost internet, even days later
+(2026-10-21: a ranged run no longer stops into a network or server wait; it keeps asking as IDM does, and the
+waits below remain for what a quit, a crash or sleep left and for a check that could not reach the site, tried
+every 30 s and never failed by themselves: IDM-WAY-DESIGN.md.)
 
 Detection:
 - classify() (3.0).

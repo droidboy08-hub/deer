@@ -982,7 +982,8 @@ class Manager {
    * review of Phase 4): a quit gives it its wait back (stopped()), and it continues at the next start.
    */
   runningCount(): number {
-    return this.recs.filter(running).length;
+    // A run that keeps asking with nothing coming in is a wait (Waiting for network, Retrying): it never holds a quit back.
+    return this.recs.filter((r) => running(r) && !this.retryingOf(r)).length;
   }
 
   /** Resolves with the download's view once it is paused, finished, failed or cancelled. */
@@ -997,12 +998,23 @@ class Manager {
   }
 
   /** For tests: the live transfer's measurements. */
-  transferInfo(id: string): { sockets: number; peakLive: number; live: number; reconnects: number; stepAsides: number; diag: Record<string, unknown> | null } | null {
+  transferInfo(id: string): { sockets: number; peakLive: number; live: number; reconnects: number; standbys: number; retrying: unknown; diag: Record<string, unknown> | null } | null {
     const t = this.runs.get(id)?.transfer;
     if (!t) return null;
     return t instanceof FileTransfer
-      ? { sockets: t.sockets.size, peakLive: t.peakLive, live: t.live, reconnects: t.reconnects, stepAsides: t.stepAsides, diag: t.diagnostics() }
-      : { sockets: 0, peakLive: t.live, live: t.live, reconnects: 0, stepAsides: 0, diag: null };
+      ? { sockets: t.sockets.size, peakLive: t.peakLive, live: t.live, reconnects: t.reconnects, standbys: t.standbys, retrying: t.retrying(), diag: t.diagnostics() }
+      : { sockets: 0, peakLive: t.live, live: t.live, reconnects: 0, standbys: 0, retrying: null, diag: null };
+  }
+
+  /**
+   * A running file download that has received nothing for a while and whose every connection is failing (ranged.ts
+   * retrying()): it keeps asking as IDM does, and reads as the wait it is (Waiting for network, Retrying) with
+   * Try now and Pause, never as a download at 0 B/s. Null for any other row.
+   */
+  private retryingOf(r: Rec): ReturnType<FileTransfer['retrying']> {
+    const run = this.runs.get(r.id);
+    if (!run || run.firefox || run.reason || r.state !== 'downloading') return null;
+    return run.transfer instanceof FileTransfer ? run.transfer.retrying() : null;
   }
 
   // ---- starting ----
@@ -2477,6 +2489,10 @@ class Manager {
   }
 
   private stopped(rec: Rec, run: Run, err: unknown): void {
+    // A run that kept asking with nothing coming in (retryingOf()) was a wait: a quit leaves it one, which continues
+    // after the next start as every wait does (G4). As it was when the stop was asked (noteStop(); review: read here,
+    // after every connection had left, it was never a wait).
+    const asking = run.transfer instanceof FileTransfer && !run.firefox ? run.transfer.atStop : null;
     this.runs.delete(rec.id);
     if (err instanceof SaveDeclined) {
       this.removeRec(rec.id);
@@ -2502,6 +2518,9 @@ class Manager {
       // (G4). A run past its check is a download the quit stopped (resumeOnStart: the setting decides).
       if (trying) {
         rec.wait = { ...trying, nextAt: 0 };
+        rec.resumeOnStart = undefined;
+      } else if (asking) {
+        rec.wait = { for: asking.for, since: asking.since, tries: asking.tries, nextAt: 0, ...(asking.status ? { status: asking.status } : {}) };
         rec.resumeOnStart = undefined;
       }
     } else if (run.reason === 'sleep') {
@@ -2735,6 +2754,12 @@ class Manager {
     const rec = this.find(id);
     // While Start over writes its decision, the row is neither checked again nor started.
     if (!rec || this.deciding.has(id)) return;
+    // Try now on a run that keeps asking (retryingOf()): every connection waiting to ask asks now.
+    if (this.retryingOf(rec)) {
+      (this.runs.get(id)?.transfer as FileTransfer).poke();
+      this.touch(rec);
+      return;
+    }
     // A manual action: an attempt of the schedule gives way, and the count starts again (renew.ts),
     // and the original address is asked again even right after a renewal failed (review of Phase 2).
     this.stopRenewing(id);
@@ -4498,7 +4523,9 @@ class Manager {
     const fixing = r.state === 'completed' ? this.fixing.get(r.id) : undefined;
     const runPhase = run?.phase === 'checking' && Date.now() - (run.phaseAt ?? 0) < CHECKING_AFTER ? 'probing' : (run?.phase ?? '');
     const phase = fixing ? 'repairing' : r.state === 'completed' && this.checking.has(r.id) ? 'checking' : runPhase;
-    const wait = r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
+    // A run that keeps asking with nothing coming in reads as its wait (retryingOf()); rec.state stays 'downloading'.
+    const asking = pausing ? null : this.retryingOf(r);
+    const wait = asking ? { for: asking.for, tries: asking.tries, nextAt: asking.nextAt } : r.state === 'paused' && !pausing && r.wait ? { for: r.wait.for, tries: r.wait.tries, nextAt: r.wait.nextAt } : null;
     // Changed after download (4.2): modified after it finished, read from the disk as `missing` is. Not while
     // Deer's own Repair writes it, nor after one a crash cut short until the check after the start has looked.
     const disk = checkDisk && r.state === 'completed' && !!r.path ? diskState(r.path, !!r.final) : null;
@@ -4521,8 +4548,8 @@ class Manager {
       dir: r.dir,
       path: r.path,
       category: categoryOf(r.filename, r.mime),
-      state: pausing ? 'paused' : r.state,
-      phase: pausing ? '' : renewing ? 'renewing' : phase,
+      state: pausing || asking ? 'paused' : r.state,
+      phase: pausing || asking ? '' : renewing ? 'renewing' : phase,
       received,
       total,
       speed,
@@ -4551,7 +4578,7 @@ class Manager {
       need: need ? { kind: need.kind, status: need.status ?? 0, evidence: need.evidence ?? '' } : null,
       wait,
       nextAt: wait?.nextAt ?? 0,
-      status: r.state === 'paused' ? (r.need?.status ?? r.wait?.status ?? 0) : (run?.status ?? 0),
+      status: asking ? asking.status : r.state === 'paused' ? (r.need?.status ?? r.wait?.status ?? 0) : (run?.status ?? 0),
       history: (r.events ?? []).map((e) => ({ at: e.at, text: e.text })),
       // Waiting for link: a row that needs an address, or a file row whose page may need a sign-in (need 'page',
       // Phase 7), armed by Open page (review of Phase 7: the latter waited with no sign of it in the panel).
@@ -5190,6 +5217,8 @@ class Manager {
           continue;
         }
         if (run.reason !== 'cancel' && !(run.reason === 'pause' && !run.resumeAfter)) rec.resumeOnStart = true;
+        // A run that keeps asking with nothing coming in is noted as the wait it is before it stops (stopped()).
+        if (run.transfer instanceof FileTransfer && !run.reason) run.transfer.noteStop();
         run.reason = 'quit';
         run.ac.abort();
         waits.push(this.whenSettled(id));

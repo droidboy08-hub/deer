@@ -1,25 +1,28 @@
 // Phase 4 of spikes/downloader/RESUME-DESIGN.md (section 7; G4 "Restarts, sleep and lost internet"), against
 // the local server's /net, /drop and /busy routes (tests/downloads/server.py) and hard kills (spike.kill(),
 // run.py's @@kill: every runtime process terminated, then a start on the same profile):
-//   - drop: /drop?for=60 cuts a running download's connections and refuses new ones: it reads Waiting for
-//     network (paused, wait 'network'; the speed and time a dash, "Continues when the connection is back",
-//     Try now; the ring "Downloads, 1 waiting, N percent"), every saved byte where its segment says; the
-//     tries come 10 s, then 30 s apart; once the network is back, Try now continues it from its segments:
-//     only what was missing is fetched, sha256 equal;
+//   - drop: /drop?for=30 cuts a running download's connections and refuses new ones: the run keeps asking at once,
+//     as IDM does (retry.ts; the owner's decision of 2026-10-21), and after about 10 s with nothing coming in it
+//     reads Waiting for network (paused, wait 'network'; the speed and time a dash, "Continues when the connection
+//     is back", Try now; the ring "Downloads, 1 waiting, N percent"), every saved byte where its segment says;
+//     once the network is back it continues by itself within a few seconds, after proving one window of the saved
+//     bytes: only what was missing is fetched (and that window), sha256 equal;
 //   - checking: a resume whose check takes a while reads Checking after 400 ms (the bar dimmed at its old
 //     percentage, "Checking the saved part and the link"), never "Starting";
 //   - offline: Firefox switched offline (Services.io.offline, localhost included) while a download runs (its
 //     connections cut at the same moment: Necko keeps open sockets when it goes offline, only new ones
-//     fail): Waiting for network, the tries only counted (nothing reaches the server); switched back online,
-//     the next try comes within 5 s and it completes intact;
+//     fail): Waiting for network, nothing reaches the server (while Windows or Firefox says there is no network
+//     the run asks once every 30 s, not at once); switched back online, it asks at once, receives within 5 s and
+//     completes intact;
 //   - busy: the site answers 503 for 90 s: Retrying ("Retrying · in N s", "The site had a problem (503).
 //     Trying again at HH:MM", Try now), never Failed, then it completes intact; its first run asks 3 times,
 //     each try of the wait once (a wait's try stops its check at the first 503);
 //   - long: a 503 with Retry-After: 3600 stops the run at its first answer: Retrying, the next try an hour
 //     away; Try now completes it;
 //   - alternate: a site that answers 503, then drops the connections, then 503 again: one count (try 1, 2,
-//     3; the next 10 s, 30 s, 1 min later), the 503's clock kept through the network failure; 24 h after
-//     the first 503 the next one fails the row with today's sentence (waits brought forward by hand);
+//     3; each next try 30 s later, IDM's queue rhythm), the 503's clock kept through the network failure; 24 h
+//     after the first 503 it still keeps trying, never Failed (IDM retries without limit; waits brought forward
+//     by hand);
 //   - fatal: failures no wait can fix (a port Gecko blocks, a redirect loop, two Content-Length headers
 //     that disagree) fail as before Phase 4, never Waiting for network;
 //   - sleep: sleep_notification pauses the running download into wait 'sleep' (the store says so);
@@ -334,7 +337,12 @@ spike.main(async () => {
 
   // ---- run 2: after a restart ----
   if (spike.run === 2) {
-    const { stopped, pausedId } = saved();
+    const { stopped, pausedId, asking } = saved();
+    // A run that kept asking with nothing coming in, when the quit came: still the wait it was (it never held the
+    // quit back), not a download the quit stopped.
+    const a0 = rec(asking);
+    check("run 2: a download that was Waiting for network (its run asking) at the quit comes back as that wait, not marked to continue", a0?.state === "paused" && a0.wait?.for === "network" && !a0.resumeOnStart, { state: a0?.state, wait: a0?.wait, flag: a0?.resumeOnStart });
+    engine.cancel(asking);
     const s0 = engine.get(stopped);
     check("run 2: both come back with their bytes; the one the quit stopped is marked to continue, the paused one is not", s0?.received > 0 && engine.get(pausedId)?.received > 0 && (!!rec(stopped)?.resumeOnStart || s0.state !== "paused") && !rec(pausedId)?.resumeOnStart, { s0: s0?.state, flag: rec(stopped)?.resumeOnStart, p: rec(pausedId)?.resumeOnStart });
     await DL.until(stopped, ["downloading", "queued", "completed"], { timeout: 25000, what: "the stopped download to continue" });
@@ -383,19 +391,20 @@ spike.main(async () => {
   // ---- run 1 ----
   await DL.open(DL.base + "/page.html");
 
-  // ---- the network goes away: /drop?for=60 ----
+  // ---- the network goes away: /drop?for=30 ----
   if (want("drop")) {
     await DL.reset();
     const id = engine.start(net("d1", 1024), { filename: "drop.bin", named: true });
     await DL.until(id, ["downloading"], { test: (v) => v.received > 4 * MiB && !v.phase, timeout: 30000, what: "4 MiB before the drop" });
     const t0 = Date.now();
-    await control("/drop?for=60&k=d1");
-    const w1 = await waitingIn(id, "network", 40000);
-    log("waiting for network after", Date.now() - t0, "ms", w1.wait);
-    check("drop: a network that went away makes it Waiting for network (paused, wait 'network'), never Failed", w1.wait.tries === 1 && !w1.need && !w1.error, w1.wait);
-    const next1 = w1.nextAt - Date.now();
-    check("... its next try about 10 s later", next1 > 6000 && next1 <= 10500, next1);
-    check("... every segment claims exactly the bytes in its .part (each connection closed its writer first)", await claimsTrue(id, "medium.bin"));
+    await control("/drop?for=30&k=d1");
+    const w1 = await DL.until(id, ["paused"], { test: (v) => v.wait?.for === "network", timeout: 20000, what: "Waiting for network" });
+    const shown = Date.now() - t0;
+    log("waiting for network after", shown, "ms", w1.wait);
+    check("drop: a network that went away reads Waiting for network (paused, wait 'network') within about 11 s, never Failed, while its run keeps asking (IDM's way)", shown <= 12500 && !w1.need && !w1.error && !!engine.transferInfo(id), { shown, wait: w1.wait, run: !!engine.transferInfo(id) });
+    const asks = (await asked("d1")).filter((q) => q.t * 1000 > t0 + 300);
+    check("... it asks again at once, without giving up (dozens of asks in the drop so far)", asks.length >= 20, asks.length);
+    check("... every segment claims exactly the bytes in its .part", await claimsTrue(id, "medium.bin"));
     await showRow(id);
     const r = row(id);
     check("its row reads Waiting for network with a dash for speed and time", text(r.querySelector(".vd-status")) === "Waiting for network" && text(r.querySelector(".speed")) === "—" && text(r.querySelector(".time")) === "—", [text(r.querySelector(".vd-status")), text(r.querySelector(".speed")), text(r.querySelector(".time"))]);
@@ -414,17 +423,30 @@ spike.main(async () => {
     ui.ring.pop.close(false);
     await sleep(300);
     check("waits never hold a quit back", engine.runningCount() === 0, engine.runningCount());
-    const w2 = await DL.until(id, ["paused"], { test: (v) => v.wait?.tries >= 2 && !engine.transferInfo(id), timeout: 25000, what: "the second try" });
-    const next2 = w2.nextAt - Date.now();
-    check("the second try fails too, the next comes about 30 s later", w2.wait.tries === 2 && next2 > 24000 && next2 <= 30500, [w2.wait.tries, next2]);
-    // The network back: Try now (resume now) goes at once.
-    await waitFor(() => Date.now() - t0 > 61000, { timeout: 70000, interval: 500, what: "the end of the drop" });
-    const before = engine.get(id).received;
-    await DL.reset();
+    // Try now while it waits: the run goes on asking (it is not started again).
     ui.store.primary(engine.get(id));
+    await sleep(300);
+    check("Try now keeps the same run asking (no new Checking)", !!engine.transferInfo(id) && engine.get(id).phase !== "checking", [!!engine.transferInfo(id), engine.get(id).phase]);
+    // What is saved, read while nothing moves (the drop's end is the server's, a moment before ours).
+    await waitFor(() => Date.now() - t0 > 25000, { timeout: 40000, interval: 250, what: "late in the drop" });
+    const before = rec(id).file.segments.reduce((n, sg) => n + sg.received, 0);
+    const marks = rec(id).file.segments.map((sg) => [sg.start, sg.end, sg.start + sg.received]);
+    // The network back: it continues by itself.
+    await waitFor(() => Date.now() - t0 > 30000, { timeout: 40000, interval: 100, what: "the end of the drop" });
+    const back = Date.now();
+    await DL.until(id, ["downloading", "completed"], { test: (v) => v.received > before, timeout: 15000, what: "receiving again" }).catch((e) => {
+      log("not receiving again", JSON.stringify(engine.get(id)), JSON.stringify(engine.transferInfo(id)?.diag?.failures), JSON.stringify(engine.transferInfo(id)?.retrying));
+      throw e;
+    });
+    const resumedIn = Date.now() - back;
+    check("when the network is back it continues by itself within about 3 s, with no Try now", resumedIn <= 3500, resumedIn);
     const done = await DL.until(id, ["completed", "failed"], { timeout: 60000 });
-    const fetched = sentAfterProbe(await since("/net/medium"));
-    check("Try now continues it from its segments: completed intact, only the missing bytes fetched", done.state === "completed" && (await DL.sha256(done.path)) === medium.sha256 && fetched === medium.size - before, { state: done.state, fetched, missing: medium.size - before });
+    // Every answer after the drop starts at or beyond what its segment had saved (nothing saved is fetched again),
+    // but the one window that proved the saved bytes first (64 KiB).
+    const after = (await asked("d1")).filter((q) => q.t * 1000 >= t0 + 1000 && q.status === 206 && (q.sent || 0) > 0);
+    const windows = after.filter((q) => q.end - q.start + 1 === 65536);
+    const refetched = after.filter((q) => q.end - q.start + 1 !== 65536 && !marks.some(([a, z, at]) => q.start >= at && q.start < z));
+    check("... completed intact: only the missing bytes fetched, after one window proved the saved bytes", done.state === "completed" && (await DL.sha256(done.path)) === medium.sha256 && refetched.length === 0 && windows.length === 1 && (engine.transferInfo(id)?.diag?.rejoins ?? 1) >= 1, { state: done.state, refetched: refetched.map((q) => q.range), windows: windows.map((q) => q.range), marks, missing: medium.size - before });
   }
 
   // ---- Checking: a resume's check that takes a while ----
@@ -465,15 +487,15 @@ spike.main(async () => {
       Services.io.manageOfflineStatus = false;
       Services.io.offline = true;
       offAt = Date.now();
-      const w = await waitingIn(id, "network", 40000);
-      check("offline: switched offline, a running download is Waiting for network", w.wait.tries >= 1 && !w.error, w.wait);
-      const w2 = await DL.until(id, ["paused"], { test: (v) => v.wait?.tries >= 2, timeout: 20000, what: "a try counted while offline" });
-      check("... while offline a try is only counted: nothing is started", w2.state === "paused" && !engine.transferInfo(id), w2.wait);
+      const w = await DL.until(id, ["paused"], { test: (v) => v.wait?.for === "network", timeout: 25000, what: "Waiting for network" });
+      check("offline: switched offline, a running download reads Waiting for network (its run waits for the network)", w.wait.tries >= 1 && !w.error && !!engine.transferInfo(id), w.wait);
+      await sleep(4000);
       Services.io.offline = false;
       onAt = Date.now();
-      await sleep(200);
-      const soon = engine.get(id).nextAt - onAt;
-      check("switched online, the next try comes within 5 s", soon <= 5200, soon);
+      const had = engine.get(id).received;
+      await DL.until(id, ["downloading", "completed"], { test: (v) => v.received > had, timeout: 15000, what: "receiving after going online" });
+      const soon = Date.now() - onAt;
+      check("switched online, it asks again at once and receives within 5 s", soon <= 5000, soon);
     } finally {
       Services.io.offline = false;
       Services.io.manageOfflineStatus = managed;
@@ -557,12 +579,12 @@ spike.main(async () => {
     await DL.until(id, ["paused"], { test: (v) => v.wait?.tries >= 3 && !engine.transferInfo(id), timeout: 30000, what: "the third try" });
     const r3 = { ...rec(id).wait };
     const in3 = r3.nextAt - Date.now();
-    check("... a 503 again: Retrying, try 3, the next 1 min later, still counted from the first 503", r3.for === "server" && r3.tries === 3 && in3 > 54000 && in3 <= 60500 && r3.since === r1.since && r3.serverSince === r1.serverSince, { r3, in3 });
-    // 24 h after the first 503, the next one ends it with today's sentence.
+    check("... a 503 again: Retrying, try 3, the next 30 s later (IDM's queue rhythm), still counted from the first 503", r3.for === "server" && r3.tries === 3 && in3 > 24000 && in3 <= 30500 && r3.since === r1.since && r3.serverSince === r1.serverSince, { r3, in3 });
+    // 24 h after the first 503 it still keeps trying (IDM retries without limit; the owner's decision of 2026-10-21).
     rec(id).wait = { ...rec(id).wait, serverSince: Date.now() - 24 * 3600 * 1000 - 1000, nextAt: Date.now() };
     await engine.save(true);
-    const v = await DL.until(id, ["failed", "completed"], { timeout: 30000, what: "the 24 h give-up" });
-    check("... and once the site has failed for 24 h, the row fails with today's sentence", v.state === "failed" && v.error === "The site had a problem serving the file (503)." && !v.wait, [v.state, v.error]);
+    const v = await DL.until(id, ["paused", "failed", "completed"], { test: (x) => x.state !== "paused" || (x.wait?.tries >= 4 && !engine.transferInfo(id)), timeout: 30000, what: "the try after 24 h" });
+    check("... and after 24 h of site errors it still keeps trying: Retrying, never Failed", v.state === "paused" && v.wait?.for === "server" && !v.error, [v.state, v.wait, v.error]);
     await control("/busy?for=0&k=a1");
   }
 
@@ -649,6 +671,12 @@ spike.main(async () => {
   await DL.until(pausedId, ["downloading"], { test: (v) => v.received > 2 * MiB && !v.phase, timeout: 30000, what: "the download the person pauses" });
   engine.pause(pausedId);
   await engine.whenSettled(pausedId);
-  remember({ stopped, pausedId });
+  // One whose network went away: its run keeps asking and reads Waiting for network when the quit comes.
+  const asking = engine.start(net("r6", 128), { filename: "asking-at-quit.bin", named: true });
+  await DL.until(asking, ["downloading"], { test: (v) => v.received > MiB && !v.phase, timeout: 30000, what: "the asking run's first bytes" });
+  await control("/drop?for=120&k=r6");
+  await DL.until(asking, ["paused"], { test: (v) => v.wait?.for === "network" && !!engine.transferInfo(asking), timeout: 30000, what: "the asking run's wait" });
+  check("a run that keeps asking never holds the quit back", engine.runningCount() === 1, engine.runningCount());
+  remember({ stopped, pausedId, asking });
   await spike.restart();
 });

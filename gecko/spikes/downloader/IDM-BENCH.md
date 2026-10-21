@@ -73,5 +73,14 @@ refusals, diagnostics in `transferInfo().diag`) is held by `tests/downloads/conn
 - The first GET without Range (Deer asks bytes=0-0 first, a resume bytes=0-65535: size, range support and
   validators before any connection opens).
 - New connection per part (Deer keeps a connection's partition between parts unless it was cut).
-- Hammering a server that refuses extra connections (a refused Deer connection leaves; the others go on).
-- Joining temp files (Deer writes in place, so nothing is left to do after the last byte).
+- Joining temp files on NTFS (Deer writes in place, so nothing is left to do after the last byte). On drives
+  without sparse files IDM's layout is the better one (the owner's decision of 2026-10-21: IDM-WAY-DESIGN.md).
+
+Since 2026-10-21 (the owner's decision, IDM-WAY-DESIGN.md, retry.ts) Deer asks again as IDM does: a cut at once, a
+site error or a refusal on 4 s steps without limit, a re-ask whenever an answer ends. Measured on the owner's IDM
+the same day: separate part files per connection in %APPDATA%\IDM\DwnlData, joined after the last byte (1 GiB in
+0.8 s on an SSD); on resume after an outage no If-Range and no HEAD, only the 64 overlapping bytes compared, and on a
+mismatch a restart from zero, then one connection; a file whose size changed made it ask about 1,700 times a second
+for ever (Deer says File changed); during a 12 s outage it asked about 1,270 times a second. Deer's only cap is the
+at most 150 asks a second after failures: Necko sends a reset request again up to 10 times itself, so that is about
+IDM's 1,270 a second at the server (a spike measured no lag to speak of up to 800 asks a second).
