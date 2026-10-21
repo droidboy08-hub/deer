@@ -469,7 +469,9 @@ local look-alike type, so a contract change fails `tsc`.
   over everything it must not hide under. The panel scales as a whole below 992x720 and opens in the
   main window from a popup. Connections (`ranged.ts`; compared with IDM 6.43 in
   `spikes/downloader/IDM-BENCH.md`, test `tests/downloads/connections.js`): the .part is sparse while it
-  downloads (no zero-fill wait far into a big file; made ordinary again before it is moved into place),
+  downloads (no zero-fill wait far into a big file; made ordinary again before it is moved into place or
+  kept as a partial file; the room check counts what a .part does not hold yet, GetCompressedFileSizeW,
+  and what other sparse downloads on that disk still need),
   a connection that keeps failing steps aside (10-60 s) or retires instead of pausing the row while
   others still receive bytes, one that goes silent (10 s) or crawls (a quarter of the others' median)
   is cut and its part asked again on a new partition, a reset after bytes is asked again at once, and

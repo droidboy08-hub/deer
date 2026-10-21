@@ -950,14 +950,18 @@ export class FileTransfer {
     // sparse (below), so it holds only what was written and what lies past its farthest write: the room still
     // needed is what it does not hold yet, and the other sparse downloads on that disk still need theirs
     // (review: counting the sized .part as held let a resume or a second download run out of room midway).
+    // A .part that is emptied gives its room back before the room is counted (review).
     const dir = PathUtils.parent(partPath) ?? partPath;
+    if (empty && size > 0) setSize(partPath, 0, { truncate: true });
     let needed = s.total <= 0 ? 0 : !s.ranges && !fresh ? s.total : s.total - Math.max(0, fresh ? 0 : size);
     let holds = -1;
     if (s.ranges && s.total > 0) {
-      holds = size < 0 || empty ? 0 : await heldBytes(partPath);
-      needed = Math.max(0, s.total - (holds >= 0 ? holds : written(s)));
+      // Untold (the worker busy past flushPart's 15 s, or broken): the count from before sparse parts, since a
+      // .part that worker never answered for was most likely never made sparse either.
+      holds = size < 0 || empty ? 0 : await heldBytes(partPath, 20000);
+      needed = Math.max(0, s.total - (holds >= 0 ? holds : Math.max(0, size)));
     }
-    const others = needed > 0 ? stillNeeded(this, dir) : 0;
+    const others = needed > 0 ? await stillNeeded(this, dir) : 0;
     this.diag.room = { needed, others, holds };
     ensureRoom(dir, needed > 0 ? needed + others : 0);
     if (s.ranges && s.total > 0) {
@@ -968,8 +972,9 @@ export class FileTransfer {
       // Also for a .part sized by an older run; where the volume has no sparse files it stays as before.
       const t1 = Date.now();
       const ok = await sparsePart(partPath);
-      this.diag.sparse = { ok, ms: Date.now() - t1 };
-      if (ok) filling.set(this, { dir, left: () => Math.max(0, s.total - written(s)) });
+      this.diag.sparse = { ok: ok === true, ms: Date.now() - t1 };
+      // No answer in time still counts: the call runs when the worker reaches it (review).
+      if (ok !== false) filling.set(this, { dir, path: partPath, total: s.total, written: () => written(s) });
       this.diag.openPartMs = Date.now() - t0;
     } else if (size < 0 || empty) {
       setSize(partPath, 0, { truncate: true });
@@ -1793,23 +1798,30 @@ export function fileFills(s: FileState, n = 8): number[] {
  * Sparse ranged downloads still writing, with the bytes each has left (openPart(); gone when download() ends):
  * a sparse .part holds no room ahead of its writes.
  */
-const filling = new Map<FileTransfer, { dir: string; left: () => number }>();
+const filling = new Map<FileTransfer, { dir: string; path: string; total: number; written: () => number }>();
 
 function written(s: FileState): number {
   return s.segments.reduce((n, seg) => n + seg.received, 0);
 }
 
-/** The drive letter or \\server\share of a path. */
+/** The drive letter or \\server\share of a path (also behind \\?\ and \\?\UNC\). */
 function volumeOf(path: string): string {
-  const m = /^(?:\\\\\?\\)?([A-Za-z]:)|^(\\\\[^\\]+\\[^\\]+)/.exec(path);
-  return (m?.[1] ?? m?.[2] ?? path).toLowerCase();
+  const m = /^(?:\\\\\?\\)?([A-Za-z]:)|^(?:\\\\\?\\UNC\\|\\\\)([^\\]+\\[^\\]+)/i.exec(path);
+  return (m?.[1] ?? (m?.[2] ? `\\\\${m[2]}` : path)).toLowerCase();
 }
 
-/** What the other sparse downloads on `dir`'s disk have left to write. */
-function stillNeeded(self: FileTransfer, dir: string): number {
+/**
+ * The room the other sparse downloads on `dir`'s disk still need: what each .part does not hold yet (the free
+ * space already leaves out what it holds, review), or what it has left to write when the disk can't tell.
+ */
+async function stillNeeded(self: FileTransfer, dir: string): Promise<number> {
   const vol = volumeOf(dir);
   let n = 0;
-  for (const [t, f] of filling) if (t !== self && volumeOf(f.dir) === vol) n += f.left();
+  for (const [t, f] of [...filling]) {
+    if (t === self || volumeOf(f.dir) !== vol) continue;
+    const h = await heldBytes(f.path);
+    n += Math.max(0, f.total - (h >= 0 ? h : f.written()));
+  }
   return n;
 }
 

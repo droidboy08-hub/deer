@@ -846,10 +846,11 @@ export function flushPart(path: string, timeout = 15000): Promise<boolean> {
 /**
  * Mark the .part sparse (FSCTL_SET_SPARSE, off the main thread: workers/flush.js), so writes far into a
  * big file never wait while NTFS fills the gap before them with zeros. False where the volume has no
- * sparse files (FAT, exFAT) or it can't be done: the download goes on as before.
+ * sparse files (FAT, exFAT) or it can't be done: the download goes on as before. Null when the worker did
+ * not answer in time: the call still runs when the worker reaches it, so the file may yet be sparse.
  */
-export function sparsePart(path: string, timeout = 5000): Promise<boolean> {
-  return fileOp('sparse', path, timeout);
+export function sparsePart(path: string, timeout = 5000): Promise<boolean | null> {
+  return fileAsk('sparse', path, timeout).then((data) => (data === null ? null : !!data.ok));
 }
 
 /**

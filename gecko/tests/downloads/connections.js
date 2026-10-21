@@ -28,7 +28,7 @@
 //  13. every connection refused at once mid-run (cut, then 404 on every ask): the row pauses as Link expired,
 //      never Failed (lanes no longer all retire together);
 //  14. the room a sparse download still needs (a sparse .part holds no room ahead of its writes): a fresh one
-//      needs the whole file, a second download on the same disk also counts what the first has left to write,
+//      needs the whole file, a second download on the same disk also counts what the first does not hold yet,
 //      and a resumed .part counts what it does not hold yet (workers/flush.js 'held').
 /* global spike, Services, ChromeUtils, DL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
@@ -236,8 +236,11 @@ spike.main(async () => {
   const id14b = engine.start(`${DL.base}/blob/medium?rate=512`, { pageUrl: page });
   await DL.until(id14b, ["downloading"], { test: (v) => v.received > 0, timeout: 30000, what: "the second's first bytes" });
   const other14 = room(id14b);
-  log("room: second download", other14);
-  check("a second download on the same disk counts what the first still has to write", !!other14 && other14.needed === 24 * MiB && other14.others > 200 * MiB && other14.others < 256 * MiB, other14);
+  const first14 = DL.view(id14)?.received ?? 0;
+  log("room: second download", other14, "first received", first14);
+  // What the first still needs is what its .part does not hold: less than what it has left to write, since the part
+  // past its farthest write is still held (counting that too refused downloads that fit, review).
+  check("a second download on the same disk counts the room the first still needs, once", !!other14 && other14.needed === 24 * MiB && other14.others > 100 * MiB && other14.others < 256 * MiB - first14, { room: other14, first: first14 });
   engine.cancel(id14b);
   await DL.until(id14b, ["cancelled"], { timeout: 10000 }).catch(() => null);
   engine.remove(id14b);

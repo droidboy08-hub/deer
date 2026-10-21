@@ -4128,8 +4128,6 @@ class Manager {
       // RESUME-DESIGN.md 5.7: the decision reaches the record first (flushed).
       await (await this.ledgerOf(rec))?.decision('keep');
       await this.save(true);
-      // The kept file is an ordinary one, as in placeFinished().
-      await unsparsePart(part).catch(() => false);
       if (!ready()) {
         rec.keeping = undefined;
         return;
@@ -4160,6 +4158,9 @@ class Manager {
         await this.save(true);
         return;
       }
+      // The kept file is an ordinary one, as in placeFinished(); cleared once it is cut to its unbroken beginning,
+      // so no hole is filled first (review: before the cut, every hole that is about to go was zero-filled).
+      await unsparsePart(target, 60000).catch(() => false);
       rec.keeping = undefined;
       rec.path = target;
       rec.filename = PathUtils.filename(target);

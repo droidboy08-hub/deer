@@ -605,6 +605,10 @@ spike.main(async () => {
     await waitFor(() => !ui.panel.open, { what: "the panel to close" });
     // Keep partial, then Resume and the row's primary verb (Space) right after the part was moved.
     const tick = () => new Promise((r) => Services.tm.dispatchToMainThread(r));
+    const { ctypes } = ChromeUtils.importESModule("resource://gre/modules/ctypes.sys.mjs");
+    const k32 = ctypes.open("kernel32.dll");
+    const attrsOf = k32.declare("GetFileAttributesW", ctypes.winapi_abi, ctypes.uint32_t, ctypes.char16_t.ptr);
+    const before = attrsOf(rec(id).path + ".part");
     const t0 = Date.now() / 1000;
     const pk = engine.keepPartial(id);
     let turns = 0;
@@ -625,6 +629,10 @@ spike.main(async () => {
     log("keeprace", { turns, mid: [mid.state, mid.need?.kind ?? "", mid.path], after: after.state, started, end: [d.state, d.path, d.note], files, fetched: brief(fetched) });
     check("Resume during Keep partial's last step starts nothing: completed, no new .part, nothing fetched", rec(id).path.includes("(partial)") && mid.state === "paused" && !started && d.state === "completed" && !engine.transferInfo(id) && d.path.endsWith("kr (partial).bin") && !files.some((f) => /\.part$/.test(f) && /kr/.test(f)) && !fetched.length, { turns, started, state: d.state, path: d.path, files, fetched: fetched.length });
     check("the part the earlier Start over set aside went with Keep partial, as the row said", !(await exists(older)), files);
+    // The .part was sparse while it filled (ranged.ts openPart()); the kept file is an ordinary one.
+    const attrs = attrsOf(d.path);
+    k32.close();
+    check("the kept partial file is not sparse (its .part was)", before !== 0xffffffff && (before & 0x200) !== 0 && attrs !== 0xffffffff && (attrs & 0x200) === 0, { part: "0x" + before.toString(16), kept: "0x" + attrs.toString(16) });
   }
 
   // ---- peek: a click in a peek sheet that continues a row flies from the sheet's header ----
