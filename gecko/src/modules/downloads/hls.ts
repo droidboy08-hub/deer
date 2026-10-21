@@ -1500,7 +1500,14 @@ export class StreamTransfer {
       // (each with its own 200) took If-Range down to Last-Modified and then to nothing within one swap, and
       // the next answer of the new file was written unchecked.
       res.destroy();
-      await this.vouch(url, now, verify);
+      try {
+        await this.vouch(url, now, verify);
+      } catch (err) {
+        // The proof was another connection's and ran under its signal, which a hedge race stopped (review): this
+        // connection asks again, and a new proof starts under its own. Never an abort that was not its own.
+        if (err instanceof AbortedError && !signal.aborted) continue;
+        throw err;
+      }
       this.slipped(url, lm);
       this.tags.set(url, { etag: v.etag || known.etag, lm: v.lm || known.lm });
     }

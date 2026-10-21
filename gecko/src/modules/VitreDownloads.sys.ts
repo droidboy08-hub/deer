@@ -2448,6 +2448,9 @@ class Manager {
       this.touch(rec);
       return;
     }
+    // The unsparse placeFinished() did not wait for may have reached the file only after block() moved it
+    // (review): clear the mark where the file is now (on an ordinary file this changes nothing).
+    void unsparsePart(target, 60000).catch(() => false);
     rec.quarantine = '';
     rec.path = target;
     rec.filename = PathUtils.filename(target);
