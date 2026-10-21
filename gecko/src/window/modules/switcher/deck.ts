@@ -7,7 +7,7 @@
 import { lens } from '../../glass';
 import type { Tab } from '../../model';
 import { tabText } from './search';
-import { cardAt, cardName, el, EXPAND, fadeLayers, favicon, glassBox, labelChanged, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING, wait } from './parts';
+import { cardAt, cardName, el, EXPAND, fadeLayers, favicon, glassBox, labelChanged, labelIcon, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING, wait } from './parts';
 import type { Model, View, ViewHandlers } from './types';
 
 const PEEK_SCALE = 0.86;
@@ -18,6 +18,8 @@ const DOCK_PAD = 10;
 const DOT = 40;
 const DOT_GAP = 8;
 const PILL = 216;
+/** A split pair's dot is the capsule at dock size (spec "Switcher"): two dots and the gap between. */
+const PAIR_EXTRA = DOT + DOT_GAP;
 const FIELD_W = 476;
 const DROP_MS = 220;
 /** Cards this far from the selection get their picture painted (the others are not on screen). */
@@ -59,7 +61,7 @@ function geometry(host: HTMLElement): Geometry {
   return { W, H, cw, ch, left: (W - cw) / 2, top, off: cw * NEIGHBOUR, scale: W / cw, dy: H / 2 - (top + ch / 2), dockTop };
 }
 
-const dotsWidth = (n: number): number => 2 * DOCK_PAD + n * DOT + Math.max(0, n - 1) * DOT_GAP + (PILL - DOT);
+const dotsWidth = (n: number, pairs: number): number => 2 * DOCK_PAD + n * DOT + pairs * PAIR_EXTRA + Math.max(0, n - 1) * DOT_GAP + (PILL - DOT);
 
 export class DeckView implements View {
   readonly root = el('sw-view sw-deck');
@@ -239,7 +241,7 @@ export class DeckView implements View {
     title.append(l.title);
     const host = el('h', 'span');
     host.append(l.detail);
-    c.label.replaceChildren(favicon(t, 18), title, host);
+    c.label.replaceChildren(labelIcon(t, this.m, 18), title, host);
     c.el.setAttribute('aria-label', cardName(t, this.m));
   }
 
@@ -325,6 +327,18 @@ export class DeckView implements View {
     if (!labelChanged(dot, t, this.m)) return;
     const title = el('t', 'span');
     title.textContent = tabText(t).title;
+    // A split pair: the capsule at dock size, its two favicons centred on two dots' footprint with
+    // the hairline between (Pair capsule), the title after them once selected.
+    const p = this.m.pair(t.id);
+    dot.classList.toggle('pair', !!p);
+    if (p) {
+      const left = el('pf l', 'span');
+      left.append(favicon(p.left, 16));
+      const right = el('pf r', 'span');
+      right.append(favicon(p.right, 16));
+      dot.replaceChildren(left, el('hair', 'span'), right, title);
+      return;
+    }
     dot.replaceChildren(favicon(t, 16), title);
   }
 
@@ -341,13 +355,15 @@ export class DeckView implements View {
       window.setTimeout(() => dot.remove(), DROP_MS + 40);
     }
     const n = this.dotEls.size;
-    const content = dotsWidth(n);
+    const pairs = [...this.dotEls.keys()].filter((id) => this.m.pair(id)).length;
+    const content = dotsWidth(n, pairs);
     const width = Math.round(this.m.latched ? Math.min(FIELD_W, g.W - 32) : Math.min(content, g.W - 96));
     this.dock.classList.toggle('latched', this.m.latched);
     Object.assign(this.dock.style, { left: `${Math.round((g.W - width) / 2)}px`, top: `${g.dockTop}px`, width: `${width}px` });
     // Too many tabs for the window: keep the pill in view.
     const i = selId === undefined ? 0 : this.m.all.indexOf(selId);
-    const pillLeft = DOCK_PAD + Math.max(0, i) * (DOT + DOT_GAP);
+    const before = this.m.all.slice(0, Math.max(0, i));
+    const pillLeft = DOCK_PAD + before.length * (DOT + DOT_GAP) + before.filter((id) => this.m.pair(id)).length * PAIR_EXTRA;
     const shift = content > width ? Math.max(width - content, Math.min(0, width / 2 - (pillLeft + PILL / 2))) : 0;
     this.row.style.transform = `translateX(${shift}px)`;
     this.setLens(width);

@@ -190,7 +190,7 @@ export class Omnibox {
       if (!this.open) return;
       const side = this.b.splitView.sideOf(this.b.active());
       this.setSide(side);
-      this.field.classList.toggle('mixed', !!side && this.b.splitView.mixed());
+      this.paintMixed(!!side && this.b.splitView.mixed());
     });
   }
 
@@ -221,7 +221,7 @@ export class Omnibox {
     this.original = tab && tab.kind === 'web' ? tab.url : '';
     this.input.value = opts.query ?? this.original;
     this.setSide(opts.side ?? null);
-    this.field.classList.toggle('mixed', !!opts.side && this.b.splitView.mixed());
+    this.paintMixed(!!opts.side && this.b.splitView.mixed());
     if (!this.open) {
       this.open = true;
       this.field.hidden = false;
@@ -237,6 +237,12 @@ export class Omnibox {
     this.moved = false;
     this.historyRows = [];
     this.refresh(true);
+  }
+
+  /** Split view's mixed tint on the field and its suggestions (spec "Split pill": Mixed tint). */
+  private paintMixed(on: boolean): void {
+    this.field.classList.toggle('mixed', on);
+    this.panel.classList.toggle('mixed', on);
   }
 
   /** Split view: the field is for one side (its glyph and name), or for the one page (null). */

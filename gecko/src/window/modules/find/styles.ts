@@ -23,6 +23,8 @@ export const CSS = `
 #vitre-root.find-face #vitre-bar .item.tab.active .load-line { visibility: hidden !important; }
 #vitre-root.find-face #vitre-bar .item.tab.active > .tint { transition: opacity 160ms ease; }
 #vitre-root.find-face.find-focused #vitre-bar .item.tab.active > .tint { opacity: 0; transition: opacity 200ms ease; }
+#vitre-root.find-face #vitre-bar .item.tab.active > .tint-mix { transition: opacity 160ms ease; }
+#vitre-root.find-face.find-focused #vitre-bar .item.tab.active > .tint-mix { opacity: 0; transition: opacity 200ms ease; }
 #vitre-root.find-own #vitre-bar .item.tab.active { visibility: hidden; }
 #vitre-root.find-cooldown #vitre-bar .item.active .reload { pointer-events: none; }
 
@@ -50,6 +52,14 @@ export const CSS = `
   --vf-hover: rgba(255,255,255,0.10); --vf-press: rgba(255,255,255,0.16);
   --vf-case-bg: rgba(76,194,255,0.24); --vf-case-ring: inset 0 0 0 1px rgba(76,194,255,0.45); --vf-case-on: #9fe3ff;
 }
+
+/* Split view (spec "With the rest of Deer": Find; FindPill mixedLight / mixedDark): over a pair whose
+   pages disagree the face takes its theme's mixed tint (vf-mixed follows the pill's own .mixed), and
+   with its own glass the darker page's contact shadow. */
+#vitre-root.theme-light #layer-find .vf-face.vf-mixed { --vf-focus: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); --vf-mix: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-root:is(.theme-dark, .theme-clear) #layer-find .vf-face.vf-mixed { --vf-focus: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); --vf-mix: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
+#vitre-root #layer-find .vf-face.vf-mixed .vf-base { background: var(--vf-mix); }
+#vitre-root.theme-light #layer-find .vf-face.vf-own.vf-mixed { box-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3); }
 
 /* ---- the pill's find face ---- */
 #vitre-root #layer-find .vf-face {

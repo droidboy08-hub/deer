@@ -47,6 +47,41 @@ once); a local http server serves tests/split/pages on 127.0.0.1 (localhost is a
             the shown unfocused side is never discarded
   restore   a restart brings the pairs back with their focused side and ratio (also a pair that was
             in the background, whose tabs load lazily)
+  lift      dragging a tab circle to an edge (phase 2): the 300 ms hold before the 5 px window move, the
+            lifted circle (1.08 from its resting shadow, its slot's rim at 0.5, the mixed tint over a
+            plate, Deer's globe as an outline in the copy and the plate, a flat white favicon on its
+            contrast plate in the copy and the ghost: pages/flat.html), the zones (outer thirds below
+            the bar band) and their plates (the other zone only cross-fades), a drop on either side, a
+            drop replacing a side of the active pair, Esc / a drop in the middle / on the bar cancel
+            and the circle flies back, a release in place is a click, a quick drag still moves the
+            window, touch and pen never lift, nothing under 648 px, over a collapsed pair or for Home
+            beside Home; in F11 a held circle lifts and drops too, and a quick drag moves nothing;
+            keyboard focus is back in the page after a drop or a cancel; a right-click during a lift
+            neither drops it nor opens a menu; no lift in a window that lost focus during the hold,
+            and a lift whose button went up elsewhere ends at the next move
+  motion    the motion (phase 2, spec "Motion", board SplitMotion): split forms (the pill slides from
+            its old slot, the joining circle morphs into its half and lands exactly on it, its globe an
+            outline, the pane slides 24 px in, the seam, the plate and both rims fade in, the glass over
+            the new pane cross-fades to the mixed tint in 200 ms, the frosted cover until first paint),
+            focus moves (the plate glides, the group's theme cross-fades), the mixed tint cross-fading
+            as the gutter passes, separate (the half back into its circle, the pane's picture slides
+            out while the other page keeps its pane, then widens; the rims fade out), close one side
+            (the half collapses into the seam, the pill settles out of the mixed tint in 200 ms), swap
+            sides, capsule <-> pill, collapse (the hidden pane fades over 150 ms) and restore
+  reduced   motion.js with reduced motion: 150 ms cross-fades, no glide, slide, flight or ghost
+  glass     the mixed tint on the address field's suggestions and on the find face, one contact
+            shadow for the split pill (the darker page's); none of it without a split
+  switcher  the switcher's pair card: one entry, both pages at the ratio with the gutter scaled, the
+            capsule in the dock, a search matching either side opens that side, Ctrl+W and Delete
+            on a pair card close both tabs (two closed-list entries)
+  ring      F6 with find open (the pill stop is the find field) and with a peek open (its stops take
+            its page's place), the divider's place in the Tab order (bar -> divider -> page; a
+            Shift+Tab between two links of the page leaves Ctrl+L, Ctrl+F and a click alone), a
+            Home side's video background showing its poster frame until Home fills the window
+  extras    the link status bubble in the pane under the pointer (12 px in from its bottom-left),
+            element full screen from one pane (Esc returns to the split), the forced-colours look of
+            the gutter, the rims, the focused half, the grip and the drop plate, Ctrl+W twice on a
+            pair closing both sides
 
 Without names all of them run. Logs and captures: tests/split/out/<name>/ (log.txt and *.png).
 No test reaches the internet.
@@ -74,6 +109,13 @@ TESTS = {
     'narrow': ('narrow.js', 300),
     'fixes': ('fixes.js', 380),
     'restore': ('restore.js', 240),
+    'lift': ('lift.js', 420),
+    'motion': ('motion.js', 300),
+    'reduced': ('motion.js', 300, ['--pref', 'ui.prefersReducedMotion=1']),
+    'glass': ('glass.js', 240),
+    'switcher': ('switcher.js', 300),
+    'ring': ('ring.js', 300),
+    'extras': ('extras.js', 240),
 }
 
 
@@ -138,13 +180,15 @@ def main():
     suffix = (app or 'build').replace('\\', '-').replace('/', '-').replace(':', '')
     failed = []
     for name in names:
-        script, timeout = TESTS[name]
+        script, timeout, *extra = TESTS[name]
         out = os.path.join(OUT, name)
         os.makedirs(out, exist_ok=True)
         cmd = [PY, os.path.join(ROOT, 'tools', 'run.py'), '--test', os.path.join(HERE, script), '--name', 'split-%s-%s-t' % (name, suffix),
                '--out', out, '--timeout', str(timeout), '--env', 'SPLIT_PORT=%d' % port]
         if app:
             cmd += ['--app', app]
+        for more in extra:
+            cmd += more
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace')
         text = r.stdout + r.stderr
         with open(os.path.join(out, 'log.txt'), 'w', encoding='utf-8') as f:

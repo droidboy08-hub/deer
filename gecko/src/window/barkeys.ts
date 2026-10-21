@@ -8,6 +8,9 @@
 // capsule are stops: Enter on the unfocused half focuses that side, on the focused half opens its
 // address field (the half stands where the address button does), on a capsule half shows the pair;
 // Shift+F10 or the Menu key opens that half's menu (Swap sides, Separate tabs, Close both tabs).
+// With a split showing, Tab on the bar's last stop goes to the divider, the one Tab stop between the
+// tab bar and the focused page (spec "Divider": Keyboard); Shift+Tab on the divider comes back to it
+// (focusLast, split.ts).
 // Feature modules that add a stop to the bar (the downloads ring) give it the attribute data-bar-stop.
 // A data-bar-stop element may also live outside #vitre-bar, anywhere in #vitre-root (the downloads
 // ring sits at the window's bottom right in its own layer, keymap.json: "Left and Right then cross
@@ -72,8 +75,26 @@ export class BarKeys {
     stops[next].focus({ focusVisible: true } as FocusOptions);
   }
 
+  /** The bar's last stop in drawn order takes focus (Shift+Tab on the split divider). */
+  focusLast(): void {
+    const stops = this.stops();
+    const last = stops[stops.length - 1];
+    if (last) last.focus({ focusVisible: true } as FocusOptions);
+    else this.b.focusPage();
+  }
+
   private onKey(e: KeyboardEvent): void {
-    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key === 'Tab' && !e.shiftKey && this.b.splitView.showing()) {
+      const stops = this.stops();
+      const last = stops[stops.length - 1];
+      if (last && (last === document.activeElement || last.contains(document.activeElement))) {
+        e.preventDefault();
+        this.b.splitView.dividerElement.focus({ focusVisible: true } as FocusOptions);
+      }
+      return;
+    }
+    if (e.shiftKey) return;
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     const stops = this.stops();
     const at = stops.findIndex((s) => s === document.activeElement || s.contains(document.activeElement));

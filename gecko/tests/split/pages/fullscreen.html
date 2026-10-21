@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Stage</title>
+<style>
+  body { margin: 0; background: #101114; color: #e8e8ea; font: 16px/1.6 "Segoe UI", sans-serif; }
+  main { padding: 96px 32px; }
+  #stage { width: 320px; height: 180px; background: #2a3b5c; display: flex; align-items: center; justify-content: center; }
+  #fs { font: inherit; padding: 8px 16px; }
+</style>
+<main>
+  <h1>Stage</h1>
+  <p><a id="link" href="light.html?from-stage">Field Notes</a></p>
+  <div id="stage"><button id="fs" type="button">Full screen</button></div>
+</main>
+<script>
+  const root = document.documentElement;
+  document.getElementById('fs').addEventListener('click', () => {
+    document.getElementById('stage').requestFullscreen().then(() => { root.dataset.fs = 'in'; }, (e) => { root.dataset.fs = 'error ' + e; });
+  });
+  document.addEventListener('fullscreenchange', () => { root.dataset.fs = document.fullscreenElement ? 'in' : 'out'; });
+</script>

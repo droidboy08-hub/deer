@@ -1,8 +1,9 @@
 // Helpers for the split view tests (tests/split/*.js). Load with
 //   Services.scriptloader.loadSubScript("resource://vitre-boot/slib.js", window);
 // Gives window.SL. Pages come from the local server tests/split/all.py starts (SPLIT_PORT): light.html
-// (Field Notes, a light page), dark.html (Tideline, a dark page), links.html, focus.html. Input is
-// synthesized in-process (spike.press / spike.click / EventUtils), never OS input.
+// (Field Notes, a light page), dark.html (Tideline, a dark page), links.html, focus.html, flat.html
+// (Flat Mark: a flat white favicon). Input is synthesized in-process (spike.press / spike.click /
+// EventUtils), never OS input.
 /* global spike, Services, Ci, gBrowser */
 window.SL = (() => {
   const b = window.vitre;

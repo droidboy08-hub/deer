@@ -25,7 +25,11 @@ import type { Browser } from '../../browser';
 import * as fx from '../../firefox';
 import type { Tab } from '../../model';
 import { drawable, loadingDocument, newId, onDiscard } from './gecko';
-import { drawCover, type Media } from './parts';
+import { drawCover, drawCoverInto, type Media } from './parts';
+
+/** Split view's gutter (split.ts GUTTER) and the panes' inner corners, scaled into a pair card. */
+const GUTTER = 8;
+const PANE_RADIUS = 8;
 
 /** The deck card is 60% of the window: pictures are taken at that size. */
 const SCALE = 0.6;
@@ -88,6 +92,9 @@ export class Thumbs {
       if (info?.withinPair) return;
       const prev = before !== undefined ? b.tab(before) : undefined;
       if (prev && prev !== t) void this.capture(prev, 'leave');
+      // Leaving a pair: its other side was on screen too (its card shows both pages).
+      const partner = prev ? b.splitView.partner(prev) : null;
+      if (partner && partner !== t) void this.capture(partner, 'leave');
       this.later(t.id, AFTER_SHOW, () => {
         if (b.activeId === t.id && !this.fresh(t.id, 60_000)) void this.capture(t, 'show');
       });
@@ -180,6 +187,48 @@ export class Thumbs {
     }
     if (media.painted < 0) media.empty(t);
     void this.decode(t.id);
+  }
+
+  /**
+   * A split pair's card (../design/SPLIT-VIEW-SPEC.md "Switcher": both pages at the ratio, with the
+   * gutter scaled): the left side's picture in its share of the card, the gutter in the Appearance
+   * mode's colour, the right side's in the rest, each with its inner corners. Painted once both
+   * pictures that exist are decoded; a side with none leaves its part in the gutter's colour.
+   */
+  paintPair(left: Tab, right: Tab, share: number, media: Media): void {
+    const el = this.entries.get(left.id);
+    const er = this.entries.get(right.id);
+    if (!el && !er) {
+      if (media.painted < 0) media.empty(left);
+      return;
+    }
+    const version = (el?.version ?? 0) * 1_000_000 + (er?.version ?? 0);
+    if (media.painted === version) return;
+    const waiting = [left, right].filter((t) => {
+      const e = this.entries.get(t.id);
+      return e && !e.bitmap;
+    });
+    if (waiting.length) {
+      for (const t of waiting) void this.decode(t.id);
+      if (media.painted < 0) media.empty(left);
+      return;
+    }
+    const canvas = media.canvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    const k = W / Math.max(1, window.innerWidth);
+    const g = Math.max(1, Math.round(GUTTER * k));
+    const r = Math.max(1, Math.round(PANE_RADIUS * k));
+    const lw = Math.round(Math.max(0, Math.min(1, share)) * (W - g));
+    ctx.fillStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#202020' : '#f3f3f3';
+    ctx.fillRect(0, 0, W, H);
+    if (el?.bitmap) drawCoverInto(ctx, el.bitmap, 0, 0, lw, H, [0, r, r, 0]);
+    if (er?.bitmap) drawCoverInto(ctx, er.bitmap, lw + g, 0, W - lw - g, H, [r, 0, 0, r]);
+    media.filled(version);
+    if (el?.bitmap) this.touch(left.id);
+    if (er?.bitmap) this.touch(right.id);
   }
 
   /** Hand the tab's decoded picture to fn, if there is one now. */

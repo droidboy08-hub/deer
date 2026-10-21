@@ -97,11 +97,21 @@ export function marked(text: string, ranges: Range[]): DocumentFragment {
   return out;
 }
 
-/** Title and detail line with the query's matches marked. */
+/** Title and detail line with the query's matches marked (a pair card: the side that matched, else its own). */
 export function labelParts(t: Tab, m: Model): { title: DocumentFragment; detail: DocumentFragment } {
-  const match = m.match(t.id);
-  const d = detailLine(t, match);
-  return { title: marked(tabText(t).title, match?.title ?? []), detail: marked(d.text, d.ranges) };
+  const f = m.face(t.id) ?? t;
+  const match = m.match(f.id);
+  const d = detailLine(f, match);
+  return { title: marked(tabText(f).title, match?.title ?? []), detail: marked(d.text, d.ranges) };
+}
+
+/** A card's icon: the tab's favicon, or a pair's two favicons with a hairline between (the capsule's). */
+export function labelIcon(t: Tab, m: Model, size: number): Element {
+  const p = m.pair(t.id);
+  if (!p) return favicon(t, size);
+  const box = el('sw-pairfav', 'span');
+  box.append(favicon(p.left, size), el('hair', 'span'), favicon(p.right, size));
+  return box;
 }
 
 /**
@@ -111,14 +121,21 @@ export function labelParts(t: Tab, m: Model): { title: DocumentFragment; detail:
  */
 const labelKeys = new WeakMap<Element, string>();
 export function labelChanged(label: Element, t: Tab, m: Model): boolean {
-  const key = [t.title, t.url, t.favicon ?? '', t.kind, m.query, t.id === m.startId].join('|');
+  const p = m.pair(t.id);
+  const pair = p ? [p.left.id, p.left.title, p.left.favicon ?? '', p.right.id, p.right.title, p.right.favicon ?? '', m.face(t.id)?.id ?? ''].join('|') : '';
+  const key = [t.title, t.url, t.favicon ?? '', t.kind, m.query, t.id === m.startId, pair].join('|');
   if (labelKeys.get(label) === key) return false;
   labelKeys.set(label, key);
   return true;
 }
 
-/** Accessible name for a card, e.g. "Float glass, refract.wiki, current tab". */
+/** Accessible name for a card, e.g. "Float glass, refract.wiki, current tab"; a pair's "Field Notes and Tideline, split view". */
 export function cardName(t: Tab, m: Model): string {
+  const p = m.pair(t.id);
+  if (p) {
+    const current = p.left.id === m.startId || p.right.id === m.startId;
+    return [`${tabText(p.left).title} and ${tabText(p.right).title}, split view`, current ? 'current tab' : ''].filter(Boolean).join(', ');
+  }
   const x = tabText(t);
   return [x.title, x.host, t.id === m.startId ? 'current tab' : ''].filter(Boolean).join(', ');
 }
@@ -190,6 +207,26 @@ export class Media {
     this.placeholder?.remove();
     this.placeholder = null;
   }
+}
+
+/**
+ * Draw a bitmap so it covers the rectangle (x, y, w, h) of a 2D context, keeping the top of the page,
+ * clipped to rounded corners `radii` (a pair card's panes: their inner corners).
+ */
+export function drawCoverInto(ctx: CanvasRenderingContext2D, source: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number, radii: number[]): void {
+  if (!source.width || !source.height || w <= 0 || h <= 0) return;
+  const scale = Math.max(w / source.width, h / source.height);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = Math.max(0, (source.width - sw) / 2);
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, radii);
+  ctx.clip();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = scale < 0.75 ? 'high' : 'medium';
+  ctx.drawImage(source, sx, 0, sw, sh, x, y, w, h);
+  ctx.restore();
 }
 
 /** Draw a bitmap into a canvas so it covers it, keeping the top of the page (the part users know). */

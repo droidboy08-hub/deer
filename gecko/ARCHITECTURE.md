@@ -231,11 +231,15 @@ Same shape as the Electron `Browser` so modules port directly (the full contract
   A tab's `url` is its pending address from the moment the load is asked for (`browser.userTypedValue`,
   when it is an absolute URL: Firefox's search-terms persistence writes a results page's terms there),
   and it counts as `loading` until a document arrives: `t.url === target && !t.loading` means loaded.
-- Split view (`split.ts`, below): `split(other? | 'home')`, `separate(ref?)`, `swapSides(ref?)`,
+- Split view (`split.ts`, below): `split(other? | 'home', { side? })` (a side: that side, replacing it
+  in an active pair: a dropped circle), `separate(ref?, { animate? })`, `swapSides(ref?)`,
   `splitRatio(ref?, r?)`, `units()` (the bar's units: a tab, or a pair as one), `shown(tab)` (on screen:
   the active tab or the other side of the active pair), `pairOf(ref)`, `splitView` (the model), the
   event `split-changed`, and `tab-activated`'s second argument `{ withinPair }`. `openLink(..., 'current',
   { targetBrowser })` loads into another page than the active one (the other side of a pair).
+  `closeTab(ref, { animate })` and `separate(ref, { animate })` are Deer's own gestures: a side of the
+  split on screen is pictured first and leaves with its pane's motion. `bar.lift` (`splitlift.ts`) is the
+  circle lift; `painted(browser)` says whether a page's current document has painted.
 - Windows: `openWindow(url?, { private, ...principals })`. In a popup window (`isPopup`) `newTab`,
   `openLink('tab')` and `reopenClosed` act on the most recent normal window; the tab-strip actions do
   nothing there.
@@ -265,8 +269,10 @@ Same shape as the Electron `Browser` so modules port directly (the full contract
   `'window-open'`, `window.open` / `target=_blank`; the latest interceptor is asked first; load a taken
   request with `openLink(request, where)`; a taken `window.open` opens no tab and no window and returns
   null to the page), services (`provide`, `service`, `whenService`, below),
-  `layer(id, z)` (z: home-bg 7, peek 8, omni-scrim 9 (core; a module layer at 9 made after boot paints
-  over the dim: find-ring, downloads-video), bar 10, peek-rise and downloads-ring 11, find 12, omnibox
+  `layer(id, z)` (z: split-motion 6 (core: a closed or separated pane's picture leaving), home-bg 7, peek
+  8, omni-scrim 9 (core; a module layer at 9 made after boot paints over the dim: find-ring,
+  downloads-video), bar 10, peek-rise and downloads-ring 11, find 12, split-lift 13 (core: a lifted
+  circle, its cover and drop plates), omnibox
   20, panels and popovers 30, switcher 40, downloads-flight 45, menus 50, downloads-prompt 55 (the quit
   prompt: it closes an open menu and the switcher first), tips 60 (core)),
   `css(id, text)`, `scrollThumb(scroller)` (`scrollthumb.ts`: the panels' 2 px overlay scroll thumb in
@@ -378,11 +384,61 @@ source. Its header is the contract.
   link in split view", "Open link on the right side" in a pair; not for image links), the pill menu's
   "New tab in split view", Ctrl+Shift+U (page-first, `splitView`, rebindable; an extension that binds
   the same chord keeps it), a half's menu (Swap sides, Separate tabs), the capsule's menu (Close both
-  tabs), a half's x or middle-click, Ctrl+W on the focused side.
-- Not yet (phase 2): dragging a circle to an edge after a 300 ms hold, and the full motion (morphs,
-  slides, the plate's glide, the theme cross-fade).
+  tabs), a half's x or middle-click, Ctrl+W on the focused side, and a background circle dragged to an
+  edge (below).
+- Lift (`splitlift.ts`, phase 2; spec "By dragging a tab circle to an edge", boards SplitDrop, SplitSpec):
+  `bar.ts watchDrag()` runs a 300 ms hold timer on a background circle before its 5 px window move, so a
+  quick drag still moves the window (and Aero Snap from maximized); mouse only (by touch and pen
+  press-and-hold is Windows' context menu); also in F11 (no window move there). The lifted circle is a
+  glass copy in layer `split-lift` (z 13) at 1.08 with the lift shadow over a transparent cover holding
+  the pointer (`setPointerCapture`), its slot keeps the rim alone at 0.5 (row lenses held off); the zones
+  are the outer thirds below the 68 px band (past the window's edges too), each with the frosted drop
+  plate 8 px inside the pane the tab would get ("Replaces <tab>" with a pair active; one reveal per
+  lift, the other zone only cross-fades); a drop calls `split(t, { side })` (with a pair active that
+  side is replaced, the replaced tab back in the bar); a release within 5 px is a click; Esc (first key
+  hook and Esc layer 5), a drop elsewhere or on the bar, the window losing focus, a move with the
+  button no longer held or the tab closing cancel (the copy flies back 280 ms). Only the lifting button
+  ends it (a right-click meanwhile is swallowed). Keyboard focus, which the press gave the circle, goes
+  back where it was (the page) when the lift ends. Not under 648 px, over a collapsed pair
+  (`dropAllowed`), in a popup, or after the window lost focus during the hold; Home never beside Home.
+  Tests read `b.bar.lift.state` and may lower `holdMs`.
+- Motion (phase 2; spec "Motion", board SplitMotion; `splitmotion.ts`, `bar.ts` morph / crossFade,
+  `split.ts` enterPane / leaving / fadeCollapse): when a render makes or ends a pair the items morph
+  (the pair's item starts on the pill it continues, the joining or dropped circle is a glass "ghost" that
+  morphs into its half, aimed at the half's real place once the extension buttons have moved into the
+  new pill (a microtask after the render: `Ghost.retarget`), the seam fades in at 120 ms and the plate
+  at 240 ms; ending, the other half morphs back into its circle and the remaining pill re-centres its
+  address; a closed side's half folds into the seam), the plate glides between halves (240 ms), Swap
+  sides crosses the halves over (320 ms) and fades the pages in, the group's theme cross-fades (a veil
+  in the old theme: 150 ms on a focus move, 200 ms as a pair forms or ends; not while a module holds the
+  theme), every glass item's mixed tint is its own `.tint-mix` layer so it cross-fades (150 ms as the
+  gutter passes; 200 ms as a pair forms, a side is replaced or a pair ends: `sv-forming`, set by
+  `paintSplitTheme` before any tint changes; a new pill continues the mixed state its glass was drawn
+  in). The joining pane slides 24 px in and fades (a page that has not painted keeps a frosted cover,
+  at most 600 ms), and both rims fade in at 240 ms (a side replaced: its own). A side closed or
+  separated by Deer's own gestures is pictured first (a snapshot, at most 150 ms; a second Ctrl+W
+  meanwhile closes its partner); then the model changes (the bar's morph starts), that picture slides
+  24 px out (layer `split-motion`, z 6), the rims fade out (200 ms), and the page that stays keeps its
+  pane for 250 ms (`[vitre-hold]` on the tab panels: the panel absolutely placed where it was, so its
+  page does not lay out, on the gutter's colour; `holdPane`, test knob `holdMs`, `held`), then fills
+  the window in one step (spec "Close one side", "Separate"; SplitMotion's 250 ms). A split, another
+  tab or a resize ends the hold at once. A window narrowed under 648 px fades the pane it hides
+  (150 ms) before `[vitre-collapsed]`. Pages never animate their width. Reduced motion: 150 ms
+  cross-fades, no morph, glide, slide, flight, pulse or hold (the leaving picture fades over the page
+  that widened at once).
+- With the rest of Deer (phase 2): the address field's suggestions and find's face take the mixed tint
+  (`#vitre-omni-panel.mixed`, `.vf-face.vf-mixed`); the split pill has one contact shadow, the darker
+  page's (`sh-*`); the switcher draws a pair as one card with both pictures at the laid-out ratio and the
+  gutter scaled (`thumbs.paintPair`), the capsule in the deck's dock, a search matching either side
+  (opening the side that matched) and Ctrl+W / Delete on a pair card closing both; F6 with find open
+  (the pill stop is the find field: `find/controller.ts`) or a peek open (its stops replace its source
+  page's: `peek/index.ts`); the divider is the one Tab stop between the bar's last stop and the focused
+  page (Tab, Shift+Tab, Shift+Tab out of the page's first element); the link status bubble shows in the
+  pane under the pointer (Firefox keeps `#statuspanel` after the selected browser; split.ts moves it on
+  `OverLink`); a Home side's video background shows its first frame until Home fills the window again
+  (`pages/home/home.ts inSplit`).
 - Tests: `python tests/split/all.py [--app build-x]` (start, end, bar, panes, divider, keys, narrow,
-  fixes, restore).
+  fixes, restore; phase 2: lift, motion, reduced, glass, switcher, ring, extras).
 
 ## Feature modules and their services
 

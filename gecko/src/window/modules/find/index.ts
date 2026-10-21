@@ -26,6 +26,7 @@
 //                            with the last query and step)
 //   Esc ladder               70: the focused find field closes find; 90: parked find (after the page)
 //   Key hook                 F6 / Shift+F6 move between the find field and its page while find is open
+//                            (in split view the field is the ring's pill stop: left page, right page, field)
 //   Layers                   find (z 12: the face and the capsule), find-ring (z 9: the landing ring)
 //   #vitre-root classes      find-face, find-focused, find-own, find-cooldown (styles.ts), find-in-peek
 //   :root[vitre-find-in-peek] set while the capsule shows in a peek's header (a CSS hook; the peek

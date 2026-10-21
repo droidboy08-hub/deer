@@ -18,7 +18,15 @@ export interface Model {
   /** Latched: stays open with Ctrl up (Enter opens, Esc cancels). */
   latched: boolean;
   tab(id: number): Tab | undefined;
+  /** The search's ranges, by the id of the tab whose text matched (a pair card's: face(id)). */
   match(id: number): Match | null;
+  /**
+   * Split view (../design/SPLIT-VIEW-SPEC.md "With the rest of Deer": Switcher): a pair is one entry,
+   * its card both pages at the ratio. The entry's pair (its two tabs and the left pane's share), or null.
+   */
+  pair(id: number): { left: Tab; right: Tab; share: number } | null;
+  /** The tab whose title and address label a card: a pair card's side that matched the search, else the entry's own. */
+  face(id: number): Tab | undefined;
   /**
    * Paint the tab's picture into a card's media (thumbs.ts). Cheap when nothing changed since the
    * last paint. A picture that must be decoded first arrives later through View.refresh(id).

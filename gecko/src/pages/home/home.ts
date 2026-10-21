@@ -2,7 +2,8 @@
 // It shows the background the user chose in Settings (settings.homeBackground):
 //   windows   the user's Windows desktop wallpaper (a screen-sized cached copy, see VitreHome)
 //   image     a picture file
-//   video     a video file, muted and looping; it plays only while this tab is on screen
+//   video     a video file, muted and looping; it plays only while this tab is on screen and fills
+//             the window (a side of a split view shows its first frame, the poster: see inSplit)
 //   none      the plain base colour
 // and tells every window which glass suits it (VitreHome.setTheme: light over a bright picture,
 // clear otherwise). A file that cannot be shown falls back to "none"; a video that breaks after its
@@ -26,7 +27,7 @@
 // only, takes no input from the web, and loads nothing from the network.
 //
 // State for tests and diagnostics, on <html>: data-kind, data-state (loading | ready | error),
-// data-theme, data-luma, data-cached (memory | true | false), data-ms, data-playing (video),
+// data-theme, data-luma, data-cached (memory | true | false), data-ms, data-playing and data-split (video),
 // data-blank-frames (frames this page drew before its first background was on screen), and the
 // timings data-t-script, -picture, -decoded, -shown (ms since the tab started loading Home).
 // With the pref vitre.home.timing set to true they are also written to the browser console.
@@ -114,20 +115,44 @@ function topLuma(el: Media): number | null {
   }
 }
 
-/** A video plays only while Home is on screen and motion is welcome. */
+/**
+ * This Home is a side of the split view on screen (../design/SPLIT-VIEW-SPEC.md "With the rest of
+ * Deer": Home: a video background shows its poster frame until Home fills the window again). The
+ * page runs in the parent process: its window's Browser (window.vitre) says so. A collapsed split
+ * shows one side filling the window: that one plays.
+ */
+function inSplit(): boolean {
+  try {
+    const top = (window as any).browsingContext?.topChromeWindow;
+    const b = top?.vitre;
+    const t = b?.tabFor?.((window as any).docShell?.chromeEventHandler);
+    return !!t && !!b.splitView?.showing?.() && !!b.pairOf?.(t);
+  } catch {
+    return false;
+  }
+}
+
+/** A video plays only while Home is on screen, fills the window and motion is welcome. */
 function syncPlayback(): void {
   const v = current;
   if (!(v instanceof HTMLVideoElement)) {
     delete root.dataset.playing;
+    delete root.dataset.split;
     return;
   }
   if (v.error) {
     root.dataset.playing = 'false'; // stopped for good (its last frame stays): not started again
     return;
   }
-  if (document.visibilityState === 'visible' && !reducedMotion.matches) {
+  const split = inSplit();
+  root.dataset.split = String(split);
+  if (document.visibilityState === 'visible' && !reducedMotion.matches && !split) {
     if (v.paused) v.play().catch(() => undefined);
-  } else if (!v.paused) v.pause();
+  } else {
+    if (!v.paused) v.pause();
+    // A split side shows the video's first frame, its poster.
+    if (split && v.currentTime > 0) v.currentTime = 0;
+  }
   root.dataset.playing = String(!v.paused);
 }
 
@@ -351,3 +376,5 @@ const unsubscribe = VitreSettings.onChange((s, changed) => {
 window.addEventListener('unload', () => unsubscribe(), { once: true });
 document.addEventListener('visibilitychange', syncPlayback);
 reducedMotion.addEventListener('change', syncPlayback);
+// A pair forming or ending (or collapsing) resizes the page.
+window.addEventListener('resize', syncPlayback);

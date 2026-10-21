@@ -8,7 +8,7 @@ import { lens } from '../../glass';
 import { icons } from '../../icons';
 import type { Tab } from '../../model';
 import { setTip } from '../../tips';
-import { cardAt, cardName, el, EXPAND, fadeLayers, favicon, flight, glassBox, labelChanged, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING } from './parts';
+import { cardAt, cardName, el, EXPAND, fadeLayers, flight, glassBox, labelChanged, labelIcon, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING } from './parts';
 import type { Model, View, ViewHandlers } from './types';
 
 const CW = 291;
@@ -200,7 +200,8 @@ export class GridView implements View {
     close.tabIndex = -1;
     close.setAttribute('aria-hidden', 'true');
     close.append(svg(icons.closeSmall));
-    setTip(close, 'Close tab', 'Ctrl+W');
+    // A split pair's card closes both tabs (spec "Switcher").
+    setTip(close, this.m.pair(t.id) ? 'Close both tabs' : 'Close tab', 'Ctrl+W');
     const label = el('sw-glabel');
     label.setAttribute('aria-hidden', 'true');
     inner.append(face, close, label);
@@ -220,7 +221,7 @@ export class GridView implements View {
     host.append(l.detail);
     const txt = el('txt', 'span');
     txt.append(title, host);
-    c.label.replaceChildren(favicon(t, 16), txt);
+    c.label.replaceChildren(labelIcon(t, this.m, 16), txt);
     c.el.setAttribute('aria-label', cardName(t, this.m));
   }
 

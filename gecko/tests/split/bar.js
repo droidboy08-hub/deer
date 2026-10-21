@@ -106,8 +106,12 @@ spike.main(async () => {
   const overRight = pair.filter((x) => x.x + x.w > rects.right.x);
   const onlyLeft = pair.filter((x) => x.x + x.w <= rects.left.r);
   check("Field Notes (light) focused beside Tideline (dark): glass over the dark page takes the mixed tint, glass only over the light one does not", overRight.length > 0 && overRight.every((x) => x.mixed) && onlyLeft.every((x) => !x.mixed), pair);
-  const tint = getComputedStyle(SL.pairItem().querySelector(":scope > .tint")).backgroundImage;
-  check("the light theme's mixed tint: white 0.70 -> 0.54", tint.includes("0.7") && tint.includes("0.54"), tint);
+  // The mixed tint is its own layer over the glass's tint, so the two cross-fade (phase 2).
+  await sleep(300);
+  const mixLayer = getComputedStyle(SL.pairItem().querySelector(":scope > .tint-mix"));
+  const tint = mixLayer.backgroundImage;
+  const plain = getComputedStyle(SL.pairItem().querySelector(":scope > .tint")).opacity;
+  check("the light theme's mixed tint: white 0.70 -> 0.54 (its layer shown, the plain tint hidden)", tint.includes("0.7") && tint.includes("0.54") && mixLayer.opacity === "1" && plain === "0", { tint, mix: mixLayer.opacity, plain });
   const winctl = document.getElementById("vitre-winctl");
   check("the window controls sample the page under them: dark over Tideline while the bar is light", winctl.classList.contains("theme-dark") && b.root.classList.contains("theme-light"), winctl.className);
   await spike.capture("bar-4-mixed");

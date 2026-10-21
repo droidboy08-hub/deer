@@ -21,7 +21,12 @@
 //                             empty Home opens on the right, focused, its field open. Returns the
 //                             pair, or null when refused (popup window, window under 648 px, Home
 //                             with Home, a pinned tab).
-//   b.separate(ref?)          both tabs stay open; the focused side stays active.
+//   b.split(other, { side })  with a side: `other` goes on that side (a circle dropped on an edge,
+//                             splitlift.ts); with a pair active it replaces that side.
+//   b.separate(ref?, { animate })  both tabs stay open; the focused side stays active. animate (the
+//                             menus, Ctrl+Shift+U): the other pane's picture slides out as it goes,
+//                             and the page that stays fills the window 250 ms later (holdPane).
+//   b.closeTab(ref, { animate })   a side closed from Deer's own gestures: its pane's picture slides out.
 //   b.swapSides(ref?)         the pages trade places; the divider stays where it is.
 //   b.splitRatio(ref?, r?)    the left pane's share of (window - 8 px), 3 decimals, per pair,
 //                             saved with the session (tab value RATIO_KEY on the column-0 tab).
@@ -49,23 +54,43 @@
 // split shows, never moved, not displayed without one): the divider (the gutter
 // itself; ew-resize; grip after a 120 ms rest; live resize at most once per frame, with the ghost
 // fallback when the frame that carried a re-layout took over 50 ms; one magnet at 50/50 +-8 px;
-// double-click 50/50; Esc cancels; Left/Right 16 px, Shift 64 px, Home/End to the minimums, Enter
-// 50/50; a Tab stop whose grip and ring show for keyboard focus only: a press hands focus back to
-// the page), the rims (1 px inside each pane; the focused one in the accent, a 2 px pulse after a
-// keyboard move) and the crash card ("This page stopped" over an unfocused pane whose process
-// died). Keyboard focus in the layer goes to the page when the layer hides. The polite live region
-// for the announcements is in #vitre-root (it must speak when no split shows).
+// double-click 50/50; Esc cancels; a bar revealed in hiding mode stays shown during a drag;
+// Left/Right 16 px, Shift 64 px, Home/End to the minimums, Enter 50/50; a Tab stop whose grip and
+// ring show for keyboard focus only: a press hands focus back to the page), the rims (1 px inside
+// each pane; the focused one in the accent, a 2 px pulse after a keyboard move) and the crash card
+// ("This page stopped" over an unfocused pane whose process died). Keyboard focus in the layer goes
+// to the page when the layer hides. The polite live region for the announcements is in #vitre-root
+// (it must speak when no split shows).
+//
+// Motion (spec "Motion"; splitmotion.ts; the bar's part is in bar.ts): a pair forming slides the
+// joining pane 24 px in from its outer edge (280 ms) as it fades in (200 ms), under a frosted cover
+// until its page has painted (at most 600 ms, then a 200 ms fade), and both rims fade in at 240 ms (a
+// side replaced: its own); a side that goes (Separate tabs, a side closed by Deer's own gestures) is
+// pictured first (a snapshot, at most 150 ms), then its picture slides 24 px outward and fades
+// (200 ms) and the rims fade out (200 ms) while the page that stays keeps its pane (holdPane: its page
+// does not lay out), which fills the window in one step 250 ms later ("then the other page widens";
+// SplitMotion); Swap sides fades both pages in (150 ms); a window narrowed under 648 px fades the
+// pane it hides (150 ms) before vitre-collapsed hides it, and a collapsed split coming back enters as
+// a pair forming. Reduced motion: 150 ms cross-fades (a leaving picture fades over the page that
+// widened at once).
 //
 // Fixes for "only the active tab is on screen" (spec "Build notes"): setSuccessor both ways (closing
 // a side gives focus to its partner), framefocusrequested from the unfocused pane is dropped unless
 // that pane had input in the last second, a mouse side button (AppCommand Back / Forward) over the
 // unfocused pane focuses it first, the shown unfocused side is never discarded (low memory,
-// tabs.discard: fx.guardDiscard); the rest is in browser.ts (moveTab, cycleMru, openLink
+// tabs.discard: fx.guardDiscard), the link status bubble shows in the pane under the pointer (Firefox
+// keeps it in the selected one); the rest is in browser.ts (moveTab, cycleMru, openLink
 // targetBrowser, the F6 ring, shown()).
+//
+// Tab order (spec "Divider": one Tab stop between the tab bar and the focused page): Tab on the bar's
+// last stop goes to the divider (barkeys.ts), Tab on the divider into the focused page, Shift+Tab on
+// it back to the bar's last stop, and Shift+Tab out of the focused page's first element to the divider
+// (only focus leaving the page that way: a Shift+Tab the page keeps for itself leaves nothing behind).
 import type { Browser } from './browser';
 import { el } from './dom';
 import * as fx from './firefox';
 import type { Tab } from './model';
+import { FADE_MS, fadeIn, paneEnter, paneLeave, reduced, within } from './splitmotion';
 
 export type Side = 'left' | 'right';
 
@@ -184,10 +209,63 @@ function pagePrincipal(url: string, userContextId: number): unknown {
   return Services.scriptSecurityManager.createContentPrincipal(Services.io.newURI(url), { userContextId });
 }
 
+/**
+ * The page's compositor layers are there (MozBrowser hasLayers, browser-custom-element.js; what
+ * AsyncTabSwitcher.sys.mjs waits for with MozLayerTreeReady before it shows a tab).
+ */
+function hasLayers(browser: XULBrowser): boolean {
+  try {
+    return !!(browser as unknown as { hasLayers?: boolean }).hasLayers;
+  } catch {
+    return true;
+  }
+}
+
+/** The page asks before it closes (MozBrowser hasBeforeUnload): its prompt must not come after its pane has gone. */
+function asksBeforeUnload(browser: XULBrowser): boolean {
+  try {
+    return !!(browser as unknown as { hasBeforeUnload?: boolean }).hasBeforeUnload;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Firefox's link status bubble, #statuspanel (tabbrowser/status-panel.js StatusPanel.panel). Firefox
+ * keeps it after the selected browser (Tabbrowser.sys.mjs appendStatusPanel(browser), called on every
+ * tab switch); XULBrowserWindow.setOverLink (browser.js) dispatches "OverLink" on the window, with
+ * detail.url, before it updates the bubble.
+ */
+function statusPanel(): HTMLElement | null {
+  try {
+    return ((window as any).StatusPanel?.panel as HTMLElement | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Put the status bubble after `browser` (gBrowser.appendStatusPanel; default: the selected browser). */
+function putStatusPanel(browser?: XULBrowser): void {
+  try {
+    gb().appendStatusPanel(browser);
+  } catch {
+    /* not up yet */
+  }
+}
+
 /** The events Firefox's split view sends (tabbrowser/tabsplitview.mjs, Tabbrowser.sys.mjs addTabSplitView); all bubble to the window. */
 const SPLIT_EVENTS = ['SplitViewCreated', 'SplitViewRemoved', 'TabSplitViewActivate', 'TabSplitViewDeactivate', 'SplitViewTabChange'];
 
-const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** A pane's picture is taken in at most this long before it goes (else it goes without one). */
+const PICTURE_MS = 150;
+/**
+ * The page that stays keeps its pane this long after the other side went, while that side's picture
+ * slides out (200 ms), then widens in one step (spec "Close one side", "Separate"; SplitMotion widens
+ * it 250 ms after the separate).
+ */
+const HOLD_MS = 250;
+/** The frosted cover over a pane whose page has not painted stays at most this long (spec "Split forms"). */
+const COVER_MS = 600;
 
 export class SplitView {
   /** The window is under 648 px (and not back at 680 yet): only the focused side shows. */
@@ -198,6 +276,8 @@ export class SplitView {
   ghost = false;
   /** Tests may lower it (to 0) to force ghost mode. */
   ghostThreshold = GHOST_MS;
+  /** How long the page that stays keeps its pane after a side went (holdPane); tests may raise it. */
+  holdMs = HOLD_MS;
 
   private layer!: HTMLElement;
   private divider!: HTMLElement;
@@ -223,6 +303,18 @@ export class SplitView {
   private edge: number | null = null;
   /** When a press on the divider began while it did not have focus (its focus then goes back to the page). */
   private pressAt = -Infinity;
+  /** Tabs whose pane is being pictured before it goes (Separate, a closed side). */
+  private outgoing = new Set<Tab>();
+  /** Of those, the sides that close once pictured (closeSide). */
+  private closingSides = new Set<Tab>();
+  /** A Shift+Tab in the focused page: if focus leaves it for Deer's window, it lands on the divider. */
+  private shiftTab: { at: number; tab: Tab } | null = null;
+  /** A collapse under way: the pane it hides is fading (fadeCollapse). */
+  private collapsing: { timer: number; anim: Animation | null } | null = null;
+  /** A divider drag keeps a revealed bar shown (hiding mode): the release. */
+  private barHold: (() => void) | null = null;
+  /** The page that stays after a side went keeps its pane for HOLD_MS (holdPane). */
+  private holding: { tab: Tab; timer: number } | null = null;
 
   constructor(private b: Browser) {}
 
@@ -372,7 +464,7 @@ export class SplitView {
    * Pair the active tab with `other` (see the header), or open a Home side ('home'). Focus stays
    * where it was, except for the Home side, which is focused with its field open.
    */
-  start(other: Tab | 'home'): Pair | null {
+  start(other: Tab | 'home', opts: { side?: Side } = {}): Pair | null {
     const b = this.b;
     const a = b.active();
     const current = this.pairOf(a);
@@ -390,6 +482,7 @@ export class SplitView {
       if (!home) return null;
       const p = this.create(a, home, a);
       if (!p) return null;
+      this.enterPane(home, { pair: true });
       b.activate(home);
       this.announce('New tab opened on the right');
       // The empty side needs typing: its field opens, as on a new tab (browser.ts newTab).
@@ -399,16 +492,42 @@ export class SplitView {
       return p;
     }
     if (other === a || other.pinned || a.pinned || !b.tabs.includes(other)) return null;
-    if (current) return this.pairOf(other) ? null : this.replaceSide(current, other);
+    if (current) return this.pairOf(other) ? null : this.replaceSide(current, other, opts.side);
     if (a.kind === 'home' && other.kind === 'home') return null;
     const otherPair = this.pairOf(other);
     if (otherPair) return null; // a side of a background pair joins through its capsule's menu, not here
-    // The joining tab keeps its side of the bar: left of the pill is the left half.
-    const left = b.tabs.indexOf(other) < b.tabs.indexOf(a) ? other : a;
+    // The joining tab keeps its side of the bar (left of the pill is the left half), unless it was
+    // dropped on a side.
+    const left = opts.side ? (opts.side === 'left' ? other : a) : b.tabs.indexOf(other) < b.tabs.indexOf(a) ? other : a;
     const right = left === a ? other : a;
     const p = this.create(left, right, a);
-    if (p) this.announce(`${titleOf(other)} opened on the ${left === other ? 'left' : 'right'}`);
+    if (p) {
+      this.enterPane(other, { pair: true });
+      this.announce(`${titleOf(other)} opened on the ${left === other ? 'left' : 'right'}`);
+    }
     return p;
+  }
+
+  /**
+   * A circle dropped on `side` (splitlift.ts) may go there: not with a window too narrow, a popup,
+   * pinned tabs, the active tab itself or a side of another pair, and Home never with Home (with a
+   * pair active the side it would stay beside is the other one). Nor while the active pair is
+   * collapsed (a window narrowed under 648 px and not back at 680 yet): only its focused side shows,
+   * so there are no drop zones, as in a window too narrow for split view (spec "Too narrow",
+   * "Collapsed window").
+   */
+  dropAllowed(t: Tab, side: Side): boolean {
+    const a = this.b.active();
+    if (this.refusal() || !a || t === a || t.pinned || a.pinned || this.pairOf(t) || !this.b.tabs.includes(t)) return false;
+    const p = this.active();
+    if (p && this.collapsed) return false;
+    const stays = p ? (side === 'left' ? p.right : p.left) : a;
+    return !(stays.kind === 'home' && t.kind === 'home');
+  }
+
+  /** A circle dropped on a side: split view with `t` on that side; with a pair active it replaces that side. */
+  drop(t: Tab, side: Side): Pair | null {
+    return this.dropAllowed(t, side) ? this.start(t, { side }) : null;
   }
 
   /** The tab `other` would replace in the active pair (its Home side, else its unfocused side). */
@@ -420,9 +539,9 @@ export class SplitView {
     return p.left === a ? p.right : p.left;
   }
 
-  /** Put `incoming` in place of one side of `p`; a web tab it replaces goes back to the bar, a Home side closes. */
-  private replaceSide(p: Pair, incoming: Tab): Pair | null {
-    const out = this.replaced(p);
+  /** Put `incoming` in place of one side of `p` (`side`, else replaced()); a web tab it replaces goes back to the bar, a Home side closes. */
+  private replaceSide(p: Pair, incoming: Tab, side?: Side): Pair | null {
+    const out = side ? p[side] : this.replaced(p);
     if (!out || incoming === out) return null;
     const kept = out === p.left ? p.right : p.left;
     if (kept.kind === 'home' && incoming.kind === 'home') return null;
@@ -447,7 +566,10 @@ export class SplitView {
     const made = keptLeft ? this.create(kept, incoming, kept, ratio) : this.create(incoming, kept, kept, ratio);
     if (focusedOut) b.activate(incoming);
     if (out.kind === 'home' && b.tabs.includes(out)) b.closeTab(out);
-    if (made) this.announce(`${titleOf(incoming)} opened on the ${keptLeft ? 'right' : 'left'}`);
+    if (made) {
+      this.enterPane(incoming);
+      this.announce(`${titleOf(incoming)} opened on the ${keptLeft ? 'right' : 'left'}`);
+    }
     return made;
   }
 
@@ -478,12 +600,147 @@ export class SplitView {
     return p;
   }
 
-  /** Both tabs stay; the focused side stays active, the other becomes a circle on its own side. */
-  separate(p: Pair | null = this.active()): void {
+  /**
+   * Both tabs stay; the focused side stays active, the other becomes a circle on its own side. With
+   * `animate` (Deer's own gestures) the other pane is pictured first and its picture slides out
+   * (spec "Separate": then the page widens).
+   */
+  separate(p: Pair | null = this.active(), opts: { animate?: boolean } = {}): void {
     if (!p) return;
+    if (opts.animate && this.showing() === p) {
+      const out = this.b.active() === p.left ? p.right : p.left;
+      void this.leaving(out, () => {
+        if (this.pairsNow.includes(p)) this.separate(p);
+      });
+      return;
+    }
     unsplit(p.wrapper);
     this.sync();
     this.announce('Split view closed');
+  }
+
+  /**
+   * A side closed by Deer's own gestures (Ctrl+W, the half's x or middle-click, its menu's Close tab):
+   * its pane is pictured first, then the tab closes and its picture slides 24 px outward and fades
+   * (spec "Close one side"). A page that asks before it closes closes at once (its prompt shows in
+   * place). False when `t` is no side of the pair on screen (the caller closes it as usual).
+   */
+  closeSide(t: Tab): boolean {
+    // A second close of a side already on its way out (Ctrl+W twice within its picture's 150 ms) is
+    // meant for the tab that takes focus once it has gone: its partner.
+    if (this.closingSides.has(t) && this.pairOf(t)) {
+      const other = this.partner(t);
+      if (other) this.b.closeTab(other);
+      return true;
+    }
+    const p = this.showing();
+    if (!p || (p.left !== t && p.right !== t) || asksBeforeUnload(t.browser) || this.outgoing.has(t)) return false;
+    this.closingSides.add(t);
+    void this.leaving(t, () => {
+      this.closingSides.delete(t);
+      if (this.b.tabs.includes(t)) this.b.closeTab(t);
+    });
+    return true;
+  }
+
+  /**
+   * Picture the pane `t` shows (at most PICTURE_MS), run `then` (the model changes: the bar's morph
+   * starts), then let the picture leave (splitmotion.paneLeave: 24 px outward, fading, 200 ms) while
+   * the page that stays keeps its pane, which widens in one step once the picture has gone (spec "Close
+   * one side", "Separate": "then the other page widens"; SplitMotion: 250 ms after). The rims fade
+   * out over 200 ms (SplitMotion "pane leave"). With reduced motion the picture fades out (150 ms)
+   * over the page that widened at once: a cross-fade.
+   */
+  private async leaving(t: Tab, then: () => void): Promise<void> {
+    if (this.outgoing.has(t)) return;
+    this.outgoing.add(t);
+    const rect = this.paneOf(t);
+    const side = this.sideOf(t);
+    let picture: ImageBitmap | null = null;
+    if (rect && side) picture = await within(this.b.snapshot(t.browser, null, Math.max(1, window.devicePixelRatio || 1)), PICTURE_MS);
+    this.outgoing.delete(t);
+    // What stays on screen, read before the model changes: the other pane and both rims.
+    const stay = this.paneOf(t) ? this.partner(t) : null;
+    const stayRect = stay ? this.paneOf(stay) : null;
+    const rims = rect ? this.rimPictures() : [];
+    then();
+    // The pair has gone once Firefox's model says so (a closed side's wrapper goes in a microtask: sync).
+    queueMicrotask(() => {
+      const gone = !this.showing() || !this.b.tabs.includes(t) || !this.pairOf(t);
+      if (!picture || !rect || !side || !gone) {
+        picture?.close();
+        return;
+      }
+      const layer = this.b.layer('split-motion', 6);
+      if (stay && stayRect && !reduced() && this.b.active() === stay && !this.showing()) this.holdPane(stay, stayRect, side === 'left' ? 'right' : 'left');
+      paneLeave(layer, picture, rect, side);
+      for (const rim of rims) {
+        layer.append(rim);
+        void rim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced() ? FADE_MS : 200, easing: 'ease', fill: 'forwards' }).finished.catch(() => undefined).then(() => rim.remove());
+      }
+    });
+  }
+
+  /** Pictures of the two rims where they are now (window coordinates), for their fade out once their layer has gone. */
+  private rimPictures(): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    for (const rim of [this.rims.left, this.rims.right]) {
+      const r = rim.getBoundingClientRect();
+      if (!r.width) continue;
+      const cs = getComputedStyle(rim);
+      const node = el('div', { class: 'sv-rim-out', 'aria-hidden': 'true' });
+      Object.assign(node.style, { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px`, height: `${Math.round(r.height)}px`, border: `${cs.borderTopWidth} solid ${cs.borderTopColor}`, borderRadius: cs.borderRadius });
+      out.push(node);
+    }
+    return out;
+  }
+
+  /**
+   * The page that stays keeps its pane's place and width (its page does not lay out again) for
+   * HOLD_MS, then fills the window in one step: attribute vitre-hold on the tab panels, the CSS below.
+   * Ends early when anything else changes the content area (a split, another tab, a resize).
+   */
+  private holdPane(stay: Tab, r: DOMRect, side: Side): void {
+    this.releaseHold();
+    let panels: HTMLElement;
+    try {
+      panels = tabpanels();
+    } catch {
+      return;
+    }
+    const base = panels.getBoundingClientRect();
+    panels.style.setProperty('--vitre-hold-x', `${Math.round(r.left - base.left)}px`);
+    panels.style.setProperty('--vitre-hold-w', `${Math.round(r.width)}px`);
+    panels.setAttribute('vitre-hold', side);
+    this.holding = { tab: stay, timer: window.setTimeout(() => this.releaseHold(), this.holdMs) };
+  }
+
+  private releaseHold(): void {
+    const h = this.holding;
+    if (!h) return;
+    this.holding = null;
+    window.clearTimeout(h.timer);
+    try {
+      const panels = tabpanels();
+      panels.removeAttribute('vitre-hold');
+      panels.style.removeProperty('--vitre-hold-x');
+      panels.style.removeProperty('--vitre-hold-w');
+    } catch {
+      /* closing */
+    }
+    // The strip of the page under the bar changed with its width.
+    this.b.resample();
+  }
+
+  /** For tests: the page that stays is held at its pane (the tab), or null. */
+  get held(): Tab | null {
+    return this.holding?.tab ?? null;
+  }
+
+  /** The left pane's share of the panes' width as laid out now (the 320 px minimums applied): the switcher's pair card. */
+  layoutShare(p: Pair): number {
+    const W = this.paneArea();
+    return W > 0 ? this.leftWidth(this.layoutRatio(p)) / W : 0.5;
   }
 
   /** The pages trade places; the divider stays where it is (the ratio moves to the new column-0 tab). */
@@ -499,6 +756,13 @@ export class SplitView {
     this.sync();
     const now = this.pairsNow.find((x) => x.wrapper === p.wrapper);
     if (now && Math.abs(r - 0.5) > 0.0005) this.setRatio(now, r);
+    // The pages swap in one re-layout and fade in over 150 ms (spec "Swap sides"; the bar crosses the halves over).
+    if (now && this.showing() === now) {
+      for (const t of [now.left, now.right]) {
+        const panel = panelOf(t.node);
+        if (panel) fadeIn(panel, FADE_MS);
+      }
+    }
     this.announce('Sides swapped');
   }
 
@@ -598,6 +862,49 @@ export class SplitView {
       if (target?.localName === 'browser') this.lastInput.set(target as unknown as XULBrowser, performance.now());
     };
     for (const type of ['mousedown', 'pointerdown', 'keydown', 'touchstart']) window.addEventListener(type, input, true);
+    // Shift+Tab out of the focused page's first element lands on the divider (spec "Divider": the
+    // divider is one Tab stop between the tab bar and the focused page). Firefox moves focus to
+    // the element before the page's browser in the window: that landing (the other pane's browser
+    // too, which would select that side) goes to the divider instead. Only that landing: a Shift+Tab
+    // the page keeps (between its own links) leaves no trace, so the key or press after it is not
+    // redirected. It is the focus that leaves the page's browser itself (the focus event's
+    // relatedTarget, which Gecko sets within the chrome document), soon after the Shift+Tab, with
+    // no other key or press in between.
+    const shiftTab = (e: KeyboardEvent): void => {
+      const p = this.showing();
+      const a = this.b.active();
+      if (e.key !== 'Tab' || !e.shiftKey || e.ctrlKey || e.altKey || !p || !a || (e.target as Element | null) !== (a.browser as unknown as Element)) {
+        // Any other key (or the Shift+Tab of another element) ends the wait.
+        if (e.key !== 'Shift') this.shiftTab = null;
+        return;
+      }
+      this.shiftTab = { at: performance.now(), tab: a };
+    };
+    window.addEventListener('keydown', shiftTab, true);
+    b.onDestroy(() => window.removeEventListener('keydown', shiftTab, true));
+    const pressed = (): void => {
+      this.shiftTab = null;
+    };
+    for (const type of ['mousedown', 'pointerdown', 'touchstart']) window.addEventListener(type, pressed, true);
+    b.onDestroy(() => {
+      for (const type of ['mousedown', 'pointerdown', 'touchstart']) window.removeEventListener(type, pressed, true);
+    });
+    const landed = (e: FocusEvent): void => {
+      const st = this.shiftTab;
+      const target = e.target as Element | null;
+      if (!st || performance.now() - st.at > 600 || !target || target === this.divider) return;
+      if (target === (st.tab.browser as unknown as Element) || !this.showing()) return;
+      // Focus moved from somewhere else than the page (a module's own field, a window raised): not the tab-out.
+      if (e.relatedTarget !== (st.tab.browser as unknown as EventTarget)) return;
+      this.shiftTab = null;
+      window.setTimeout(() => {
+        if (!this.showing() || !this.b.tabs.includes(st.tab)) return;
+        if (this.b.active() !== st.tab) this.b.activate(st.tab);
+        this.divider.focus({ focusVisible: true } as FocusOptions);
+      }, 0);
+    };
+    window.addEventListener('focus', landed, true);
+    b.onDestroy(() => window.removeEventListener('focus', landed, true));
     // A mouse side button (or a hardware Back / Forward key) over the unfocused pane acts on that pane:
     // focus it first (spec "Keys": "Mouse side buttons, hardware Back/Forward"). Every other hardware
     // key (Reload, Close, Search, Find...) acts on the focused side, as its keyboard chord does.
@@ -610,6 +917,21 @@ export class SplitView {
       },
       true
     );
+    // The link status bubble sits 12 px in from the bottom-left of the pane under the pointer (spec
+    // "Prompts and other per-pane surfaces"; shell.css places it in its pane). Firefox keeps it in the
+    // focused pane, so a link hovered in the other one would show in the wrong corner: each link hover
+    // moves it to the hovered pane, and it goes back to the selected page once its pane is not on
+    // screen any more (the pair ended or went to the background, a collapse).
+    const overLink = (e: Event): void => {
+      const url = (e as CustomEvent<{ url?: string } | null>).detail?.url;
+      if (!url || !this.showing()) return;
+      const t = this.paneUnderPointer();
+      const panel = statusPanel();
+      if (t && panel && panel.previousElementSibling !== (t.browser as unknown as Element)) putStatusPanel(t.browser);
+    };
+    window.addEventListener('OverLink', overLink);
+    b.onDestroy(() => window.removeEventListener('OverLink', overLink));
+    b.on('split-changed', () => this.homeStatusPanel());
     // A closing column-0 side takes the pair's ratio with it before SessionStore records the closed
     // tab (SessionStore's TabClose listener is a capture listener on the tab strip, which comes after
     // this one on the window): Ctrl+Shift+T brings it back as an ordinary tab (spec "Keys"), and a pair
@@ -711,6 +1033,9 @@ export class SplitView {
       }
     }
     const shown = this.active();
+    // A page held at its pane after its partner went (holdPane) fills the window as soon as anything
+    // else changes the content area: a split shows again, another tab is selected.
+    if (this.holding && (shown || this.b.active() !== this.holding.tab)) this.releaseHold();
     if (shown) this.applyRatio(this.layoutRatio(shown));
     else {
       try {
@@ -779,6 +1104,7 @@ export class SplitView {
   // ---- narrow windows ----
 
   private onResize(): void {
+    this.releaseHold();
     this.updateCollapse(true);
     this.layout();
   }
@@ -791,20 +1117,54 @@ export class SplitView {
     if (!p) next = W < SPLIT_MIN_WIDTH;
     else if (!this.collapsed && W < SPLIT_MIN_WIDTH) next = true;
     else if (this.collapsed && W >= RESTORE_WIDTH) next = false;
+    // A window narrowed under 648 px: the hidden pane fades over 150 ms before it goes (spec "Motion":
+    // Collapse / restore); a restored session or a pair shown in a narrow window collapses at once.
+    if (p && announce && next && !this.collapsed) this.fadeCollapse(p);
+    if (!next || !p) this.endCollapseFade();
     // The attribute only while a pair is active: without one the panels carry nothing of Deer's.
     try {
       const panels = tabpanels();
-      if (panels.hasAttribute('vitre-collapsed') !== (next && !!p)) panels.toggleAttribute('vitre-collapsed', next && !!p);
+      if (!this.collapsing && panels.hasAttribute('vitre-collapsed') !== (next && !!p)) panels.toggleAttribute('vitre-collapsed', next && !!p);
     } catch {
       /* not up yet */
     }
     if (next === this.collapsed) return;
     this.collapsed = next;
     if (p && announce && next) this.announce(`Window too narrow: showing ${titleOf(this.b.active())}`);
+    // Coming back, the hidden pane enters as when a pair forms (spec "Collapse / restore").
+    if (p && announce && !next) {
+      const other = this.b.active() === p.left ? p.right : p.left;
+      queueMicrotask(() => this.enterPane(other, { pair: true }));
+    }
     if (p) {
       this.b.emit('split-changed');
       this.b.render();
     }
+  }
+
+  /**
+   * The pane a collapse hides fades out over 150 ms (also with reduced motion: it is a cross-fade);
+   * the vitre-collapsed attribute that hides it comes after. Its page's box fades, not the panel.
+   */
+  private fadeCollapse(p: Pair): void {
+    this.endCollapseFade();
+    const other = this.b.active() === p.left ? p.right : p.left;
+    const box = panelOf(other.node)?.querySelector('.browserContainer') ?? null;
+    const anim = box ? box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: 'ease', fill: 'forwards' }) : null;
+    const timer = window.setTimeout(() => {
+      this.endCollapseFade();
+      this.updateCollapse(false);
+    }, FADE_MS);
+    this.collapsing = { timer, anim };
+  }
+
+  /** The collapse fade is over (or cancelled: the window is wide again, the pair went): the pane's opacity is its own again. */
+  private endCollapseFade(): void {
+    const c = this.collapsing;
+    if (!c) return;
+    this.collapsing = null;
+    window.clearTimeout(c.timer);
+    c.anim?.cancel();
   }
 
   // ---- drawing: rims, divider, crash cards ----
@@ -835,6 +1195,7 @@ export class SplitView {
     // Keyboard focus on the divider (a Tab stop) or a crash card's button must not be stranded on
     // the body when the layer goes (the pair ended, another tab, a collapse): it goes to the page.
     const stranded = !on && this.layer.contains(document.activeElement);
+    const wasOn = this.layer.classList.contains('on');
     this.mountLayer(on);
     this.layer.classList.toggle('on', on);
     this.b.root.classList.toggle('split-on', on);
@@ -850,7 +1211,15 @@ export class SplitView {
     if (!this.ghost) this.placeDivider(rects.left.right);
     place(this.rims.left, rects.left);
     place(this.rims.right, rects.right);
-    this.paintRims();
+    if (!wasOn) {
+      // The rims take this pair's colours at once (they fade in: enterPane), not over 150 ms from the
+      // last pair's: their colour transition is for focus moving within a pair.
+      this.layer.classList.add('sp-instant');
+      this.paintRims();
+      void getComputedStyle(this.rims.left).borderTopColor;
+      void getComputedStyle(this.rims.right).borderTopColor;
+      this.layer.classList.remove('sp-instant');
+    } else this.paintRims();
     const p = this.showing();
     for (const [id, card] of this.crash) {
       const t = this.b.tab(id);
@@ -913,13 +1282,66 @@ export class SplitView {
   /** After a keyboard move the new side's rim pulses to 2 px (spec "Focus"). */
   pulse(t: Tab): void {
     const p = this.showing();
-    if (!p || reducedMotion()) return;
+    if (!p || reduced()) return;
     const rim = t === p.left ? this.rims.left : t === p.right ? this.rims.right : null;
     if (!rim) return;
     rim.classList.remove('pulse');
     void rim.offsetWidth;
     rim.classList.add('pulse');
     window.setTimeout(() => rim.classList.remove('pulse'), 700);
+  }
+
+  /**
+   * A pane comes in (a pair forming, a side replaced, a collapsed split coming back; spec "Split
+   * forms"): it slides 24 px in from its outer edge and fades in, and a page that has not painted yet
+   * keeps a frosted cover meanwhile. The rims fade in with the plate (240-390 ms): with `pair` (a pair
+   * forming or coming back) both, the focused one too ("the focused plate and rim fade in"; SplitMotion
+   * fades both from 240 ms); a side replaced fades in its own.
+   */
+  private enterPane(t: Tab, opts: { pair?: boolean } = {}): void {
+    const p = this.showing();
+    const side = this.sideOf(t);
+    const panel = panelOf(t.node);
+    if (!p || !side || !panel || (p.left !== t && p.right !== t)) return;
+    // The page's box moves, not the panel: the panes' rectangles (rims, divider, the bar's mixed
+    // tint) are the panels' and stay where the layout puts them.
+    paneEnter(panel.querySelector('.browserContainer') ?? panel, side);
+    for (const rim of opts.pair ? [this.rims.left, this.rims.right] : [this.rims[side]]) fadeIn(rim, 150, reduced() ? 0 : 240);
+    this.coverUntilPainted(t, side);
+  }
+
+  /**
+   * A frosted cover over a pane whose page has not painted (a tab that never loaded, one still on
+   * its way, one whose layers are not there yet): it goes when the page has painted, at most 600 ms
+   * later, fading over 200 ms (spec "Split forms").
+   */
+  private coverUntilPainted(t: Tab, side: Side): void {
+    const browser = t.browser;
+    if (!t.deferred && hasLayers(browser) && this.b.painted(browser)) return;
+    const r = this.paneOf(t);
+    if (!r) return;
+    const cover = el('div', { class: `sp-frost side-${side}`, 'aria-hidden': 'true' });
+    place(cover, r);
+    this.layer.append(cover);
+    const offs: (() => void)[] = [];
+    const done = (): void => {
+      if (cover.classList.contains('out')) return;
+      cover.classList.add('out');
+      for (const off of offs) off();
+      void cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced() ? FADE_MS : 200, easing: 'ease', fill: 'forwards' }).finished.catch(() => undefined).then(() => cover.remove());
+    };
+    const timer = window.setTimeout(done, COVER_MS);
+    offs.push(() => window.clearTimeout(timer));
+    offs.push(
+      this.b.on('page-message', (_tab, name, _data, from) => {
+        if (from.browser === browser && from.isTop && (name === 'core:paint' || name === 'core:pageshow') && hasLayers(browser)) done();
+      })
+    );
+    const layers = (e: Event): void => {
+      if (e.target === browser && !t.deferred && this.b.painted(browser)) done();
+    };
+    window.addEventListener('MozLayerTreeReady', layers);
+    offs.push(() => window.removeEventListener('MozLayerTreeReady', layers));
   }
 
   /**
@@ -1006,6 +1428,10 @@ export class SplitView {
       this.ghost = false;
       d.classList.add('dragging');
       this.cover(true);
+      // A bar revealed in hiding mode stays shown while the divider is dragged (spec "Auto-hide and
+      // F11": drags hold the bar shown); a hidden one stays hidden, the whole gutter is free.
+      this.barHold?.();
+      this.barHold = this.b.bar.hiding && !this.b.bar.hidden ? this.b.bar.hold('split-divider') : null;
     });
     d.addEventListener('pointermove', (e) => {
       const g = this.drag;
@@ -1040,7 +1466,17 @@ export class SplitView {
       const p = this.showing();
       if (p) this.setRatio(p, 0.5);
     });
-    d.addEventListener('keydown', (e) => this.onKey(e));
+    d.addEventListener('keydown', (e) => {
+      // The divider is one Tab stop between the tab bar and the focused page (spec "Divider": Keyboard).
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) this.b.focusBarEnd();
+        else this.b.focusPage();
+        return;
+      }
+      this.onKey(e);
+    });
     // The accent grip and its 2 px ring are keyboard focus only (spec "Divider": "Look at rest: the
     // gutter itself; no grip"; "Focus shows the accent grip and a 2 px focus ring"): class focused is
     // every focus but a press's (Tab, the bar's keys). The focus a press gave goes back to the page at
@@ -1100,6 +1536,8 @@ export class SplitView {
     this.ghost = false;
     this.divider.classList.remove('dragging', 'ghost', 'hover');
     this.cover(false);
+    this.barHold?.();
+    this.barHold = null;
     if (cancel) {
       this.applyRatio(g.start);
     } else if (g.moved && this.pairsNow.includes(g.pair)) {
@@ -1173,6 +1611,14 @@ export class SplitView {
     if (!p) return null;
     for (const t of [p.left, p.right]) if (panelOf(t.node)?.matches(':hover')) return t;
     return null;
+  }
+
+  /** The status bubble went with a pane that is not on screen now: back after the selected page (Firefox's place). */
+  private homeStatusPanel(): void {
+    const prev = statusPanel()?.previousElementSibling;
+    if (!prev || prev.localName !== 'browser') return;
+    const t = this.b.tabFor(prev as unknown as XULBrowser);
+    if (t && !this.b.shown(t)) putStatusPanel();
   }
 
   private focusPaneUnderPointer(): void {
@@ -1266,6 +1712,30 @@ const CSS = `
   flex: 1 1 auto !important;
   width: auto !important;
 }
+/* A side just went by Deer's own gesture (leaving, holdPane): the page that stays keeps its pane's
+ * place, width and inner corners while the other pane's picture slides out, on the gutter's colour,
+ * then fills the window in one step (spec "Close one side", "Separate"). */
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold] { background: #f3f3f3 !important; }
+@media (prefers-color-scheme: dark) {
+  :root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold] { background: #202020 !important; }
+}
+@media (forced-colors: active) {
+  :root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold] { background: Canvas !important; }
+}
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold] > .deck-selected {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: var(--vitre-hold-x, 0) !important;
+  width: var(--vitre-hold-w, 100%) !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  flex: none !important;
+}
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold] > .deck-selected > .browserContainer { overflow: clip !important; }
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold="left"] > .deck-selected > .browserContainer { border-radius: 0 8px 8px 0 !important; }
+:root[vitre]:not([inDOMFullscreen]) #tabbrowser-tabpanels[vitre-hold="right"] > .deck-selected > .browserContainer { border-radius: 8px 0 0 8px !important; }
 /* Firefox's split-view chrome: the splitter, the per-pane footer and the selected panel's outline. */
 :root[vitre] #tabbrowser-tabpanels > .split-view-splitter { display: none !important; }
 :root[vitre] split-view-footer { display: none !important; }
@@ -1301,6 +1771,7 @@ const CSS = `
 #vitre-split .sp-rim.focused { border-color: #4cc2ff; color: #4cc2ff; }
 #vitre-split .sp-rim.focused.light:not(.home) { border-color: #005fb8; color: #005fb8; }
 #vitre-split .sp-rim { transition: border-color 150ms ease; }
+#vitre-split.sp-instant .sp-rim { transition: none !important; }
 #vitre-split .sp-rim.pulse { animation: sp-pulse 600ms var(--expand) 1; }
 @keyframes sp-pulse {
   0%, 33% { box-shadow: inset 0 0 0 1px currentColor; }
@@ -1386,6 +1857,19 @@ const CSS = `
   user-select: none;
 }
 #vitre-split .sp-crash[hidden] { display: none; }
+
+/* A pane whose page has not painted yet keeps a frosted cover (spec "Split forms"), in the
+ * Appearance mode's colour, as the gutter. */
+#vitre-split > .sp-frost { position: absolute; pointer-events: none; background: rgba(243,243,243,0.72); backdrop-filter: blur(24px) saturate(1.6); }
+@media (prefers-color-scheme: dark) {
+  #vitre-split > .sp-frost { background: rgba(32,32,32,0.72); }
+}
+#vitre-split > .sp-frost.side-left { border-radius: 0 8px 8px 0; }
+#vitre-split > .sp-frost.side-right { border-radius: 8px 0 0 8px; }
+/* The picture of a pane that went (splitmotion.paneLeave), in a layer under the bar, and the rims
+ * fading out with it (leaving). */
+#vitre-root > #layer-split-motion > .sv-leaving { position: absolute; pointer-events: none; }
+#vitre-root > #layer-split-motion > .sv-rim-out { position: absolute; box-sizing: border-box; pointer-events: none; }
 #vitre-split .sp-crash-reload {
   appearance: none;
   margin: 0;
@@ -1403,8 +1887,9 @@ const CSS = `
 #vitre-split .sp-crash-reload:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 @media (forced-colors: active) {
-  #vitre-split .sp-rim { border-color: CanvasText; }
-  #vitre-split .sp-rim.focused { border: 2px solid Highlight; }
+  /* As specific as the light-page rules above, which would otherwise keep their colours (forced to CanvasText). */
+  #vitre-split .sp-rim, #vitre-split .sp-rim.light { border-color: CanvasText; }
+  #vitre-split .sp-rim.focused, #vitre-split .sp-rim.focused.light:not(.home) { border: 2px solid Highlight; }
   #vitre-split .sp-grip { background: ButtonText; }
   #vitre-split .sp-divider:is(.dragging, .focused) .sp-grip { background: Highlight; }
 }

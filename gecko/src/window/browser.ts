@@ -13,10 +13,12 @@
 //             instead: find's face) (see bar.ts). While the
 //             bar is in hiding mode (auto-hide, F11) the window's pages are listed as "under a
 //             hidden bar" for the page modules (pagearea.ts): no top strip, no PDF offset.
-//   Split     b.split(other? | 'home'), b.separate(ref?), b.swapSides(ref?), b.splitRatio(ref?, r?),
-//             b.units(), b.shown(tab), b.pairOf(ref), b.splitView (split.ts: two pages side by side,
-//             Firefox's own split view; 'split-changed'; contract in the header of split.ts)
-//   Tabs      b.newTab(url?, { background, index }), b.closeTab(tab), b.activate(tab),
+//   Split     b.split(other? | 'home', { side? }), b.separate(ref?, { animate? }), b.swapSides(ref?),
+//             b.splitRatio(ref?, r?), b.units(), b.shown(tab), b.pairOf(ref), b.splitView (split.ts:
+//             two pages side by side, Firefox's own split view; 'split-changed'; contract in the
+//             header of split.ts), b.bar.lift (splitlift.ts: a circle dragged to an edge)
+//   Tabs      b.newTab(url?, { background, index }), b.closeTab(tab, { animate? }) (animate: a side
+//             of the split on screen leaves with its pane's motion), b.activate(tab),
 //             b.navigate(tab, url), b.moveTab(tab, index), b.tab(id), b.tabFor(browserElement),
 //             b.toggleMute(tab), b.moveToNewWindow(tab), b.forgetClosed(),
 //             b.focusPage(), b.editAddress(query?), b.render()
@@ -51,8 +53,10 @@
 //             registered last is asked first (like registerAction, the latest wins), so a later,
 //             more specific one (a test, a module wrapping another) sees a request before Peek's.
 //   UI        b.layer(id, z) -> a full-window overlay div inside #vitre-root (pointer-events only on its
-//             children; z: peek 8, omni-scrim 9 (core; a module layer at z 9 that must show above
-//             the dim is created after boot and so paints over it), bar 10, find 12, omnibox 20,
+//             children; z: split-motion 6 (core: a closed or separated pane's picture leaving),
+//             peek 8, omni-scrim 9 (core; a module layer at z 9 that must show above the dim is
+//             created after boot and so paints over it), bar 10, find 12, split-lift 13 (core: a
+//             lifted circle, its cover and plates), omnibox 20,
 //             panels 30, switcher 40, menus 50, downloads-prompt 55 (the quit prompt, above
 //             everything it must not hide under), tips 60 (core));
 //             b.css(id, text) injects a module's CSS once (the sheet applies to all of browser.xhtml:
@@ -63,7 +67,8 @@
 //             bar, native popups) reads `theme` while a module's own full-window surface covers the
 //             page (the switcher's deck and grid hold 'clear'); b.luma(browser, rect) and
 //             b.snapshot(browser, rect, scale) for any part of any page (null while a new document
-//             has not painted yet: a snapshot would lay it out unstyled); b.closePanels() hides
+//             has not painted yet: a snapshot would lay it out unstyled; b.painted(browser) says
+//             whether it has); b.closePanels() hides
 //             Firefox's open panels.
 //   Page      b.page(target).send(name, data), await .query(name, data), .sendAll(name, data),
 //             await .queryAll(name, data) (one answer per frame); target: a Tab, its id, a <browser>
@@ -112,7 +117,7 @@ import { HIDDEN_TAB_VALUE, startTheme, Tab, type Theme } from './model';
 import { installModules } from './modules';
 import { Omnibox } from './omnibox';
 import { PageArea } from './pagearea';
-import { SplitView, titleOf, type Pair, type Unit } from './split';
+import { SplitView, titleOf, type Pair, type Side, type Unit } from './split';
 
 export { HIDDEN_TAB_VALUE, Tab, type Theme } from './model';
 export type { Pair, Side, Unit } from './split';
@@ -222,6 +227,7 @@ const SCROLL_THROTTLE = 80;
 /** Longest wait between paint-driven samples that keep reading the same luma (see sampleFromPaint). */
 const PAINT_BACKOFF_MAX = 2000;
 const LIGHT_ABOVE = 0.56;
+const THEMES: readonly Theme[] = ['light', 'dark', 'clear'];
 // HIDDEN_TAB_VALUE (model.ts): the session value on tabs b.openHidden made; they are closed on
 // restore (nothing would show them).
 /** Page actions that do nothing while a panel (panel-open on b.root) covers the page (see the header). */
@@ -271,6 +277,13 @@ export class Browser {
   private mruCycle: { index: number; order: number[] } | null = null;
   /** Themes held by modules (holdTheme), latest last. */
   private themeHolds: { theme: Theme }[] = [];
+  /**
+   * At the last render (Browser.render's cross-fade): the tabs of the pair on screen (null: none), the
+   * active tab, and whether a module held the theme.
+   */
+  private shownPair: [number, number] | null = null;
+  private renderedActive = 0;
+  private heldAtRender = false;
   private cleanups: (() => void)[] = [];
   private renderQueued = false;
   private sampleTimer = 0;
@@ -310,7 +323,8 @@ export class Browser {
     this.splitView = new SplitView(this);
     this.bar = new Bar(this, {
       activate: (id) => this.activate(id),
-      close: (id) => this.closeTab(id),
+      // A half's x or middle-click closes that side with its pane's motion (split.ts closeSide).
+      close: (id) => this.closeTab(id, { animate: true }),
       newTab: () => this.run('newTab'),
       editAddress: () => this.editAddress(),
       back: () => this.run('back'),
@@ -706,6 +720,11 @@ export class Browser {
     return fx.sysModule(name);
   }
 
+  /** The page's current document has painted (or loaded, or reported its style sheets): a snapshot of it is safe. */
+  painted(browser: XULBrowser): boolean {
+    return !this.unpainted.has(browser);
+  }
+
   /** Mean luma (0..1) of a rectangle of a page, in CSS px of the browser's box; null when it has no document. */
   luma(browser: XULBrowser, rect: { x: number; y: number; width: number; height: number }): Promise<number | null> {
     if (this.unpainted.has(browser)) return Promise.resolve(null);
@@ -945,9 +964,15 @@ export class Browser {
     return t;
   }
 
-  closeTab(ref: TabRef): void {
+  /**
+   * Close a tab. `animate` (Deer's own gestures: Ctrl+W, a half's x, a menu row): a side of the
+   * split on screen is pictured first and its picture slides out after the tab has closed (split.ts
+   * closeSide, at most 150 ms later); anything else closes at once.
+   */
+  closeTab(ref: TabRef, opts: { animate?: boolean } = {}): void {
     const t = this.tab(ref);
     if (!t) return;
+    if (opts.animate && this.splitView.closeSide(t)) return;
     // Firefox keeps the closed tab for Ctrl+Shift+T (SessionStore) and closes the window with its last tab.
     fx.removeTab(t.node);
     this.flushRender();
@@ -1008,6 +1033,12 @@ export class Browser {
     fx.forgetClosedTabs();
   }
 
+  /** Keyboard focus to the tab bar's last stop (Shift+Tab on the split divider). */
+  focusBarEnd(): void {
+    if (this.barKeys) this.barKeys.focusLast();
+    else this.focusPage();
+  }
+
   focusPage(): void {
     try {
       fx.selectedBrowser().focus();
@@ -1039,16 +1070,19 @@ export class Browser {
    * its field open). With a pair active, `other` replaces its Home side, else its unfocused side.
    * Null when refused (popup window, a window under 648 px, Home with Home, pinned tabs).
    */
-  split(other: TabRef | 'home' = 'home'): Pair | null {
+  split(other: TabRef | 'home' = 'home', opts: { side?: Side } = {}): Pair | null {
     if (other === 'home') return this.splitView.start('home');
     const t = this.tab(other);
-    return t ? this.splitView.start(t) : null;
+    return t ? this.splitView.start(t, opts) : null;
   }
 
-  /** End the pair `ref` belongs to (default: the active one): both tabs stay, the focused side stays active. */
-  separate(ref?: TabRef): void {
+  /**
+   * End the pair `ref` belongs to (default: the active one): both tabs stay, the focused side stays
+   * active. `animate` (Deer's own gestures): the other pane's picture slides out (split.ts).
+   */
+  separate(ref?: TabRef, opts: { animate?: boolean } = {}): void {
     const p = ref === undefined ? this.splitView.active() : this.splitView.pairOf(this.tab(ref));
-    if (p) this.splitView.separate(p);
+    if (p) this.splitView.separate(p, opts);
   }
 
   /** The pages of the pair trade places; the divider stays where it is. */
@@ -1367,6 +1401,27 @@ export class Browser {
   render(): void {
     this.renderQueued = false;
     const theme = this.theme();
+    // Split view: the bar group's theme cross-fades when it changes there (spec "Motion": 150 ms as
+    // focus moves between the sides of the pair on screen; 200 ms as a pair forms around the page on
+    // screen, a side is replaced, or the pair ends and its remaining side fills the window). Without a
+    // split, going to or from a pair in the background ("Pair <-> another tab": as a circle and the
+    // pill do), or when a module takes or gives back the theme (the switcher's deck), it changes at
+    // once, as always.
+    const pair = this.splitView.showing();
+    const ids: [number, number] | null = pair ? [pair.left.id, pair.right.id] : null;
+    const prev = this.shownPair;
+    let fade = 0;
+    if (ids && prev && ids.some((id) => prev.includes(id))) fade = ids.every((id) => prev.includes(id)) ? 150 : 200;
+    else if (ids && !prev && ids.includes(this.renderedActive)) fade = 200;
+    else if (!ids && prev && prev.includes(this.activeId)) fade = 200;
+    const held = this.themeHolds.length > 0;
+    const before = THEMES.find((x) => this.root.classList.contains(`theme-${x}`));
+    // Reduced motion: every moment is a 150 ms cross-fade.
+    if (fade && window.matchMedia('(prefers-reduced-motion: reduce)').matches) fade = 150;
+    if (before && before !== theme && fade && held === this.heldAtRender) this.bar.crossFade(before, fade);
+    this.shownPair = ids;
+    this.renderedActive = this.activeId;
+    this.heldAtRender = held;
     this.root.classList.remove('theme-light', 'theme-dark', 'theme-clear');
     this.root.classList.add(`theme-${theme}`);
     // Native popups are outside #vitre-root: they read the theme from the document root.
@@ -1568,7 +1623,7 @@ export class Browser {
       case 'newTab': this.newTab(); break;
       case 'closeTab': {
         for (const l of [...this.closeLayers]) if (l.handle()) return;
-        if (t) this.closeTab(t);
+        if (t) this.closeTab(t, { animate: true });
         break;
       }
       case 'reopenClosed': {
@@ -1594,7 +1649,7 @@ export class Browser {
         // An extension that bound the same chord to its own command keeps it (its <key> runs too).
         const route = this.keys?.current;
         if (route && route.how !== 'app-command' && fx.extensionKeyFor(route.spec)) break;
-        if (this.splitView.active()) this.splitView.separate();
+        if (this.splitView.active()) this.splitView.separate(undefined, { animate: true });
         else if (t.kind !== 'home') this.splitView.start('home');
         break;
       }

@@ -348,7 +348,8 @@
   font-size: 13.5px;
   font-weight: 400;
   color: var(--g-icon);
-  transition: color 150ms ease;
+  /* Spec "Motion": Focus moves: text weight and colour change over 150 ms. */
+  transition: color 150ms ease, font-weight 150ms ease;
 }
 #vitre-bar .item.pair .half.focused .host { color: var(--g-text); font-weight: 500; }
 #vitre-bar .item.pair .half.home .host, #vitre-bar .item.pair .half.home .fav { color: var(--g-placeholder); }
@@ -412,9 +413,80 @@
 #vitre-bar .item.pair.active .close-badge { display: none; }
 
 /* Mixed tint (spec "Split pill": Mixed tint): glass over the other page of a split whose pages
- * disagree, light over dark or the other way round, keeps its text at 4.5:1. */
-#vitre-root.theme-light #vitre-bar .item.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
-#vitre-root:is(.theme-dark, .theme-clear) #vitre-bar .item.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
+ * disagree, light over dark or the other way round, keeps its text at 4.5:1. It is its own layer
+ * (.tint-mix, bar.ts addMix) over the glass's tint, so the two cross-fade: 150 ms as the gutter passes
+ * under an item during a drag, 200 ms as a pair forms or ends (spec "Where the bar sits", "Motion"). The
+ * lifted circle (splitlift.ts) has the same layer. Without a split no item is ever .mixed. */
+#vitre-root #vitre-bar .item > .tint-mix,
+#vitre-root .sv-lifted > .tint-mix { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 150ms ease; }
+#vitre-root.theme-light :is(#vitre-bar .item, .sv-lifted) > .tint-mix { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-root:is(.theme-dark, .theme-clear) :is(#vitre-bar .item, .sv-lifted) > .tint-mix { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
+#vitre-root #vitre-bar .item.mixed > .tint-mix, #vitre-root .sv-lifted.mixed > .tint-mix { opacity: 1; }
+#vitre-root #vitre-bar .item.mixed > .tint, #vitre-root .sv-lifted.mixed > .tint { opacity: 0; }
+#vitre-root .sv-lifted > .tint { transition: opacity 150ms ease; }
+#vitre-root.split-on #vitre-bar .item > .tint { transition-duration: 150ms; }
+/* A pair forming around the page on screen, a side replaced, a pair ending (bar.ts paintSplitTheme). */
+#vitre-root #vitre-bar.sv-forming .item > :is(.tint, .tint-mix) { transition-duration: 200ms; }
+
+/* One contact shadow for the split pill, the darker page's (spec "Split pill": Glass), when it is not
+ * the bar theme's own (bar.ts paintSplitTheme). */
+#vitre-bar .item.pair.active.sh-light { box-shadow: 0 10px 28px rgba(40,30,15,0.14), 0 1px 2px rgba(40,30,15,0.18); }
+#vitre-bar .item.pair.active.sh-dark { box-shadow: 0 10px 28px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.3); }
+#vitre-bar .item.pair.active.sh-clear { box-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.22); }
+
+/* ---- Split view motion (bar.ts morph, crossFade; splitmotion.ts; spec "Motion", board SplitMotion) ---- */
+/* An item that starts mid-morph shows its face (and its plate, its text colours) at once: the face
+ * fade-in and the plate's own transitions would run under the morph's timed fades. */
+#vitre-bar .item.sv-instant * { transition: none !important; }
+/* …except its tint: the pill a pair forms on (or the remaining side's) cross-fades into (or out of)
+ * the mixed tint over 200 ms, as the circles do (spec "Motion": Split forms, Close one side). */
+#vitre-root #vitre-bar .item.sv-instant > :is(.tint, .tint-mix) { transition: opacity 200ms ease !important; }
+/* The other side of a pair that ended: its circle waits until its half has morphed into it (it
+ * still takes clicks: the morph is only a picture of it). */
+#vitre-bar .item.sv-hidden { opacity: 0 !important; transition: none !important; }
+/* Focus moved between the halves: the plate glides (a transform), the old one goes at once. */
+#vitre-bar .item.pair.glide .half > .plate { transition: none; }
+/* A ghost: a circle morphing into a half of the split pill, or back (left and width on the spring). */
+#vitre-bar .sv-ghost { position: absolute; border-radius: 22px; overflow: hidden; pointer-events: none; }
+#vitre-bar .sv-ghost > :is(.g-lens, .g-tint, .g-rim) { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+#vitre-bar .sv-ghost > .g-lens { backdrop-filter: blur(10px) saturate(1.6); }
+#vitre-bar .sv-ghost > .g-tint { background: var(--g-tint); }
+#vitre-bar .sv-ghost > .g-rim { padding: 1px; background: var(--g-rim); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; }
+#vitre-bar .sv-ghost > .g-fav { position: absolute; left: 0; top: 0; width: 18px; height: 18px; transform-origin: 0 0; display: flex; align-items: center; justify-content: center; color: var(--g-icon); }
+/* Its favicon as the bar draws one: only an image takes the icon colour (Deer's own glyphs are
+ * stroke-only SVGs), and a flat light or dark favicon keeps its contrast plate (data-tone). */
+#vitre-bar .sv-ghost > .g-fav img { width: 18px; height: 18px; border-radius: 3px; -moz-context-properties: fill, stroke; fill: currentColor; stroke: currentColor; }
+#vitre-bar .sv-ghost > .g-fav svg { width: 18px; height: 18px; }
+#vitre-root.theme-light #vitre-bar .sv-ghost > .g-fav[data-tone="light"] img { padding: 2px; border-radius: 4.5px; background: #1d1f24; }
+#vitre-root:is(.theme-dark, .theme-clear) #vitre-bar .sv-ghost > .g-fav[data-tone="dark"] img { padding: 2px; border-radius: 4.5px; background: #f4f2ec; }
+#vitre-bar .sv-ghost > .g-host { position: absolute; left: 38px; right: 12px; top: 0; height: 44px; line-height: 44px; white-space: nowrap; overflow: hidden; font-size: 13.5px; color: var(--g-icon); mask-image: linear-gradient(90deg, #000 calc(100% - 12px), transparent); }
+#vitre-bar .sv-ghost.focused > .g-host { color: var(--g-text); font-weight: 500; }
+/* A closed side's half collapses into the seam (a copy of its content). */
+#vitre-bar .sv-collapse { position: absolute; pointer-events: none; }
+#vitre-bar .sv-collapse > .half-main { position: absolute; inset: 0; }
+#vitre-bar .sv-collapse .fav { position: absolute; left: 14px; top: 14px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+#vitre-bar .sv-collapse .fav :is(img, svg) { width: 16px; height: 16px; border-radius: 3px; }
+#vitre-bar .sv-collapse .host { position: absolute; left: 38px; right: 12px; top: 0; height: 44px; line-height: 44px; white-space: nowrap; overflow: hidden; font-size: 13.5px; color: var(--g-icon); }
+/* What a separated pair leaves on the remaining pill for 120 ms: its seam and its plate, fading. */
+#vitre-bar .item .sv-leftover { position: absolute; pointer-events: none; }
+#vitre-bar .item .sv-leftover.sv-seam { top: 12px; width: 1px; height: 20px; background: rgba(255,255,255,0.16); }
+#vitre-root.theme-light #vitre-bar .item .sv-leftover.sv-seam { background: rgba(22,24,29,0.12); }
+#vitre-bar .item .sv-leftover.sv-plate { top: 6px; height: 32px; border-radius: 16px; background: rgba(76,194,255,0.18); box-shadow: inset 0 0 0 1px rgba(76,194,255,0.45); }
+#vitre-root.theme-light #vitre-bar .item .sv-leftover.sv-plate { background: rgba(0,95,184,0.10); box-shadow: inset 0 0 0 1px rgba(0,95,184,0.35); }
+#vitre-root.theme-clear #vitre-bar .item .sv-leftover.sv-plate { background: rgba(255,255,255,0.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45); }
+/* The theme cross-fade (bar.ts crossFade): a veil in the old theme fades out over the new glass;
+ * text and icons follow over the same time. */
+#vitre-bar .item > .sv-veil { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+#vitre-bar .item > .sv-veil > .tint { position: absolute; inset: 0; border-radius: inherit; background: var(--g-tint); }
+#vitre-bar .item > .sv-veil.theme-light.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-bar .item > .sv-veil:is(.theme-dark, .theme-clear).mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
+#vitre-bar .item > .sv-veil > .rim { position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--g-rim); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; }
+#vitre-bar.sv-xf .item :is(.nav, .address, .host, .half-x, .cap-half, .fav) { transition: color var(--sv-xf, 150ms) ease, background-color var(--sv-xf, 150ms) ease; }
+#vitre-bar.sv-xf .item .circle-face, #vitre-bar.sv-xf .item.plus .face { transition: color var(--sv-xf, 150ms) ease, background-color var(--sv-xf, 150ms) ease, opacity 160ms ease; }
+/* A lifted circle's slot keeps its glass rim alone, at 0.5 (splitlift.ts; SplitDrop). */
+#vitre-bar .item.lifted { box-shadow: none; transition: none; }
+#vitre-bar .item.lifted > :not(.rim) { visibility: hidden; }
+#vitre-bar .item.lifted > .rim { opacity: 0.5; }
 
 @media (forced-colors: active) {
   #vitre-bar .item.pair .half.focused > .plate { outline: 2px solid Highlight; outline-offset: -2px; }

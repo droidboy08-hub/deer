@@ -16,6 +16,11 @@
 //   nothing happens.
 // - Ctrl+W on a card whose page would ask "Leave page?": its tab is opened and closed there, where
 //   Firefox shows the prompt (never hidden under the switcher or in a background tab).
+// Split view (../design/SPLIT-VIEW-SPEC.md "With the rest of Deer": Switcher): a pair is one entry
+// (the side used last stands for it), its card both pages at the ratio with the gutter scaled
+// (thumbs.ts paintPair), the capsule at dock size in the deck's dock; a search matches either side and
+// opening the result focuses the side that matched (`sides`); Ctrl+W, Delete or a middle click on a
+// pair card closes both tabs (two entries on the closed-tab list).
 // Focus: while the switcher is up the search field holds keyboard focus (also while it is still
 // invisible, during the quick-tap window), and Firefox's tab-switch focus handling is held off
 // (fx.guardTabSwitchFocus), so closing the current tab under the switcher cannot pull focus into a
@@ -70,6 +75,8 @@ export class Switcher {
   private root: HTMLElement | null = null;
   private finishClosing: (() => void) | null = null;
   private matches = new Map<number, Match | null>();
+  /** Pair cards whose other side matched the search: entry id -> the side opening it shows. */
+  private sides = new Map<number, number>();
   /** Tabs whose page is being asked whether it would prompt before closing (closeCard). */
   private asking = new Set<number>();
   /**
@@ -122,15 +129,11 @@ export class Switcher {
       else this.ctrlUp();
     });
     b.on('tab-closed', (t) => this.tabGone(t.id));
-    b.on('tab-updated', (t) => {
-      if (this.phase === 'open') this.view?.refresh(t.id);
-    });
+    b.on('tab-updated', (t) => this.refresh(t.id));
     b.addEscLayer(ESC_PRIORITY, () => this.escape());
     b.addCloseLayer(ESC_PRIORITY, () => this.closeKey());
     b.keys?.addHook((binding, e) => this.onKey(binding, e));
-    thumbs.onChange((id) => {
-      if (this.phase === 'open') this.view?.refresh(id);
-    });
+    thumbs.onChange((id) => this.refresh(id));
     // Minimized: cancel back to the tab you started on (the window's deactivation is 'ctrl-up' 'blur').
     const hidden = (): void => {
       if (document.hidden) this.lostFocus();
@@ -149,6 +152,14 @@ export class Switcher {
       this.reset();
     });
     fx.guardTabSwitchFocus(() => this.phase === 'pending' || this.phase === 'open');
+  }
+
+  /** A tab's title, favicon or picture changed: its card (a pair's card shows both sides). */
+  private refresh(id: number): void {
+    if (this.phase !== 'open') return;
+    this.view?.refresh(id);
+    const partner = this.b.splitView.partner(this.b.tab(id));
+    if (partner) this.view?.refresh(partner.id);
   }
 
   // ---- service ----
@@ -242,6 +253,9 @@ export class Switcher {
     this.timing = { begin: performance.now(), show: 0, frame: 0, paint: 0, style: this.style(), tabs: m.all.length, latched: false };
     const active = this.b.active();
     if (active) void this.thumbs.capture(active, 'open');
+    // A pair on screen: its other side is in its card too.
+    const partner = this.b.splitView.showing() ? this.b.splitView.partner(active) : null;
+    if (partner) void this.thumbs.capture(partner, 'open');
     if (this.style() === 'deck') this.wallpaper.warm();
     this.thumbs.loadRestored();
     const near = [m.list[m.sel], m.list[m.sel + 1], m.list[m.sel - 1], m.list[m.sel + 2]].filter((x): x is number => x !== undefined);
@@ -379,9 +393,11 @@ export class Switcher {
     const m = this.model;
     if (!view || !m) return;
     for (const id of view.visible()) {
-      if (id === m.startId || this.thumbs.fresh(id)) continue;
-      const t = this.b.tab(id);
-      if (t) void this.thumbs.capture(t, 'visible');
+      const p = this.b.pairOf(id);
+      for (const t of p ? [p.left, p.right] : [this.b.tab(id)]) {
+        if (!t || t.id === m.startId || this.thumbs.fresh(t.id)) continue;
+        void this.thumbs.capture(t, 'visible');
+      }
     }
   }
 
@@ -409,7 +425,9 @@ export class Switcher {
       m.sel = m.list.indexOf(id);
       view.update();
     }
-    if (id !== null && id !== this.b.activeId) this.b.activate(id);
+    // A pair card found by its other side opens on that side.
+    const target = id === null ? null : (this.sides.get(id) ?? id);
+    if (target !== null && target !== this.b.activeId) this.b.activate(target);
     else if (focusPage) this.b.focusPage();
     else this.input.blur();
     if (id !== null) await view.expand(id);
@@ -446,6 +464,7 @@ export class Switcher {
     this.phase = 'idle';
     this.finishClosing = null;
     this.matches.clear();
+    this.sides.clear();
     this.input.value = '';
     this.input.removeAttribute('aria-activedescendant');
     this.fieldRow.remove();
@@ -508,11 +527,19 @@ export class Switcher {
     const q = this.input.value;
     m.query = q;
     this.matches.clear();
+    this.sides.clear();
     if (q.trim()) {
       m.list = m.all.filter((id) => {
         const t = m.tab(id);
-        const hit = t ? matchTab(t, q) : null;
-        this.matches.set(id, hit);
+        let hit = t ? matchTab(t, q) : null;
+        // A pair card matches either side; found by its other side, it opens on that side.
+        const p = this.b.pairOf(id);
+        if (!hit && p) {
+          const other = p.left.id === id ? p.right : p.left;
+          hit = matchTab(other, q);
+          if (hit) this.sides.set(id, other.id);
+        }
+        this.matches.set(this.sides.get(id) ?? id, hit);
         return !!hit;
       });
       m.sel = m.list.length ? 0 : -1;
@@ -543,6 +570,11 @@ export class Switcher {
   private closeCard(id = this.selectedId()): void {
     const m = this.model;
     if (this.phase !== 'open' || !m || !this.view || id === undefined || !m.all.includes(id)) return;
+    const pair = this.b.pairOf(id);
+    if (pair) {
+      this.closePairCard(id, pair.left, pair.right);
+      return;
+    }
     const t = this.b.tab(id);
     if (t && mayAskBeforeClosing(t.browser)) {
       if (this.asking.has(id)) return;
@@ -556,6 +588,50 @@ export class Switcher {
       return;
     }
     this.dropCard(id);
+  }
+
+  /**
+   * A pair card closes both tabs (spec "Switcher": Ctrl+W or Delete on a pair card; two entries on
+   * the closed-tab list). A side whose page may ask "Leave page?" first: the pair is opened and both
+   * close there, where the prompt shows.
+   */
+  private closePairCard(id: number, left: Tab, right: Tab): void {
+    const sides = [left, right];
+    const both = (): void => {
+      const p = this.b.pairOf(left) ?? this.b.pairOf(right);
+      if (p) this.b.splitView.closeBoth(p);
+      else for (const t of sides) if (this.b.tabs.includes(t)) this.b.closeTab(t.id);
+    };
+    if (sides.some((t) => mayAskBeforeClosing(t.browser))) {
+      if (this.asking.has(id)) return;
+      this.asking.add(id);
+      void Promise.all(sides.map((t) => asksBeforeClosing(t.browser))).then((asks) => {
+        this.asking.delete(id);
+        if (!sides.every((t) => this.b.tabs.includes(t))) return;
+        if (!asks.some(Boolean)) {
+          this.dropPairCard(id, both);
+          return;
+        }
+        if (this.phase === 'open' && this.model?.list.includes(id)) void this.close(id).then(() => window.setTimeout(both, 0));
+        else window.setTimeout(both, 0);
+      });
+      return;
+    }
+    this.dropPairCard(id, both);
+  }
+
+  /** A pair card lifts away and both its tabs close. */
+  private dropPairCard(id: number, closeBoth: () => void): void {
+    const m = this.model;
+    const p = this.b.pairOf(id);
+    const had = !!p && (p.left.id === m?.startId || p.right.id === m?.startId);
+    if (this.phase === 'open' && m && this.view && m.all.includes(id)) {
+      this.view.closing(id);
+      this.forget(id);
+    }
+    closeBoth();
+    if (m && this.model === m && had) m.startId = this.b.activeId;
+    if (this.phase === 'open') this.focusInput();
   }
 
   /** The card lifts away (when it is still shown) and its tab closes. */
@@ -779,7 +855,17 @@ export class Switcher {
       latched: false,
       tab: (id) => b.tab(id),
       match: (id) => this.matches.get(id) ?? null,
+      pair: (id) => {
+        const p = b.pairOf(id);
+        return p ? { left: p.left, right: p.right, share: b.splitView.layoutShare(p) } : null;
+      },
+      face: (id) => b.tab(this.sides.get(id) ?? id),
       paint: (id, media) => {
+        const p = b.pairOf(id);
+        if (p) {
+          this.thumbs.paintPair(p.left, p.right, b.splitView.layoutShare(p), media);
+          return;
+        }
         const t = b.tab(id);
         if (t) this.thumbs.paint(t, media);
       },

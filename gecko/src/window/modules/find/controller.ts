@@ -718,8 +718,19 @@ export class FindController {
     const inField = view.hasFocus();
     const inPage = e.target === st.browser || document.activeElement === st.browser;
     if (!inField && !inPage) return undefined;
+    // Split view (../design/SPLIT-VIEW-SPEC.md "Keys": F6): the ring is left page -> right page ->
+    // pill stop, and while find is open the pill stop is this field. From the field F6 goes to the
+    // left page (Shift+F6 to the right one); from the page, the core's ring moves to the other page
+    // unless the field is next.
+    const pair = this.b.splitView.showing();
+    const back = e.shiftKey;
+    if (pair && inPage) {
+      const left = this.b.active() === pair.left;
+      if ((!back && left) || (back && !left)) return undefined;
+    }
     if (e.repeat) return 'swallow';
-    if (inField) st.browser.focus();
+    if (pair && inField) this.b.splitView.focusSide(back ? pair.right : pair.left, { keyboard: true });
+    else if (inField) st.browser.focus();
     else view.focusField(true);
     this.focusChanged();
     return 'swallow';

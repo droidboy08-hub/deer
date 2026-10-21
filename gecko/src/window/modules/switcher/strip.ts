@@ -9,7 +9,7 @@
 // (no error, intermittent; over a static page it always worked), while CSS blur never failed: at a
 // blur this heavy the edge refraction is not visible anyway.
 import type { Tab } from '../../model';
-import { cardAt, cardName, el, EXPAND, fadeLayers, favicon, flight, glassBox, labelChanged, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING } from './parts';
+import { cardAt, cardName, el, EXPAND, fadeLayers, flight, glassBox, labelChanged, labelIcon, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING } from './parts';
 import type { Model, View, ViewHandlers } from './types';
 
 const CW = 192;
@@ -169,7 +169,7 @@ export class StripView implements View {
     if (!labelChanged(c.label, t, this.m)) return;
     const title = el('t', 'span');
     title.append(labelParts(t, this.m).title);
-    c.label.replaceChildren(favicon(t, 14), title);
+    c.label.replaceChildren(labelIcon(t, this.m, 14), title);
     c.el.setAttribute('aria-label', cardName(t, this.m));
   }
 

@@ -27,6 +27,8 @@
  * lens) goes at once. On close the lenses are back first and the rest fades in over them. */
 #vitre-root.omni-open #vitre-bar .item { pointer-events: none; box-shadow: none; }
 #vitre-root.omni-open #vitre-bar .item > .tint,
+#vitre-root.omni-open #vitre-bar .item.tab > .tint-mix,
+#vitre-root.omni-open #vitre-bar .item.plus > .tint-mix,
 #vitre-root.omni-open #vitre-bar .item > .rim,
 #vitre-root.omni-open #vitre-bar .item .pill-face,
 #vitre-root.omni-open #vitre-bar .item .circle-face,
@@ -93,6 +95,9 @@
 #vitre-root #vitre-omni-panel > .tint { background: rgba(28,28,34,0.8); }
 /* Board: lighter over a photo, where the dim is under it. */
 #vitre-root.theme-clear #vitre-omni-panel > .tint { background: rgba(22,22,26,0.52); }
+/* Split view (spec "Split pill": Mixed tint; SplitStart "The empty side"): with one page light and
+ * the other not, the suggestions take the dark mixed tint, as the field does. */
+#vitre-root #vitre-omni-panel.mixed > .tint { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.72); }
 #vitre-root #vitre-omni-panel > .rim {
   background: linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.22));
 }

@@ -124,11 +124,12 @@ export function splitHalfRows(b: Browser, t: Tab): MenuItem[] {
     pasteAndGo((url) => b.navigate(t, url)),
     SEP,
     item('Swap sides', 'swap', '', 'P', () => b.swapSides(t)),
-    item('Separate tabs', '', splitKey(b), 'E', () => b.separate(t)),
+    // Deer's own gestures: the pane that goes slides out (split.ts; spec "Motion": Separate, Close one side).
+    item('Separate tabs', '', splitKey(b), 'E', () => b.separate(t, { animate: true })),
     muteRow(b, t),
     SEP,
     item('Close other tabs', '', '', 'O', () => closeOthersOfPair(b, p, t), { disabled: b.tabs.length <= 2 }),
-    item('Close tab', 'close', focused ? 'Ctrl+W' : '', 'C', () => b.closeTab(t)),
+    item('Close tab', 'close', focused ? 'Ctrl+W' : '', 'C', () => b.closeTab(t, { animate: true })),
   ]);
 }
 

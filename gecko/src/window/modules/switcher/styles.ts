@@ -109,6 +109,18 @@ ${S} .sw-dot:not(.sel):hover { background-color: rgba(255,255,255,0.1); }
 ${S} .sw-dot .t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: 0; transition: opacity 240ms ease; }
 ${S} .sw-dot.sel .t { opacity: 1; }
 ${S} .sw-dot.sw-gone { width: 0; padding: 0; margin-left: -8px; opacity: 0; transition-duration: 220ms; transition-timing-function: ease; }
+/* A split pair in the dock: the capsule at dock size (two dots and the gap; favicons centred on each
+ * dot, a 1x16 hairline between), the title after them once selected (spec "Switcher"). */
+${S} .sw-dot.pair { position: relative; width: 88px; padding: 0; }
+${S} .sw-dot.pair.sel { width: 264px; padding: 0 14px 0 96px; }
+${S} .sw-dot.pair .pf { position: absolute; top: 12px; width: 16px; height: 16px; display: flex; }
+${S} .sw-dot.pair .pf.l { left: 12px; }
+${S} .sw-dot.pair .pf.r { left: 60px; }
+${S} .sw-dot.pair .hair { position: absolute; left: 44px; top: 12px; width: 1px; height: 16px; background: rgba(255,255,255,0.12); }
+${S} .sw-dot.pair.sw-gone { width: 0; padding: 0; }
+/* A pair card's label: both favicons, the hairline between. */
+${S} .sw-pairfav { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+${S} .sw-pairfav .hair { width: 1px; height: 12px; background: rgba(255,255,255,0.24); }
 ${S} .sw-dockfield { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
 ${S} .sw-dock.latched .sw-dots { opacity: 0; pointer-events: none; }
 ${S} .sw-dock.latched .sw-dockfield { opacity: 1; pointer-events: auto; transition-delay: 80ms; }

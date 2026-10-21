@@ -48,6 +48,7 @@
 //   Alt+Left                 back in the sheet; on its first page it closes it (never on repeat)
 //   F6 / Shift+F6            peek page -> header -> address field (and back), in a key hook while a
 //                            peek is open; otherwise the registered focusAddress action runs
+//                            (in split view the peek's stops take its source page's place in the ring)
 //   Ctrl+Shift+T             reopens the warm peek while its source tab is active and nothing was
 //                            closed after it; otherwise Firefox's reopen (registerAction reopenClosed)
 //   Developer tools          the peek is opened as a tab first (DevTools attach to the selected tab)
@@ -1066,6 +1067,11 @@ class Peek {
     const b = this.b;
     if (this.phase !== 'open' || !this.live) return false;
     if (b.omni.focused) {
+      // Split view (../design/SPLIT-VIEW-SPEC.md "Keys": F6): the peek's own stops replace its source
+      // page's in the ring left page -> right page -> address pill. From the field the next stop is
+      // the left page's, the previous the right page's: the other side's page is the core's (f6Ring).
+      const side = b.splitView.showing() ? b.splitView.sideOf(b.active()) : null;
+      if (side && side !== (back ? 'right' : 'left')) return false;
       b.omni.close(false);
       if (back) this.sheet.focusHeader();
       else this.focusPeek(true);

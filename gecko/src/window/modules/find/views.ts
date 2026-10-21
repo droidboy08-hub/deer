@@ -302,6 +302,16 @@ export class PillFace extends FieldView {
     );
     layer.append(root);
     this.wire();
+    // Split view: the face follows the pill's mixed tint (the bar sets it on 'split-changed' and
+    // 'render', before these listeners run).
+    b.on('split-changed', () => this.paintMixed());
+    b.on('render', () => this.paintMixed());
+  }
+
+  /** Over a pair whose pages disagree, the face takes the mixed tint where the pill has it (spec "With the rest of Deer": Find). */
+  private paintMixed(): void {
+    const on = this.mode !== 'hidden' && this.tabId !== null && !!this.b.bar.item(this.tabId)?.classList.contains('mixed');
+    this.el.classList.toggle('vf-mixed', on);
   }
 
   private q<T extends HTMLElement>(sel: string): T {
@@ -336,6 +346,7 @@ export class PillFace extends FieldView {
     this.b.root.classList.add('find-face');
     this.b.root.classList.remove('find-cooldown');
     this.syncTab(t);
+    this.paintMixed();
 
     if (wasClosing) {
       // Reopened mid-close: the transitions simply turn around.
@@ -474,7 +485,7 @@ export class PillFace extends FieldView {
     this.browser = null;
     this.el.hidden = true;
     this.fadeParts(null);
-    this.el.classList.remove('vf-find', 'vf-focused', 'vf-raised', 'vf-under', 'vf-ime', 'vf-own');
+    this.el.classList.remove('vf-find', 'vf-focused', 'vf-raised', 'vf-under', 'vf-ime', 'vf-own', 'vf-mixed');
     this.b.root.classList.remove('find-face', 'find-own', 'find-focused');
     if (!cooldown) return;
     // The reload slot ignores clicks for a moment, so a second click on × doesn't reload.
