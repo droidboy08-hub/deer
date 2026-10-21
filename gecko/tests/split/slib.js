@@ -3,12 +3,20 @@
 // Gives window.SL. Pages come from the local server tests/split/all.py starts (SPLIT_PORT): light.html
 // (Field Notes, a light page), dark.html (Tideline, a dark page), links.html, focus.html, flat.html
 // (Flat Mark: a flat white favicon). Input is synthesized in-process (spike.press / spike.click /
-// EventUtils), never OS input.
+// EventUtils), never OS input; real mouse input is shut out (below).
 /* global spike, Services, Ci, gBrowser */
 window.SL = (() => {
   const b = window.vitre;
   const { sleep } = spike;
   const port = Services.env.get("SPLIT_PORT");
+
+  // The person's cursor over the test window (or resting there while a window opens or closes under
+  // it) makes Windows send a WM_MOUSEMOVE or WM_MOUSELEAVE, which Gecko takes as the pointer's new
+  // place: it replaces the synthesized pointer and the hover with it, so a link hovered in a pane is
+  // left a moment later and the status bubble rightly follows the real pointer (extras.js section 1
+  // failed that way about 1 run in 3). Gecko drops every mouse event not synthesized for tests from
+  // here on, in every window of this process (what mochitests do with EventUtils.disableNonTestMouseEvents).
+  window.windowUtils.disableNonTestMouseEvents(true);
 
   const http = (leaf, host = "127.0.0.1") => `http://${host}:${port}/${leaf}`;
 
