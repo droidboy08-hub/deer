@@ -32,6 +32,8 @@ const PATHS: Record<string, [string, string?]> = {
   // Split view (CtxMenu.dc.html split rows): the split glyph and Swap sides.
   split: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11'],
   swap: ['M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3'],
+  // History (CtxMenu.dc.html plushistory): a clock with a back arrow, so it doesn't read as Downloads' "Queued" clock.
+  history: ['M4.2 10a5.8 5.8 0 1 0 1.7-4.1M3.6 3.6v2.8h2.8M10 6.6V10l2.4 1.5'],
   /** Submenu arrow in the accelerator column (not part of the board set: Deer's own menus have no submenus). */
   chevron: ['M8 5.5 12.5 10 8 14.5'],
 };

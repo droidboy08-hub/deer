@@ -289,6 +289,9 @@
 #layer-tips .vitre-tip .t { overflow: hidden; text-overflow: ellipsis; }
 #layer-tips .vitre-tip .k { flex: none; color: rgba(255,255,255,0.6); }
 #layer-tips .vitre-tip .k[hidden] { display: none; }
+/* A tip of several lines (the History panel's rows: title, address, date and time). */
+#vitre-root #layer-tips .vitre-tip.lines { height: auto; padding: 5px 10px; align-items: flex-start; white-space: pre-line; line-height: 16px; }
+#layer-tips .vitre-tip.lines .t { white-space: pre-line; overflow-wrap: anywhere; unicode-bidi: plaintext; }
 
 /* ---- Split view: a pair's item (src/window/bar.ts; SplitPill board, spec "Split pill", "Pair capsule") ----
  * One .item.tab.pair with two faces: the split pill while one of its sides is active, the 96x44

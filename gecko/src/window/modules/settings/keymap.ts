@@ -71,7 +71,6 @@ export const KEY_GROUPS: KeyGroup[] = [
     name: 'Address and search',
     rows: [
       { label: 'Edit the address', keys: 'Ctrl+L', alt: 'Alt+D', page: true },
-      { label: 'Recent history', keys: 'Ctrl+H', page: true },
       { label: 'Go to the address or search', keys: 'Enter', where: 'In the address field' },
       { label: 'Open in a new tab', keys: 'Alt+Enter', where: 'In the address field' },
       { label: 'Peek the highlighted result', keys: 'Shift+Enter', alt: '{peekLink}', where: 'In the address field' },
@@ -155,6 +154,8 @@ export const KEY_GROUPS: KeyGroup[] = [
     name: 'Panels and app',
     rows: [
       { label: 'Open or close Settings', keys: 'Ctrl+,', page: true },
+      // HISTORY-SPEC.md "With the rest of Deer": Ctrl+H opens the History panel (no longer the address field's list).
+      { label: 'Open or close History', keys: 'Ctrl+H', page: true },
       { label: 'Keyboard shortcuts', keys: 'F1', page: true },
       { label: 'Clear browsing data', keys: 'Ctrl+Shift+Delete', page: true },
       { label: 'Close the panel', keys: 'Esc', alt: 'Ctrl+W', where: 'With a panel open' },
@@ -187,7 +188,7 @@ export const DIFFERENT_FROM_CHROME: { text: string; link?: { label: string; sect
   { text: 'F6 cycles both pages in split view' },
   { text: 'Shift+Enter in the address field peeks' },
   { text: '{peekLink} peeks the focused link' },
-  { text: 'Ctrl+H shows recent history in the address field' },
+  { text: 'Ctrl+H opens a panel, not a page' },
   { text: 'Ctrl+Shift+T also reopens a peek you just closed' },
   { text: 'Ctrl+J opens a panel, not a page' },
   { text: 'F1 opens these keyboard shortcuts' },

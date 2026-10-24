@@ -1,4 +1,4 @@
-"""Integration tests: the seven feature modules together (from gecko/):
+"""Integration tests: the eight feature modules together (from gecko/):
 
     python tests/integrate/all.py [name ...] [--app build-x] [--no-build] [--jobs N]
 

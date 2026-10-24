@@ -442,7 +442,7 @@ source. Its header is the contract.
 
 ## Feature modules and their services
 
-Seven feature modules sit on the core. Each lives in `src/window/modules/<key>/` (contract in its
+Eight feature modules sit on the core. Each lives in `src/window/modules/<key>/` (contract in its
 `index.ts` header), keeps every Firefox internal it uses in its own `gecko.ts` / `fx.ts` with the
 source file named, and is tested by `tests/<key>/` (the builder's suites) and `tests/<key>-verify/`
 (the verifier's attack suites, which also rerun the builder's). `tests/integrate/` runs them together.
@@ -454,13 +454,14 @@ are optional for callers and were added during the build, the rest is the agreed
 
 | Service | Provider | Members | Additions | Used by |
 |---|---|---|---|---|
-| `peek` | peek | `open(urlOrRequest, opts?)` (opts: `origin` rect, `browser`, principals), `isOpen()`, `browser()`, `close()`, `promote()`, `headerRect()`, `canReopen()`, `reopen()` | `headerSlot(on)` (find's capsule slot; hides the header's domain and path), `search(text, opts?)`; window event `vitre:peek` (`detail.phase`: open, closing, promoting, closed); `window.vitrePeek` `{ browser(), close(), open(url) }` for the core | menus, find, downloads |
+| `peek` | peek | `open(urlOrRequest, opts?)` (opts: `origin` rect, `browser`, principals), `isOpen()`, `browser()`, `close()`, `promote()`, `headerRect()`, `canReopen()`, `reopen()` | `headerSlot(on)` (find's capsule slot; hides the header's domain and path), `search(text, opts?)`; open opts `noWash` (History draws its row's wash itself); window event `vitre:peek` (`detail.phase`: open, closing, promoting, closed); `window.vitrePeek` `{ browser(), close(), open(url) }` for the core | menus, find, downloads |
 | `find` | find | `open({ query?, browser? }?)`, `close()`, `isOpen()` | | menus |
 | `menus` | menus | `show(items, at, { align?, onClose? })`, `close()` | `isOpen()`, `editItems(field)`; `MenuItem.access`, `.bold`; show options `keyboard`, `label`, `owner`, `gap`, `touch`; `onClose` also runs when nothing could be shown | find, peek, downloads, extensions |
 | `downloads` | downloads | `download(urlOrRequest, { browser?, filename?, saveAs?, referrerInfo?, triggeringPrincipal? })`, `openPanel()`, `videoPicker()` | options `origin` (where the file flies from), `isPrivate`, `cookieJarSettings` (the page's); `openPanel(focusId?)`; `mediaState(browser?)`, `isPanelOpen()` | menus |
 | `settings` | settings | `open(pageId?, query?)`, `registerPage({ id, title, icon?, order, render })` | page `keywords`; `isOpen()`, `close()`, `changeBackground()` (Home's popover on Home, else Settings › Home and background) | menus, downloads (Video downloads, 51), extensions (Extensions, 65) |
 | `extensions` | extensions | `openPanel()`, `count()` | | |
 | `switcher` | switcher | `open('cycle' \| 'latched' \| 'search')`, `isOpen()` | `close()` (cancel as Esc does) | downloads (the quit prompt) |
+| `history` | history | `open(opts?)` (opts: `query`, `view` 'all' \| 'closed'), `toggle()`, `close()`, `isOpen()` | | menus (the + circle's History row) |
 
 `tests/integrate/services.js` checks every provider against this table. Consumers read a service
 typed by its provider's declaration (`b.service('menus')` is `MenusApi | undefined`), never through a
@@ -502,6 +503,35 @@ local look-alike type, so a contract change fails `tsc`.
   and `settings-open` on `b.root`; Esc and close layers 60. Tests: `tests/settings` (pages, rebind,
   clear, picker, appicon, wallpapers), `tests/settings-verify` (ladder, keyboard, windows, scale, restart,
   hung, a11y, integration).
+- **History** (`modules/history/`, singleton `modules/VitreHistory.sys.ts`; spec
+  `../design/HISTORY-SPEC.md`, approved by the owner 2026-10-24, boards on the canvas page "History"):
+  the third floating panel (Ctrl+H, page-first, toggles; History in the + circle's menu; Ctrl+H in the
+  address field searches for what was typed). The 960x688 Settings sheet with a 216 px sidebar (search,
+  All history / Recently closed, Clear browsing data…), a 32 px toolbar line (summary, match count,
+  selection, undo line) and the list: one row per page per day (that day's latest counted visit;
+  reloads, embeds, downloads, framed links, redirect sources and non-web pages left out), days newest
+  first, read from Places one day per query (`store.ts`, read-only connections; at least 60 rows at a
+  time, a large day built 200 rows per frame). Search: `AUTOCOMPLETE_MATCH` over moz_places by a scan
+  and sort, 150 a page, never interrupted (a newer search wins by serial). Rows open like links (click
+  here, Ctrl/middle background, Ctrl+Shift switched, Shift+click a peek with History stepping aside and
+  coming back warm); a checkbox selects; deletes are instant with a 10 s undo line and change Places
+  only when they commit (`removeVisitsByFilter` per row and day, never `history.remove`: a row takes that
+  page's visits on that day only; a day's range ends at the next midnight less 0.001 ms, Today's at the
+  moment of the delete). The commit runs in `VitreHistory` (it outlives the window and blocks Places'
+  shutdown), on timeout, close, a new delete, opening a page, the window closing, Clear browsing data in
+  any window (`settings/gecko.ts sanitize` calls `flushAll()` first) and quit. The rows a delete hides
+  stay in the store (`hides()` keeps them off screen), so Undo is exact after the list was read again
+  (the Peek hand-off, a bulk change); a committed delete's rows stay hidden until `VitreHistory` has
+  removed them (a reopen meanwhile never shows them). Rows read again keep their ids, so the drawn rows,
+  keyboard focus and the selection survive a reload. Delete day on a search-results heading takes the
+  whole day, and its line counts the day's pages (counted in Places when that day isn't loaded). Every
+  loaded row is drawn: a change repaints only rows whose fields changed and skips unchanged days, and
+  `aria-rowindex` is renumbered 3,000 rows a frame (about 10 ms a change with 20,000 rows). Live updates through
+  `PlacesObservers` while open; Recently closed from SessionStore (`closed.ts`). Warm state 60 s
+  (view, query, scroll, focused row; never the selection). A private window's panel shows only "History
+  isn’t shown in private windows." and reads nothing. Esc and close layers 60; `panel-open` and
+  `history-open` on `b.root`. Tests: `tests/history` (look, open, list, search, gestures, select,
+  delete, closed, live, keys, a11y).
 - **Downloads** (`modules/downloads/`, engine `modules/VitreDownloads.sys.ts` + `modules/downloads/*`,
   page module `actors/page/downloads.ts`): IDM-style segmented engine (one network partition per
   connection), take-over of Firefox's downloads, HLS / DASH joined by ffmpeg (`-c copy`), yt-dlp with
@@ -824,8 +854,9 @@ Cross-module behaviour worth knowing: the menus' Peek link / Download linked fil
 Find selection / Settings rows go through the services above; find in a peek uses `headerSlot` and
 closes with the sheet (`vitre:peek` closed); a promoted peek is an ordinary tab for the switcher; the
 download mark and the extension buttons share the pill's right end (mark slot 410..438 always kept,
-cluster before it); Downloads and Settings are panels (one at a time: `downloads-open` /
-`settings-open`); any menu whose owner is in the bar, an extension popup and a peek hold an
+cluster before it); Downloads, Settings and History are panels (one at a time: `downloads-open` /
+`settings-open` / `history-open`; History steps aside when another appears and closes them when it
+opens); any menu whose owner is in the bar, an extension popup and a peek hold an
 auto-hidden bar on screen.
 
 ## Settings, data, pages
@@ -897,7 +928,9 @@ auto-hidden bar on screen.
   search box hands every key to Firefox's hidden address bar (`gURLBar.handoff`), so nothing could
   be typed there (test `input/private.js`).
 - Address field history: Places SQL in `src/window/places.ts` (hosts first, then a frecency-ordered
-  scan; a newer search interrupts the running one). Search engines: Deer's own list in
+  scan; a newer search interrupts the running one). While the History panel holds a delete under its
+  undo line, the pages it would take out of history entirely are left out of this window's
+  suggestions (`setPendingRemoval`) until the commit has finished. Search engines: Deer's own list in
   `src/shared/settings.ts`; private windows search with their own engine (`privateSearchEngine`,
   DuckDuckGo by default, the owner's choice of 2026-10-10; Settings › Search engine › Private
   windows), picked by the window's `Browser.applySettings` for its address field, selected text and
@@ -1114,6 +1147,17 @@ the code as described; the user may want it otherwise.
   items may push a menu past the 10-row limit (more so now that an extension's nested items are listed
   in place under captions instead of a submenu); the overlay scrollbar is Gecko's thin one, not 2 px; in
   element full screen menus use the solid material.
+- **History**: its menus keep the menus module's width rule (MenuSpec: fitted to the measured text in
+  8 px steps, as every Deer menu): the + circle 288 px (as before History; HistoryMenus draws 296), the
+  selection menu 304 (spec 328) and the day menu 280 (spec 312). The canvas sizes menus from character
+  counts (CtxMenu.dc.html: length x size x 0.51), and its `plus` kind is 296 where Deer has drawn 288
+  since before History; the heights match. A row's three-line tooltip is tips.ts's tip grown to three lines
+  (`.lines`); rows are plain fixed-height DOM, without `content-visibility` (the spec's optional hint:
+  measured with 37,000 rows drawn, `content-visibility: auto` on rows made each frame slower, 32 ms
+  against 6, and a change no faster);
+  the summary counts pages with at least one counted visit; the closed-tab row that Ctrl+Shift+T would
+  bring back (its key printed in the menu) is the newest close of any normal window or a window, as
+  SessionStore's last close action is; "Open N pages in new tabs" opens them in the background.
 - **Extensions** (no board exists): the cluster is not drawn on Home or in popup windows (there
   `openPanel()` opens Settings or nothing); pinned buttons give way below a 140 px address and the
   cluster below 100 px; page actions come before pinned buttons; Firefox's wording is replaced by "Pin

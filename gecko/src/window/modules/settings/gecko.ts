@@ -3,7 +3,8 @@
 //
 //   pickFile(title, filters, dir?)   the native Open dialog (nsIFilePicker, modeOpen) -> path | null
 //   pickFolder(title, dir?)          the native folder dialog (modeGetFolder)         -> path | null
-//   sanitize(items, range)           Firefox's Sanitizer with a time range
+//   sanitize(items, range)           Firefox's Sanitizer with a time range (History's pending
+//                                    delete, in any window, commits first: VitreHistory.flushAll)
 //   forgetClosedEverywhere()         empty Ctrl+Shift+T's list in every browser window
 //   builtinWallpapers()              the photos that ship with Windows (%SystemRoot%\Web\Wallpaper)
 //   exists(path)                     IOUtils.exists, never throwing
@@ -13,6 +14,8 @@
 //   exitElementFullscreen()          leave a page element's full screen (FullScreen.exitDomFullScreen)
 //   caretBrowsing() / setCaretBrowsing(on) / onCaretBrowsingChange(fn)
 //                                    Firefox's caret browsing pref (accessibility.browsewithcaret)
+
+import { sysModule } from '../../firefox';
 
 /** What the Open dialog offers. `extensions` without dots: ['jpg', 'png']. */
 export interface FileFilter {
@@ -93,6 +96,13 @@ export type SanitizeItem = 'history' | 'formdata' | 'cookies' | 'offlineApps' | 
 export async function sanitize(items: SanitizeItem[], range: [number, number] | null): Promise<void> {
   const { Sanitizer } = ChromeUtils.importESModule('resource:///modules/Sanitizer.sys.mjs');
   if (!items.length) return;
+  // A delete waiting under History's undo line, in any window, commits first (HISTORY-SPEC.md
+  // "Deleting, and undo": the commit runs when Clear browsing data runs).
+  try {
+    await sysModule('VitreHistory').flushAll();
+  } catch (e) {
+    console.error('Deer settings: History could not commit its pending delete', e);
+  }
   await Sanitizer.sanitize(items, range ? { ignoreTimespan: false, range } : { ignoreTimespan: true });
 }
 

@@ -13,7 +13,7 @@ import { titleOf } from '../../split';
 import { displayHost } from '../../../shared/url';
 import * as gecko from './gecko';
 import { pasteAndGo } from './page-items';
-import { downloadsService, peekService, settingsService } from './services';
+import { downloadsService, historyService, peekService, settingsService } from './services';
 import { item, SEP, tidy, type MenuCommand, type MenuItem } from './types';
 
 const w = window as any;
@@ -195,7 +195,7 @@ function updateRow(b: Browser): MenuCommand | null {
   }
 }
 
-/** The + circle: routes for the page-first keys a page could keep (Ctrl+J, Ctrl+comma) and F11; Restart to update while an update waits. */
+/** The + circle: routes for the page-first keys a page could keep (Ctrl+H, Ctrl+J, Ctrl+comma) and F11; Restart to update while an update waits. */
 export function plusRows(b: Browser): MenuItem[] {
   const peek = peekService(b);
   let reopen: MenuCommand;
@@ -214,6 +214,9 @@ export function plusRows(b: Browser): MenuItem[] {
     item('New private window', 'newwindow', 'Ctrl+Shift+N', 'P', () => b.run('newPrivateWindow')),
     reopen,
     SEP,
+    // History (HISTORY-SPEC.md "Menus", CtxMenu kind plushistory): the first row of the panel group,
+    // the same in a private window (where it opens the panel to its one line). Opens; never closes.
+    historyService(b) ? item('History', 'history', 'Ctrl+H', 'H', () => historyService(b)?.open()) : null,
     downloadsService(b) ? item('Show downloads', 'download', 'Ctrl+J', 'S', () => downloadsService(b)?.openPanel()) : null,
     item('Full screen', '', 'F11', 'F', () => b.run('fullscreen'), { checked: !!window.fullScreen }),
     // Opens the panel (Ctrl+, toggles it; a menu row never closes it).

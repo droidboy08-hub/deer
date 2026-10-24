@@ -130,6 +130,11 @@ export interface PeekOpenOptions extends gk.Principals {
   origin?: { x: number; y: number; width: number; height: number };
   /** The page that asked (default: the active tab's). */
   browser?: XULBrowser;
+  /**
+   * No accent wash on `origin` when the sheet goes back into it: the caller draws its own (the History
+   * panel's row, HISTORY-SPEC.md "Peek from a row"). (Addition.)
+   */
+  noWash?: boolean;
 }
 
 export interface PeekApi {
@@ -229,6 +234,9 @@ class Peek {
   private link: LinkInfo | null = null;
   /** Where a peek opened without a link grew from (window px). */
   private anchor: Box | null = null;
+  /** The anchor gets the wash when the sheet goes back into it (not for an opener that draws its own: noWash). */
+  private anchorWash = true;
+  private nextAnchorWash = true;
   private live: Live | null = null;
   private warm: Warm | null = null;
   private lastEsc = 0;
@@ -468,6 +476,8 @@ class Peek {
     this.source = tab;
     this.link = link;
     this.anchor = link ? null : from;
+    this.anchorWash = !!link || this.nextAnchorWash;
+    this.nextAnchorWash = true;
     this.live = live;
     this.lastEsc = 0;
     live.typed = false;
@@ -644,7 +654,7 @@ class Peek {
     void this.locate(tab, this.link).then((where) => {
       if (this.live === live && this.phase === 'closing') this.shrink(live, where && tab ? this.toWindow(tab, where.rect, true) : anchor);
       const spot = where && tab ? this.toWindow(tab, where.row ?? padded(where.rect), false) : anchor && padded(anchor);
-      if (tab && spot) this.wash(tab, spot, t0);
+      if (tab && spot && (where || this.anchorWash)) this.wash(tab, spot, t0);
     });
     this.sheet.dimmed(false, reducedMotion() ? 150 : 240);
     // The bar leaves with the dim (it hides HIDE_DELAY after, reveal.ts), as on PeekMotion.
@@ -1585,6 +1595,8 @@ class Peek {
     }
     const o = opts.origin;
     const from: Box | null = o ? { x: o.x, y: o.y, w: Math.max(8, o.width), h: Math.max(8, o.height), r: Math.min(22, o.height / 2) } : null;
+    this.nextAnchorWash = !opts.noWash;
     this.open(url, tab, null, from, principals);
+    this.nextAnchorWash = true;
   }
 }

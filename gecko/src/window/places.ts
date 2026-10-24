@@ -21,6 +21,10 @@
 //   3. an empty text lists the most recent visits (Ctrl+H).
 // One search runs at a time per window: a newer one interrupts the older one, whose promise then
 // resolves to null ("superseded").
+// A delete waiting under the History panel's undo line (modules/history/store.ts) leaves out the
+// pages it would take out of history entirely, in this window only, until its commit has finished
+// (setPendingRemoval; ../design/HISTORY-SPEC.md "Deleting, and undo"). A page with visits on other
+// days stays suggested.
 
 export interface HistoryRow {
   url: string;
@@ -28,6 +32,17 @@ export interface HistoryRow {
 }
 
 const likeEscape = (s: string): string => s.replace(/[%_/]/g, '/$&');
+
+/** Addresses the History panel's pending delete would remove from history entirely (this window). */
+let pendingRemoval: ReadonlySet<string> = new Set();
+
+/** The History panel's pending delete (store.ts): these pages are left out until it commits. */
+export function setPendingRemoval(urls: Iterable<string>): void {
+  pendingRemoval = new Set(urls);
+}
+
+/** Leave out pending removals and keep `limit` rows. */
+const keep = (list: HistoryRow[], limit: number): HistoryRow[] => (pendingRemoval.size ? list.filter((r) => !pendingRemoval.has(r.url)) : list).slice(0, limit);
 
 let placesUtils: any = null;
 const places = (): any => (placesUtils ??= ChromeUtils.importESModule('resource://gre/modules/PlacesUtils.sys.mjs').PlacesUtils);
@@ -63,7 +78,7 @@ export class HistorySearch {
   lastMs = 0;
 
   /** Up to `limit` rows for the text, best first; null when a newer search replaced this one. */
-  async query(text: string, limit: number): Promise<HistoryRow[] | null> {
+  async query(text: string, want: number): Promise<HistoryRow[] | null> {
     const mine = ++this.serial;
     const started = performance.now();
     const conn = await db();
@@ -76,10 +91,12 @@ export class HistorySearch {
     }
     if (mine !== this.serial) return null;
     this.running++;
+    // Room for the rows a pending History delete leaves out (none: exactly the rows asked for).
+    const limit = want + Math.min(pendingRemoval.size, 50);
     try {
       const tokens = text.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
       if (!tokens.length) {
-        return rows(await conn.executeCached(`SELECT ${COLUMNS} FROM moz_places h WHERE ${BASE} ORDER BY h.last_visit_date DESC LIMIT :limit`, { limit }), false);
+        return keep(rows(await conn.executeCached(`SELECT ${COLUMNS} FROM moz_places h WHERE ${BASE} ORDER BY h.last_visit_date DESC LIMIT :limit`, { limit }), false), want);
       }
       const params: Record<string, unknown> = { limit };
       const words: string[] = [];
@@ -99,12 +116,12 @@ export class HistorySearch {
         )
       );
       if (mine !== this.serial) return null;
-      if (hosts.length >= limit) return hosts;
+      if (hosts.length >= limit) return keep(hosts, want);
       // 2. Everything else, most used first.
       const rest = rows(await conn.executeCached(`SELECT ${COLUMNS} FROM moz_places h WHERE ${where} ORDER BY h.frecency DESC LIMIT :limit`, params));
       if (mine !== this.serial) return null;
       const have = new Set(hosts.map((r) => r.url));
-      return [...hosts, ...rest.filter((r) => !have.has(r.url))].slice(0, limit);
+      return keep([...hosts, ...rest.filter((r) => !have.has(r.url))], want);
     } catch (e) {
       // Interrupted by a newer search, or the database is busy shutting down.
       if (mine === this.serial) console.warn('Deer: history search did not finish', e);

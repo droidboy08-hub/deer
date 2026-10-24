@@ -178,15 +178,6 @@
      "priority": "local",
      "note": "",
      "isNew": true
-    },
-    {
-     "keys": "Ctrl+H",
-     "alt": "",
-     "action": "Recent history: focuses the address field with an empty query and lists the History group. Type to search it.",
-     "scope": "anywhere in the window",
-     "priority": "page-first",
-     "note": "Docs and Word keep Ctrl+H for Replace. Needs an empty-query state on HomeSearch.",
-     "isNew": true
     }
    ]
   },
@@ -877,6 +868,15 @@
      "isNew": true
     },
     {
+     "keys": "Ctrl+H",
+     "alt": "History in the + menu",
+     "action": "Open or close the History panel; from the address field, what you typed becomes its search",
+     "scope": "anywhere in the window",
+     "priority": "page-first",
+     "note": "Docs and Word keep Ctrl+H for Replace; F6 then Ctrl+H, or History in the + menu, is the route a page can't block. Added 2026-10-24 (HISTORY-SPEC.md, approved by the owner).",
+     "isNew": true
+    },
+    {
      "keys": "F1",
      "alt": "",
      "action": "Open Settings › Keyboard shortcuts",
@@ -897,7 +897,7 @@
     {
      "keys": "Esc",
      "alt": "The panel's close button",
-     "action": "Close the open Settings or Downloads panel",
+     "action": "Close the open Settings, Downloads or History panel",
      "scope": "panel open",
      "priority": "local",
      "note": "Topmost first: a panel, then a peek, then the tab",
@@ -906,7 +906,7 @@
     {
      "keys": "Ctrl+W",
      "alt": "",
-     "action": "Close the panel, not the tab under it",
+     "action": "Close the Settings, Downloads or History panel, not the tab under it",
      "scope": "panel open",
      "priority": "local",
      "note": "",
@@ -915,7 +915,7 @@
     {
      "keys": "Ctrl+F",
      "alt": "",
-     "action": "Focus the panel's own search field ('Find a setting', 'Search downloads')",
+     "action": "Focus the Settings, Downloads or History panel's own search field ('Find a setting', 'Search downloads', 'Search history')",
      "scope": "panel open",
      "priority": "local",
      "note": "",
@@ -945,6 +945,155 @@
      "action": "Inspect element (the developer tools picker)",
      "scope": "page",
      "priority": "page-first",
+     "note": "",
+     "isNew": true
+    }
+   ]
+  },
+  {
+   "name": "History panel",
+   "entries": [
+    {
+     "keys": "Up, Down",
+     "alt": "",
+     "action": "Move by row; day headings are stops",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Home, End",
+     "alt": "",
+     "action": "First or last loaded row; reaching the end loads more",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Page Up, Page Down",
+     "alt": "",
+     "action": "One screen (13 rows)",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Up, Ctrl+Down",
+     "alt": "",
+     "action": "Previous or next day heading",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Enter",
+     "alt": "",
+     "action": "Open the row in the current tab; the panel closes",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Alt+Enter",
+     "alt": "",
+     "action": "Open the row in a new tab, switched to",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Enter",
+     "alt": "",
+     "action": "Open the row in a background tab; the panel stays",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+Enter",
+     "alt": "",
+     "action": "Peek the row (Ctrl+Q always peeks)",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Space",
+     "alt": "",
+     "action": "Select or unselect the row; on a heading, the whole day",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+Up, Shift+Down",
+     "alt": "",
+     "action": "Extend the selection from the anchor; Shift+Home and Shift+End too",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+A",
+     "alt": "",
+     "action": "Select every match, in search results only",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Delete",
+     "alt": "",
+     "action": "Delete the selection, or else the focused row (that day's visits only); on a heading, the day. In Recently closed, remove the entry",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "Shift+Delete too",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+Z",
+     "alt": "",
+     "action": "Undo the last delete while its line shows (in the list and the sidebar, not in the search field)",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "The one exception to 'never a Vitre accelerator', in this list only",
+     "isNew": true
+    },
+    {
+     "keys": "Ctrl+C",
+     "alt": "",
+     "action": "Copy the focused row's address, or the selection's, one per line and each once",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "",
+     "isNew": true
+    },
+    {
+     "keys": "Shift+F10",
+     "alt": "",
+     "action": "The row's or heading's menu, 4 px below it",
+     "scope": "History panel",
+     "priority": "local",
+     "note": "The Menu key too",
+     "isNew": true
+    },
+    {
+     "keys": "Esc",
+     "alt": "",
+     "action": "One step per keydown: close a menu, clear the selection, clear the search text (in the field), close the panel",
+     "scope": "History panel",
+     "priority": "local",
      "note": "",
      "isNew": true
     }
@@ -1077,8 +1226,8 @@
   "IME guard: no shortcut fires while isComposing is true or keyCode is 229. Esc closes the IME first.",
   "Layouts: match letters by virtual key, which follows the key's label, so QWERTZ, AZERTY and Dvorak behave like every Windows app and Cyrillic or Greek layouts still give Ctrl+C. Match digits by virtual key or physical code. Match Plus, Minus and Equals by the character the active layout types, with VK_OEM_PLUS/MINUS and the numpad as fallbacks; zoom wins when a digit key types - or +. Only letters, digits, F keys, navigation keys, Enter, Esc, Tab, Backspace, Delete, Plus, Minus, Equals and comma carry shortcuts. Comma is matched by VK_OEM_COMMA.",
   "Held-Ctrl states: no chord that holds Ctrl may rely on Esc, because Ctrl+Esc opens Start. The switcher latches, staying open with Ctrl up, on the first typed character, on Ctrl+Shift+A, when opened by mouse, and when Sticky Keys is on. Losing window focus (Start, Alt+Tab, the Win key) cancels back to the starting tab.",
-  "Key repeat is ignored for anything that closes, opens, reopens or toggles: Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+N, F11, F12, F1, Ctrl+J, Ctrl+comma, Ctrl+Shift+A, Ctrl+Shift+D, Ctrl+Shift+U, Alt+Enter, Ctrl+Q, every Esc step, and Alt+Left or Browser Back when it closes a peek.",
-  "Esc unwinds one layer per fresh keydown (key repeat never steps the ladder), in this order: the IME; a split divider drag or a lifted tab circle (cancelled back to where it started); a Vitre menu; a Vitre popover, prompt or page dialog; the latched switcher; element full screen or pointer lock; the Settings or Downloads panel; the focused Vitre field (the address field first puts the address back, then returns to the page; the find field closes find); the page; parked find; the peek; and finally stop loading. An Esc used by any layer never counts toward a peek’s Esc Esc.",
+  "Key repeat is ignored for anything that closes, opens, reopens or toggles: Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+N, F11, F12, F1, Ctrl+H, Ctrl+J, Ctrl+comma, Ctrl+Shift+A, Ctrl+Shift+D, Ctrl+Shift+U, Alt+Enter, Ctrl+Q, every Esc step, and Alt+Left or Browser Back when it closes a peek.",
+  "Esc unwinds one layer per fresh keydown (key repeat never steps the ladder), in this order: the IME; a split divider drag or a lifted tab circle (cancelled back to where it started); a Vitre menu; a Vitre popover, prompt or page dialog; the latched switcher; element full screen or pointer lock; the Settings, Downloads or History panel (History clears its selection, then its search text, first); the focused Vitre field (the address field first puts the address back, then returns to the page; the find field closes find); the page; parked find; the peek; and finally stop loading. An Esc used by any layer never counts toward a peek’s Esc Esc.",
   "Topmost surface: Ctrl+W, Esc, Ctrl+F and the page keys (reload, print, save, source, zoom, developer tools) act on an open panel first, then a peek, then the tab — the same order as the Esc ladder and as they are drawn. Tab and window keys always act on the window, and leaving a tab warm-closes its peek.",
   "Peek's Shift+click and Shift+Enter come only from setWindowOpenHandler, and only when all of these hold: the disposition is 'new-window'; details.features is empty, so sign-in, payment and call pop-ups stay real pop-ups; within about 500 ms the preload saw a trusted Shift+click or Shift+Enter on a link whose href equals the URL; the URL is http, https or file and isn't only a #fragment change; and the Shift+click setting is on. Otherwise Vitre behaves exactly like Chrome, and it never adds a Shift+click listener of its own.",
   "Windows conventions keep working. Alt+F4 closes the window, and Alt+Space opens the system menu on the frameless window. Alt or F10 pressed alone only closes an open Vitre menu: there is no native menu bar, no & mnemonics, autoHideMenuBar stays off, and handled Alt chords don't beep. Shift+F10 and the Menu key open the context menu. CUA keys, Ctrl+Backspace and Ctrl+Left/Right Shift text direction work in every Vitre field.",
@@ -1124,7 +1273,7 @@
   "Ctrl+Shift+D is printed beside Download video… and in the download mark’s tooltip.",
   "Split view (owner's decision 2026-10-20, SPLIT-VIEW-SPEC.md): Ctrl+Shift+U toggles it (page-first, ignores key repeat, rebindable); F6 cycles both pages; a pair is one Ctrl+Tab entry and moves as one with Ctrl+Shift+Page Up/Down while its sides are two stops for Ctrl+Page Up/Down and Ctrl+1–9; Ctrl+W closes the focused side; the divider has local keys; a drag is cancelled by Esc right after the IME on the ladder."
  ],
- "customization": "Settings › Keyboard shortcuts sits in the Settings sidebar; F1 or Ctrl+, opens it. It lists every key in this map, grouped the same way, as plain dim text in Windows spelling, with labels taken from the active keyboard layout (navigator.keyboard.getLayoutMap) and localized modifier names. The panel's 'Find a setting' field searches the page by action or by key. Page-first keys carry a dim note, 'Sites can use this first'. A short 'Different from Chrome' section lists the deviations: Shift+click peeks; Shift+Enter in the address field peeks; Ctrl+Tab uses most-recent order; F6 always leaves the page; F6 cycles both pages in split view; Ctrl+Q peeks. The page also has a switch, 'Shift+click a link: Peek / Open in new window', and a 'Caret browsing' switch, which has no key. Only Vitre's own verbs can be rebound, one key each: Peek (Ctrl+Q), Open as tab (Alt+Enter), Search tabs (Ctrl+Shift+A), Download this video (Ctrl+Shift+D) and Split view (Ctrl+Shift+U). Chrome-standard tab and window keys, find, navigation and editing keys are fixed. To rebind, click the key text and press the new keys; Esc cancels the capture. Each changed row gets a dim 'Reset', and the page has 'Reset all shortcuts'. The editor refuses some keys with a one-line reason: reserved keys ('Windows uses Ctrl+Shift+1 to switch input language', 'Ctrl+Alt types characters on many keyboards', 'Win keys belong to Windows', 'Microsoft Pinyin uses Ctrl+Shift+B', 'Ctrl+Esc opens Start'); single letters, bare modifiers and layout-dependent punctuation; and keys another Vitre command already uses ('Already used by Show downloads'). It warns but allows GPU-overlay defaults ('Radeon Software may use this on some PCs') and keys popular sites use ('Slack, GitHub and Notion use Ctrl+K; sites get it first'). Not in v1: a per-site 'Let this site use Ctrl+W, Ctrl+T and Ctrl+N' list for web IDEs and terminals. If it ships, it is off by default, set per site, and never covers Ctrl+Tab, F6 or Esc Esc. The refusals also cover Shift+printable keys (‘Types a character’) and Alt+letter (‘Pages use Alt+letter for access keys’), count every scope-local use as already used, and rebinding Peek or Open as tab changes every place it applies (page, peek, address field, find field). ‘Different from Chrome’ also lists Ctrl+H (recent history in the address field), F1 (keyboard shortcuts), Ctrl+Shift+D (download this video), Ctrl+Shift+T (also reopens a warm peek) and Ctrl+J (a panel, not a page). Keys some Radeon installs take (Ctrl+Shift+R, Ctrl+Shift+I) carry a dim warning.",
+ "customization": "Settings › Keyboard shortcuts sits in the Settings sidebar; F1 or Ctrl+, opens it. It lists every key in this map, grouped the same way, as plain dim text in Windows spelling, with labels taken from the active keyboard layout (navigator.keyboard.getLayoutMap) and localized modifier names. The panel's 'Find a setting' field searches the page by action or by key. Page-first keys carry a dim note, 'Sites can use this first'. A short 'Different from Chrome' section lists the deviations: Shift+click peeks; Shift+Enter in the address field peeks; Ctrl+Tab uses most-recent order; F6 always leaves the page; F6 cycles both pages in split view; Ctrl+Q peeks. The page also has a switch, 'Shift+click a link: Peek / Open in new window', and a 'Caret browsing' switch, which has no key. Only Vitre's own verbs can be rebound, one key each: Peek (Ctrl+Q), Open as tab (Alt+Enter), Search tabs (Ctrl+Shift+A), Download this video (Ctrl+Shift+D) and Split view (Ctrl+Shift+U). Chrome-standard tab and window keys, find, navigation and editing keys are fixed. To rebind, click the key text and press the new keys; Esc cancels the capture. Each changed row gets a dim 'Reset', and the page has 'Reset all shortcuts'. The editor refuses some keys with a one-line reason: reserved keys ('Windows uses Ctrl+Shift+1 to switch input language', 'Ctrl+Alt types characters on many keyboards', 'Win keys belong to Windows', 'Microsoft Pinyin uses Ctrl+Shift+B', 'Ctrl+Esc opens Start'); single letters, bare modifiers and layout-dependent punctuation; and keys another Vitre command already uses ('Already used by Show downloads'). It warns but allows GPU-overlay defaults ('Radeon Software may use this on some PCs') and keys popular sites use ('Slack, GitHub and Notion use Ctrl+K; sites get it first'). Not in v1: a per-site 'Let this site use Ctrl+W, Ctrl+T and Ctrl+N' list for web IDEs and terminals. If it ships, it is off by default, set per site, and never covers Ctrl+Tab, F6 or Esc Esc. The refusals also cover Shift+printable keys (‘Types a character’) and Alt+letter (‘Pages use Alt+letter for access keys’), count every scope-local use as already used, and rebinding Peek or Open as tab changes every place it applies (page, peek, address field, find field). ‘Different from Chrome’ also lists Ctrl+H (a panel, not a page), F1 (keyboard shortcuts), Ctrl+Shift+D (download this video), Ctrl+Shift+T (also reopens a warm peek) and Ctrl+J (a panel, not a page). Keys some Radeon installs take (Ctrl+Shift+R, Ctrl+Shift+I) carry a dim warning.",
  "boards": [
   "KeyMap: the whole map as a reference sheet (fills the empty Keyboard map frame): every group as a table (keys, action, where it works), a quiet text marker for Vitre first / Page first / Inside Vitre, new keys marked, and the reserved list by owner.",
   "KeyRouting: how one keydown travels (guards, browser-first, the page, page-first), the Esc ladder as a stack, the F6 focus cycle with and without a peek or find, and “What pages can never block”.",
