@@ -406,6 +406,55 @@
       "w": 1440,
       "x": 0,
       "y": 2120
+    },
+    "HistoryPanel.dc.html": {
+      "h": 688,
+      "page": "parts",
+      "title": "Part · History panel (every state)",
+      "w": 960,
+      "x": 1520,
+      "y": 3060
+    },
+    "HistoryOpen.dc.html": {
+      "h": 900,
+      "page": "history",
+      "title": "History · the panel over the page (Ctrl+H or + › History)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "HistoryMotion.dc.html": {
+      "h": 980,
+      "page": "history",
+      "title": "History · in motion: open, search, delete and undo, peek, delete a day (plays by itself)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0,
+      "is_interactive": true
+    },
+    "HistoryMenus.dc.html": {
+      "h": 900,
+      "page": "history",
+      "title": "History · the + menu's new row and a row's menu",
+      "w": 1440,
+      "x": 0,
+      "y": 1100
+    },
+    "HistoryStates.dc.html": {
+      "h": 3316,
+      "page": "history",
+      "title": "History · every state: search, selection, undo, recently closed, private, light, empty",
+      "w": 2040,
+      "x": 1520,
+      "y": 1100
+    },
+    "HistorySpec.dc.html": {
+      "h": 3400,
+      "page": "history",
+      "title": "History · anatomy, rows, menus, keys, motion and edge cases",
+      "w": 1440,
+      "x": 0,
+      "y": 2120
     }
   },
   "createdOnFiles": {
@@ -507,6 +556,15 @@
       "w": 240,
       "x": 0,
       "y": -300
+    },
+    "t13": {
+      "kind": "title1",
+      "maxW": 3560,
+      "page": "history",
+      "text": "History: every page you visited, in one panel",
+      "w": 240,
+      "x": 0,
+      "y": -300
     }
   },
   "order": [
@@ -519,6 +577,7 @@
     "FindPill.dc.html",
     "CtxMenu.dc.html",
     "SplitPill.dc.html",
+    "HistoryPanel.dc.html",
     "Home.dc.html",
     "HomeSearch.dc.html",
     "HomeBrowse.dc.html",
@@ -559,7 +618,12 @@
     "SplitMotion.dc.html",
     "SplitStart.dc.html",
     "SplitDrop.dc.html",
-    "SplitSpec.dc.html"
+    "SplitSpec.dc.html",
+    "HistoryOpen.dc.html",
+    "HistoryMotion.dc.html",
+    "HistoryMenus.dc.html",
+    "HistoryStates.dc.html",
+    "HistorySpec.dc.html"
   ],
   "pages": [
     {
@@ -597,6 +661,10 @@
     {
       "id": "split",
       "name": "Split view"
+    },
+    {
+      "id": "history",
+      "name": "History"
     },
     {
       "id": "parts",

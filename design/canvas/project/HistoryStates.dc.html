@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History panel states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 2040px; height: 3316px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 40px; top: 32px; width: 1400px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">History · every state</h1>
+<p style="margin: 4px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">Every panel at 1:1, as it sits over Field Notes in a 1440×900 window. Dark mode unless marked.</p>
+</div>
+
+<div style="position: absolute; left: 40px; top: 120px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Search</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">“glass” in titles and addresses; Semibold matches; the Field Notes essay matches only in its address.</p>
+</div>
+<section aria-label="History panel, searching for glass" style="position: absolute; left: 40px; top: 172px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="search" query="glass" field-focus="{{true}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 1040px; top: 120px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Selection</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Checkboxes keep Ctrl+click and Shift+click for links. Today is partly selected.</p>
+</div>
+<section aria-label="History panel, three pages selected" style="position: absolute; left: 1040px; top: 172px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="select" selected="t1,t7,t9" hover="t4" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 40px; top: 908px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">After a delete, and a day’s heading on hover</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">One undo line for 10 s; Ctrl+Z works too. Delete day appears on the heading.</p>
+</div>
+<section aria-label="History panel, after a delete" style="position: absolute; left: 40px; top: 960px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="undo" gone="t7" undo-text="Deleted “Tin bath” from Today." scroll="{{260}}" head-hover="yesterday" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 1040px; top: 908px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Recently closed</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Tabs and windows, newest first. A click reopens with its back history.</p>
+</div>
+<section aria-label="History panel, Recently closed" style="position: absolute; left: 1040px; top: 960px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" view="closed" state="rest" hover="c1" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 40px; top: 1696px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Private window</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Ctrl+H or the + menu opens it to one line. No history, no search, no Recently closed, not even this window’s own tabs.</p>
+</div>
+<section aria-label="History panel in a private window" style="position: absolute; left: 40px; top: 1748px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="private" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 1040px; top: 1696px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Light mode</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Settings › Appearance › Light. Keyboard focus on a row.</p>
+</div>
+<section aria-label="History panel in light mode" style="position: absolute; left: 1040px; top: 1748px; width: 960px; height: 688px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" theme="light" state="rest" focus-row="t2" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 40px; top: 2484px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">No history yet</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Top of the panel.</p>
+</div>
+<section aria-label="History panel with no history yet, top of the panel" style="position: absolute; left: 40px; top: 2536px; width: 960px; height: 320px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="empty" field-focus="{{true}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 1040px; top: 2484px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Nothing found</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Top of the panel. Clear search puts the list back.</p>
+</div>
+<section aria-label="History panel, nothing found for obsidian, top of the panel" style="position: absolute; left: 1040px; top: 2536px; width: 960px; height: 320px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="nomatch" query="obsidian" field-focus="{{true}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 40px; top: 2904px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">Recently closed, empty</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Top of the panel.</p>
+</div>
+<section aria-label="History panel, Recently closed empty, top of the panel" style="position: absolute; left: 40px; top: 2956px; width: 960px; height: 320px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" view="closed" state="closedempty" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div style="position: absolute; left: 1040px; top: 2904px; width: 960px; height: 44px">
+<h2 style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 600">History unavailable</h2>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">Top of the panel. Places couldn’t be read; Try again reads it again.</p>
+</div>
+<section aria-label="History panel, history unavailable, top of the panel" style="position: absolute; left: 1040px; top: 2956px; width: 960px; height: 320px; overflow: hidden; border-radius: 0">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="unavailable" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2040,"height":3316}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

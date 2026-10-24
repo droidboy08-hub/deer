@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History panel (part)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@keyframes vt-caret{0%{opacity:1}50%{opacity:0}100%{opacity:1}}
+.hp-in{-webkit-appearance:none;appearance:none}
+.hp-in::-webkit-search-cancel-button,.hp-in::-webkit-search-decoration{-webkit-appearance:none;display:none}
+.hp-dark::placeholder{color:rgba(255,255,255,0.55);opacity:1}
+.hp-light::placeholder{color:rgba(0,0,0,0.55);opacity:1}
+.hp-del-dark:hover{background:rgba(255,255,255,0.08) !important}
+.hp-del-light:hover{background:rgba(255,255,255,0.72) !important;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.09)}
+@media (prefers-reduced-motion: reduce){.vt-m{transition-property:opacity !important;transition-duration:150ms !important;transition-delay:0ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 960px; height: 688px; position: relative; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true" focusable="false">
+<defs>
+<filter id="lens-hist" x="0" y="0" width="960" height="688" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feImage href="/_blob/907d800cda0d60b0784640e4a27452c3" x="0" y="0" width="960" height="688" preserveAspectRatio="none" result="map"></feImage>
+<feGaussianBlur in="SourceGraphic" stdDeviation="22" result="soft"></feGaussianBlur>
+<feDisplacementMap in="soft" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G" result="bent"></feDisplacementMap>
+<feColorMatrix in="bent" type="saturate" values="1.5"></feColorMatrix>
+</filter>
+</defs>
+</svg>
+
+<section role="dialog" aria-modal="true" aria-label="History" aria-describedby="{{pv.desc}}" class="vt-m" style="position: absolute; left: 0; top: 0; width: 960px; height: 688px; border-radius: 22px; color: {{t.text}}; transform: {{sheet.tf}}; box-shadow: {{sheet.shadow}}; transition: {{sheet.tr}}; pointer-events: {{sheet.pe}}">
+<div class="vt-m" style="position: absolute; inset: 0; border-radius: 22px; backdrop-filter: url(#lens-hist); opacity: {{sheet.lensOp}}; transition: {{sheet.lensTr}}"></div>
+<div class="vt-m" style="position: absolute; inset: 0; border-radius: 22px; background: {{t.tint}}; opacity: {{sheet.op}}; transition: {{sheet.opTr}}"></div>
+<div class="vt-m" style="position: absolute; inset: 0; border-radius: 22px; padding: 1px; background: {{t.rim}}; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: {{sheet.op}}; transition: {{sheet.opTr}}"></div>
+
+<div class="vt-m" style="position: relative; height: 688px; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; opacity: {{sheet.op}}; transition: {{sheet.opTr}}">
+
+<div style="height: 48px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid {{t.line}}">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 10a5.8 5.8 0 1 0 1.7-4.1M3.6 3.6v2.8h2.8M10 6.6V10l2.4 1.5"></path></svg>
+<span style="flex-grow: 1; font-size: 14px; font-weight: 600">History</span>
+<button aria-label="Close history" aria-keyshortcuts="Escape" style="width: 30px; height: 30px; border: 0; margin: 0; border-radius: 15px; padding: 0; background: {{t.ctl}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; display: {{pv.body}}">
+
+<div style="position: relative; width: 216px; flex-shrink: 0; box-sizing: border-box; padding: 16px 12px; font-size: 13.5px">
+<div style="height: 34px; margin-bottom: 12px; box-sizing: border-box; padding: 0 {{fld.padR}}px 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; background: {{fld.bg}}; box-shadow: {{fld.line}}; color: {{t.text3}}; font-size: 13px">
+<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 3.6 3.6"></path></svg>
+<span style="position: relative; flex-grow: 1; min-width: 0; height: 34px">
+<input type="search" class="hp-in {{fld.cls}}" aria-label="{{fld.ph}}" aria-description="Searches page titles and addresses" aria-keyshortcuts="Control+F" placeholder="{{fld.ph}}" value="{{fld.text}}" onChange="{{noop}}" style="position: absolute; left: 0; top: 0; width: 100%; height: 34px; box-sizing: border-box; border: 0; margin: 0; padding: 0; background: transparent; color: {{t.text}}; font: inherit; outline: none">
+<sc-if value="{{fld.caret}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="position: absolute; left: 0; top: 0; height: 34px; display: flex; align-items: center; white-space: pre; color: transparent; pointer-events: none">{{fld.text}}<span class="vt-m" style="width: 1px; height: 16px; margin-left: 1px; background: {{t.accent}}; animation: vt-caret 1060ms steps(1) infinite"></span></span></sc-if>
+</span>
+<sc-if value="{{fld.hasText}}" hint-placeholder-val="{{true}}"><button aria-label="Clear search" style="width: 26px; height: 26px; flex-shrink: 0; border: 0; margin: 0; padding: 0; border-radius: 5px; background: transparent; color: {{t.dim}}; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button></sc-if>
+</div>
+<nav aria-label="History views" style="display: flex; flex-direction: column; gap: 2px">
+<button aria-current="{{nv.allCur}}" style="position: relative; height: 34px; box-sizing: border-box; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; background: {{nv.allBg}}; color: {{nv.allColor}}; font: inherit; font-size: 13.5px; text-align: left; white-space: nowrap"><span style="position: absolute; left: 0; top: 9px; width: 3px; height: 16px; border-radius: 2px; background: {{t.accent}}; opacity: {{nv.allBar}}"></span><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4.2 10a5.8 5.8 0 1 0 1.7-4.1M3.6 3.6v2.8h2.8M10 6.6V10l2.4 1.5"></path></svg><span style="flex-grow: 1">All history</span></button>
+<button aria-current="{{nv.closedCur}}" aria-label="{{nv.closedName}}" style="position: relative; height: 34px; box-sizing: border-box; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; background: {{nv.closedBg}}; color: {{nv.closedColor}}; font: inherit; font-size: 13.5px; text-align: left; white-space: nowrap"><span style="position: absolute; left: 0; top: 9px; width: 3px; height: 16px; border-radius: 2px; background: {{t.accent}}; opacity: {{nv.closedBar}}"></span><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M7.5 5.5 4 9l3.5 3.5M4 9h7.5a4 4 0 0 1 0 8H9"></path></svg><span style="flex-grow: 1">Recently closed</span><sc-if value="{{nv.hasCount}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: {{t.dim}}">{{nv.count}}</span></sc-if></button>
+</nav>
+<div style="position: absolute; left: 12px; top: 581px; width: 192px; height: 1px; background: {{t.line}}"></div>
+<button aria-label="Clear browsing data, opens Settings" aria-keyshortcuts="Control+Shift+Delete" style="position: absolute; left: 12px; top: 590px; width: 192px; height: 34px; box-sizing: border-box; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 12px; background: transparent; color: {{t.nav}}; font: inherit; font-size: 13.5px; text-align: left; white-space: nowrap"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12M11 4.5h4.5V9M15.5 4.5 9.5 10.5"></path></svg><span style="flex-grow: 1">Clear browsing data…</span></button>
+</div>
+
+<div style="width: 1px; flex-shrink: 0; margin: 16px 0; background: {{t.line}}"></div>
+
+<div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 18px 20px 0; display: flex; flex-direction: column">
+<div style="position: relative; height: 32px; flex-shrink: 0">
+<sc-for list="{{tb}}" as="L" hint-placeholder-count="2">
+<div aria-hidden="{{L.hidden}}" style="position: absolute; left: 0; top: 0; width: 703px; height: 32px; display: flex; align-items: center; gap: 8px; opacity: {{L.op}}; visibility: {{L.vis}}; transition: {{L.tr}}">
+<span style="flex-grow: 1; min-width: 0; font-size: 13px; color: {{L.color}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{L.text}}</span>
+<sc-if value="{{L.isSel}}" hint-placeholder-val="{{false}}"><button aria-keyshortcuts="Delete" style="height: 32px; flex-shrink: 0; padding: 0 12px 0 10px; display: flex; align-items: center; gap: 6px; border: 0; margin: 0; border-radius: 6px; background: {{t.ctl}}; box-shadow: inset 0 0 0 1px {{t.ctlLine}}; color: {{t.text}}; font: inherit; font-size: 13px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.8 10a1.5 1.5 0 0 0 1.5 1.4h3.4a1.5 1.5 0 0 0 1.5-1.4L14 6"></path></svg>Delete</button><button aria-label="Clear selection" aria-keyshortcuts="Escape" style="width: 32px; height: 32px; flex-shrink: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; margin: 0; border-radius: 6px; background: {{t.ctl}}; box-shadow: inset 0 0 0 1px {{t.ctlLine}}; color: {{t.text}}; font: inherit; font-size: 13px"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button></sc-if>
+<sc-if value="{{L.isUndo}}" hint-placeholder-val="{{false}}"><button aria-keyshortcuts="Control+Z" style="flex-shrink: 0; height: 32px; padding: 0 12px; border: 0; margin: 0; border-radius: 6px; background: {{t.ctl}}; box-shadow: inset 0 0 0 1px {{t.ctlLine}}; color: {{t.text}}; font: inherit; font-size: 13px">Undo</button></sc-if>
+</div>
+</sc-for>
+</div>
+
+<div style="position: relative; margin-top: 12px; height: 578px; flex-shrink: 0; overflow: hidden">
+<sc-if value="{{lst.on}}" hint-placeholder-val="{{true}}">
+<div role="grid" aria-label="{{lst.label}}" aria-multiselectable="{{lst.multi}}" aria-rowcount="-1" style="padding-bottom: 20px; transform: translateY({{lst.ty}}px)">
+<sc-if value="{{g0.on}}" hint-placeholder-val="{{true}}">
+<div role="rowgroup" aria-hidden="{{g0.hide}}" class="vt-m" style="opacity: {{g0.op}}; transition: {{g0.opTr}}">
+<div role="row" aria-rowindex="{{g0.head.ri}}" class="vt-m" style="position: relative; height: {{g0.head.h}}px; overflow: hidden; transition: {{g0.head.tr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 28px; border-radius: 6px; box-shadow: {{g0.head.ring}}">
+<span aria-hidden="true" class="vt-m" style="position: absolute; left: 12px; top: 4px; width: 20px; height: 20px; border-radius: 4px; background: {{g0.head.cbBg}}; box-shadow: {{g0.head.cbLine}}; color: {{t.onAccent}}; opacity: {{g0.head.cbOp}}; transition: {{g0.head.cbTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{g0.head.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: {{t.onAccent}}; opacity: {{g0.head.mixOp}}"></span></span>
+<span role="rowheader" aria-label="{{g0.head.aria}}" class="vt-m" style="position: absolute; left: 2px; top: 4px; height: 20px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; transform: translateX({{g0.head.shift}}px); transition: {{g0.head.slideTr}}">
+<span style="font-size: 13px; line-height: 20px; font-weight: 600; color: {{t.h2}}">{{g0.head.label}}</span>
+<sc-if value="{{g0.head.hasSub}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; line-height: 20px; color: {{t.text3}}">{{g0.head.sub}}</span></sc-if>
+</span>
+<sc-if value="{{g0.head.canDelete}}" hint-placeholder-val="{{true}}"><span role="gridcell" style="position: absolute; right: 0; top: 0; height: 28px"><button aria-label="{{g0.head.delLabel}}" aria-keyshortcuts="Delete" class="vt-m {{g0.head.delCls}}" style="height: 28px; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; background: transparent; color: {{t.value}}; font: inherit; font-size: 12.5px; white-space: nowrap; opacity: {{g0.head.delOp}}; transition: {{fx.fade}}">Delete day</button></span></sc-if>
+</div>
+</div>
+<div style="position: relative; border-radius: 10px; overflow: hidden; background: {{t.card}}">
+<sc-for list="{{g0.rows}}" as="r0" hint-placeholder-count="4">
+<div role="row" aria-hidden="{{r0.hide}}" aria-rowindex="{{r0.ri}}" aria-selected="{{r0.ariaSel}}" aria-label="{{r0.aria}}" class="vt-m" style="position: relative; height: {{r0.h}}px; overflow: hidden; transition: {{r0.tr}}">
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; opacity: {{r0.cop}}; transition: {{r0.ctr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{r0.plate}}"></div>
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{t.wash}}; opacity: {{r0.washOp}}; transition: {{r0.washTr}}"></div>
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 2px {{t.ring}}; opacity: {{r0.ringOp}}"></div>
+<span aria-hidden="true" style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px">
+<span class="vt-m" style="position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; color: {{t.dim}}; opacity: {{r0.favOp}}; transition: {{fx.fade}}">
+<sc-if value="{{r0.fn}}" hint-placeholder-val="{{true}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></sc-if>
+<sc-if value="{{r0.tl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></sc-if>
+<sc-if value="{{r0.rf}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></sc-if>
+<sc-if value="{{r0.vs}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+<sc-if value="{{r0.le}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></sc-if>
+<sc-if value="{{r0.gl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 1 0 0-13zM3.5 10h13M10 3.5c-1.8 2-2.6 4.1-2.6 6.5s.8 4.5 2.6 6.5c1.8-2 2.6-4.1 2.6-6.5S11.8 5.5 10 3.5z"></path></svg></sc-if>
+<sc-if value="{{r0.win}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 14V6A1.5 1.5 0 0 1 4 4.5zM2.5 7.5h15"></path></svg></sc-if>
+</span>
+<span class="vt-m" style="position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 4px; background: {{r0.cbBg}}; box-shadow: {{r0.cbLine}}; color: {{t.onAccent}}; opacity: {{r0.cbOp}}; transition: {{fx.fade}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{r0.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+</span>
+<span role="gridcell" dir="auto" style="position: absolute; left: 44px; top: 0; width: 315px; height: 40px; line-height: 40px; font-size: 13.5px; color: {{t.text}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r0.s0}}<span style="font-weight: 600">{{r0.h1}}</span>{{r0.s1}}<span style="font-weight: 600">{{r0.h2}}</span>{{r0.s2}}<span style="font-weight: 600">{{r0.h3}}</span>{{r0.s3}}</span>
+<span role="gridcell" style="position: absolute; left: 375px; top: 0; width: 200px; height: 40px; line-height: 40px; font-size: 12.5px; color: {{t.dim}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left"><span dir="ltr" style="unicode-bidi: isolate">{{r0.a0}}<span style="font-weight: 600; color: {{t.text}}">{{r0.ah1}}</span>{{r0.a1}}<span style="font-weight: 600; color: {{t.text}}">{{r0.ah2}}</span>{{r0.a2}}</span></span>
+<span role="gridcell" style="position: absolute; left: 591px; top: 0; width: 64px; height: 40px; line-height: 40px; text-align: right; font-size: 12.5px; color: {{t.dim}}; font-variant-numeric: tabular-nums; white-space: nowrap"><time datetime="{{r0.dt}}">{{r0.time}}</time></span>
+<span role="gridcell" style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px">
+<button aria-label="{{r0.xLabel}}" aria-keyshortcuts="Delete" class="vt-m" style="width: 28px; height: 28px; border: 0; margin: 0; padding: 0; border-radius: 14px; background: {{r0.xBg}}; color: {{t.dim}}; opacity: {{r0.xOp}}; transition: {{fx.fadeX}}; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</span>
+<div class="vt-m" style="position: absolute; left: 44px; top: 39px; width: 659px; height: 1px; background: {{t.sep}}; opacity: {{r0.hairOp}}; transition: {{fx.hair}}"></div>
+</div>
+</div>
+</sc-for>
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px {{t.cardLine}}; pointer-events: none"></div>
+</div>
+<div class="vt-m" style="height: {{g0.gapH}}px; transition: {{g0.head.tr}}"></div>
+</div>
+</sc-if>
+<sc-if value="{{g1.on}}" hint-placeholder-val="{{true}}">
+<div role="rowgroup" aria-hidden="{{g1.hide}}" class="vt-m" style="opacity: {{g1.op}}; transition: {{g1.opTr}}">
+<div role="row" aria-rowindex="{{g1.head.ri}}" class="vt-m" style="position: relative; height: {{g1.head.h}}px; overflow: hidden; transition: {{g1.head.tr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 28px; border-radius: 6px; box-shadow: {{g1.head.ring}}">
+<span aria-hidden="true" class="vt-m" style="position: absolute; left: 12px; top: 4px; width: 20px; height: 20px; border-radius: 4px; background: {{g1.head.cbBg}}; box-shadow: {{g1.head.cbLine}}; color: {{t.onAccent}}; opacity: {{g1.head.cbOp}}; transition: {{g1.head.cbTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{g1.head.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: {{t.onAccent}}; opacity: {{g1.head.mixOp}}"></span></span>
+<span role="rowheader" aria-label="{{g1.head.aria}}" class="vt-m" style="position: absolute; left: 2px; top: 4px; height: 20px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; transform: translateX({{g1.head.shift}}px); transition: {{g1.head.slideTr}}">
+<span style="font-size: 13px; line-height: 20px; font-weight: 600; color: {{t.h2}}">{{g1.head.label}}</span>
+<sc-if value="{{g1.head.hasSub}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; line-height: 20px; color: {{t.text3}}">{{g1.head.sub}}</span></sc-if>
+</span>
+<sc-if value="{{g1.head.canDelete}}" hint-placeholder-val="{{true}}"><span role="gridcell" style="position: absolute; right: 0; top: 0; height: 28px"><button aria-label="{{g1.head.delLabel}}" aria-keyshortcuts="Delete" class="vt-m {{g1.head.delCls}}" style="height: 28px; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; background: transparent; color: {{t.value}}; font: inherit; font-size: 12.5px; white-space: nowrap; opacity: {{g1.head.delOp}}; transition: {{fx.fade}}">Delete day</button></span></sc-if>
+</div>
+</div>
+<div style="position: relative; border-radius: 10px; overflow: hidden; background: {{t.card}}">
+<sc-for list="{{g1.rows}}" as="r1" hint-placeholder-count="4">
+<div role="row" aria-hidden="{{r1.hide}}" aria-rowindex="{{r1.ri}}" aria-selected="{{r1.ariaSel}}" aria-label="{{r1.aria}}" class="vt-m" style="position: relative; height: {{r1.h}}px; overflow: hidden; transition: {{r1.tr}}">
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; opacity: {{r1.cop}}; transition: {{r1.ctr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{r1.plate}}"></div>
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{t.wash}}; opacity: {{r1.washOp}}; transition: {{r1.washTr}}"></div>
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 2px {{t.ring}}; opacity: {{r1.ringOp}}"></div>
+<span aria-hidden="true" style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px">
+<span class="vt-m" style="position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; color: {{t.dim}}; opacity: {{r1.favOp}}; transition: {{fx.fade}}">
+<sc-if value="{{r1.fn}}" hint-placeholder-val="{{true}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></sc-if>
+<sc-if value="{{r1.tl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></sc-if>
+<sc-if value="{{r1.rf}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></sc-if>
+<sc-if value="{{r1.vs}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+<sc-if value="{{r1.le}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></sc-if>
+<sc-if value="{{r1.gl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 1 0 0-13zM3.5 10h13M10 3.5c-1.8 2-2.6 4.1-2.6 6.5s.8 4.5 2.6 6.5c1.8-2 2.6-4.1 2.6-6.5S11.8 5.5 10 3.5z"></path></svg></sc-if>
+<sc-if value="{{r1.win}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 14V6A1.5 1.5 0 0 1 4 4.5zM2.5 7.5h15"></path></svg></sc-if>
+</span>
+<span class="vt-m" style="position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 4px; background: {{r1.cbBg}}; box-shadow: {{r1.cbLine}}; color: {{t.onAccent}}; opacity: {{r1.cbOp}}; transition: {{fx.fade}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{r1.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+</span>
+<span role="gridcell" dir="auto" style="position: absolute; left: 44px; top: 0; width: 315px; height: 40px; line-height: 40px; font-size: 13.5px; color: {{t.text}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r1.s0}}<span style="font-weight: 600">{{r1.h1}}</span>{{r1.s1}}<span style="font-weight: 600">{{r1.h2}}</span>{{r1.s2}}<span style="font-weight: 600">{{r1.h3}}</span>{{r1.s3}}</span>
+<span role="gridcell" style="position: absolute; left: 375px; top: 0; width: 200px; height: 40px; line-height: 40px; font-size: 12.5px; color: {{t.dim}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left"><span dir="ltr" style="unicode-bidi: isolate">{{r1.a0}}<span style="font-weight: 600; color: {{t.text}}">{{r1.ah1}}</span>{{r1.a1}}<span style="font-weight: 600; color: {{t.text}}">{{r1.ah2}}</span>{{r1.a2}}</span></span>
+<span role="gridcell" style="position: absolute; left: 591px; top: 0; width: 64px; height: 40px; line-height: 40px; text-align: right; font-size: 12.5px; color: {{t.dim}}; font-variant-numeric: tabular-nums; white-space: nowrap"><time datetime="{{r1.dt}}">{{r1.time}}</time></span>
+<span role="gridcell" style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px">
+<button aria-label="{{r1.xLabel}}" aria-keyshortcuts="Delete" class="vt-m" style="width: 28px; height: 28px; border: 0; margin: 0; padding: 0; border-radius: 14px; background: {{r1.xBg}}; color: {{t.dim}}; opacity: {{r1.xOp}}; transition: {{fx.fadeX}}; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</span>
+<div class="vt-m" style="position: absolute; left: 44px; top: 39px; width: 659px; height: 1px; background: {{t.sep}}; opacity: {{r1.hairOp}}; transition: {{fx.hair}}"></div>
+</div>
+</div>
+</sc-for>
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px {{t.cardLine}}; pointer-events: none"></div>
+</div>
+<div class="vt-m" style="height: {{g1.gapH}}px; transition: {{g1.head.tr}}"></div>
+</div>
+</sc-if>
+<sc-if value="{{g2.on}}" hint-placeholder-val="{{true}}">
+<div role="rowgroup" aria-hidden="{{g2.hide}}" class="vt-m" style="opacity: {{g2.op}}; transition: {{g2.opTr}}">
+<div role="row" aria-rowindex="{{g2.head.ri}}" class="vt-m" style="position: relative; height: {{g2.head.h}}px; overflow: hidden; transition: {{g2.head.tr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 28px; border-radius: 6px; box-shadow: {{g2.head.ring}}">
+<span aria-hidden="true" class="vt-m" style="position: absolute; left: 12px; top: 4px; width: 20px; height: 20px; border-radius: 4px; background: {{g2.head.cbBg}}; box-shadow: {{g2.head.cbLine}}; color: {{t.onAccent}}; opacity: {{g2.head.cbOp}}; transition: {{g2.head.cbTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{g2.head.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: {{t.onAccent}}; opacity: {{g2.head.mixOp}}"></span></span>
+<span role="rowheader" aria-label="{{g2.head.aria}}" class="vt-m" style="position: absolute; left: 2px; top: 4px; height: 20px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; transform: translateX({{g2.head.shift}}px); transition: {{g2.head.slideTr}}">
+<span style="font-size: 13px; line-height: 20px; font-weight: 600; color: {{t.h2}}">{{g2.head.label}}</span>
+<sc-if value="{{g2.head.hasSub}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; line-height: 20px; color: {{t.text3}}">{{g2.head.sub}}</span></sc-if>
+</span>
+<sc-if value="{{g2.head.canDelete}}" hint-placeholder-val="{{true}}"><span role="gridcell" style="position: absolute; right: 0; top: 0; height: 28px"><button aria-label="{{g2.head.delLabel}}" aria-keyshortcuts="Delete" class="vt-m {{g2.head.delCls}}" style="height: 28px; border: 0; margin: 0; padding: 0 10px; border-radius: 6px; background: transparent; color: {{t.value}}; font: inherit; font-size: 12.5px; white-space: nowrap; opacity: {{g2.head.delOp}}; transition: {{fx.fade}}">Delete day</button></span></sc-if>
+</div>
+</div>
+<div style="position: relative; border-radius: 10px; overflow: hidden; background: {{t.card}}">
+<sc-for list="{{g2.rows}}" as="r2" hint-placeholder-count="4">
+<div role="row" aria-hidden="{{r2.hide}}" aria-rowindex="{{r2.ri}}" aria-selected="{{r2.ariaSel}}" aria-label="{{r2.aria}}" class="vt-m" style="position: relative; height: {{r2.h}}px; overflow: hidden; transition: {{r2.tr}}">
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; opacity: {{r2.cop}}; transition: {{r2.ctr}}">
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{r2.plate}}"></div>
+<div class="vt-m" style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; background: {{t.wash}}; opacity: {{r2.washOp}}; transition: {{r2.washTr}}"></div>
+<div style="position: absolute; left: 0; top: 0; width: 703px; height: 40px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 2px {{t.ring}}; opacity: {{r2.ringOp}}"></div>
+<span aria-hidden="true" style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px">
+<span class="vt-m" style="position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; color: {{t.dim}}; opacity: {{r2.favOp}}; transition: {{fx.fade}}">
+<sc-if value="{{r2.fn}}" hint-placeholder-val="{{true}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#d9482b"></rect><text x="9.4" y="13.6" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#ffffff">F</text></svg></sc-if>
+<sc-if value="{{r2.tl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#0f8f8a"></circle><path d="M3.5 8.2c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6M3.5 11.6c1.4 0 1.4-1.6 2.8-1.6s1.4 1.6 2.8 1.6 1.4-1.6 2.8-1.6 1.4 1.6 2.6 1.6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"></path></svg></sc-if>
+<sc-if value="{{r2.rf}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg></sc-if>
+<sc-if value="{{r2.vs}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+<sc-if value="{{r2.le}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="display: block"><circle cx="9" cy="9" r="9" fill="#141416"></circle><circle cx="9" cy="9" r="4.6" fill="none" stroke="#ececef" stroke-width="1.5"></circle><circle cx="9" cy="9" r="1.4" fill="#ececef"></circle></svg></sc-if>
+<sc-if value="{{r2.gl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 1 0 0-13zM3.5 10h13M10 3.5c-1.8 2-2.6 4.1-2.6 6.5s.8 4.5 2.6 6.5c1.8-2 2.6-4.1 2.6-6.5S11.8 5.5 10 3.5z"></path></svg></sc-if>
+<sc-if value="{{r2.win}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 14V6A1.5 1.5 0 0 1 4 4.5zM2.5 7.5h15"></path></svg></sc-if>
+</span>
+<span class="vt-m" style="position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 4px; background: {{r2.cbBg}}; box-shadow: {{r2.cbLine}}; color: {{t.onAccent}}; opacity: {{r2.cbOp}}; transition: {{fx.fade}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; left: 0; top: 0; opacity: {{r2.checkOp}}"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+</span>
+<span role="gridcell" dir="auto" style="position: absolute; left: 44px; top: 0; width: 315px; height: 40px; line-height: 40px; font-size: 13.5px; color: {{t.text}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r2.s0}}<span style="font-weight: 600">{{r2.h1}}</span>{{r2.s1}}<span style="font-weight: 600">{{r2.h2}}</span>{{r2.s2}}<span style="font-weight: 600">{{r2.h3}}</span>{{r2.s3}}</span>
+<span role="gridcell" style="position: absolute; left: 375px; top: 0; width: 200px; height: 40px; line-height: 40px; font-size: 12.5px; color: {{t.dim}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left"><span dir="ltr" style="unicode-bidi: isolate">{{r2.a0}}<span style="font-weight: 600; color: {{t.text}}">{{r2.ah1}}</span>{{r2.a1}}<span style="font-weight: 600; color: {{t.text}}">{{r2.ah2}}</span>{{r2.a2}}</span></span>
+<span role="gridcell" style="position: absolute; left: 591px; top: 0; width: 64px; height: 40px; line-height: 40px; text-align: right; font-size: 12.5px; color: {{t.dim}}; font-variant-numeric: tabular-nums; white-space: nowrap"><time datetime="{{r2.dt}}">{{r2.time}}</time></span>
+<span role="gridcell" style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px">
+<button aria-label="{{r2.xLabel}}" aria-keyshortcuts="Delete" class="vt-m" style="width: 28px; height: 28px; border: 0; margin: 0; padding: 0; border-radius: 14px; background: {{r2.xBg}}; color: {{t.dim}}; opacity: {{r2.xOp}}; transition: {{fx.fadeX}}; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></button>
+</span>
+<div class="vt-m" style="position: absolute; left: 44px; top: 39px; width: 659px; height: 1px; background: {{t.sep}}; opacity: {{r2.hairOp}}; transition: {{fx.hair}}"></div>
+</div>
+</div>
+</sc-for>
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px {{t.cardLine}}; pointer-events: none"></div>
+</div>
+<div class="vt-m" style="height: {{g2.gapH}}px; transition: {{g2.head.tr}}"></div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{msg.empty}}" hint-placeholder-val="{{false}}"><p style="position: absolute; left: 0; top: 56px; width: 703px; margin: 0; text-align: center; font-size: 13px; line-height: 20px; color: {{t.text3}}">Pages you visit will show up here.</p></sc-if>
+<sc-if value="{{msg.closedEmpty}}" hint-placeholder-val="{{false}}"><p style="position: absolute; left: 0; top: 56px; width: 703px; margin: 0; text-align: center; font-size: 13px; line-height: 20px; color: {{t.text3}}">Tabs and windows you close show up here.</p></sc-if>
+<sc-if value="{{msg.noMatch}}" hint-placeholder-val="{{false}}"><div role="status" style="position: absolute; left: 0; top: 56px; width: 703px; display: flex; flex-direction: column; align-items: center; text-align: center">
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: {{t.h2}}">{{msg.noMatchText}}</p>
+<p style="margin: 6px 0 0; font-size: 12.5px; line-height: 18px; color: {{t.text3}}">Search looks in page titles and addresses.</p>
+<button style="height: 32px; padding: 0 12px; border: 0; margin: 14px 0 0; border-radius: 6px; background: {{t.ctl}}; box-shadow: inset 0 0 0 1px {{t.ctlLine}}; color: {{t.text}}; font: inherit; font-size: 13px">Clear search</button>
+</div></sc-if>
+<sc-if value="{{msg.unavailable}}" hint-placeholder-val="{{false}}"><div role="status" style="position: absolute; left: 0; top: 56px; width: 703px; display: flex; flex-direction: column; align-items: center; text-align: center">
+<p style="margin: 0; font-size: 13px; line-height: 20px; color: {{t.h2}}">History isn’t available right now.</p>
+<button style="height: 32px; padding: 0 12px; border: 0; margin: 14px 0 0; border-radius: 6px; background: {{t.ctl}}; box-shadow: inset 0 0 0 1px {{t.ctlLine}}; color: {{t.text}}; font: inherit; font-size: 13px">Try again</button>
+</div></sc-if>
+</div>
+</div>
+
+</div>
+<sc-if value="{{pv.on}}" hint-placeholder-val="{{false}}"><p id="hp-private-note" style="position: absolute; left: 0; top: 166px; width: 960px; margin: 0; text-align: center; font-size: 13px; line-height: 20px; color: {{t.text3}}">History isn’t shown in private windows.</p></sc-if>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["dark","light"],"section":"Panel"},"view":{"editor":"enum","default":"all","options":["all","closed"],"section":"Panel"},"state":{"editor":"enum","default":"rest","options":["rest","search","select","undo","dayundo","private","empty","nomatch","closedempty","unavailable"],"section":"Panel"},"query":{"editor":"text","default":"glass","section":"Panel"},"fieldFocus":{"editor":"boolean","default":true,"section":"Panel"},"hover":{"editor":"text","default":"","section":"Rows"},"hoverX":{"editor":"boolean","default":false,"section":"Rows"},"focusRow":{"editor":"text","default":"","section":"Rows"},"pressed":{"editor":"text","default":"","section":"Rows"},"headHover":{"editor":"enum","default":"","options":["","today","yesterday","tue"],"section":"Rows"},"selected":{"editor":"text","default":"t1,t7,t9","section":"Rows"},"wash":{"editor":"text","default":"","section":"Rows"},"washOn":{"editor":"boolean","default":true,"section":"Rows"},"gone":{"editor":"text","default":"","section":"Deletes"},"dayGone":{"editor":"text","default":"","section":"Deletes"},"undoText":{"editor":"text","default":"Deleted “Tin bath” from Today.","section":"Deletes"},"scroll":{"editor":"int","default":0,"min":0,"max":900,"unit":"px","section":"Panel"},"shown":{"editor":"boolean","default":true,"section":"Motion"},"reduced":{"editor":"boolean","default":false,"section":"Motion"},"$preview":{"width":960,"height":688}}'>
+class Component extends DCLogic {
+componentDidMount() {
+this.armClose();
+}
+
+componentDidUpdate() {
+this.armClose();
+}
+
+componentWillUnmount() {
+if (this.closeTimer) clearTimeout(this.closeTimer);
+this.closeTimer = null;
+}
+
+armClose() {
+if (this.closing && !this.closeTimer) {
+this.closeTimer = setTimeout(() => {
+this.closeTimer = null;
+this.closing = false;
+this.forceUpdate();
+}, 160);
+}
+}
+
+renderVals() {
+const p = this.props;
+const theme = p.theme === 'light' ? 'light' : 'dark';
+const state = p.state ?? 'rest';
+// A private window shows no history at all, not even its own Recently closed: only one line.
+const priv = state === 'private';
+const view =state === 'closedempty' || p.view === 'closed' ? 'closed' : 'all';
+const query = String(p.query ?? 'glass').replace(/\s+/g, ' ').trim();
+const fieldFocus = !!(p.fieldFocus ?? true);
+const hover = p.hover ?? '';
+const hoverX = !!(p.hoverX ?? false);
+const focusRow = p.focusRow ?? '';
+const pressed = p.pressed ?? '';
+const headHover = p.headHover ?? '';
+const wash = p.wash ?? '';
+const washOn = !!(p.washOn ?? true);
+const scroll = Math.max(0, Number(p.scroll ?? 0) || 0);
+const shown = !!(p.shown ?? true);
+const reduced = !!(p.reduced ?? false);
+const ids = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+
+const T = {
+dark: {
+tint: 'rgba(20,20,24,0.62)',
+rim: 'linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.2))',
+shadow: '0 40px 100px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3)',
+text: '#ffffff', dim: 'rgba(255,255,255,0.6)', text3: 'rgba(255,255,255,0.55)', value: 'rgba(255,255,255,0.7)', h2: 'rgba(255,255,255,0.86)', nav: 'rgba(255,255,255,0.88)',
+card: 'rgba(255,255,255,0.06)', cardLine: 'rgba(255,255,255,0.06)', sep: 'rgba(255,255,255,0.07)', line: 'rgba(255,255,255,0.08)',
+ctl: 'rgba(255,255,255,0.08)', ctlLine: 'rgba(255,255,255,0.08)',
+hover: 'rgba(255,255,255,0.05)', pressed: 'rgba(255,255,255,0.08)', selected: 'rgba(255,255,255,0.1)',
+accent: '#4cc2ff', onAccent: '#0b1a24', checkBg: 'rgba(0,0,0,0.12)', checkLine: 'rgba(255,255,255,0.6)',
+searchBg: 'rgba(255,255,255,0.07)', searchFocus: 'rgba(0,0,0,0.12)', searchLine: 'rgba(255,255,255,0.3)',
+ring: '#ffffff', wash: 'rgba(76,194,255,0.14)'
+},
+light: {
+tint: 'rgba(243,243,246,0.8)',
+rim: 'linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.4) 30%, rgba(255,255,255,0.25) 60%, rgba(255,255,255,0.7))',
+shadow: '0 40px 100px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.16)',
+text: 'rgba(0,0,0,0.9)', dim: 'rgba(0,0,0,0.6)', text3: 'rgba(0,0,0,0.55)', value: 'rgba(0,0,0,0.62)', h2: 'rgba(0,0,0,0.86)', nav: 'rgba(0,0,0,0.86)',
+card: 'rgba(255,255,255,0.62)', cardLine: 'rgba(0,0,0,0.06)', sep: 'rgba(0,0,0,0.07)', line: 'rgba(0,0,0,0.08)',
+ctl: 'rgba(255,255,255,0.72)', ctlLine: 'rgba(0,0,0,0.09)',
+hover: 'rgba(0,0,0,0.04)', pressed: 'rgba(0,0,0,0.06)', selected: 'rgba(0,0,0,0.06)',
+accent: '#005fb8', onAccent: '#ffffff', checkBg: 'rgba(0,0,0,0.02)', checkLine: 'rgba(0,0,0,0.45)',
+searchBg: 'rgba(255,255,255,0.7)', searchFocus: '#ffffff', searchLine: 'rgba(0,0,0,0.45)',
+ring: 'rgba(0,0,0,0.9)', wash: 'rgba(0,95,184,0.1)'
+}
+};
+const t = T[theme];
+
+const R = (id, title, host, time, fav, path) => ({ id: id, title: title, host: host, addr: '', time: time, fav: fav, path: path || '' });
+const DAYS = [
+{ id: 'today', label: 'Today', sub: 'Thursday, 23 October', date: '2026-10-23', aria: 'Today, Thursday 23 October 2026', del: 'Today', rows: [
+R('t0', 'Sand, heat and a bath of molten tin', 'fieldnotes.press', '14:32', 'fn', '/notes/float-glass'),
+R('t1', 'Float glass', 'refract.wiki', '14:27', 'rf'),
+R('t2', 'Molten: a 4K study of glass in motion', 'tideline.fm', '14:19', 'tl'),
+R('t3', 'Downloads: resume fails when the server drops the ETag · Issue #39 · vitre/vitre-shell', 'code.vitre.dev', '14:05', 'vs'),
+R('t4', 'Search: Alt + Enter should open the result in a background tab · Issue #38 · vitre/vitre-shell', 'code.vitre.dev', '13:58', 'vs'),
+R('t5', 'Slow light · Long Exposure Club', 'longexposure.club', '13:41', 'le'),
+R('t6', 'The quiet science of ice', 'fieldnotes.press', '12:56', 'fn'),
+R('t7', 'Tin bath', 'refract.wiki', '12:48', 'rf'),
+R('t8', 'Issues · vitre/vitre-shell', 'code.vitre.dev', '12:30', 'vs'),
+R('t9', 'Annealing lehr', 'refract.wiki', '11:52', 'rf'),
+R('t10', 'The tin bath, explained in five minutes', 'tideline.fm', '11:37', 'tl'),
+R('t11', 'backdrop-filter - CSS | MDN', 'developer.mozilla.org', '10:24', 'gl'),
+R('t12', 'Archive', 'fieldnotes.press', '10:15', 'fn'),
+R('t13', 'Segoe UI Variable font - Microsoft Learn', 'learn.microsoft.com', '09:48', 'gl')
+] },
+{ id: 'yesterday', label: 'Yesterday', sub: 'Wednesday, 22 October', date: '2026-10-22', aria: 'Yesterday, Wednesday 22 October 2026', del: 'Yesterday', rows: [
+R('y0', 'Ribbon studies, part 2', 'tideline.fm', '22:41', 'tl'),
+R('y1', 'Pull requests · vitre/vitre-shell', 'code.vitre.dev', '21:12', 'vs'),
+R('y2', 'Glass: refraction looks too strong at 125% display scaling · Issue #33 · vitre/vitre-shell', 'code.vitre.dev', '20:40', 'vs'),
+R('y3', 'Collections · Long Exposure Club', 'longexposure.club', '19:05', 'le'),
+R('y4', 'Soda-lime glass', 'refract.wiki', '18:22', 'rf'),
+R('y5', 'Northern lake, four seasons in one take', 'tideline.fm', '17:50', 'tl'),
+R('y6', 'How we lit the orb shot', 'tideline.fm', '17:31', 'tl'),
+R('y7', 'Members · Long Exposure Club', 'longexposure.club', '16:02', 'le'),
+R('y8', 'Peek: Esc should return focus to the link that opened it · Issue #24 · vitre/vitre-shell', 'code.vitre.dev', '15:20', 'vs'),
+R('y9', 'The weight of a window', 'fieldnotes.press', '11:08', 'fn'),
+R('y10', 'Fire polishing', 'refract.wiki', '10:40', 'rf'),
+R('y11', 'Salt flats at first light', 'tideline.fm', '09:12', 'tl')
+] },
+{ id: 'tue', label: 'Tuesday, 21 October', sub: '', date: '2026-10-21', aria: 'Tuesday 21 October 2026', del: 'Tuesday, 21 October', rows: [
+R('u0', 'Bristol Blue Glass, a visit', 'fieldnotes.press', '16:05', 'fn'),
+R('u1', 'Tab switcher: Ctrl + W closes the wrong tab while searching · Issue #29 · vitre/vitre-shell', 'code.vitre.dev', '15:47', 'vs'),
+R('u2', 'Dusk, from a canoe', 'tideline.fm', '13:20', 'tl'),
+R('u3', 'glass - Wiktionary, the free dictionary', 'en.wiktionary.org', '09:12', 'gl')
+] }
+];
+DAYS.forEach((d) => d.rows.forEach((r) => { r.dt = d.date + 'T' + r.time; }));
+const C = (id, title, host, time, fav, dt) => ({ id: id, title: title, host: host, addr: '', time: time, fav: fav, path: '', dt: dt });
+const TABS = [
+C('c0', 'Tab bar: reveal delay feels long on the top edge · Issue #41 · vitre/vitre-shell', 'code.vitre.dev', '14:36', 'vs', '2026-10-23T14:36'),
+C('c1', 'Dusk, from a canoe', 'tideline.fm', '14:12', 'tl', '2026-10-23T14:12'),
+C('c2', 'Annealing lehr', 'refract.wiki', '11:58', 'rf', '2026-10-23T11:58'),
+C('c3', 'How we lit the orb shot', 'tideline.fm', 'Yesterday', 'tl', '2026-10-22'),
+C('c4', 'backdrop-filter - CSS | MDN', 'developer.mozilla.org', 'Yesterday', 'gl', '2026-10-22'),
+C('c5', 'Members · Long Exposure Club', 'longexposure.club', '21 Oct', 'le', '2026-10-21')
+];
+const WINS = [
+{ id: 'w0', title: 'Pull requests · vitre/vitre-shell', host: '', addr: 'Window · 4 tabs', time: '09:30', fav: 'win', path: '', dt: '2026-10-23T09:30' },
+{ id: 'w1', title: 'Salt flats at first light', host: '', addr: 'Window · 7 tabs', time: 'Yesterday', fav: 'win', path: '', dt: '2026-10-22' }
+];
+
+const low = (s) => String(s || '').toLowerCase();
+const has = (s, w) => low(s).indexOf(w) >= 0;
+const wordsOf = (q) => low(q).split(' ').filter(Boolean);
+const matchAll = (r, ws) => ws.length > 0 && ws.every((w) => has(r.title, w) || has(r.host || r.addr, w) || has(r.path, w));
+const allRows = view === 'all' ? DAYS.reduce((a, d) => a.concat(d.rows), []) : TABS.concat(WINS);
+const countFor = (q) => allRows.filter((r) => matchAll(r, wordsOf(q))).length;
+
+let q = '';
+if (state === 'search') q = query;
+if (state === 'nomatch') q = query && countFor(query) === 0 ? query : 'obsidian';
+const searching = q.length > 0;
+const words = searching ? wordsOf(q) : [];
+const quote = '“' + q + '”';
+
+const hitsIn = (s) => {
+const l = low(s);
+const iv = [];
+words.forEach((w) => {
+let i = l.indexOf(w);
+while (i >= 0) { iv.push([i, i + w.length]); i = l.indexOf(w, i + w.length); }
+});
+iv.sort((a, b) => a[0] - b[0]);
+const m = [];
+iv.forEach((x) => {
+const last = m[m.length - 1];
+if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]);
+else m.push([x[0], x[1]]);
+});
+return m;
+};
+const pack = (s, n) => {
+const m = searching ? hitsIn(s) : [];
+const plain = [];
+const hit = [];
+let pos = 0;
+for (let k = 0; k < m.length && k < n; k += 1) {
+plain.push(s.slice(pos, m[k][0]));
+hit.push(s.slice(m[k][0], m[k][1]));
+pos = m[k][1];
+}
+plain.push(s.slice(pos));
+while (hit.length < n) { hit.push(''); plain.push(''); }
+return { plain: plain, hit: hit };
+};
+const addrOf = (r) => {
+if (r.addr) return r.addr;
+if (!searching || !r.path) return r.host;
+const w = words.find((x) => !has(r.title, x) && !has(r.host, x) && has(r.path, x));
+if (!w) return r.host;
+const segs = r.path.split('/').filter(Boolean);
+const i = Math.max(0, segs.findIndex((s) => has(s, w)));
+return r.host + (i > 0 ? '/…/' : '/') + segs[i];
+};
+
+let selIds = state === 'select' ? ids(p.selected ?? 't1,t7,t9') : [];
+let goneIds = ids(p.gone ?? '');
+let dayIds = ids(p.dayGone ?? '');
+if (state === 'undo' && !goneIds.length) goneIds = ['t7'];
+if (state === 'dayundo' && !dayIds.length) dayIds = ['yesterday'];
+if (view !== 'all') { selIds = []; dayIds = []; }
+const gone = new Set(goneIds);
+const dayGone = new Set(dayIds);
+
+let groups = [];
+if (priv) {
+groups = [];
+} else if (view === 'all') {
+if (state !== 'empty' && state !== 'unavailable') {
+groups = DAYS.map((d) => Object.assign({}, d, { rows: searching ? d.rows.filter((r) => matchAll(r, words)) : d.rows })).filter((d) => d.rows.length);
+}
+} else if (state !== 'empty' && state !== 'closedempty') {
+let tabs = TABS;
+let wins = WINS;
+if (searching) { tabs = tabs.filter((r) => matchAll(r, words)); wins = wins.filter((r) => matchAll(r, words)); }
+groups = [
+{ id: 'tabs', label: 'Tabs', sub: '', aria: 'Tabs', del: '', rows: tabs },
+{ id: 'windows', label: 'Windows', sub: '', aria: 'Windows', del: '', rows: wins }
+].filter((g) => g.rows.length);
+}
+const total = groups.reduce((a, g) => a + g.rows.length, 0);
+const visibleIds = new Set();
+groups.forEach((g) => g.rows.forEach((r) => { if (!gone.has(r.id) && !dayGone.has(g.id)) visibleIds.add(r.id); }));
+const sel = new Set(selIds.filter((id) => visibleIds.has(id)));
+const selMode = view === 'all' && state === 'select' && sel.size > 0;
+
+const dgKey = Array.from(dayGone).sort().join(',');
+if (this.dgKey === undefined) { this.dgKey = dgKey; this.dgSet = dayGone; this.dgBack = new Set(); }
+else if (this.dgKey !== dgKey) {
+const before = this.dgSet;
+this.dgBack = new Set(Array.from(before).filter((d) => !dayGone.has(d)));
+this.dgKey = dgKey;
+this.dgSet = dayGone;
+}
+const dayBack = this.dgBack;
+
+const SPR = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const EXP = 'cubic-bezier(0.2, 0, 0, 1)';
+const fade = reduced ? 'opacity 150ms ease' : 'opacity 120ms ease';
+const fx = {
+fade: fade,
+fadeX: reduced ? 'opacity 150ms ease, background 150ms ease' : 'opacity 120ms ease, background 120ms ease',
+hair: reduced ? 'opacity 150ms ease' : 'opacity 160ms ease 100ms'
+};
+
+let ri = 0;
+const blank = (n) => ({ s0: '', h1: '', s1: '', h2: '', s2: '', h3: '', s3: '', a0: '', ah1: '', a1: '', ah2: '', a2: '', n: n });
+const mkGroup = (g, isLast) => {
+const gGone = dayGone.has(g.id) || g.rows.every((r) => gone.has(r.id));
+const back = !gGone && dayBack.has(g.id);
+let headTr;
+if (reduced) headTr = gGone ? 'height 0ms linear 150ms' : 'height 0ms linear';
+else headTr = 'height 280ms ' + SPR;
+const live = g.rows.filter((r) => !gone.has(r.id));
+const nSel = live.filter((r) => sel.has(r.id)).length;
+const allSel = nSel > 0 && nSel === live.length;
+if (!gGone) ri += 1;
+const head = {
+ri: ri,
+h: gGone ? 0 : 34,
+tr: headTr,
+label: g.label,
+sub: g.sub,
+hasSub: !!g.sub,
+aria: g.aria + ', ' + live.length + (view === 'all' ? (live.length === 1 ? ' page' : ' pages') : ''),
+canDelete: view === 'all',
+delOp: headHover === g.id || focusRow === g.id ? 1 : 0,
+delLabel: 'Delete day, ' + (g.del || g.label),
+delCls: 'hp-del-' + theme,
+ring: focusRow === g.id ? 'inset 0 0 0 2px ' + t.ring : 'none',
+cbOp: selMode ? 1 : 0,
+cbTr: reduced ? 'opacity 150ms ease' : 'opacity 240ms ease',
+cbBg: nSel > 0 ? t.accent : t.checkBg,
+cbLine: nSel > 0 ? 'none' : 'inset 0 0 0 1px ' + t.checkLine,
+checkOp: allSel ? 1 : 0,
+mixOp: nSel > 0 && !allSel ? 1 : 0,
+shift: selMode ? 42 : 0,
+slideTr: reduced ? 'none' : 'transform 240ms ' + SPR
+};
+const rows = g.rows.map((r, i) => {
+const isGone = gone.has(r.id);
+const later = g.rows.slice(i + 1).some((x) => !gone.has(x.id));
+let tr;
+let ctr;
+if (reduced) {
+tr = gGone || isGone ? 'height 0ms linear 150ms' : 'height 0ms linear';
+ctr = 'opacity 150ms ease';
+} else if (gGone) {
+tr = 'height 280ms ' + SPR;
+ctr = 'opacity 100ms ease';
+} else if (isGone) {
+tr = 'height 240ms ' + SPR + ' 100ms';
+ctr = 'opacity 100ms ease';
+} else {
+tr = 'height ' + (back ? 280 : 240) + 'ms ' + SPR;
+ctr = 'opacity 160ms ease 80ms';
+}
+const isSel = selMode && sel.has(r.id);
+const isHover = hover === r.id;
+const isPress = pressed === r.id;
+const isFocus = focusRow === r.id;
+const showCb = view === 'all' && (selMode || isHover);
+const isWash = wash === r.id && washOn;
+const addr = addrOf(r);
+const tp = pack(r.title, 3);
+const ap = pack(addr, 2);
+if (!isGone && !gGone) ri += 1;
+return {
+id: r.id,
+ri: ri,
+hide: isGone || gGone ? 'true' : 'false',
+ariaSel: view === 'all' ? (isSel ? 'true' : 'false') : undefined,
+aria: r.title + ', ' + addr + ', ' + (view === 'all' ? '' : 'closed ') + r.time,
+h: isGone || gGone ? 0 : 40,
+tr: tr,
+cop: isGone ? 0 : 1,
+ctr: ctr,
+plate: isSel ? t.selected : (isPress ? t.pressed : (isHover ? t.hover : 'rgba(0,0,0,0)')),
+washOp: isWash ? 1 : 0,
+washTr: isWash ? 'none' : (reduced ? 'opacity 150ms ease' : 'opacity 900ms ease'),
+ringOp: isFocus ? 1 : 0,
+favOp: showCb ? 0 : 1,
+cbOp: showCb ? 1 : 0,
+cbBg: isSel ? t.accent : t.checkBg,
+cbLine: isSel ? 'none' : 'inset 0 0 0 1px ' + t.checkLine,
+checkOp: isSel ? 1 : 0,
+fn: r.fav === 'fn', tl: r.fav === 'tl', rf: r.fav === 'rf', vs: r.fav === 'vs', le: r.fav === 'le', gl: r.fav === 'gl', win: r.fav === 'win',
+s0: tp.plain[0], h1: tp.hit[0], s1: tp.plain[1], h2: tp.hit[1], s2: tp.plain[2], h3: tp.hit[2], s3: tp.plain[3],
+a0: ap.plain[0], ah1: ap.hit[0], a1: ap.plain[1], ah2: ap.hit[1], a2: ap.plain[2],
+time: r.time,
+dt: r.dt,
+xLabel: view === 'all' ? 'Delete from history, ' + r.title + ', ' + (g.del || g.label) : 'Remove ' + r.title + ' from Recently closed',
+xOp: isHover || isFocus ? 1 : 0,
+xBg: isHover && hoverX ? t.ctl : 'rgba(0,0,0,0)',
+hairOp: later ? 1 : 0
+};
+});
+return {
+on: true,
+hide: gGone ? 'true' : 'false',
+op: gGone ? 0 : 1,
+opTr: reduced ? 'opacity 150ms ease' : 'opacity 160ms ease',
+gapH: gGone || isLast ? 0 : 18,
+head: head,
+rows: rows
+};
+};
+const offGroup = () => ({
+on: false, hide: 'true', op: 1, opTr: 'none', gapH: 0, rows: [],
+head: { ri: 0, h: 0, tr: 'none', label: '', sub: '', hasSub: false, aria: '', canDelete: false, delOp: 0, delLabel: '', delCls: '', ring: 'none', cbOp: 0, cbTr: 'none', cbBg: 'rgba(0,0,0,0)', cbLine: 'none', checkOp: 0, mixOp: 0, shift: 0, slideTr: 'none' }
+});
+const G = [0, 1, 2].map((i) => (groups[i] ? mkGroup(groups[i], i === groups.length - 1) : offGroup()));
+
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+let tbNow = { kind: 'text', tone: 'value', text: '' };
+const closedSummary = () => {
+const nt = groups.filter((g) => g.id === 'tabs').reduce((a, g) => a + g.rows.length, 0);
+const nw = groups.filter((g) => g.id === 'windows').reduce((a, g) => a + g.rows.length, 0);
+const parts = [];
+if (nt) parts.push(plural(nt, 'tab', 'tabs'));
+if (nw) parts.push(plural(nw, 'window', 'windows'));
+return { text: parts.join(' and '), n: nt + nw };
+};
+if (view === 'all') {
+if (state === 'rest') tbNow.text = '1,284 pages since 3 March 2026';
+else if (state === 'search' && total > 0) tbNow.text = plural(total, 'page', 'pages') + (total === 1 ? ' matches ' : ' match ') + quote;
+else if (state === 'select') {
+if (selMode) tbNow = { kind: 'select', tone: 'text', text: sel.size + ' selected' };
+else tbNow.text = '1,284 pages since 3 March 2026';
+} else if (state === 'undo') {
+const DEF = 'Deleted “Tin bath” from Today.';
+let text = p.undoText ?? DEF;
+if (p.undoText === undefined || p.undoText === DEF) {
+// The line names the day: a delete removes only that day's visits of each page.
+const goneRows = [];
+DAYS.forEach((d) => d.rows.forEach((r) => { if (gone.has(r.id)) goneRows.push({ title: r.title, day: d.del }); }));
+const days = Array.from(new Set(goneRows.map((x) => x.day)));
+const from = days.length === 1 ? days[0] : plural(days.length, 'day', 'days');
+if (goneRows.length === 1) {
+const tt = goneRows[0].title;
+text = 'Deleted “' + (tt.length > 40 ? tt.slice(0, 40).trimEnd() + '…' : tt) + '” from ' + from + '.';
+} else if (goneRows.length > 1) text = 'Deleted ' + goneRows.length + ' pages from ' + from + '.';
+}
+tbNow = { kind: 'undo', tone: 'h2', text: text };
+} else if (state === 'dayundo') {
+const d = DAYS.find((x) => x.id === dayIds[dayIds.length - 1]) || DAYS[1];
+const n = d.rows.length;
+const text = d.id === 'today' || d.id === 'yesterday' ? 'Deleted ' + d.label + '’s history (' + plural(n, 'page', 'pages') + ').' : 'Deleted history from ' + d.label + ' (' + plural(n, 'page', 'pages') + ').';
+tbNow = { kind: 'undo', tone: 'h2', text: text };
+}
+} else {
+const cs = closedSummary();
+if (state === 'search' && cs.n > 0) tbNow.text = cs.text + (cs.n === 1 ? ' matches ' : ' match ') + quote;
+else if (state !== 'search' && state !== 'nomatch' && state !== 'empty' && state !== 'closedempty') tbNow.text = cs.text;
+}
+const tbKey = tbNow.kind + '|' + tbNow.text;
+if (!this.tbL) { this.tbL = [tbNow, { kind: 'text', tone: 'value', text: '' }]; this.tbA = 0; this.tbKey = tbKey; }
+else if (this.tbKey !== tbKey) { this.tbA = 1 - this.tbA; this.tbL[this.tbA] = tbNow; this.tbKey = tbKey; }
+const tb = this.tbL.map((L, i) => {
+const on = i === this.tbA;
+return {
+text: L.text,
+color: t[L.tone] || t.value,
+isSel: L.kind === 'select',
+isUndo: L.kind === 'undo',
+op: on ? 1 : 0,
+vis: on ? 'visible' : 'hidden',
+hidden: on ? 'false' : 'true',
+tr: on ? 'opacity 150ms ease, visibility 0ms linear' : 'opacity 150ms ease, visibility 0ms linear 150ms'
+};
+});
+
+if (this.shownPrev === true && !shown) this.closing = true;
+if (shown) {
+this.closing = false;
+if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; }
+}
+this.shownPrev = shown;
+const flat = '0 0 0 rgba(0,0,0,0)';
+let sheet;
+if (reduced) {
+sheet = { tf: 'none', shadow: shown ? t.shadow : flat, tr: 'box-shadow 150ms ease', lensOp: shown ? 1 : 0, lensTr: 'opacity 150ms ease', op: shown ? 1 : 0, opTr: 'opacity 150ms ease' };
+} else if (shown) {
+sheet = { tf: 'scale(1)', shadow: t.shadow, tr: 'transform 280ms ' + SPR + ', box-shadow 160ms ' + EXP, lensOp: 1, lensTr: 'none', op: 1, opTr: 'opacity 160ms ' + EXP };
+} else if (this.closing) {
+sheet = { tf: 'scale(0.985)', shadow: flat, tr: 'transform 140ms ease, box-shadow 140ms ease', lensOp: 0, lensTr: 'none', op: 0, opTr: 'opacity 140ms ease' };
+} else {
+sheet = { tf: 'scale(0.96)', shadow: flat, tr: 'none', lensOp: 0, lensTr: 'none', op: 0, opTr: 'none' };
+}
+sheet.pe = shown ? 'auto' : 'none';
+
+const ph = view === 'closed' ? 'Search recently closed' : 'Search history';
+const fld = {
+text: q,
+ph: ph,
+cls: 'hp-' + theme,
+caret: fieldFocus,
+hasText: q.length > 0,
+padR: q.length > 0 ? 4 : 10,
+bg: fieldFocus ? t.searchFocus : t.searchBg,
+line: fieldFocus ? 'inset 0 -2px 0 ' + t.accent : 'inset 0 -1px 0 ' + t.searchLine
+};
+
+const isAll = view === 'all';
+const nv = {
+allCur: isAll ? 'page' : 'false',
+allBg: isAll ? t.selected : 'rgba(0,0,0,0)',
+allColor: isAll ? t.text : t.nav,
+allBar: isAll ? 1 : 0,
+closedCur: isAll ? 'false' : 'page',
+closedBg: isAll ? 'rgba(0,0,0,0)' : t.selected,
+closedColor: isAll ? t.nav : t.text,
+closedBar: isAll ? 0 : 1,
+hasCount: state !== 'empty' && state !== 'closedempty',
+count: '8'
+};
+nv.closedName = nv.hasCount ? 'Recently closed, ' + nv.count : 'Recently closed';
+
+const lst = {
+on: groups.length > 0,
+label: view === 'closed' ? (searching ? 'Recently closed, search results for ' + q : 'Recently closed') : (searching ? 'Search results for ' + q : 'All history'),
+multi: isAll ? 'true' : 'false',
+ty: -scroll
+};
+const msg = {
+empty: isAll && state === 'empty',
+closedEmpty: !isAll && (state === 'empty' || state === 'closedempty'),
+noMatch: searching && total === 0,
+noMatchText: isAll ? 'No pages match ' + quote + '.' : 'No tabs or windows match ' + quote + '.',
+unavailable: isAll && state === 'unavailable'
+};
+// Private window: no sidebar, toolbar or list; the dialog is described by its one line.
+const pv = {
+on: priv,
+body: priv ? 'none' : 'flex',
+desc: priv ? 'hp-private-note' : null
+};
+
+return {
+t: t,
+fx: fx,
+sheet: sheet,
+fld: fld,
+nv: nv,
+tb: tb,
+lst: lst,
+msg: msg,
+pv: pv,
+g0: G[0],
+g1: G[1],
+g2: G[2],
+noop: () => {}
+};
+}
+}
+</script>
+</body>
+</html>

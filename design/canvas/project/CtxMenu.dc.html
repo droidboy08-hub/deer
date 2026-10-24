@@ -30,7 +30,7 @@ body{margin:0}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"link","options":["page","link","linksplit","linkpair","filelink","mailto","image","canvas","imagelink","selection","selectionurl","editable","password","misspelled","video","videodrm","audio","pill","pillsplit","splitpill","address","suggestion","circle","circlesplit","circlepair","capsule","plus","ring","peekpage","peekheader","peeklink","home","findfield"],"section":"Menu"},"theme":{"editor":"enum","default":"dark","options":["dark","raised","light","solid","contrast"],"section":"Menu"},"hover":{"editor":"int","default":-1,"min":-1,"max":12,"section":"State"},"pressed":{"editor":"boolean","default":false,"section":"State"},"keys":{"editor":"boolean","default":false,"section":"State"},"touch":{"editor":"boolean","default":false,"section":"State"},"narrow":{"editor":"boolean","default":false,"section":"State"},"focused":{"editor":"boolean","default":true,"section":"State"},"quote":{"editor":"text","default":"float glass","section":"Menu"},"caption":{"editor":"text","default":"Slow light · Long Exposure Club","section":"Menu"},"$preview":{"width":264,"height":234}}'>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"link","options":["page","link","linksplit","linkpair","filelink","mailto","image","canvas","imagelink","selection","selectionurl","editable","password","misspelled","video","videodrm","audio","pill","pillsplit","splitpill","address","suggestion","circle","circlesplit","circlepair","capsule","plus","ring","peekpage","peekheader","peeklink","home","findfield","plushistory","historyrow","historysel","historyday","closedtab","closedwindow"],"section":"Menu"},"theme":{"editor":"enum","default":"dark","options":["dark","raised","light","solid","contrast"],"section":"Menu"},"hover":{"editor":"int","default":-1,"min":-1,"max":12,"section":"State"},"pressed":{"editor":"boolean","default":false,"section":"State"},"keys":{"editor":"boolean","default":false,"section":"State"},"touch":{"editor":"boolean","default":false,"section":"State"},"narrow":{"editor":"boolean","default":false,"section":"State"},"focused":{"editor":"boolean","default":true,"section":"State"},"quote":{"editor":"text","default":"float glass","section":"Menu"},"caption":{"editor":"text","default":"Slow light · Long Exposure Club","section":"Menu"},"$preview":{"width":264,"height":234}}'>
 class Component extends DCLogic {
 componentDidMount() {
 this.prevHover = this.props.hover ?? -1;
@@ -82,7 +82,8 @@ folder: ['M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 1.5h6A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 
 opentab: ['M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12M11 4.5h4.5V9M15.5 4.5 9.5 10.5', ''],
 check: ['M5 10.5 8.5 14 15 6.5', ''],
 split: ['M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11', ''],
-swap: ['M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3', '']
+swap: ['M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3', ''],
+history: ['M4.2 10a5.8 5.8 0 1 0 1.7-4.1M3.6 3.6v2.8h2.8M10 6.6V10l2.4 1.5', '']
 };
 
 const I = (label, icon, accel, ak, o) => Object.assign({ t: 'item', label: label, icon: icon || '', accel: accel || '', ak: ak || '' }, o || {});
@@ -127,7 +128,13 @@ peekpage: [I('Open as tab', 'opentab', 'Alt+Enter', 'T'), I('Copy address', 'lin
 peekheader: [I('Open as tab', 'opentab', 'Alt+Enter', 'T'), I('Copy address', 'link', '', 'A'), I('Open in new window', 'newwindow', '', 'W'), S, I('Close peek', 'close', 'Esc', 'C')],
 peeklink: [I('Open link in new tab', 'newtab', '', 'T'), I('Open link in new window', 'newwindow', '', 'W'), S, I('Copy link address', 'link', '', 'E'), I('Download linked file', 'download', '', 'D'), S, inspect],
 home: [I('Paste and go', 'paste', '', 'G'), S, I('Change background…', 'image', '', 'B'), I('Show tab bar', '', '', 'T', { check: true }), S, I('Settings', '', 'Ctrl+,', 'E')],
-findfield: [I('Undo', 'undo', 'Ctrl+Z', 'U'), I('Redo', 'redo', 'Ctrl+Y', 'R', { dis: true }), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Select all', '', 'Ctrl+A', 'A'), S, I('Match case', '', 'Alt+C', 'M', { check: false })]
+findfield: [I('Undo', 'undo', 'Ctrl+Z', 'U'), I('Redo', 'redo', 'Ctrl+Y', 'R', { dis: true }), S, I('Cut', 'cut', 'Ctrl+X', 'T'), I('Copy', 'copy', 'Ctrl+C', 'C'), I('Paste', 'paste', 'Ctrl+V', 'P'), I('Select all', '', 'Ctrl+A', 'A'), S, I('Match case', '', 'Alt+C', 'M', { check: false })],
+plushistory: [I('New window', 'newwindow', 'Ctrl+N', 'W'), I('New private window', 'newwindow', 'Ctrl+Shift+N', 'P'), I('Reopen closed tab', '', 'Ctrl+Shift+T', 'R'), S, I('History', 'history', 'Ctrl+H', 'H'), I('Show downloads', 'download', 'Ctrl+J', 'S'), I('Full screen', '', 'F11', 'F', { check: false }), I('Settings', '', 'Ctrl+,', 'E')],
+historyrow: [I('Open in new tab', 'newtab', '', 'T'), I('Peek', 'peek', 'Shift+click', 'P'), I('Open in new window', 'newwindow', '', 'W'), I('Open in new private window', 'newwindow', '', 'R'), S, I('Copy address', 'link', '', 'A'), S, I('Delete from history', 'close', 'Delete', 'D')],
+historysel: [I('Open 3 pages in new tabs', 'newtab', '', 'T'), I('Open 3 pages in a new window', 'newwindow', '', 'W'), S, I('Copy 3 addresses', 'link', '', 'A'), S, I('Delete 3 pages from history', 'close', 'Delete', 'D')],
+historyday: [I('Select this day', '', '', 'S'), I('Delete this day’s history', 'close', 'Delete', 'D')],
+closedtab: [I('Reopen tab', '', focused ? 'Ctrl+Shift+T' : '', 'R'), I('Copy address', 'link', '', 'A'), S, I('Remove from list', 'close', 'Delete', 'L')],
+closedwindow: [I('Reopen window', '', '', 'R'), S, I('Remove from list', 'close', 'Delete', 'L')]
 };
 const list = M[kind] || M.link;
 
@@ -186,7 +193,7 @@ isSep: false, isCap: false, isItem: true, label: r.label,
 role: r.check === undefined ? 'menuitem' : 'menuitemcheckbox',
 ariaDis: r.dis ? 'true' : 'false',
 ariaChecked: r.check === undefined ? undefined : (r.check ? 'true' : 'false'),
-aks: /^(Ctrl|Alt|Shift|Esc|F\d)/.test(r.accel) && r.accel !== 'Shift+click' ? ariaK(r.accel) : undefined,
+aks: /^(Ctrl|Alt|Shift|Esc|F\d|Delete$)/.test(r.accel) && r.accel !== 'Shift+click' ? ariaK(r.accel) : undefined,
 pre: pre, k: k, post: post,
 ud: keys && k ? 'underline' : 'none',
 fw: r.bold ? 600 : 400,
@@ -197,7 +204,8 @@ color: color, op: op
 };
 });
 if (!hovRow && this.lastLit !== undefined && tops[this.lastLit] !== undefined) plateTop = tops[this.lastLit];
-const w = Math.max(264, Math.min(360, Math.ceil(need / 8) * 8));
+const WFIX = { plushistory: 296, historyrow: 264 };
+const w = WFIX[kind] || Math.max(264, Math.min(360, Math.ceil(need / 8) * 8));
 const h = 12 + rowsH;
 
 let plateBg = t.plate;

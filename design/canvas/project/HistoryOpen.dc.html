@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History panel, open over a page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #f3eee4; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+
+<div style="position: absolute; left: 240px; top: 106px; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="rest" view="all" theme="dark" field-focus="{{true}}" hover="t3" hint-size="960px,688px"></dc-import></div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: 698px; top: 386px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

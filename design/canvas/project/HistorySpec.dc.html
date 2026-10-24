@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History anatomy, keys and edge cases</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 3400px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums">
+
+<div style="position: absolute; left: 48px; top: 40px; width: 1100px">
+<h1 style="margin: 0; font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 28px; line-height: 36px; font-weight: 600">History: anatomy, keys and edge cases</h1>
+<p style="margin: 6px 0 0; font-size: 14px; line-height: 20px; color: #9a9ca6">A third panel beside Settings and Downloads: your history by day, what you closed, and deletes you can undo.</p>
+</div>
+
+
+<div style="position: absolute; left: 48px; top: 120px; width: 1344px; display: flex; align-items: baseline; gap: 16px">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap">1 · The panel</h2>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">At 1:1 over Field Notes, Thursday 23 October, 14:40. The pointer is on the fourth row, and Today’s heading shows its hover too.</span>
+</div>
+
+<section aria-label="History panel at rest, its parts numbered" style="position: absolute; left: 48px; top: 150px; width: 960px; height: 688px; overflow: hidden">
+<div aria-hidden="true" inert="inert" style="position: absolute; left: -240px; top: -106px; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="rest" hover="t3" head-hover="today" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+</section>
+
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1440px; height: 860px; pointer-events: none">
+<sc-for list="{{markers}}" as="m" hint-placeholder-count="10">
+<sc-if value="{{m.lead}}" hint-placeholder-val="{{true}}"><div style="position: absolute; left: {{m.ll}}px; top: {{m.lt}}px; width: {{m.lw}}px; height: 1px; background: rgba(255,255,255,0.5)"></div></sc-if>
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: 18px; height: 18px; border-radius: 9px; background: rgba(255,255,255,0.92); box-shadow: 0 1px 3px rgba(0,0,0,0.4); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">{{m.n}}</div>
+</sc-for>
+</div>
+
+<ol aria-label="Parts of the History panel" style="position: absolute; left: 1040px; top: 150px; width: 352px; margin: 0; padding: 0; list-style: none">
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">1</span><div><div style="font-size: 13px; line-height: 20px">Title bar <span style="color: #9a9ca6">48</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Close 30×30, tooltip “Close&#160;&#160;Esc”</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">2</span><div><div style="font-size: 13px; line-height: 20px">Search <span style="color: #9a9ca6">192×34</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Settings’ field; Ctrl+F focuses it</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">3</span><div><div style="font-size: 13px; line-height: 20px">Views <span style="color: #9a9ca6">34 each</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The accent bar marks the current view only</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">4</span><div><div style="font-size: 13px; line-height: 20px">Clear browsing data… <span style="color: #9a9ca6">pinned at the bottom</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Opens Settings, as Ctrl+Shift+Delete does</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">5</span><div><div style="font-size: 13px; line-height: 20px">Toolbar <span style="color: #9a9ca6">32</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Summary, match count, selection or undo</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">6</span><div><div style="font-size: 13px; line-height: 20px">Day heading <span style="color: #9a9ca6">28</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Delete day shows on hover or focus</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">7</span><div><div style="font-size: 13px; line-height: 20px">Card <span style="color: #9a9ca6">radius 10</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">White 0.06; 18 px between days</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">8</span><div><div style="font-size: 13px; line-height: 20px">Row <span style="color: #9a9ca6">40</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Favicon, title, address and time</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">9</span><div><div style="font-size: 13px; line-height: 20px">Time <span style="color: #9a9ca6">64, right-aligned</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Tabular figures, Windows’ short time format</div></div></li>
+<li style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08)"><span aria-hidden="true" style="width: 18px; height: 18px; margin-top: 1px; border-radius: 9px; background: rgba(255,255,255,0.92); color: #121317; font-size: 11px; line-height: 18px; font-weight: 600; text-align: center">10</span><div><div style="font-size: 13px; line-height: 20px">× <span style="color: #9a9ca6">28×28</span></div><div style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Shown on hover and focus; the slot is always reserved</div></div></li>
+</ol>
+
+<div style="position: absolute; left: 1040px; top: 716px; width: 352px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 19px">
+<p style="margin: 0">960×688 at (240,106); scales as a whole below 992×720</p>
+<p style="margin: 0">Opens with Ctrl+H or + › History; Esc, Ctrl+W, Ctrl+H or the dim close it</p>
+</div>
+
+
+<div style="position: absolute; left: 48px; top: 880px; width: 1344px; display: flex; align-items: baseline; gap: 16px">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap">2 · Rows and headings</h2>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">At 1:1 on the panel’s dark tint. Card-local x; add 477 for the window x.</span>
+</div>
+
+<div aria-hidden="true" style="position: absolute; left: 0; top: 900px; width: 1440px; height: 104px; pointer-events: none">
+<sc-for list="{{segs}}" as="s" hint-placeholder-count="5">
+<div style="position: absolute; left: {{s.nl}}px; top: 8px; width: 120px; height: 16px; font-size: 12px; line-height: 16px; color: #9a9ca6; text-align: center; white-space: nowrap">{{s.name}}</div>
+<div style="position: absolute; left: {{s.sl}}px; top: 26px; width: {{s.sw}}px; height: 1px; background: #9a9ca6"></div>
+<div style="position: absolute; left: {{s.sl}}px; top: 23px; width: 1px; height: 7px; background: #9a9ca6"></div>
+<div style="position: absolute; left: {{s.el}}px; top: 23px; width: 1px; height: 7px; background: #9a9ca6"></div>
+</sc-for>
+</div>
+
+<div role="img" aria-label="Ruler row at rest: Float glass, refract.wiki, 14:27, with the checkbox slot and the delete slot outlined" style="position: absolute; left: 48px; top: 930px; width: 703px; height: 40px; border-radius: 10px; background: linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06)), #26262a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="position: absolute; left: 14px; top: 12px"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<span style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 4px; border: 1px dashed rgba(76,194,255,0.85)"></span>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+<span style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px; box-sizing: border-box; border-radius: 6px; border: 1px dashed rgba(76,194,255,0.85)"></span>
+</div>
+
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1440px; height: 1010px; pointer-events: none">
+<sc-for list="{{ticks}}" as="t" hint-placeholder-count="11">
+<div style="position: absolute; left: {{t.line}}px; top: 930px; width: 1px; height: {{t.h}}px; background: rgba(154,156,166,0.6)"></div>
+<div style="position: absolute; left: {{t.lx}}px; top: {{t.lt}}px; width: 40px; height: 13px; font-size: 11px; line-height: 13px; color: #9a9ca6; text-align: {{t.ta}}">{{t.label}}</div>
+</sc-for>
+</div>
+
+<div style="position: absolute; left: 770px; top: 930px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">At rest, card-local x</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">The slot and the × are always reserved, so nothing shifts on hover.</span>
+</div>
+
+<div aria-hidden="true" style="position: absolute; left: 48px; top: 1000px; width: 703px; height: 452px; border-radius: 12px; background: #26262a"></div>
+
+<div role="img" aria-label="Row at rest" style="position: absolute; left: 48px; top: 1010px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="position: absolute; left: 14px; top: 12px"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+</div>
+<div style="position: absolute; left: 770px; top: 1010px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Rest</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">A hairline from x 44 to 703 runs under every row but a card’s last, white 0.07.</span>
+</div>
+
+<div role="img" aria-label="Row on hover: an empty checkbox in the favicon slot and the delete button shown" style="position: absolute; left: 48px; top: 1062px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; inset: 0; border-radius: 10px; background: rgba(255,255,255,0.05)"></span>
+<span style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6)"></span>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+<span style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.6)"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></span>
+</div>
+<div style="position: absolute; left: 770px; top: 1062px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Hover</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Plate white 0.05 / black 0.04, shown at once. The checkbox and the × fade in, 120 ms.</span>
+</div>
+
+<div role="img" aria-label="Row pressed, or with its menu open" style="position: absolute; left: 48px; top: 1114px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; inset: 0; border-radius: 10px; background: rgba(255,255,255,0.08)"></span>
+<span style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6)"></span>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+<span style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.6)"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></span>
+</div>
+<div style="position: absolute; left: 770px; top: 1114px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Pressed, or its menu open</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">White 0.08 / black 0.06. A right-clicked row keeps this look while its menu is open.</span>
+</div>
+
+<div role="img" aria-label="Row selected: checkbox checked" style="position: absolute; left: 48px; top: 1166px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; inset: 0; border-radius: 10px; background: rgba(255,255,255,0.10)"></span>
+<span style="position: absolute; left: 12px; top: 10px; width: 20px; height: 20px; border-radius: 4px; background: #4cc2ff"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#0b1a24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+</div>
+<div style="position: absolute; left: 770px; top: 1166px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Selected</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">White 0.10 / black 0.06, checkbox checked. The same page under other days stays unselected.</span>
+</div>
+
+<div role="img" aria-label="Row with keyboard focus: an inset white ring, delete button shown" style="position: absolute; left: 48px; top: 1218px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="position: absolute; left: 14px; top: 12px"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+<span style="position: absolute; left: 663px; top: 6px; width: 28px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.6)"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"></path></svg></span>
+<span style="position: absolute; inset: 0; border-radius: 6px; box-shadow: inset 0 0 0 2px #ffffff"></span>
+</div>
+<div style="position: absolute; left: 770px; top: 1218px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Keyboard focus</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Inset 2 px ring, radius 6: white / black 0.9, on :focus-visible only. The × shows.</span>
+</div>
+
+<div role="img" aria-label="Row opened in the background, or back from a peek: an accent wash" style="position: absolute; left: 48px; top: 1270px; width: 703px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; inset: 0; border-radius: 10px; background: rgba(76,194,255,0.14)"></span>
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" style="position: absolute; left: 14px; top: 12px"><rect x="0.5" y="0.5" width="17" height="17" rx="4.5" fill="#f4f2ec" stroke="rgba(0,0,0,0.12)"></rect><path d="M9 3.6 14.6 13.8H3.4Z" fill="none" stroke="#1b1d21" stroke-width="1.5" stroke-linejoin="round"></path><path d="M1 9.6 7.6 8.6" stroke="#1b1d21" stroke-width="1.1"></path><path d="M10.6 8.4 17 6.4" stroke="#e0532f" stroke-width="1.1"></path><path d="M10.8 9.2 17 9.6" stroke="#3a6df0" stroke-width="1.1"></path></svg>
+<span style="position: absolute; left: 44px; top: 0; width: 315px; font-size: 13.5px; line-height: 40px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Float glass</span>
+<span style="position: absolute; left: 375px; top: 0; width: 200px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden">refract.wiki</span>
+<span style="position: absolute; left: 591px; top: 0; width: 64px; font-size: 12.5px; line-height: 40px; color: rgba(255,255,255,0.6); text-align: right">14:27</span>
+</div>
+<div style="position: absolute; left: 770px; top: 1270px; width: 622px; height: 40px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Opened in the background, or back from a peek</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Wash rgba(76,194,255,0.14) / rgba(0,95,184,0.10), fading over 900 ms. History draws it.</span>
+</div>
+
+<div role="img" aria-label="Day heading at rest: Today, Thursday, 23 October" style="position: absolute; left: 48px; top: 1334px; width: 703px; height: 28px">
+<span style="position: absolute; left: 2px; top: 4px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-size: 13px; line-height: 20px; font-weight: 600; color: rgba(255,255,255,0.86)">Today</span><span style="font-size: 12px; line-height: 20px; color: rgba(255,255,255,0.55)">Thursday, 23 October</span></span>
+</div>
+<div style="position: absolute; left: 770px; top: 1330px; width: 622px; height: 36px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Day heading, 28</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">“Today” 13/20 Semibold at 0.86, 8 px, then the date, 12 px at 0.55. Older days: the date alone.</span>
+</div>
+
+<div role="img" aria-label="Day heading on hover: Delete day shown at its right end" style="position: absolute; left: 48px; top: 1374px; width: 703px; height: 28px">
+<span style="position: absolute; left: 2px; top: 4px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-size: 13px; line-height: 20px; font-weight: 600; color: rgba(255,255,255,0.86)">Today</span><span style="font-size: 12px; line-height: 20px; color: rgba(255,255,255,0.55)">Thursday, 23 October</span></span>
+<span style="position: absolute; right: 0; top: 0; height: 28px; box-sizing: border-box; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; font-size: 12.5px; color: rgba(255,255,255,0.7); white-space: nowrap">Delete day</span>
+</div>
+<div style="position: absolute; left: 770px; top: 1370px; width: 622px; height: 36px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">On hover or focus</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Delete day fades in, 120 ms: 28 px, radius 6, 12.5 px at 0.7; white 0.08 on hover. Never red.</span>
+</div>
+
+<div role="img" aria-label="Day heading in selection mode: a mixed checkbox, the text moved to the title column" style="position: absolute; left: 48px; top: 1414px; width: 703px; height: 28px">
+<span style="position: absolute; left: 12px; top: 4px; width: 20px; height: 20px; border-radius: 4px; background: #4cc2ff"><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: #0b1a24"></span></span>
+<span style="position: absolute; left: 44px; top: 4px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap"><span style="font-size: 13px; line-height: 20px; font-weight: 600; color: rgba(255,255,255,0.86)">Today</span><span style="font-size: 12px; line-height: 20px; color: rgba(255,255,255,0.55)">Thursday, 23 October</span></span>
+</div>
+<div style="position: absolute; left: 770px; top: 1410px; width: 622px; height: 36px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">In selection mode</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">A checkbox at card-local 12, here mixed; the text moves to 44, over the titles. Not collapsible.</span>
+</div>
+
+<div role="img" aria-label="Checkboxes in dark mode: unchecked, checked and mixed" style="position: absolute; left: 48px; top: 1476px; width: 343px; height: 72px; border-radius: 10px; background: #26262a">
+<span style="position: absolute; left: 47px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6)"></span>
+<span style="position: absolute; left: 7px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.7); text-align: center">Unchecked</span>
+<span style="position: absolute; left: 161px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: #4cc2ff"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#0b1a24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+<span style="position: absolute; left: 121px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.7); text-align: center">Checked</span>
+<span style="position: absolute; left: 276px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: #4cc2ff"><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: #0b1a24"></span></span>
+<span style="position: absolute; left: 236px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,0.7); text-align: center">Mixed</span>
+</div>
+
+<div role="img" aria-label="Checkboxes in light mode: unchecked, checked and mixed" style="position: absolute; left: 408px; top: 1476px; width: 343px; height: 72px; border-radius: 10px; background: #e4e4e7">
+<span style="position: absolute; left: 47px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,0.02); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45)"></span>
+<span style="position: absolute; left: 7px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(0,0,0,0.66); text-align: center">Unchecked</span>
+<span style="position: absolute; left: 161px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: #005fb8"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block"><path d="M5.5 10.2 8.6 13.2 14.5 7"></path></svg></span>
+<span style="position: absolute; left: 121px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(0,0,0,0.66); text-align: center">Checked</span>
+<span style="position: absolute; left: 276px; top: 14px; width: 20px; height: 20px; border-radius: 4px; background: #005fb8"><span style="position: absolute; left: 6px; top: 9px; width: 8px; height: 2px; border-radius: 1px; background: #ffffff"></span></span>
+<span style="position: absolute; left: 236px; top: 42px; width: 100px; font-size: 12px; line-height: 16px; color: rgba(0,0,0,0.66); text-align: center">Mixed</span>
+</div>
+
+<div style="position: absolute; left: 770px; top: 1476px; width: 622px; height: 72px; display: flex; flex-direction: column; justify-content: center">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600">Checkbox, 20×20, radius 4</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Settings’ own control. Dark: black 0.12, inset white 0.6; checked #4cc2ff with a #0b1a24 check.</span>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Light: black 0.02, inset black 0.45; checked #005fb8, white check. Mixed: the checked fill, an 8×2 bar.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 1570px; width: 1344px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 1 0 0-13zM3.5 10h13M10 3.5c-1.8 2-2.6 4.1-2.6 6.5s.8 4.5 2.6 6.5c1.8-2 2.6-4.1 2.6-6.5S11.8 5.5 10 3.5z"></path></svg>
+<span><span style="color: #f2f2f4">No favicon:</span> line globe</span>
+<span aria-hidden="true">·</span>
+<span><span style="color: #f2f2f4">No title:</span> the address</span>
+<span aria-hidden="true">·</span>
+<span><span style="color: #f2f2f4">file:</span> Local file</span>
+<span aria-hidden="true">·</span>
+<span><span style="color: #f2f2f4">Tooltip after 600 ms:</span> title, address, full date and time</span>
+</div>
+
+
+<div style="position: absolute; left: 48px; top: 1640px; width: 1344px; display: flex; align-items: baseline; gap: 16px">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap">3 · Menus</h2>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Dark theme. Height = 12 + 34 × rows + 9 × separators.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 1690px; width: 296px; height: 259px"><dc-import name="CtxMenu" kind="plushistory" theme="dark" hover="{{3}}" hint-size="296px,259px"></dc-import></div>
+<p style="position: absolute; left: 48px; top: 1955px; width: 296px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6"><span style="color: #f2f2f4">+ circle</span> · 296×259</p>
+
+<div style="position: absolute; left: 376px; top: 1690px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="historyrow" theme="dark" hint-size="264px,234px"></dc-import></div>
+<p style="position: absolute; left: 376px; top: 1930px; width: 264px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6"><span style="color: #f2f2f4">Row</span> · 264×234</p>
+
+<div style="position: absolute; left: 672px; top: 1690px; width: 328px; height: 166px"><dc-import name="CtxMenu" kind="historysel" theme="dark" hint-size="328px,166px"></dc-import></div>
+<p style="position: absolute; left: 672px; top: 1862px; width: 328px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6"><span style="color: #f2f2f4">Selection</span> · 328×166 (Open rows grey out above 15: “15 at most”)</p>
+
+<div style="position: absolute; left: 1032px; top: 1690px; width: 312px; height: 80px"><dc-import name="CtxMenu" kind="historyday" theme="dark" hint-size="312px,80px"></dc-import></div>
+<p style="position: absolute; left: 1032px; top: 1776px; width: 360px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6"><span style="color: #f2f2f4">Day heading</span> · 312×80</p>
+
+<div style="position: absolute; left: 1032px; top: 1806px; width: 264px; height: 123px"><dc-import name="CtxMenu" kind="closedtab" theme="dark" focused="{{true}}" hint-size="264px,123px"></dc-import></div>
+<p style="position: absolute; left: 1032px; top: 1935px; width: 360px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap"><span style="color: #f2f2f4">Closed tab</span> · 264×123 (Ctrl+Shift+T only on the next one)</p>
+
+<div style="position: absolute; left: 1032px; top: 1965px; width: 264px; height: 89px"><dc-import name="CtxMenu" kind="closedwindow" theme="dark" hint-size="264px,89px"></dc-import></div>
+<p style="position: absolute; left: 1032px; top: 2060px; width: 360px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6"><span style="color: #f2f2f4">Closed window</span> · 264×89</p>
+
+<p style="position: absolute; left: 48px; top: 2080px; width: 960px; margin: 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6">Menus follow Appearance, sit above panels (z 50), hang 4 px below a focused row by keyboard; the right-clicked row stays pressed.</p>
+
+
+<div style="position: absolute; left: 48px; top: 2140px; width: 1344px; display: flex; align-items: baseline; gap: 16px">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap">4 · Keys</h2>
+<span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">Local keys act while the panel has focus. Page keys do nothing under it.</span>
+</div>
+
+<div style="position: absolute; left: 48px; top: 2176px; width: 652px">
+<h3 style="margin: 0 0 6px; font-size: 13.5px; line-height: 20px; font-weight: 600">Anywhere</h3>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+H</span><span>Open or close History; key repeat is ignored. From the address field, the typed text becomes its search. Page-first, because Docs and Word use it for Replace: F6 then Ctrl+H, or + › History, can’t be blocked.</span></div>
+
+<h3 style="margin: 14px 0 6px; font-size: 13.5px; line-height: 20px; font-weight: 600">In the panel</h3>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Up, Down</span><span>Move by row; day headings are stops</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Home, End</span><span>First or last loaded row; reaching the end loads more</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Page Up, Page Down</span><span>One screen, 13 rows</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+Up, Ctrl+Down</span><span>Previous or next day heading</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Enter</span><span>Open here; the panel closes</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Alt+Enter</span><span>A new tab, switched to</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+Enter</span><span>A background tab; the panel stays</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Shift+Enter, Ctrl+Q</span><span>Peek</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Space</span><span>Toggle the selection; on a heading, the whole day</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Shift+arrows</span><span>Extend the selection from the anchor; Shift+Home and Shift+End too</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+A</span><span>Select every match, in search results only</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Delete, Shift+Delete</span><span>The selection, or else the focused row, that day’s visits only; on a heading, the day. In Recently closed, the entry.</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+Z</span><span>Undo the last delete while its line shows; not in the search field</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+C</span><span>Copy the address, or the selection’s, one per line</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Shift+F10, Menu key</span><span>The row’s or heading’s menu, 4 px below it</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+F</span><span>Focus search and select its text</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Tab, Shift+Tab</span><span>Search → views → Clear browsing data… → toolbar → list, one stop → Close. Focus stays inside.</span></div>
+<div style="display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+W</span><span>Close the panel, never the tab</span></div>
+</div>
+
+<div style="position: absolute; left: 740px; top: 2176px; width: 652px">
+<h3 style="margin: 0 0 6px; font-size: 13.5px; line-height: 20px; font-weight: 600">Opening a row</h3>
+<div style="display: grid; grid-template-columns: 208px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Click, Enter</span><span>Opens here: the focused side in split view, or in place of Home. The panel closes; focus goes to the page.</span></div>
+<div style="display: grid; grid-template-columns: 208px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+click, middle-click, Ctrl+Enter</span><span>A background tab, placed as Settings › Tabs says; the row gets the wash. The panel stays.</span></div>
+<div style="display: grid; grid-template-columns: 208px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Ctrl+Shift+click, Alt+Enter</span><span>A new tab, switched to. The panel closes.</span></div>
+<div style="display: grid; grid-template-columns: 208px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="color: #9a9ca6">Shift+click, Shift+Enter, Ctrl+Q</span><span>A peek. History steps aside, and returns when the peek closes.</span></div>
+<p style="margin: 0; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px; color: #9a9ca6">Double-click and Alt+click act as a click. Opening any page commits a pending delete first; a file: row has no Peek.</p>
+
+<h3 style="margin: 30px 0 2px; font-size: 13.5px; line-height: 20px; font-weight: 600">Esc, one step per keydown</h3>
+<p style="margin: 0 0 10px; font-size: 12.5px; line-height: 18px; color: #9a9ca6">The top of the stack goes first; each press takes one step.</p>
+<ol aria-label="What Esc does, in order" style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px">
+<li style="height: 36px; box-sizing: border-box; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 14px; background: #1c1d23; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); font-size: 13px; line-height: 18px"><span style="width: 36px; font-size: 12px; color: #9a9ca6">First</span><span style="width: 110px; font-weight: 600">Menu</span><span style="color: #9a9ca6">An open row or heading menu closes</span></li>
+<li style="height: 36px; box-sizing: border-box; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 14px; background: #1c1d23; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); font-size: 13px; line-height: 18px"><span style="width: 36px; font-size: 12px; color: #9a9ca6">Then</span><span style="width: 110px; font-weight: 600">Selection</span><span style="color: #9a9ca6">Cleared; the rows stay</span></li>
+<li style="height: 36px; box-sizing: border-box; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 14px; background: #1c1d23; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); font-size: 13px; line-height: 18px"><span style="width: 36px; font-size: 12px; color: #9a9ca6">Then</span><span style="width: 110px; font-weight: 600">Search text</span><span style="color: #9a9ca6">Cleared, while focus is in the field</span></li>
+<li style="height: 36px; box-sizing: border-box; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 14px; background: #1c1d23; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); font-size: 13px; line-height: 18px"><span style="width: 36px; font-size: 12px; color: #9a9ca6">Last</span><span style="width: 110px; font-weight: 600">Panel</span><span style="color: #9a9ca6">Closes; focus returns to where it was, or to the page</span></li>
+</ol>
+<p style="margin: 14px 0 0; font-size: 13px; line-height: 19px">The house order stays: panel, then peek, then tab.</p>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6">Window keys still act underneath: Ctrl+Tab, Ctrl+1–9 and Ctrl+Shift+T switch or reopen tabs, and the panel keeps focus.</p>
+</div>
+
+
+<h2 style="position: absolute; left: 48px; top: 2870px; margin: 0; font-size: 18px; line-height: 24px; font-weight: 600">5 · Motion and edge cases</h2>
+
+<div style="position: absolute; left: 48px; top: 2910px; width: 652px">
+<div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px"><h3 style="margin: 0; font-size: 13.5px; line-height: 20px; font-weight: 600">Motion</h3><span style="font-size: 12.5px; line-height: 18px; color: #9a9ca6">One spring, cubic-bezier(0.22, 1, 0.36, 1); expand cubic-bezier(0.2, 0, 0, 1)</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Open</span><span style="color: #9a9ca6">280 ms on the spring, as Settings: the sheet 0.96 → 1; the scrim 0 → 0.3 in 200 ms</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Close</span><span style="color: #9a9ca6">140 ms: the sheet 1 → 0.985 and fades; the lens goes first</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Panel hand-off</span><span style="color: #9a9ca6">The scrim holds at 0.3; one sheet closes in 140 ms as the other opens</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Hover</span><span style="color: #9a9ca6">The plate at once; favicon to checkbox and × in, 120 ms cross-fades</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Selection mode</span><span style="color: #9a9ca6">Slots cross-fade, 120 ms; heading text slides to the titles, 240 ms on the spring</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Delete a row</span><span style="color: #9a9ca6">100 ms fade, then a 240 ms collapse on the spring; the rows below slide up</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Delete a day</span><span style="color: #9a9ca6">160 ms fade, then a 280 ms collapse on the spring</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Undo</span><span style="color: #9a9ca6">240 ms expand on the spring; the content fades in from 80 ms, over 160 ms</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Peek hand-off</span><span style="color: #9a9ca6">History out in 140 ms · the sheet grows from the row, 400 ms · back into the row, 280 ms, as History returns</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Wash</span><span style="color: #9a9ca6">The accent wash on a row fades over 900 ms</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Jumps</span><span style="color: #9a9ca6">Ctrl+Up, Ctrl+Down, Home and End are instant, never smoothed</span></div>
+<div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Reduced motion</span><span style="color: #9a9ca6">Every moment becomes a 150 ms cross-fade: no scale, collapse, slide or wash travel</span></div>
+</div>
+
+<div style="position: absolute; left: 740px; top: 2910px; width: 652px">
+<h3 style="margin: 0 0 6px; font-size: 13.5px; line-height: 20px; font-weight: 600">Edge cases</h3>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Deleting a row</span><span style="color: #9a9ca6">Removes that page’s visits on that day only; it stays under its other days and in the address field</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Pending delete</span><span style="color: #9a9ca6">Committed when the undo line goes, on another delete, when the panel closes, when a page opens from it, or when Clear browsing data runs</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Crash before the commit</span><span style="color: #9a9ca6">The pages stay in history; the owner accepted this</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">A page visited again</span><span style="color: #9a9ca6">Its time updates in place; rows never jump under the pointer</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Midnight</span><span style="color: #9a9ca6">Headings relabel in place: Today becomes Yesterday</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Split view</span><span style="color: #9a9ca6">Open here loads into the focused side; new tabs open after the pair</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Popup windows</span><span style="color: #9a9ca6">The panel opens in the most recent normal window of the same privacy</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Bookmarked pages</span><span style="color: #9a9ca6">Keep the bookmark; that day’s visits and the row go</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Daylight saving</span><span style="color: #9a9ca6">Days of 23 or 25 hours; every boundary is a local midnight</span></div>
+<div style="display: grid; grid-template-columns: 168px minmax(0, 1fr); column-gap: 16px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 18px"><span style="font-weight: 600">Private windows</span><span style="color: #9a9ca6">Nothing is shown, not even Recently closed: one line, “History isn’t shown in private windows.” Ctrl+H and + › History still open it.</span></div>
+<div style="margin-top: 22px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08)">
+<h3 style="margin: 0; font-size: 13.5px; line-height: 20px; font-weight: 600">Not in v1</h3>
+<p style="margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: #9a9ca6">Jump to a date · Delete all from a site · Show all history in the address field · type-to-search · touch multi-select · thumbnails · sessions or AI · export.</p>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3400}}'>
+class Component extends DCLogic {
+renderVals() {
+const mk = (n, cx, cy, from, to) => {
+const lead = from !== undefined;
+return {
+n: String(n),
+left: cx - 9,
+top: cy - 9,
+lead: lead,
+ll: lead ? Math.min(from, to) : 0,
+lt: cy,
+lw: lead ? Math.abs(to - from) : 0
+};
+};
+const markers = [
+mk(1, 29, 174, 38, 64),
+mk(2, 29, 231, 38, 60),
+mk(3, 29, 277, 38, 60),
+mk(4, 29, 805, 38, 60),
+mk(5, 275, 232),
+mk(6, 998, 274),
+mk(7, 275, 306),
+mk(8, 275, 354),
+mk(9, 998, 314, 943, 989),
+mk(10, 998, 434, 977, 989)
+];
+
+const segs = [[12, 32, 'slot 20'], [44, 359, 'title 315'], [375, 575, 'address 200'], [591, 655, 'time 64'], [663, 691, '× 28']].map((s) => ({
+name: s[2],
+nl: 48 + (s[0] + s[1]) / 2 - 60,
+sl: 48 + s[0],
+sw: s[1] - s[0],
+el: 48 + s[1] - 1
+}));
+
+const lineA = [12, 44, 375, 591, 663];
+const ticks = [12, 32, 44, 359, 375, 575, 591, 655, 663, 691, 703].map((x) => {
+const a = lineA.indexOf(x) >= 0;
+const right = !a && x !== 703;
+const bx = 48 + (x === 703 ? 702 : x);
+return {
+label: String(x),
+line: bx,
+h: a ? 54 : 67,
+lt: a ? 972 : 985,
+lx: right ? bx - 43 : bx + 3,
+ta: right ? 'right' : 'left'
+};
+});
+
+return { markers: markers, segs: segs, ticks: ticks };
+}
+}
+</script>
+</body>
+</html>

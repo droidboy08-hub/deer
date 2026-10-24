@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History menus</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #121317; color: #ffffff; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<section aria-label="+ circle" style="position: absolute; left: 0px; top: 0px; width: 720px; height: 900px; overflow: hidden">
+<div style="position: absolute; left: -720px; top: 0px; width: 1440px; height: 900px; overflow: hidden; background: #f3eee4; color: #16181d">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+
+<div aria-hidden="true" style="position: absolute; left: 1074px; top: 12px; width: 44px; height: 44px; border-radius: 22px; background: rgba(22,24,29,0.10); pointer-events: none"></div>
+
+<div style="position: absolute; left: 1080px; top: 64px; width: 296px; height: 259px"><dc-import name="CtxMenu" kind="plushistory" theme="dark" hover="{{3}}" hint-size="296px,259px"></dc-import></div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: 1128px; top: 196px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+<div style="position: absolute; left: 0; bottom: 0; width: 720px; height: 52px; box-sizing: border-box; padding: 0 20px; display: flex; flex-direction: column; justify-content: center; gap: 2px; background: rgba(18,19,23,0.86); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600; color: #ffffff; white-space: nowrap">+ circle</span>
+<span style="font-size: 12.5px; line-height: 17px; color: #9a9ca6; white-space: pre">History  Ctrl+H is the first row of the panel group; the menu grows to 7 rows, 296×259.</span>
+</div>
+</section>
+
+<section aria-label="A row’s menu" style="position: absolute; left: 720px; top: 0px; width: 720px; height: 900px; overflow: hidden">
+<div style="position: absolute; left: -500px; top: 0px; width: 1440px; height: 900px; overflow: hidden; background: #f3eee4; color: #16181d">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(8,8,12,0.3)"></div>
+
+<div style="position: absolute; left: 240px; top: 106px; width: 960px; height: 688px"><dc-import name="HistoryPanel" state="rest" pressed="t5" field-focus="{{false}}" hint-size="960px,688px"></dc-import></div>
+
+<div style="position: absolute; left: 700px; top: 468px; width: 264px; height: 234px"><dc-import name="CtxMenu" kind="historyrow" theme="dark" hover="{{1}}" hint-size="264px,234px"></dc-import></div>
+
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: 758px; top: 523px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+<div style="position: absolute; left: 0; bottom: 0; width: 720px; height: 52px; box-sizing: border-box; padding: 0 20px; display: flex; flex-direction: column; justify-content: center; gap: 2px; background: rgba(18,19,23,0.86); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)">
+<span style="font-size: 13.5px; line-height: 18px; font-weight: 600; color: #ffffff; white-space: nowrap">A row’s menu</span>
+<span style="font-size: 12.5px; line-height: 17px; color: #9a9ca6; white-space: nowrap">Peek grows from the row while History steps aside; Delete from history removes only that day’s visits.</span>
+</div>
+</section>
+
+<div aria-hidden="true" style="position: absolute; left: 720px; top: 0; width: 1px; height: 900px; background: rgba(255,255,255,0.12)"></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

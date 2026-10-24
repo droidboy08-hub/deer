@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History in motion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+@media (prefers-reduced-motion: reduce){.vt-anim{transition-property:opacity !important;transition-duration:150ms !important;transition-delay:0ms !important;animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 980px; position: relative; overflow: hidden; background: #121317; color: #f2f2f4; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif">
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; overflow: hidden; background: #f3eee4; color: #16181d">
+
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px"><dc-import name="HomeBrowse" hover="{{false}}" hint-size="1440px,900px"></dc-import></div>
+
+<div aria-hidden="true" class="vt-anim" style="position: absolute; left: 1074px; top: 12px; width: 44px; height: 44px; border-radius: 22px; background: rgba(22,24,29,0.10); pointer-events: none; opacity: {{plate.op}}; transition: {{plate.tr}}"></div>
+
+<div aria-hidden="true" class="vt-anim" style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; background: rgb(8,8,12); pointer-events: none; opacity: {{scrim.op}}; transition: {{scrim.tr}}"></div>
+
+<section aria-label="Peek: code.vitre.dev" class="vt-anim" style="position: absolute; left: {{sheet.l}}px; top: {{sheet.t}}px; width: {{sheet.w}}px; height: {{sheet.h}}px; border-radius: {{sheet.r}}px; overflow: hidden; visibility: {{sheet.vis}}; opacity: {{sheet.op}}; background: #f6f7f9; box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25); transition: {{sheet.tr}}">
+<div class="vt-anim" style="position: absolute; left: 0; top: 44px; width: 1040px; height: 760px; overflow: hidden; opacity: {{sheet.page}}; transition: {{sheet.trPage}}"><dc-import name="PeekIssue" issue="39" w="{{1040}}" h="{{760}}" hint-size="1040px,760px"></dc-import></div>
+<div style="position: absolute; left: 0; top: 0; width: 1040px; height: 44px; box-sizing: border-box; border-bottom: 1px solid rgba(16,18,24,0.08); background: rgba(250,251,253,0.78); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6)">
+<div style="position: absolute; left: 14px; top: 0; height: 43px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #16181d">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4.5" fill="#1d1f24"></rect><path d="M6.6 5.6 3.6 9l3 3.4M11.4 5.6l3 3.4-3 3.4" fill="none" stroke="#7df3d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-weight: 600">code.vitre.dev</span>
+<span style="white-space: nowrap; color: rgba(22,24,29,0.64)">/vitre/vitre-shell/issues/39</span>
+</div>
+<div style="position: absolute; right: 8px; top: 6px; display: flex; gap: 6px">
+<button aria-label="Open as tab" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V12"></path><path d="M11 4.5h4.5V9"></path><path d="M15.5 4.5 9.5 10.5"></path></svg></button>
+<button aria-label="Close peek" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: #16181d; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"></path></svg></button>
+</div>
+</div>
+<div aria-hidden="true" style="position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 30%, rgba(255,255,255,0.2) 60%, rgba(255,255,255,0.8)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none"></div>
+</section>
+
+<div style="position: absolute; left: {{pw.l}}px; top: 0; width: {{pw.w}}px; height: 900px; overflow: hidden">
+<div style="position: absolute; left: {{pw.x}}px; top: 106px; width: 960px; height: 688px"><dc-import name="HistoryPanel" theme="dark" view="all" shown="{{p.shown}}" state="{{p.state}}" query="{{p.query}}" hover="{{p.hover}}" hover-x="{{p.hoverX}}" gone="{{p.gone}}" day-gone="{{p.dayGone}}" scroll="{{p.scroll}}" wash="{{p.wash}}" wash-on="{{p.washOn}}" focus-row="{{p.focusRow}}" head-hover="{{p.headHover}}" undo-text="{{p.undoText}}" field-focus="{{p.fieldFocus}}" reduced="{{reduced}}" hint-size="960px,688px"></dc-import></div>
+</div>
+
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: {{tw.w}}px; height: 900px; overflow: hidden">
+<div style="position: absolute; left: 240px; top: 106px; width: 960px; height: 688px"><dc-import name="HistoryPanel" theme="dark" view="all" shown="{{true}}" state="search" query="{{tw.text}}" field-focus="{{true}}" reduced="{{reduced}}" hint-size="960px,688px"></dc-import></div>
+</div>
+
+<div class="vt-anim" style="position: absolute; left: 1080px; top: 64px; width: 296px; height: 259px; transform-origin: 0 0; visibility: {{menu.vis}}; opacity: {{menu.op}}; transform: {{menu.tf}}; transition: {{menu.tr}}"><dc-import name="CtxMenu" kind="plushistory" theme="dark" hover="{{menu.hover}}" pressed="{{menu.pressed}}" hint-size="296px,259px"></dc-import></div>
+
+<div aria-hidden="true" class="vt-anim" style="position: absolute; left: {{cur.x}}px; top: {{cur.y}}px; width: 0; height: 0; transform-origin: 0 0; transform: scale({{cur.s}}); opacity: {{cur.op}}; transition: {{cur.tr}}">
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: -2px; top: -2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+<sc-for list="{{fades}}" as="f" hint-placeholder-count="8">
+<div aria-hidden="true" class="vt-anim" style="position: absolute; left: {{f.x}}px; top: {{f.y}}px; width: 0; height: 0; opacity: {{f.op}}; transition: {{f.tr}}">
+<svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true" focusable="false" style="position: absolute; left: -2px; top: -2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35))"><path d="M2 2 L2 20 L7 15.5 L10.5 23 L13.5 21.7 L10 14.3 L16.5 14.3 Z" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+</div>
+</sc-for>
+
+</div>
+
+<div style="position: absolute; left: 0; top: 900px; width: 1440px; height: 80px; background: rgba(18,19,23,0.86)">
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1440px; height: 2px; background: rgba(255,255,255,0.08)"></div>
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1440px; height: 2px; background: rgba(255,255,255,0.4); transform-origin: 0 0; transform: {{prog.tf}}; transition: {{prog.tr}}"></div>
+<div style="position: absolute; left: 40px; top: 0; width: 1100px; height: 80px; display: flex; flex-direction: column; justify-content: center; gap: 3px">
+<div aria-live="polite" style="display: flex; align-items: baseline; font-size: 14px; line-height: 20px; font-weight: 600; white-space: nowrap"><span style="width: 22px; flex-shrink: 0; color: #9a9ca6; font-variant-numeric: tabular-nums">{{cap.n}}</span><span style="color: #ffffff">{{cap.title}}</span></div>
+<div style="padding-left: 22px; font-size: 12.5px; line-height: 18px; color: #9a9ca6; white-space: nowrap">{{cap.line}}</div>
+</div>
+<div style="position: absolute; right: 40px; top: 0; width: 220px; height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 3px; text-align: right">
+<div style="font-size: 13px; line-height: 20px; color: #9a9ca6; white-space: nowrap">{{key}}</div>
+<div style="font-size: 12px; line-height: 18px; color: #858892; font-variant-numeric: tabular-nums; white-space: nowrap">{{clock}}</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"autoplay":{"editor":"boolean","default":true,"section":"Motion"},"still":{"editor":"enum","default":"open","options":["menu","open","search","deleted","peek","day"],"section":"Motion"},"reduced":{"editor":"boolean","default":false,"section":"Motion"},"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+state = { t: 0, snap: true, still: false };
+
+componentDidMount() {
+this.timers = [];
+if (this.props.autoplay ?? true) {
+this.run();
+} else {
+const at = { menu: 1000, open: 2000, search: 3000, deleted: 5600, peek: 8000, day: 11800 };
+this.setState({ t: at[this.props.still ?? 'open'] ?? 2000, snap: true, still: true });
+}
+}
+
+componentWillUnmount() {
+(this.timers || []).forEach((x) => clearTimeout(x));
+}
+
+componentDidUpdate(prev) {
+if (prev && (prev.autoplay !== this.props.autoplay || prev.still !== this.props.still || prev.reduced !== this.props.reduced)) {
+(this.timers || []).forEach((x) => clearTimeout(x));
+this.componentDidMount();
+}
+}
+
+isReduced() {
+const os = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+return !!(this.props.reduced ?? false) || os;
+}
+
+// Cursor stops (window px, the arrow's tip): rest, +, History row, Tin bath, its ×, Undo, row t3, Delete day.
+spots() {
+return [[980, 250], [1096, 34], [1130, 198], [700, 550], [1154, 550], [1151, 188], [640, 390], [1139, 542]];
+}
+
+captions() {
+return [
+['1', 'Right-click + › History', 'Or Ctrl+H anywhere. History opens over the page, like Settings and Downloads.'],
+['2', 'Search titles and addresses', 'Matches are Semibold; a match only in the address shows that part.'],
+['3', 'Delete: gone at once, Undo for 10 s', 'Only that day’s visits go, and nothing is asked. History is changed only when the undo line goes.'],
+['4', 'Shift+click peeks the row', 'History steps aside, and comes back when the peek is put back.'],
+['5', 'Delete a day', 'Only that day’s visits go; pages also visited on other days stay there.'],
+['6', 'Ctrl+Z undoes', 'The day comes back in place. Ctrl+Z works in the list and the sidebar, never in the search field.'],
+['7', 'Esc, Ctrl+W or Ctrl+H closes', 'Focus goes back to the page. Within 60 s, History reopens where you left it.']
+];
+}
+
+// CSS 'ease', cubic-bezier(0.25, 0.1, 0.25, 1), solved for y at x.
+ease(x) {
+const bx = (s) => 3 * (1 - s) * (1 - s) * s * 0.25 + 3 * (1 - s) * s * s * 0.25 + s * s * s;
+const by = (s) => 3 * (1 - s) * (1 - s) * s * 0.1 + 3 * (1 - s) * s * s + s * s * s;
+let lo = 0;
+let hi = 1;
+for (let i = 0; i < 30; i += 1) {
+const m = (lo + hi) / 2;
+if (bx(m) < x) lo = m; else hi = m;
+}
+return by((lo + hi) / 2);
+}
+
+// The wheel move: the part's list has no scroll transition, so the board steps it, 300 px in 200 ms on 'ease'.
+// Reduced motion: one jump.
+wheel() {
+if (this.isReduced()) return [[10400, { scroll: 300, key: 'Wheel' }]];
+const out = [];
+for (let k = 1; k <= 7; k += 1) out.push([10400 + Math.round((k - 1) * 33.3), { scroll: Math.round(300 * this.ease(k / 7)) }]);
+out[0][1].key = 'Wheel';
+return out;
+}
+
+// [ms, changes]. A cursor move names its stop (c) and its duration (cd).
+plan() {
+return this.steps().concat(this.wheel()).sort((a, b) => a[0] - b[0]);
+}
+
+steps() {
+return [
+[0, { c: 0, cd: 0, press: false, plate: false, menu: 'hidden', mHover: -1, mPressed: false, scrim: 0, shown: false, state: 'rest', typed: '', query: '', hover: '', hoverX: false, gone: '', dayGone: '', scroll: 0, wash: '', washOn: false, focusRow: '', headHover: '', undoText: '', fieldFocus: false, sheet: 'hidden', cap: 0, key: '' }],
+[300, { c: 1, cd: 300 }],
+[600, { press: true, plate: true, menu: 'open', key: 'Right-click' }],
+[690, { press: false }],
+[700, { c: 2, cd: 400 }],
+[721, { mHover: 0 }],
+[743, { mHover: 1 }],
+[773, { mHover: 2 }],
+[848, { mHover: 3 }],
+[1220, { press: true, mPressed: true, key: 'Click' }],
+[1300, { press: false, mPressed: false, menu: 'chosen', plate: false }],
+[1400, { scrim: 0.3, shown: true, fieldFocus: true }],
+[1460, { menu: 'hidden', mHover: -1 }],
+[2200, { typed: 'g', cap: 1, key: 'Typing' }],
+[2310, { typed: 'gl' }],
+[2420, { typed: 'gla' }],
+[2530, { typed: 'glas' }],
+[2640, { typed: 'glass' }],
+[2900, { typed: '', query: 'glass', state: 'search' }],
+[3800, { query: '', state: 'rest', key: 'Esc' }],
+[4200, { c: 3, cd: 400 }],
+[4380, { hover: 't7' }],
+[4600, { c: 4, cd: 300 }],
+[4760, { hoverX: true }],
+[4930, { press: true, key: 'Click ×' }],
+[5000, { press: false, gone: 't7', state: 'undo', undoText: 'Deleted “Tin bath” from Today.', hover: '', hoverX: false, fieldFocus: false, cap: 2 }],
+[6000, { c: 5, cd: 300 }],
+[6330, { press: true, key: 'Click Undo' }],
+[6400, { press: false, gone: '', state: 'rest' }],
+[7000, { c: 6, cd: 300 }],
+[7120, { hover: 't3' }],
+[7330, { press: true, key: 'Shift+click' }],
+[7400, { press: false, hover: '', shown: false, scrim: 0.22, sheet: 'open', cap: 3 }],
+[9000, { sheet: 'closing', shown: true, scrim: 0.3, key: 'Esc' }],
+[9300, { wash: 't3', washOn: true, focusRow: 't3' }],
+[9340, { sheet: 'hidden' }],
+[9420, { washOn: false }],
+[10700, { c: 7, cd: 300 }],
+[10860, { headHover: 'yesterday' }],
+[11130, { press: true, key: 'Click Delete day' }],
+[11200, { press: false, dayGone: 'yesterday', state: 'dayundo', headHover: '', focusRow: '', cap: 4 }],
+[12600, { dayGone: '', state: 'rest', focusRow: 'y0', cap: 5, key: 'Ctrl+Z' }],
+[13600, { shown: false, scrim: 0, cap: 6, key: 'Esc' }],
+[14000, { scroll: 0, wash: '', focusRow: '' }],
+[14300, { c: 0, cd: 400 }]
+];
+}
+
+run() {
+(this.timers || []).forEach((x) => clearTimeout(x));
+if ((this.props.autoplay ?? true) === false) return;
+this.timers = [];
+this.setState({ t: 0, snap: true, still: false });
+this.timers.push(setTimeout(() => this.setState({ snap: false }), 80));
+this.plan().forEach((p) => {
+if (p[0] > 0) this.timers.push(setTimeout(() => this.setState({ t: p[0] }), p[0]));
+});
+this.timers.push(setTimeout(() => this.run(), 15000));
+}
+
+renderVals() {
+const plan = this.plan();
+const t = this.state.t;
+const snap = this.state.snap;
+const still = this.state.still;
+const R = this.isReduced();
+const v = {};
+let at = 0;
+for (let i = 0; i < plan.length; i += 1) {
+if (plan[i][0] > t) break;
+Object.assign(v, plan[i][1]);
+at = plan[i][0];
+}
+const S = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const E = 'cubic-bezier(0.2, 0, 0, 1)';
+const tr = (s) => (snap ? 'none' : s);
+const fade = tr('opacity 150ms ease');
+
+let menu = { op: 0, vis: 'hidden', tf: R ? 'scale(1)' : 'scale(0.96)', tr: 'none' };
+if (v.menu === 'open') menu = { op: 1, vis: 'visible', tf: 'scale(1)', tr: R ? fade : tr('opacity 90ms ' + E + ', transform 200ms ' + S) };
+if (v.menu === 'chosen') menu = { op: 0, vis: 'visible', tf: 'scale(1)', tr: R ? fade : tr('opacity 100ms ease') };
+menu.hover = v.mHover;
+menu.pressed = v.mPressed;
+
+// The peek grows from row t3 (window 477,370 703×40) and shrinks back into it.
+const rowRect = { l: 477, t: 370, w: 703, h: 40, r: 6 };
+const openRect = { l: 200, t: 72, w: 1040, h: 804, r: 22 };
+const box = (o) => ({ l: o.l, t: o.t, w: o.w, h: o.h, r: o.r });
+let sheet = Object.assign(box(R ? openRect : rowRect), { op: 0, vis: 'hidden', tr: 'none', page: 0, trPage: 'none' });
+if (v.sheet === 'open') {
+sheet = Object.assign(box(openRect), { op: 1, vis: 'visible', page: 1 });
+sheet.tr = R ? fade : tr('left 400ms ' + S + ', top 400ms ' + S + ', width 400ms ' + S + ', height 400ms ' + S + ', border-radius 400ms ' + S + ', opacity 80ms ease');
+sheet.trPage = R ? 'none' : tr('opacity 200ms ease 160ms');
+}
+if (v.sheet === 'closing') {
+sheet = Object.assign(box(R ? openRect : rowRect), { op: 0, vis: 'visible', page: 1, trPage: 'none' });
+sheet.tr = R ? fade : tr('left 280ms ' + S + ', top 280ms ' + S + ', width 280ms ' + S + ', height 280ms ' + S + ', border-radius 280ms ' + S + ', opacity 120ms ease 180ms');
+}
+
+const spots = this.spots();
+const here = spots[v.c] || spots[0];
+const moveTr = 'left ' + v.cd + 'ms ' + S + ', top ' + v.cd + 'ms ' + S + ', transform 120ms ease';
+const fades = spots.map((s, i) => ({ x: s[0], y: s[1], op: R && i === v.c ? 1 : 0, tr: R ? fade : 'none' }));
+
+const caps = this.captions();
+const c = caps[v.cap] || caps[0];
+
+// While typing, the field shows the text but the list waits for the pause. The part shows a query only in
+// its search state, so a second copy in that state draws the sidebar (x < 457) and the first copy, still at
+// rest, draws the title bar's right part, the toolbar and the list. Same position, same lens: no seam.
+const typing = !!v.typed;
+
+return {
+reduced: R,
+pw: typing ? { l: 457, w: 983, x: -217 } : { l: 0, w: 1440, x: 240 },
+tw: { w: typing ? 457 : 0, text: v.typed || 'g' },
+plate: { op: v.plate ? 1 : 0, tr: v.plate ? 'none' : (R ? fade : tr('opacity 100ms ease')) },
+scrim: { op: v.scrim, tr: R ? fade : tr('opacity 200ms ease') },
+sheet: sheet,
+menu: menu,
+p: {
+shown: v.shown, state: v.state, query: v.query, hover: v.hover, hoverX: v.hoverX,
+gone: v.gone, dayGone: v.dayGone, scroll: v.scroll, wash: v.wash, washOn: v.washOn,
+focusRow: v.focusRow, headHover: v.headHover, undoText: v.undoText, fieldFocus: v.fieldFocus
+},
+cur: { x: here[0], y: here[1], s: v.press && !R ? 0.86 : 1, op: R ? 0 : 1, tr: snap || R ? 'none' : moveTr },
+fades: fades,
+cap: { n: c[0], title: c[1], line: c[2] },
+key: v.key,
+prog: still ? { tf: 'scaleX(' + (t / 15000).toFixed(3) + ')', tr: 'none' } : { tf: snap ? 'scaleX(0)' : 'scaleX(1)', tr: snap ? 'none' : 'transform 14920ms linear' },
+clock: still ? 'Still · ' + (t / 1000).toFixed(1) + ' s' : (at / 1000).toFixed(1) + ' s'
+};
+}
+}
+</script>
+</body>
+</html>
