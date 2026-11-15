@@ -2,10 +2,17 @@
 // capsule in a peek's header (440x32). Both are DOM only: they know nothing about the finder.
 // Ported from app/src/renderer/modules/find.ts (FindFace); the capsule is new (FindPill board,
 // variant "capsule"; FindContexts "In a peek").
+// One row (macOS, ../../onerow.ts; board RowFind): the face is the active capsule's, 400x36 at
+// CAP_TOP (ACTIVE_W, CAP_H): it claims ACTIVE_W, not 480; its own glass (a hidden row) is CAP_H tall;
+// its parts sit where RowFind puts them (glyph at 12, field from 40, the counter's right edge 140 from
+// the right; styles.ts, One row).
 import type { Browser, Tab } from '../../browser';
 import { el, svg } from '../../dom';
 import { lens } from '../../glass';
+import { ACTIVE_W, CAP_H, oneRow } from '../../onerow';
 import { setTip } from '../../tips';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
 import { CLOSE_MS, DROP_MS, PILL_H } from './styles';
 
 export type Dir = 1 | -1;
@@ -38,7 +45,15 @@ const NARROW = 400;
 /** Under this the face also drops its favicon, so the field keeps its room (DESIGN-NOTES: at least 160 px). */
 const TIGHT = 360;
 /** The width the face claims for the active pill while it shows (b.bar.claimPill): many tabs never squeeze it. */
-const FACE_W = 480;
+const FACE_W = oneRow() ? ACTIVE_W : 480;
+/** The face's height (its own glass's lens): the pill's, or the One row's capsule. */
+const FACE_H = oneRow() ? CAP_H : PILL_H;
+/** Face-local x of the favicon and of the field (and of the morph's host): FindPill, or RowFind (One row). */
+const FAV_X = oneRow() ? 12 : 16;
+const FIELD_X = oneRow() ? 40 : 42;
+/** The field's right end before the counter (its right edge from the face's): wide, and narrow without Aa. */
+const COUNT_R = oneRow() ? 140 : 156;
+const COUNT_R_NARROW = oneRow() ? 100 : 110;
 const HOLD_HIDDEN_BAR_MS = 400;
 const COOLDOWN_MS = 400;
 const SPRING = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -92,13 +107,16 @@ abstract class FieldView {
     this.count = el('div', { class: 'vf-count', 'aria-live': 'polite', 'aria-atomic': 'true' });
     this.prev = el('button', { type: 'button', class: 'vf-btn vf-prev', 'aria-label': 'Previous match', 'aria-keyshortcuts': 'Shift+Enter' }, ICON.up(size, stroke));
     this.next = el('button', { type: 'button', class: 'vf-btn vf-next', 'aria-label': 'Next match', 'aria-keyshortcuts': 'Enter' }, ICON.down(size, stroke));
-    this.caseBtn = el('button', { type: 'button', class: 'vf-btn vf-case', 'aria-label': 'Match case', 'aria-pressed': 'false', 'aria-keyshortcuts': 'Alt+C' }, 'Aa');
+    // Match case is ⌥⌘C on macOS (⌥C types ç there): aria-keyshortcuts names ⌘ Meta.
+    this.caseBtn = el('button', { type: 'button', class: 'vf-btn vf-case', 'aria-label': 'Match case', 'aria-pressed': 'false', 'aria-keyshortcuts': isMac ? 'Alt+Meta+C' : 'Alt+C' }, 'Aa');
     this.closeBtn = el('button', { type: 'button', class: 'vf-btn vf-close', 'aria-label': 'Close find', 'aria-keyshortcuts': 'Escape' }, ICON.close(small ? 12 : 13, small ? '1.7' : '1.6'));
     this.sr = el('div', { class: 'vf-sr', role: 'status' });
-    setTip(this.prev, 'Previous match', 'Shift+Enter');
-    setTip(this.next, 'Next match', 'Enter');
-    setTip(this.caseBtn, 'Match case', 'Alt+C');
-    setTip(this.closeBtn, 'Close', 'Esc');
+    // macOS prints the keys in Apple glyphs: ⇧↩, ↩, ⌥⌘C, ⎋.
+    const key = (win: string, mac: string): string => (isMac ? displaySpec(mac, currentOS()) : win);
+    setTip(this.prev, 'Previous match', key('Shift+Enter', 'Shift+Enter'));
+    setTip(this.next, 'Next match', key('Enter', 'Enter'));
+    setTip(this.caseBtn, 'Match case', key('Alt+C', 'Mod+Alt+C'));
+    setTip(this.closeBtn, 'Close', key('Esc', 'Escape'));
     this.input.id = small ? 'vitre-find-capsule-input' : 'vitre-find-input';
     this.count.id = small ? 'vitre-find-capsule-count' : 'vitre-find-count';
     this.input.setAttribute('aria-describedby', this.count.id);
@@ -319,13 +337,13 @@ export class PillFace extends FieldView {
   }
 
   protected fieldRight(): number {
-    return this.el.classList.contains('vf-narrow') ? 110 : 156;
+    return this.el.classList.contains('vf-narrow') ? COUNT_R_NARROW : COUNT_R;
   }
   protected fieldLeft(): number {
-    return this.el.classList.contains('vf-tight') ? 12 : 42;
+    return this.el.classList.contains('vf-tight') ? 12 : FIELD_X;
   }
   protected width(): number {
-    return this.rect.w || 480;
+    return this.rect.w || FACE_W;
   }
   protected minField(): number {
     return 24;
@@ -525,14 +543,14 @@ export class PillFace extends FieldView {
     copy('.reload', '.vf-reload');
     // Split view: the split pill's focused half stands for the address (its favicon and host).
     const fav = part('.half.focused .fav, .address .fav')?.getBoundingClientRect();
-    if (fav) this.el.style.setProperty('--vf-fav-dx', `${fav.x + fav.width / 2 - 8 - box.x - 16}px`);
+    if (fav) this.el.style.setProperty('--vf-fav-dx', `${fav.x + fav.width / 2 - 8 - box.x - FAV_X}px`);
     const host = part('.half.focused .host') ?? part('.host');
     const domain = this.q('.vf-domain');
     if (host) {
       const r = host.getBoundingClientRect();
       domain.textContent = host.textContent;
       domain.style.width = `${Math.ceil(r.width) + 1}px`;
-      this.el.style.setProperty('--vf-dom-dx', `${r.x - box.x - 42}px`);
+      this.el.style.setProperty('--vf-dom-dx', `${r.x - box.x - FIELD_X}px`);
     }
   }
 
@@ -564,7 +582,7 @@ export class PillFace extends FieldView {
   private setLens(w: number): void {
     if (w === this.lensW) return;
     this.lensW = w;
-    this.lensEl.style.backdropFilter = lens(w, PILL_H, { blur: 2.4 });
+    this.lensEl.style.backdropFilter = lens(w, FACE_H, { blur: 2.4 });
   }
 
   /** Stay on the pill's slot as the bar re-flows (tabs opening and closing, window resizes). */

@@ -146,7 +146,10 @@
 /* Drag strip: the part of the window that moves it. In a normal window Windows keeps the top 8px of
  * the client area for resizing (WM_NCHITTEST says HTTOP there), so the strip is 8 + 10px tall;
  * maximized there is no resize band. The drag region is geometric: anything painted over the strip
- * drags too unless it declares -moz-window-dragging: no-drag. The wheel is dead on the strip. */
+ * drags too unless it declares -moz-window-dragging: no-drag. The wheel is dead on the strip.
+ * macOS (the One row): the same strip, and with the lights' capsule the only part of the row that
+ * moves the window; macOS keeps no resize band inside the client area, so all 18px drag, in a zoomed
+ * window too (skin/bar.css, macOS section). */
 #vitre-drag {
   position: absolute;
   left: 0;
@@ -224,4 +227,38 @@
   backdrop-filter: blur(16px) saturate(1.5);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 18px rgba(0, 0, 0, 0.25);
   text-shadow: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. macOS one row: the page fills the window under the row           */
+/* ------------------------------------------------------------------ */
+/* The owner, 2026-11-15: "remove the gray bar like windows". On macOS the page area fills the window
+ * from y 0 as sections 2 and 6 lay it out for Windows, in a normal window as in window full screen
+ * (:root[inFullscreen]); the One row (src/window/onerow.ts) floats over the page as the Windows bar
+ * does: the window's own traffic lights (AppKit draws them above the view that hosts Gecko's pixels)
+ * and the capsules in Deer's CSS glass (skin/bar.css, macOS section). Nothing of it lies across the
+ * row: the drag strip (section 4) and the lights' capsule move the window, and between the capsules
+ * the page gets the pointer, hover, right-click and the wheel, as under the Windows bar's items (until
+ * 2026-11-15 a transparent 52 px band, the drag region, took them). Web pages start below the row at
+ * scroll top through the inset module's top strip (src/actors/page/inset.ts, ROW_AREA 64;
+ * src/window/pagearea.ts) and scroll under the capsules; the tab dialogs hang 64 px down as on
+ * Windows (section 6).
+ * Until 2026-11-15 #tabbrowser-tabpanels started at the row's bottom edge and the band carried macOS's
+ * gray Titlebar material (-moz-window-titlebar), which shows only where no layer of the window
+ * paints; nothing of that is left.
+ * The notification card (section 5) hangs 8 px below the row (ROW_H 52 + 8) instead of under the
+ * Windows bar's 68 px area.
+ * Window-modal dialogs (gDialogBox: the quit prompt of ⌘Q, prompts with MODAL_TYPE_WINDOW) hang
+ * 64 px down like the tab dialogs. Firefox puts them 5 px above the top of the page area
+ * (content-area.css: margin-top clamp(3px, var(--chrome-offset) - 5px, ...), --chrome-offset being
+ * the selected <browser>'s top, browser.js gDialogBox._open), which since the page starts at y 0 is
+ * the window's top edge: over the capsules and next to the traffic lights. A window too short for
+ * that keeps Firefox's limit (the dialog's bottom 5 px above the window's). */
+@media (-moz-platform: macos) {
+  :root[vitre] #navigator-toolbox > #notifications-toolbar {
+    top: 60px;
+  }
+  :root[vitre]:not([inDOMFullscreen]) #window-modal-dialog > .dialogOverlay > .dialogBox:not(.spotlightBox) {
+    margin-top: clamp(3px, 64px, calc(100vh - var(--subdialog-inner-height, 0px) - 5px));
+  }
 }

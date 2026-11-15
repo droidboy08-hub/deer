@@ -6,15 +6,32 @@
 // replacing a side of the active pair, every way to cancel, a release in place as a click, touch and
 // pen never lifting, a narrow window, Home with Home, F11; keyboard focus back in the page after a
 // drop or a cancel, a second button during a lift, a window that lost focus, a collapsed pair.
+// macOS (One row, src/window/onerow.ts; splitlift.ts header, One row): a background tab is a compact
+// capsule, still the item's .circle-face (bar.ts createTab), so the press and the helpers are the
+// same. The panes run under the floating 52 px row from y 0, as under the Windows bar; the zones
+// start below the row and a plate stands 8 px below it and inside its pane's other sides: from y 60
+// (ROW_H + 8), H - 68 tall. The lifted copy's mixed tint and a flat favicon's plate go by the row's
+// theme, which follows the page under it as the Windows bar's does (splitlift.ts rowLight,
+// LIFT_ROW_CSS). A drop flies no ghost into the half (the row runs no split morphs: bar.ts render);
+// the pair's capsule shows the flat favicon on the row's plate. F11 is window full screen there, where
+// the row hides as the Windows bar does in F11 but comes back while macOS's menu bar is down (the real
+// pointer at the top: reveal.ts), so section 10 waits for full screen alone; it needs native full
+// screen, which cannot start while the screen is locked (the window then stays as it was and its
+// animations stop: section 10 fails and the sections after it stall). The steps wait for animation
+// frames, which macOS stops giving a window that is covered or on another Space: run it with the Deer
+// window in front.
 /* global spike, SL */
 Services.scriptloader.loadSubScript("resource://vitre-boot/slib.js", window);
 spike.main(async () => {
   const { b } = SL;
   const { check, log, sleep } = spike;
   const EU = spike.EU;
+  const mac = Services.appinfo.OS === "Darwin";
   await spike.resize(1440, 900);
   await spike.activate();
   const near = (a, c, tol = 2) => Math.abs(a - c) <= tol;
+  /** macOS: the row is light (a light page under it, not a private window: splitlift.ts rowLight). */
+  const rowLight = () => !b.root.classList.contains("private") && b.root.classList.contains("theme-light");
   const circle = (t) => b.bar.item(t.id)?.querySelector(".circle-face");
   const centre = (el) => {
     const r = el.getBoundingClientRect();
@@ -45,12 +62,18 @@ spike.main(async () => {
   }
   const W = () => window.innerWidth;
   const H = () => window.innerHeight;
-  /** The plate a drop on `side` shows for a new pair: its 50/50 pane, 8 px inside it, from y 64 (SplitDrop). */
+  /**
+   * The plate a drop on `side` shows for a new pair: its 50/50 pane, 8 px inside it, from y 64 (SplitDrop).
+   * macOS: 8 px below the row (ROW_H 52, over the pane's top) and inside the pane's other sides:
+   * from y 60, H - 68 tall (splitlift.ts plateTop, plateRect).
+   */
+  const PLATE_Y = mac ? 60 : 64;
   function expectPlate(side) {
     const area = W() - 8;
     const lw = Math.max(320, Math.min(area - 320, Math.round(area / 2)));
     const l = side === "left" ? 0 : lw + 8;
     const r = side === "left" ? lw : W();
+    if (mac) return { x: l + 8, y: 60, w: r - l - 16, h: H() - 68 };
     return { x: l + 8, y: 64, w: r - l - 16, h: H() - 72 };
   }
 
@@ -77,12 +100,15 @@ spike.main(async () => {
   await sleep(320);
   const pr = plate("right");
   const want = expectPlate("right");
-  check("over the right third: the right zone, the plate where the right pane will be (8 px inside it, from y 64)", b.bar.lift.state?.zone === "right" && !!pr && near(SL.rect(pr).x, want.x) && near(SL.rect(pr).w, want.w) && SL.rect(pr).y === 64 && near(SL.rect(pr).h, want.h), { plate: pr && SL.rect(pr), want });
+  check(`over the right third: the right zone, the plate where the right pane will be (8 px inside it, from y ${PLATE_Y})`, b.bar.lift.state?.zone === "right" && !!pr && near(SL.rect(pr).x, want.x) && near(SL.rect(pr).w, want.w) && SL.rect(pr).y === PLATE_Y && near(SL.rect(pr).h, want.h), { plate: pr && SL.rect(pr), want });
   check("the plate shows the tab: favicon (32 px), title and host; named as a preview", !!pr && pr.querySelector(".sv-plate-title")?.textContent === "Tideline" && pr.querySelector(".sv-plate-line")?.textContent.startsWith("127.0.0.1") && pr.querySelector(".sv-plate-fav")?.getBoundingClientRect().width === 32 && pr.getAttribute("aria-label") === "Split view preview: Tideline opens on the right", pr && { label: pr.getAttribute("aria-label"), lines: [...pr.querySelectorAll(".sv-plate-in > div")].map((x) => x.textContent) });
   const mat = pr && getComputedStyle(pr.querySelector(".sv-plate-mat"));
   check("the plate: frost rgba(32,32,38,0.80) blur 24 saturate 1.6, radius 8, shadow 0 18px 44px", !!mat && mat.backgroundColor === "rgba(32, 32, 38, 0.8)" && mat.backdropFilter.includes("blur(24px)") && getComputedStyle(pr).borderRadius === "8px", mat && { bg: mat.backgroundColor, bf: mat.backdropFilter });
   const cl = clone();
-  check("the lifted circle follows the pointer and, light over the dark plate, takes the mixed tint", near(centre(cl).x, rightAt.x, 30) && cl.classList.contains("mixed"), { c: centre(cl), p: rightAt, cls: cl.className });
+  // macOS: the copy's tint is the row's, by the theme of the page under it; over the (always dark)
+  // plate it takes the mixed tint only when that is light (splitlift.ts move: rowLight).
+  if (mac) check(`the lifted capsule follows the pointer and, over the dark plate, ${rowLight() ? "takes" : "does not take (dark row)"} the mixed tint`, near(centre(cl).x, rightAt.x, 30) && cl.classList.contains("mixed") === rowLight(), { c: centre(cl), p: rightAt, cls: cl.className, rowLight: rowLight() });
+  else check("the lifted circle follows the pointer and, light over the dark plate, takes the mixed tint", near(centre(cl).x, rightAt.x, 30) && cl.classList.contains("mixed"), { c: centre(cl), p: rightAt, cls: cl.className });
   await spike.capture("lift-1-right-zone");
   await glide(rightAt, { x: W() / 2, y: 420 });
   await sleep(300);
@@ -106,7 +132,10 @@ spike.main(async () => {
   await SL.shown();
   let p = b.splitView.active();
   check("dropped on the right: Field Notes | Tideline, focus stays on Field Notes", p && p.left === fn && p.right === tl && b.active() === fn, p && [p.left.title, p.right.title, b.active().title]);
-  check("the dropped circle flies into its half (a ghost in the bar while it does)", flying);
+  // macOS: the row runs no split morphs (bar.ts render: their ghosts are the Windows bar's glass);
+  // its capsules fade and slide into the pair instead.
+  if (mac) check("One row: the dropped capsule does not fly as a ghost (no split morphs on the row)", !flying);
+  else check("the dropped circle flies into its half (a ghost in the bar while it does)", flying);
   await sleep(600);
   check("the lift is over: no copy, no cover, no plate, no ghost", !b.bar.lift.state && !clone() && !document.querySelector("#layer-split-lift > .sv-lift-cover, #layer-split-lift > .sv-plate, #vitre-bar > .sv-ghost"));
   await spike.capture("lift-2-formed");
@@ -232,7 +261,13 @@ spike.main(async () => {
   log("--- 10. in F11 a held circle lifts too (spec Auto-hide and F11: drags hold the bar shown); a quick drag moves nothing");
   [fn, tl, ln] = await SL.scene(["dark.html", "links.html"]);
   b.run("fullscreen");
-  await SL.until(() => window.fullScreen && b.root.classList.contains("fullscreen") && b.bar.hidden, 8000);
+  // macOS: window full screen (native Spaces). The row hides there as the Windows bar does in F11,
+  // but comes back while macOS's menu bar is down (reveal.ts: the real pointer at the top of the
+  // screen), which a test cannot steer: only full screen is waited for. The hold below shows it.
+  if (mac) {
+    await SL.until(() => window.fullScreen && b.root.classList.contains("fullscreen"), 8000);
+    log("window full screen", { fullScreen: window.fullScreen, hiding: b.bar.hiding, hidden: b.bar.hidden });
+  } else await SL.until(() => window.fullScreen && b.root.classList.contains("fullscreen") && b.bar.hidden, 8000);
   await sleep(900);
   const shownBar = b.bar.hold("test", true);
   await sleep(500);
@@ -391,19 +426,33 @@ spike.main(async () => {
   log("--- 16. a favicon that is one flat white shape keeps its dark contrast plate in the copy and in the ghost (bar.ts toneOf)");
   const [fn2, flat] = await SL.scene(["flat.html"]);
   const flatFav = await SL.until(() => b.bar.item(flat.id)?.querySelector(".circle-face .fav[data-tone='light']"), 6000);
-  check("set-up: on light glass the bar draws Flat Mark's white favicon on its dark plate", !!flatFav && b.root.classList.contains("theme-light") && getComputedStyle(flatFav.querySelector("img")).backgroundColor === "rgb(29, 31, 36)", flatFav && getComputedStyle(flatFav.querySelector("img")).backgroundColor);
+  // macOS: the plate goes by the row's theme, which follows the page under it (skin/bar.css One row;
+  // LIFT_ROW_CSS): the dark plate on a light row, none (a transparent background) on a dark one or in
+  // a private window, and the copy and the ghost keep what the row shows.
+  const rowPlate = mac && !rowLight() ? "rgba(0, 0, 0, 0)" : "rgb(29, 31, 36)";
+  if (mac) check(`set-up: the row draws Flat Mark's white favicon ${rowLight() ? "on its dark plate (light row)" : "with no plate (dark row)"}`, !!flatFav && getComputedStyle(flatFav.querySelector("img")).backgroundColor === rowPlate, flatFav && getComputedStyle(flatFav.querySelector("img")).backgroundColor);
+  else check("set-up: on light glass the bar draws Flat Mark's white favicon on its dark plate", !!flatFav && b.root.classList.contains("theme-light") && getComputedStyle(flatFav.querySelector("img")).backgroundColor === "rgb(29, 31, 36)", flatFav && getComputedStyle(flatFav.querySelector("img")).backgroundColor);
   if (flatFav) {
     at = await hold(flat);
     const copyImg = document.querySelector("#layer-split-lift > .sv-lifted .fav img");
-    check("the lifted copy keeps the plate (#1D1F24)", !!copyImg && getComputedStyle(copyImg).backgroundColor === "rgb(29, 31, 36)", copyImg && getComputedStyle(copyImg).backgroundColor);
+    if (mac) check("the lifted copy keeps the row's plate", !!copyImg && getComputedStyle(copyImg).backgroundColor === rowPlate, copyImg && getComputedStyle(copyImg).backgroundColor);
+    else check("the lifted copy keeps the plate (#1D1F24)", !!copyImg && getComputedStyle(copyImg).backgroundColor === "rgb(29, 31, 36)", copyImg && getComputedStyle(copyImg).backgroundColor);
     await glide(at, rightAt);
     await sleep(250);
     up(rightAt);
     await sleep(30);
     const ghostImg = document.querySelector("#vitre-bar > .sv-ghost .g-fav img");
-    check("the ghost flying into its half keeps it too", !!ghostImg && getComputedStyle(ghostImg).backgroundColor === "rgb(29, 31, 36)", ghostImg && getComputedStyle(ghostImg).backgroundColor);
+    // macOS: no ghost (the row runs no split morphs, section 3); the pair's capsule shows the
+    // favicon on the row's plate instead (checked below).
+    if (mac) check("One row: no ghost flies into the half", !ghostImg && !document.querySelector("#vitre-bar > .sv-ghost"));
+    else check("the ghost flying into its half keeps it too", !!ghostImg && getComputedStyle(ghostImg).backgroundColor === "rgb(29, 31, 36)", ghostImg && getComputedStyle(ghostImg).backgroundColor);
     await SL.shown();
     check("set-up: Field Notes | Flat Mark", b.splitView.active()?.left === fn2 && b.splitView.active()?.right === flat);
+    if (mac) {
+      await sleep(400);
+      const pairImgs = [...document.querySelectorAll("#vitre-bar > .item.pair .fav[data-tone='light'] img")];
+      check("the pair's capsule keeps Flat Mark's favicon on the row's plate", pairImgs.length > 0 && pairImgs.every((img) => getComputedStyle(img).backgroundColor === rowPlate), pairImgs.map((img) => getComputedStyle(img).backgroundColor));
+    }
     await sleep(600);
   }
   log("done");

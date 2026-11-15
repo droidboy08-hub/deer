@@ -26,6 +26,18 @@ import { CATEGORY_ICON, ic, node } from './icons';
 import { closeMenu, openMenu, type MenuEntry } from './menu';
 import type { Command, DownloadStore } from './store';
 import { leaveElementFullscreen } from './system';
+import { isMac, revealLabel } from '../../../shared/os';
+/** Show in folder, or Show in Finder on a Mac. */
+const REVEAL = revealLabel();
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
+
+/**
+ * The keys a row's menu prints for open, pause or resume and remove (the list's own keys): Windows
+ * "Enter", "Space", "Delete"; macOS ↩, Space and ⌫ in Apple glyphs (MacKeys board, Downloads).
+ */
+const ROW_KEY = isMac
+  ? { open: displaySpec('Enter', currentOS()), space: displaySpec('Space', currentOS()), remove: displaySpec('Backspace', currentOS()) }
+  : { open: 'Enter', space: 'Space', remove: 'Delete' };
 
 type Filter = 'all' | 'active' | 'queued' | 'paused' | 'done' | Category;
 
@@ -948,7 +960,8 @@ export class Panel {
     } else if (e.key === ' ' && v) {
       // A finished file: Space is Repair on a Damaged row, and only moves focus on a Changed after download one.
       if (v.state !== 'completed' || f.isDamaged(v) || f.isEdited(v)) this.primary(v);
-    } else if (e.key === 'Delete' && v) {
+    } else if ((e.key === 'Delete' || (isMac && e.key === 'Backspace' && !e.shiftKey && !e.altKey && !e.ctrlKey)) && v) {
+      // macOS: ⌫ and ⌘⌫ remove the row (MacKeys board, Downloads); that key is Backspace there.
       this.removeRow(v.id);
     } else if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
       const row = this.rows.get(this.selected);
@@ -972,18 +985,18 @@ export class Panel {
     // changed) and Open anyway; Changed after download, Restore original; every finished file, Check file (H).
     if (f.isDamaged(v)) {
       if (v.check?.site === 'changed') entries.push({ label: 'Download again', access: 'd', icon: 'reload', run: run('download-again') });
-      else entries.push({ label: 'Repair', access: 'e', key: v.phase ? undefined : 'Space', icon: 'reload', run: run('repair') });
-      entries.push({ label: 'Open anyway', access: 'o', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
-    } else if (f.isEdited(v)) entries.push({ label: 'Restore original', access: 's', icon: 'reload', run: run('restore') }, { label: 'Open', access: 'o', key: 'Enter', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
-    else if (v.state === 'completed' && !v.missing) entries.push({ label: 'Open', access: 'o', key: 'Enter', icon: 'open', run: run('open') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
+      else entries.push({ label: 'Repair', access: 'e', key: v.phase ? undefined : ROW_KEY.space, icon: 'reload', run: run('repair') });
+      entries.push({ label: 'Open anyway', access: 'o', icon: 'open', run: run('open') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
+    } else if (f.isEdited(v)) entries.push({ label: 'Restore original', access: 's', icon: 'reload', run: run('restore') }, { label: 'Open', access: 'o', key: ROW_KEY.open, icon: 'open', run: run('open') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
+    else if (v.state === 'completed' && !v.missing) entries.push({ label: 'Open', access: 'o', key: ROW_KEY.open, icon: 'open', run: run('open') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') }, { label: 'Check file', access: 'h', icon: 'verify', run: run('check') });
     else if (v.state === 'completed') entries.push({ label: 'Download again', access: 'd', icon: 'reload', run: run('resume') });
-    else if (active) entries.push({ label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
-    else if (v.state === 'queued') entries.push({ label: 'Start now', access: 's', icon: 'play', run: run('start-now') }, { label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') });
+    else if (active) entries.push({ label: 'Pause', access: 'p', key: ROW_KEY.space, icon: 'pause', run: run('pause') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
+    else if (v.state === 'queued') entries.push({ label: 'Start now', access: 's', icon: 'play', run: run('start-now') }, { label: 'Pause', access: 'p', key: ROW_KEY.space, icon: 'pause', run: run('pause') });
     else if (v.need?.kind === 'address') {
       // Renewing link: Space pauses (the attempt stops); with attempts planned, Pause stops those too (RESUME-DESIGN.md 6, G4).
       const renewing = v.phase === 'renewing';
-      const space = renewing ? undefined : 'Space';
-      if (renewing) entries.push({ label: 'Pause', access: 'p', key: 'Space', icon: 'pause', run: run('pause') });
+      const space = renewing ? undefined : ROW_KEY.space;
+      if (renewing) entries.push({ label: 'Pause', access: 'p', key: ROW_KEY.space, icon: 'pause', run: run('pause') });
       else if (v.nextAt) entries.push({ label: 'Pause', access: 'p', icon: 'pause', run: run('pause') });
       // Waiting for link: Open page and Stop waiting; Link expired: Refresh address (Retry for a stream).
       if (v.armed) entries.push({ label: 'Open page', access: 'o', key: space, icon: 'opentab', run: run('open-page') }, { label: 'Stop waiting', access: 'w', icon: 'close', run: run('stop-waiting') });
@@ -992,26 +1005,26 @@ export class Panel {
         if (v.pageUrl) entries.push({ label: 'Open page', access: 'o', icon: 'opentab', run: run('open-page') });
       }
       if (canUseAddress(v)) entries.push({ label: 'Use another address…', access: 'u', icon: 'link', run: () => this.openAddress(id) });
-      entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+      entries.push({ label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
     }
     else if (v.need?.kind === 'choice') {
       entries.push({ label: 'Start over with the new file', access: 'n', icon: 'reload', run: run('start-over') });
       if (v.keep) entries.push({ label: 'Keep partial file', access: 'k', icon: 'download', run: run('keep-partial') });
-      entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+      entries.push({ label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
     }
     else if (v.need?.kind === 'page') {
-      entries.push({ label: 'Open page', access: 'o', key: 'Space', icon: 'opentab', run: run('open-page') });
+      entries.push({ label: 'Open page', access: 'o', key: ROW_KEY.space, icon: 'opentab', run: run('open-page') });
       // Armed by Open page, it waits for its start there (Waiting for link): Stop waiting (review of Phase 7).
       if (v.armed) entries.push({ label: 'Stop waiting', access: 'w', icon: 'close', run: run('stop-waiting') });
       // Phase 7: a download of Deer's whose page may need the person to sign in keeps its bytes and its other ways back.
       if (v.engine === 'vitre') {
         if (canUseAddress(v)) entries.push({ label: 'Use another address…', access: 'u', icon: 'link', run: () => this.openAddress(id) });
-        entries.push({ label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+        entries.push({ label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
       }
     }
     // Waiting for network, Retrying (RESUME-DESIGN.md 6, G4): Try now; Pause ends the wait.
-    else if (f.isWaiting(v)) entries.push({ label: 'Try now', access: 't', key: 'Space', icon: 'reload', run: run('start-now') }, { label: 'Pause', access: 'p', icon: 'pause', run: run('pause') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
-    else if (v.state === 'paused') entries.push({ label: 'Resume', access: 's', key: 'Space', icon: 'play', run: run('resume') }, { label: 'Show in folder', access: 'f', icon: 'folder', run: run('show-in-folder') });
+    else if (f.isWaiting(v)) entries.push({ label: 'Try now', access: 't', key: ROW_KEY.space, icon: 'reload', run: run('start-now') }, { label: 'Pause', access: 'p', icon: 'pause', run: run('pause') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
+    else if (v.state === 'paused') entries.push({ label: 'Resume', access: 's', key: ROW_KEY.space, icon: 'play', run: run('resume') }, { label: REVEAL, access: 'f', icon: 'folder', run: run('show-in-folder') });
     else {
       // Safe Browsing blocked it as uncommon or unwanted: the person may keep it anyway.
       if (v.keepable) entries.push({ label: 'Keep file', access: 'k', icon: 'download', run: run('keep') });
@@ -1019,7 +1032,7 @@ export class Panel {
     }
     entries.push('separator', { label: 'Copy address', access: 'a', icon: 'copy', run: run('copy-address') }, 'separator');
     if (!['completed', 'failed', 'cancelled'].includes(v.state)) entries.push({ label: 'Cancel', access: 'c', icon: 'close', danger: true, run: run('cancel') });
-    entries.push({ label: 'Remove from list', access: 'r', key: 'Delete', run: () => this.removeRow(id) });
+    entries.push({ label: 'Remove from list', access: 'r', key: ROW_KEY.remove, run: () => this.removeRow(id) });
     openMenu(this.b, `${v.filename} actions`, entries, place, { keyboard, owner: from, returnFocus: from });
   }
 
@@ -1117,7 +1130,7 @@ function primaryOf(v: DownloadView): [string, string, string] {
   // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4): Try now.
   if (f.isWaiting(v)) return ['try', 'Try now', ic.retry];
   if (v.state === 'paused') return ['resume', 'Resume', ic.play(14)];
-  if (v.state === 'completed' && !v.missing) return ['folder', 'Show in folder', ic.folder()];
+  if (v.state === 'completed' && !v.missing) return ['folder', REVEAL, ic.folder()];
   return ['retry', v.state === 'completed' ? 'Download again' : 'Retry', ic.retry];
 }
 
@@ -1182,10 +1195,10 @@ function detailActions(v: DownloadView): [string, string, string][] {
   // anyway · Show in folder · Remove from list (Download again first once the site's file changed). Changed
   // after download: Restore original (only when chosen) · Open · Show in folder · Remove from list. Every
   // other finished file gains Check file.
-  if (v.state === 'completed' && !v.missing && v.phase === 'repairing') return [['folder', 'Show in folder', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
-  if (f.isDamaged(v)) return [v.check?.site === 'changed' ? ['again', 'Download again', ''] : ['repair', 'Repair', ''], ['open-anyway', 'Open anyway', ''], ['folder', 'Show in folder', ''], ['remove', 'Remove from list', '']];
-  if (f.isEdited(v)) return [['restore', 'Restore original', ''], ['open', 'Open', ''], ['folder', 'Show in folder', ''], ['remove', 'Remove from list', '']];
-  if (v.state === 'completed' && !v.missing) return [['open', 'Open', ''], ['folder', 'Show in folder', ''], ['check', 'Check file', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  if (v.state === 'completed' && !v.missing && v.phase === 'repairing') return [['folder', REVEAL, ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
+  if (f.isDamaged(v)) return [v.check?.site === 'changed' ? ['again', 'Download again', ''] : ['repair', 'Repair', ''], ['open-anyway', 'Open anyway', ''], ['folder', REVEAL, ''], ['remove', 'Remove from list', '']];
+  if (f.isEdited(v)) return [['restore', 'Restore original', ''], ['open', 'Open', ''], ['folder', REVEAL, ''], ['remove', 'Remove from list', '']];
+  if (v.state === 'completed' && !v.missing) return [['open', 'Open', ''], ['folder', REVEAL, ''], ['check', 'Check file', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'completed') return [['retry', 'Download again', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' && v.keepable) return [['keep', 'Keep file', ''], ['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   if (v.state === 'failed' || v.state === 'cancelled') return [['retry', 'Retry', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
@@ -1206,25 +1219,25 @@ function detailActions(v: DownloadView): [string, string, string][] {
     const acts: [string, string, string][] = [v.phase === 'renewing' ? ['pause', 'Pause', ''] : v.canRenew ? ['refresh', 'Refresh address', ''] : ['retry', 'Retry', '']];
     if (canUseAddress(v)) acts.push(['use-address', 'Use another address…', '']);
     if (v.pageUrl) acts.push(['open-page', 'Open page', '']);
-    acts.push(['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']);
+    acts.push(['folder', REVEAL, ''], ['cancel', 'Cancel', 'danger']);
     return acts;
   }
-  if (v.need?.kind === 'choice') return [['start-over', 'Start over with the new file', 'danger'], ...(v.keep ? [['keep-partial', 'Keep partial file', ''] as [string, string, string]] : []), ['folder', 'Show in folder', '']];
+  if (v.need?.kind === 'choice') return [['start-over', 'Start over with the new file', 'danger'], ...(v.keep ? [['keep-partial', 'Keep partial file', ''] as [string, string, string]] : []), ['folder', REVEAL, '']];
   // Phase 7 (RESUME-DESIGN.md G1 step 3): a download of Deer's whose page, opened out of sight, may need the
   // person to sign in: Open page · Use another address… · Show in folder · Cancel (Pause first while an attempt
   // runs). A download Firefox moved: Open page · Copy address · Remove from list, as before.
   if (v.need?.kind === 'page' && v.engine === 'vitre') {
     const acts: [string, string, string][] = v.phase === 'renewing' ? [['pause', 'Pause', ''], ['open-page', 'Open page', '']] : [['open-page', 'Open page', '']];
     if (canUseAddress(v)) acts.push(['use-address', 'Use another address…', '']);
-    acts.push(['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']);
+    acts.push(['folder', REVEAL, ''], ['cancel', 'Cancel', 'danger']);
     return acts;
   }
   if (v.need?.kind === 'page') return [['open-page', 'Open page', ''], ['copy', 'Copy address', ''], ['remove', 'Remove from list', '']];
   // Waiting for network and Retrying (RESUME-DESIGN.md 6, G4): Try now · Pause (the wait ends) · Show in folder · Cancel.
-  if (f.isWaiting(v)) return [['try', 'Try now', ''], ['pause', 'Pause', ''], ['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']];
+  if (f.isWaiting(v)) return [['try', 'Try now', ''], ['pause', 'Pause', ''], ['folder', REVEAL, ''], ['cancel', 'Cancel', 'danger']];
   const first: [string, string, string] = active ? ['pause', 'Pause', ''] : v.state === 'queued' ? ['now', 'Start now', ''] : ['resume', 'Resume', ''];
   const acts: [string, string, string][] = [first];
   if (v.engine === 'vitre') acts.push(['limit', 'Limit speed', '']);
-  acts.push(['folder', 'Show in folder', ''], ['cancel', 'Cancel', 'danger']);
+  acts.push(['folder', REVEAL, ''], ['cancel', 'Cancel', 'danger']);
   return acts;
 }

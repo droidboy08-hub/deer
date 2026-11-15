@@ -77,6 +77,9 @@
 // focus is re-asserted after the first load and after a process switch (17).
 import type { Browser, OpenRequest, Tab } from '../../browser';
 import { HIDDEN_TAB_VALUE } from '../../model';
+import { CAP_H, CAP_TOP, EDGE, oneRow } from '../../onerow';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
 import { searchUrl } from '../../../shared/url';
 import * as gk from './gecko';
 import { EXPAND, reducedMotion, SPRING, tween } from './motion';
@@ -264,6 +267,7 @@ class Peek {
       back: () => this.live?.browser.goBack(),
       dimClick: (e) => this.dimClick(e),
       headerMenu: (e) => this.headerMenu(e),
+      keyLabel: (action) => b.keys?.label(action) ?? '',
     });
     if (b.isPopup) return; // a popup window shows one page: its links open the way Firefox opens them
     b.interceptOpen((r) => this.intercept(r));
@@ -1308,7 +1312,11 @@ class Peek {
     this.announce();
   }
 
-  /** The link was a download: the sheet folds into a circle that drops toward the downloads ring. */
+  /**
+   * The link was a download: the sheet folds into a circle that drops toward the downloads ring.
+   * macOS, One row: Downloads is the first capsule of the row's right end (#vitre-row-end, at the
+   * top right; downloads/ring.ts), so the sheet folds into that capsule instead.
+   */
   private aborted(live: Live): void {
     if (this.live !== live || this.phase !== 'open') return;
     this.phase = 'closing';
@@ -1316,7 +1324,7 @@ class Peek {
     const reduced = reducedMotion();
     const a = area();
     const from: Pose = this.sheet.current ?? { box: sheetBox(), off: HEADER };
-    const ring: Box = { x: a.right - 116, y: a.bottom - 64, w: 44, h: 44, r: 22 };
+    const ring: Box = oneRow() ? this.rowDownloads() : { x: a.right - 116, y: a.bottom - 64, w: 44, h: 44, r: 22 };
     this.sheet.animate({
       from,
       to: reduced ? from : { box: ring, off: HEADER },
@@ -1330,6 +1338,18 @@ class Peek {
     this.holdBar(false);
     this.returnFocus(live);
     this.announce();
+  }
+
+  /**
+   * One row: the Downloads capsule's box (window coordinates), from the anchor the downloads module
+   * registers (ring.ts). Until it is in the row: where the row's first right-end capsule would be with
+   * nothing after it (as ring.ts center()).
+   */
+  private rowDownloads(): Box {
+    const node = this.b.anchor('downloads');
+    const r = node.closest('#vitre-row-end') ? node.getBoundingClientRect() : null;
+    if (r && r.width && r.height) return { x: r.x, y: r.y, w: r.width, h: r.height, r: Math.min(r.width, r.height) / 2 };
+    return { x: window.innerWidth - EDGE - CAP_H, y: CAP_TOP, w: CAP_H, h: CAP_H, r: CAP_H / 2 };
   }
 
   private relayout(): void {
@@ -1365,7 +1385,9 @@ class Peek {
     return this.phase === 'open' && this.live && this.b.active() === this.source ? this.live.browser : null;
   }
 
+  /** Open as tab's key as printed: Windows its spec ("Alt+Enter"); macOS the chord in Apple glyphs ("⌥↩"). */
   private promoteSpec(): string {
+    if (isMac) return this.b.keys?.label('openAsTab') ?? '';
     const binding = this.b.keys?.bindings().find((x) => x.action === 'openAsTab');
     return binding?.spec ?? 'Alt+Enter';
   }
@@ -1384,7 +1406,7 @@ class Peek {
       { label: 'Copy address', icon: 'link', access: 'A', run: () => gk.copyText(url) },
       { label: 'Open in new window', icon: 'newwindow', access: 'W', run: () => this.openInWindow() },
       { separator: true as const },
-      { label: 'Close peek', icon: 'close', key: 'Esc', access: 'C', run: () => this.close() },
+      { label: 'Close peek', icon: 'close', key: isMac ? displaySpec('Escape', currentOS()) : 'Esc', access: 'C', run: () => this.close() },
     ];
     menus.show(rows, { x: e.clientX, y: e.clientY });
   }
@@ -1479,7 +1501,7 @@ class Peek {
     dot.className = 'd';
     const tip = document.createElement('span');
     tip.className = 'h';
-    tip.textContent = 'Shift+click to peek';
+    tip.textContent = isMac ? '⇧-click to peek' : 'Shift+click to peek';
     const el = document.createElement('div');
     el.className = 'vp-hint';
     el.setAttribute('role', 'status');

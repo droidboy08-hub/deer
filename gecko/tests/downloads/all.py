@@ -200,6 +200,8 @@ TESTS = {
     'repair': (600, True),
     'stream-expiry': (900, True),
     'resolve': (720, True),
+    # macOS One row only (passes at once elsewhere): the quick view and the video pill under the row.
+    'mac-row': (150, True),
     # A diagnostic, not part of the default set: throughput and main-thread stalls.
     'perf': (300, True),
     # Real GitHub and YouTube: installs yt-dlp + Deno to %TEMP% and saves a 19 s video. Not in the default set.

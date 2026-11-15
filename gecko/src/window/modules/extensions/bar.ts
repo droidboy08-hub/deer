@@ -43,8 +43,19 @@
 // F11: the toolbar carries fullscreentoolbar, or Firefox collapses it in full screen.
 // Firefox's own items about extensions say what Deer says (fx.VITRE_LABELS: "Pin to tab bar"...),
 // and the panel's gear menu "Remove extension…" asks in Settings › Extensions like Deer's menu.
+//
+// macOS, One row (window/onerow.ts; Mac canvas boards RowSpec, RowExtensions): the cluster is not in
+// the address field but in a capsule of its own, <div class="vx-rowcap">, at the row's right end
+// (#vitre-row-end, after the Downloads capsule, joined to it): 30 px buttons 6 px apart, 3 px from the
+// capsule's ends (the puzzle alone is a 36 px circle, one pin makes the board's 72). It is drawn on Home
+// too. The capsule takes at most a quarter of the window and never pushes the active tab under its
+// minimum (rowSlots); the pins that do not fit go into Firefox's panel as in the pill. Popups hang
+// 8 px under the capsule (the hang points span its height, css.ts), the extensions panel too
+// (hangUnderPill measures the capsule). The CustomizableUI area is the same toolbar element, moved:
+// it is in the document from install (mount) and the bar may build #vitre-row-end later.
 import type { Browser } from '../../browser';
 import { el } from '../../dom';
+import { ACTIVE_MIN, CAP_H, EDGE, GAP as CAP_GAP, oneRow, TABS_LEFT } from '../../onerow';
 import { CSS } from './css';
 import * as fx from './fx';
 import type { ExtMenus } from './menu';
@@ -70,6 +81,32 @@ const PILL_FIXED = 154;
 const SPLIT_FIXED = 142;
 const BUTTON = 28;
 const GAP = 2;
+/** One row (macOS): the capsule's buttons, the room between them and at its ends (css.ts, macOS block). */
+const ROW_BUTTON = 30;
+const ROW_GAP = 6;
+const ROW_PAD = 3;
+/** One row: the share of the window's width the extensions capsule may take at most. */
+const ROW_SHARE = 0.25;
+
+/**
+ * One row (macOS): call `fn` with the row's right end (#vitre-row-end, made by the bar) once it
+ * exists. The bar may build it after this module's install, so a watch on #vitre-root waits for it.
+ */
+function whenRowEnd(b: Browser, fn: (end: HTMLElement) => void): void {
+  const found = document.getElementById('vitre-row-end');
+  if (found) {
+    fn(found);
+    return;
+  }
+  const watch = new MutationObserver(() => {
+    const end = document.getElementById('vitre-row-end');
+    if (!end) return;
+    watch.disconnect();
+    fn(end);
+  });
+  watch.observe(b.root, { childList: true, subtree: true });
+  b.onDestroy(() => watch.disconnect());
+}
 
 /**
  * A keyboard stop of the tab bar (src/window/barkeys.ts: Tab from the address field, then Left /
@@ -96,6 +133,8 @@ export class ExtBar {
   readonly hang: HTMLElement;
   readonly door: HTMLElement;
   readonly pageActions: PageActions;
+  /** One row (macOS): the capsule at the row's right end that holds the cluster; null on Windows. */
+  readonly capsule: HTMLElement | null = oneRow() ? el('div', { class: 'vx-rowcap' }) : null;
   menus: ExtMenus | null = null;
   /** Pinned widget ids hidden from the pill for lack of room. */
   readonly overflowed = new Set<string>();
@@ -168,6 +207,27 @@ export class ExtBar {
     this.cleanups.push(this.b.on('render', () => this.place()));
     this.cluster.addEventListener('contextmenu', (e) => this.onContextMenu(e), true);
     this.anchors();
+    if (this.capsule) this.homeInRow(this.capsule);
+  }
+
+  /**
+   * One row (macOS): the capsule goes into the row's right end when the bar has built it, after the
+   * Downloads capsule (which puts itself first: downloads/ring.ts), so the order is the board's
+   * whichever module comes first. Extension icons follow the capsule's theme there (paintBright):
+   * the page's, as every capsule of the row, or in split view the other side's page's when the
+   * capsule is over it. bar.ts paintRowSplit sets that (over-light / over-dark / over-clear on the
+   * capsule) without a render, on every divider move, so a watch on the capsule's class repaints them.
+   */
+  private homeInRow(capsule: HTMLElement): void {
+    whenRowEnd(this.b, (end) => {
+      const downloads = end.querySelector(':scope > .vd-ring');
+      if (downloads) downloads.after(capsule);
+      else end.prepend(capsule);
+      this.place();
+    });
+    const watch = new MutationObserver(() => this.paintBright());
+    watch.observe(capsule, { attributes: true, attributeFilter: ['class'] });
+    this.cleanups.push(() => watch.disconnect());
   }
 
   /** Delayed startup: Firefox's lazy objects (gUnifiedExtensions, CustomizableUI's window state) exist. */
@@ -209,15 +269,27 @@ export class ExtBar {
     return !this.cluster.classList.contains('vx-parked') && this.cluster.getClientRects().length > 0;
   }
 
-  /** After every render: follow the active pill, match the glass, refit. */
+  /** After every render: follow the active pill, match the glass, refit. One row: stay in the capsule. */
   place(): void {
-    const host = this.b.bar.accessories();
+    const host = this.capsule ? (this.capsule.parentElement ? this.capsule : null) : this.b.bar.accessories();
     if (host && this.cluster.parentElement !== host) host.append(this.cluster);
     this.cluster.classList.toggle('vx-parked', !host);
-    // Dark and clear glass want an extension's light icon (theme_icons): Firefox's brighttext rule.
-    this.toolbar.toggleAttribute('brighttext', this.b.theme() !== 'light');
+    this.paintBright();
     this.pageActions.paint();
     this.fit();
+  }
+
+  /**
+   * Dark and clear glass want an extension's light icon (theme_icons): Firefox's brighttext rule.
+   * One row: the capsule follows the page's theme as the pill does (css.ts); in split view, over the
+   * other side's page, it takes that page's theme (bar.ts paintRowSplit: over-light, over-dark,
+   * over-clear on the capsule); a private window's capsule is dark glass whatever the page.
+   */
+  private paintBright(): void {
+    const cap = this.capsule?.classList;
+    const theme = cap?.contains('over-light') ? 'light' : cap?.contains('over-dark') || cap?.contains('over-clear') ? 'dark' : this.b.theme();
+    const bright = this.capsule ? this.b.isPrivate || theme !== 'light' : this.b.theme() !== 'light';
+    this.toolbar.toggleAttribute('brighttext', bright);
   }
 
   private fitSoon(): void {
@@ -233,6 +305,10 @@ export class ExtBar {
   fit(): void {
     if (this.lent.size) return; // the panel is open with some of them: refit when it closes
     const nodes = [...this.toolbar.children].filter((n) => n.localName === 'toolbaritem' || n.id);
+    if (this.capsule) {
+      this.hideOverflow(nodes, this.rowSlots());
+      return;
+    }
     const pill = this.b.bar.layout.pillRect?.width ?? 480;
     const split = !!this.b.pairOf(this.b.activeId);
     const fixed = split ? SPLIT_FIXED : PILL_FIXED;
@@ -247,6 +323,11 @@ export class ExtBar {
     const room = pill - fixed - halves * MIN_ADDRESS - BUTTON;
     const slots = Math.max(0, Math.floor(room / (BUTTON + GAP)));
     const forPins = Math.max(0, slots - shownPa);
+    this.hideOverflow(nodes, forPins);
+  }
+
+  /** The first `forPins` pinned buttons are drawn; the rest wait for Firefox's panel (vx-overflow). */
+  private hideOverflow(nodes: Element[], forPins: number): void {
     this.overflowed.clear();
     nodes.forEach((node, i) => {
       const over = i >= forPins;
@@ -256,6 +337,24 @@ export class ExtBar {
     this.cluster.classList.toggle('vx-nopins', nodes.length - this.overflowed.size === 0);
     this.cluster.dataset.pinned = String(nodes.length);
     this.cluster.dataset.shown = String(nodes.length - this.overflowed.size);
+  }
+
+  /**
+   * One row (macOS): how many pinned buttons the capsule draws. It takes at most ROW_SHARE of the
+   * window, and the row keeps the active tab at its minimum beside the + capsule (onerow.ts: tabs from
+   * TABS_LEFT, ACTIVE_MIN, the + capsule CAP_H) whatever else the right end holds. Page actions are
+   * placed first (they cannot go into the panel), then the pins; the puzzle button always stays.
+   */
+  private rowSlots(): number {
+    const capsule = this.capsule as HTMLElement;
+    const end = capsule.parentElement;
+    const W = Math.floor(window.innerWidth);
+    // The rest of the right end: the Downloads capsule, a Private capsule, and the gaps between them.
+    const others = end ? Math.max(0, end.getBoundingClientRect().width - capsule.getBoundingClientRect().width) : 0;
+    const room = Math.min(Math.round(W * ROW_SHARE), W - EDGE - others - TABS_LEFT - ACTIVE_MIN - CAP_GAP - CAP_H - CAP_GAP);
+    const slots = Math.max(0, Math.floor((room - 2 * ROW_PAD + ROW_GAP) / (ROW_BUTTON + ROW_GAP)) - 1);
+    const shownPa = this.pageActions.fitTo(slots);
+    return Math.max(0, slots - shownPa);
   }
 
   // ---- Firefox's extensions button ----
@@ -535,9 +634,10 @@ export class ExtBar {
   /**
    * A panel anchored to an element inside the pill opens at that element's bottom edge: push it
    * down so its visible top is 8 px under the pill (the panel's own shadow margin accounted for).
+   * One row (macOS): 8 px under the capsule (board RowExtensions).
    */
   private hangUnderPill(popup: HTMLElement, anchor: Element): void {
-    const pill = this.cluster.closest('.item');
+    const pill = this.capsule ?? this.cluster.closest('.item');
     if (!pill) return;
     const shadow = parseFloat(getComputedStyle(popup).getPropertyValue('--panel-box-shadow-margin')) || 0;
     // An anchor with delegatesanchor hangs its popup from its first child (adoptButton removes it

@@ -5,6 +5,11 @@
 // scrolls. This module gives the page a strip of exactly that height at its top, in the page's own
 // colour, that is part of the page: everything in the document flow starts below it, and it scrolls
 // away with the page like any content. After that the bar floats over the page as before.
+// macOS (src/shared/os.ts isMac, read here in the content process): the band is ROW_AREA (64) px,
+// the One row's 52 and 12 of air (board RowFullScreen: content at 64). The row floats over the page
+// as the Windows bar does, so a Mac page gets the strip in a normal window; in window full screen the
+// row hides, as the Windows bar does in F11, and every page of the window is listed as under a hidden
+// bar (below; src/window/pagearea.ts).
 //
 // Setting: Settings.pageInset (pref vitre.pageInset, default true), read here from the pref and
 // observed with a pref observer (see ./README): turning it off or on applies at once to every open
@@ -18,8 +23,8 @@
 // text/plain and view-source documents are ordinary HTML documents and get the strip.
 //
 // How:
-//   - Height: BAR_AREA chrome px, i.e. BAR_AREA / fullZoom page px, so the strip is exactly the bar
-//     area at any page zoom (re-applied on resize, which a zoom change fires).
+//   - Height: BAR_AREA chrome px (macOS ROW_AREA), i.e. BAR_AREA / fullZoom page px, so the strip is
+//     exactly the bar area at any page zoom (re-applied on resize, which a zoom change fires).
 //   - A USER sheet (windowUtils.loadSheetUsingURIString, data: URL) gives the root element
 //     `padding-top: <inset + the site's own root padding>px !important` and the custom property
 //     `--vitre-inset: <inset>px` (screen media only, not while the root itself is full screen).
@@ -163,11 +168,14 @@
 // InspectorUtils.getMatchingCSSRules and CSSStyleSheet.parsingMode (chrome-only; devtools'
 // shared/inspector/css-logic.js uses both); MozAfterPaint (chrome-only, as ./core.ts).
 import type { PageContext } from '../page-api';
-import { BAR_AREA, INSET_BAR_HIDDEN_KEY, INSET_OFF_KEY } from '../../shared/geometry';
+import { BAR_AREA, INSET_BAR_HIDDEN_KEY, INSET_OFF_KEY, ROW_AREA } from '../../shared/geometry';
+import { isMac } from '../../shared/os';
 import { settingPref } from '../../shared/settings';
 import { sheetsPending } from '../../shared/sheets';
 
 const PREF = settingPref('pageInset');
+/** The band the strip covers, in window (chrome) px: the Windows bar's, or the floating One row's on macOS (header). */
+const AREA = isMac ? ROW_AREA : BAR_AREA;
 const SCHEMES = /^(?:https?|file|data|blob|moz-extension|view-source):/i;
 const PRIVILEGED = /^(?:about|chrome|resource|moz-src):/i;
 const XHTML = 'http://www.w3.org/1999/xhtml';
@@ -307,7 +315,7 @@ function insetPx(ctx: PageContext): number {
   } catch {
     zoom = 1;
   }
-  return Math.round((BAR_AREA / zoom) * 1000) / 1000;
+  return Math.round((AREA / zoom) * 1000) / 1000;
 }
 
 /** '' when the document gets the strip, else why not. */

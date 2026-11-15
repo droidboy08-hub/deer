@@ -15,9 +15,23 @@
 // Waiting rows (RESUME-DESIGN.md G4, Phase 4: Waiting for network, Retrying) count as active
 // (format.ts isActive): the ring stays shown, its arc includes them and Pause all reaches them; their
 // quick view row offers Try now.
+//
+// macOS, One row (window/onerow.ts; Mac canvas boards RowSpec, RowDownloads): the ring is a 36 px
+// capsule at the row's right end (#vitre-row-end, first, before Extensions), in the row's glass over the
+// page, and it is always there: "shown" only brings the arc (while anything downloads, then 6 s). The
+// quick view hangs 8 px under the capsule with their right edges aligned, the menu too (below it, not
+// above), and takes the capsule's theme (Popover.paintTheme: the row's, or in split view the other
+// side's page's when the capsule is over it). The bar may build #vitre-row-end after this module installs: the capsule waits for it. The
+// open quick view holds the row (b.bar.hold, reveal.ts), as the menus and extension popups that hang
+// from the row do. In window full screen, while macOS's menu bar is down, the row moves down by
+// --vitre-row-shift (reveal.ts, skin/bar.css) and the quick view with it: Popover.place measures
+// layout boxes only, which no translate moves, and skin/bar.css translates #layer-downloads-pop as
+// it does #layer-bar, so the shift counts once, at every frame of the slide.
 import type { Browser } from '../../browser';
 import { el, svg } from '../../dom';
 import { glass, lens } from '../../glass';
+import { CAP_H, CAP_TOP, EDGE, oneRow } from '../../onerow';
+import { isMac, revealLabel } from '../../../shared/os';
 import type { DownloadView } from '../../../modules/downloads/types';
 import * as f from './format';
 import { ic, node } from './icons';
@@ -28,10 +42,35 @@ import type { DownloadStore } from './store';
 const CIRC = 2 * Math.PI * 14;
 const SPRING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const HIDE_AFTER = 6000;
+/** macOS One row: the quick view's width and corner (board RowDownloads). */
+const ROW_POP_W = 380;
+const ROW_POP_RADIUS = 16;
 const reduced = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * macOS One row: call `fn` with the row's right end (#vitre-row-end, made by the bar) once it exists.
+ * The bar may build it after this module's install, so a watch on #vitre-root waits for it.
+ */
+function whenRowEnd(b: Browser, fn: (end: HTMLElement) => void): void {
+  const found = document.getElementById('vitre-row-end');
+  if (found) {
+    fn(found);
+    return;
+  }
+  const watch = new MutationObserver(() => {
+    const end = document.getElementById('vitre-row-end');
+    if (!end) return;
+    watch.disconnect();
+    fn(end);
+  });
+  watch.observe(b.root, { childList: true, subtree: true });
+  b.onDestroy(() => watch.disconnect());
+}
 
 export class Ring {
   readonly el: HTMLElement;
+  /** macOS One row: the capsule at the row's right end (see the header) instead of the corner ring. */
+  readonly row = oneRow();
   private btn: HTMLButtonElement;
   private arc: SVGCircleElement;
   private shown = false;
@@ -48,17 +87,26 @@ export class Ring {
     private panel: Panel
   ) {
     const layer = b.layer('downloads-ring', 11);
+    // One row: a capsule of the row (css.ts, macOS block), no lens map of its own: skin/bar.css gives
+    // it the capsules' CSS blur over the page.
     this.el = el('div', { class: 'vd-ring' });
-    glass(this.el).lens.style.backdropFilter = lens(44, 44);
+    if (!this.row) glass(this.el).lens.style.backdropFilter = lens(44, 44);
     const face = svg(
       `<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="track" cx="17" cy="17" r="14" fill="none" stroke-width="2"/><g class="spin"><circle class="arc" cx="17" cy="17" r="14" fill="none" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 ${CIRC.toFixed(2)}" transform="rotate(-90 17 17)"/></g><path d="M17 11.5v9M13.6 17.2 17 20.6l3.4-3.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
     );
     // data-bar-stop: a keyboard stop of the tab bar, after + (src/window/barkeys.ts header).
     this.btn = el('button', { type: 'button', 'aria-haspopup': 'dialog', 'aria-label': 'Downloads', 'data-bar-stop': '' }, face);
     this.el.append(this.btn, el('span', { class: 'vd-ring-dot', 'aria-hidden': 'true' }));
-    this.el.setAttribute('inert', '');
     this.live = el('span', { class: 'vd-live', role: 'status', 'aria-live': 'polite' });
-    layer.append(this.el, this.live);
+    if (this.row) {
+      // First in the row's right end; the extensions capsule puts itself after it (extensions/bar.ts).
+      this.btn.setAttribute('aria-expanded', 'false');
+      layer.append(this.live);
+      whenRowEnd(b, (end) => end.prepend(this.el));
+    } else {
+      this.el.setAttribute('inert', '');
+      layer.append(this.el, this.live);
+    }
     this.arc = face.querySelector('.arc') as SVGCircleElement;
     this.pop = new Popover(b, store, panel, this);
     // The panel is the topmost surface: the quick view under it would take the first Esc.
@@ -76,12 +124,25 @@ export class Ring {
     });
     store.subscribe(() => this.update());
     // The menus module's anchor router may hang native popups from the ring (none today).
-    b.setAnchor('downloads', () => (this.shown ? this.el : null));
+    b.setAnchor('downloads', () => (this.row || this.shown ? this.el : null));
   }
 
   /** Window coordinates of the ring's centre (also while it is hidden). */
   center(): { x: number; y: number } {
+    if (this.row) {
+      const r = this.el.getBoundingClientRect();
+      if (r.width) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      // Not in the row yet: where the row's first right-end capsule would be with nothing after it.
+      return { x: window.innerWidth - EDGE - CAP_H / 2, y: CAP_TOP + CAP_H / 2 };
+    }
     return { x: window.innerWidth - 72 - 22, y: window.innerHeight - 20 - 22 };
+  }
+
+  /** One row: the capsule looks pressed while its quick view hangs from it (board RowDownloads). */
+  markOpen(open: boolean): void {
+    if (!this.row) return;
+    this.el.classList.toggle('open', open);
+    this.btn.setAttribute('aria-expanded', String(open));
   }
 
   get isShown(): boolean {
@@ -116,7 +177,9 @@ export class Ring {
     const waits = active.filter(f.isWaiting).length;
     const under = [active.length > waits ? `${active.length - waits} active` : '', waits ? `${waits} waiting` : ''].filter(Boolean).join(', ');
     const running = active.length ? `${under}${known.length ? `, ${Math.floor(pct * 100)} percent` : ''}` : '';
-    const label = attention ? `Downloads, ${needAttention(attention)}${running ? `, ${running}` : ''}` : running ? `Downloads, ${running}` : 'Downloads, finished';
+    // One row: the capsule is there with nothing to say too; "finished" only while the arc shows.
+    const idle = this.row && !this.shown ? 'Downloads' : 'Downloads, finished';
+    const label = attention ? `Downloads, ${needAttention(attention)}${running ? `, ${running}` : ''}` : running ? `Downloads, ${running}` : idle;
     this.btn.setAttribute('aria-label', label);
     this.pop.render();
   }
@@ -141,7 +204,7 @@ export class Ring {
   show(): void {
     if (this.shown) return;
     this.shown = true;
-    this.el.removeAttribute('inert');
+    if (!this.row) this.el.removeAttribute('inert');
     this.el.classList.add('shown');
   }
 
@@ -149,6 +212,11 @@ export class Ring {
     if (!this.shown) return;
     this.shown = false;
     this.el.classList.remove('shown');
+    if (this.row) {
+      // The capsule stays in the row (and keeps the keyboard): only the arc goes.
+      this.btn.setAttribute('aria-label', 'Downloads');
+      return;
+    }
     this.el.setAttribute('inert', '');
     if (this.el.contains(document.activeElement)) this.b.focusPage();
   }
@@ -186,7 +254,8 @@ export class Ring {
     const anyPaused = views.some((v) => v.state === 'paused');
     const copied = this.store.engine.clipboardUrl();
     const entries: MenuEntry[] = [
-      { label: 'Show downloads', access: 's', key: 'Ctrl+J', icon: 'download', run: () => this.panel.show() },
+      // macOS prints the Mac chord (⌥⌘L) as the key router has it.
+      { label: 'Show downloads', access: 's', key: isMac ? (this.b.keys?.label('downloads') ?? '') : 'Ctrl+J', icon: 'download', run: () => this.panel.show() },
       { label: 'Open Downloads folder', access: 'f', icon: 'folder', run: () => this.store.engine.openFolder() },
       'separator',
       anyActive || !anyPaused
@@ -195,8 +264,9 @@ export class Ring {
     ];
     if (copied) entries.push({ label: 'Download copied link', access: 'd', icon: 'link', run: () => void this.store.start(copied, { origin: this.center() }) });
     entries.push({ label: 'Clear finished', access: 'c', disabled: !views.some(f.isFinished), run: () => this.store.clearFinished() });
-    // Opens up and to the left: right edge at the ring's right, bottom 8 px above it.
-    openMenu(this.b, 'Downloads', entries, { at: this.el, align: 'above-end' }, { keyboard, owner: this.el, returnFocus: this.btn });
+    // Opens up and to the left: right edge at the ring's right, bottom 8 px above it. One row: 8 px
+    // under the capsule, right edges aligned, as the quick view.
+    openMenu(this.b, 'Downloads', entries, { at: this.el, align: this.row ? 'end' : 'above-end' }, { keyboard, owner: this.el, returnFocus: this.btn });
   }
 
   focus(): void {
@@ -212,6 +282,10 @@ class Popover {
   private height = 0;
   private unEsc: (() => void) | null = null;
   private unFocus: (() => void) | null = null;
+  /** One row: ends the bar hold taken while the quick view is open (see open()). */
+  private releaseBar: (() => void) | null = null;
+  /** One row: stops following the capsule's theme (paintTheme). */
+  private unTheme: (() => void) | null = null;
 
   constructor(
     private b: Browser,
@@ -231,6 +305,11 @@ class Popover {
 
   open(keyboard: boolean): void {
     closeMenu(this.b);
+    // One row: the quick view hangs from the row, which stays in place while it is open (in place at
+    // once, for place() below), as menus/index.ts, extensions/bar.ts and Peek hold it. Not on Windows:
+    // there the quick view stands over the corner ring, and a hold would bring an auto-hidden or full
+    // screen bar in (reveal.ts show()).
+    if (this.ring.row) this.releaseBar ??= this.b.bar.hold('downloads-pop', true);
     this.store.reload();
     const layer = this.b.layer('downloads-pop', 30);
     this.catcher = el('div', { class: 'vd-menu-catcher' });
@@ -242,10 +321,22 @@ class Popover {
       el('div', { class: 'vd-pop-body' }, el('div', { class: 'vd-pop-head' }, el('b', {}, 'Downloads'), el('span', { class: 'vd-pop-sum' })), el('div', { class: 'vd-pop-list' }), openBtn)
     );
     glass(elm);
+    // One row: it hangs under the capsule (css.ts, macOS block; place() sets top and right), in the
+    // capsule's theme, which follows the root's theme-* and, in split view, the over-* that bar.ts
+    // paintRowSplit puts on the capsule without a render (every divider move): both are watched.
+    if (this.ring.row) {
+      elm.classList.add('under-row');
+      this.paintTheme(elm);
+      const watch = new MutationObserver(() => this.paintTheme(elm));
+      watch.observe(this.ring.el, { attributes: true, attributeFilter: ['class'] });
+      watch.observe(this.b.root, { attributes: true, attributeFilter: ['class'] });
+      this.unTheme = () => watch.disconnect();
+    }
     layer.append(this.catcher, elm);
     this.el = elm;
     this.rows.clear();
     this.height = 0;
+    this.ring.markOpen(true);
     openBtn.addEventListener('click', () => {
       this.close(false);
       this.panel.show();
@@ -265,7 +356,9 @@ class Popover {
     this.unFocus = () => document.removeEventListener('focusin', lost, true);
     this.render();
     if (!reduced()) {
-      elm.animate([{ transform: 'translate(4px, 6px) scale(0.96)' }, { transform: 'none' }], { duration: 240, easing: SPRING });
+      // From the ring below it; one row: from the capsule above it.
+      const from = this.ring.row ? 'translate(0, -6px) scale(0.96)' : 'translate(4px, 6px) scale(0.96)';
+      elm.animate([{ transform: from }, { transform: 'none' }], { duration: 240, easing: SPRING });
       (elm.querySelector('.vd-pop-body') as HTMLElement).animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'cubic-bezier(0.2,0,0,1)' });
     }
     const first = elm.querySelector<HTMLElement>('.vd-pop-row') ?? openBtn;
@@ -281,8 +374,13 @@ class Popover {
     this.unEsc = null;
     this.unFocus?.();
     this.unFocus = null;
+    this.releaseBar?.();
+    this.releaseBar = null;
+    this.unTheme?.();
+    this.unTheme = null;
     this.catcher?.remove();
     this.catcher = null;
+    this.ring.markOpen(false);
     elm.style.pointerEvents = 'none';
     const hadFocus = elm.contains(document.activeElement);
     elm.animate([{ transform: 'none' }, { transform: 'scale(0.985)' }], { duration: reduced() ? 150 : 120, fill: 'forwards' }).onfinish = () => elm.remove();
@@ -332,11 +430,48 @@ class Popover {
       });
       if (!pick.length) list.append(el('div', { class: 'vd-pop-empty' }, 'Downloads you start appear here.'));
     }
+    if (this.ring.row) this.place(elm);
     const h = elm.offsetHeight;
     if (h !== this.height) {
       this.height = h;
-      (elm.querySelector('.lens') as HTMLElement).style.backdropFilter = lens(360, h, { radius: 20, scale: 24, blur: 14, opaque: true });
+      const [w, radius] = this.ring.row ? [ROW_POP_W, ROW_POP_RADIUS] : [360, 20];
+      (elm.querySelector('.lens') as HTMLElement).style.backdropFilter = lens(w, h, { radius, scale: 24, blur: 14, opaque: true });
     }
+  }
+
+  /**
+   * One row: the quick view in the theme of the Downloads capsule it hangs from (css.ts, class
+   * row-light): light glass under a light capsule (the row's theme-light, or over-light when the
+   * capsule is over the other side's light page in split view; over-dark and over-clear win over the
+   * row's light), dark glass otherwise and always in a private window.
+   */
+  private paintTheme(elm: HTMLElement): void {
+    const ring = this.ring.el.classList;
+    const overDark = ring.contains('over-dark') || ring.contains('over-clear');
+    const light = !this.b.isPrivate && (ring.contains('over-light') || (this.b.root.classList.contains('theme-light') && !overDark));
+    elm.classList.toggle('row-light', light);
+  }
+
+  /**
+   * One row: 8 px under the Downloads capsule, right edges aligned (board RowDownloads). Again at every
+   * render: the capsule's right edge moves when the extensions capsule after it grows or shrinks.
+   * Layout boxes only (offsetLeft and offsetTop up to #vitre-root, which fills the window), never
+   * getBoundingClientRect, so no transform moves it: not the capsule's pulse (scale 1.06), and not the
+   * full-screen shift under macOS's menu bar (the translate on #layer-bar). That shift reaches the
+   * quick view through its own layer instead (skin/bar.css translates #layer-downloads-pop by the same
+   * --vitre-row-shift), whenever it was placed: measured here as well, it would count twice.
+   */
+  private place(elm: HTMLElement): void {
+    const ring = this.ring.el;
+    if (!ring.offsetParent || !ring.offsetWidth) return;
+    let x = 0;
+    let y = 0;
+    for (let n: HTMLElement | null = ring; n && n !== this.b.root; n = n.offsetParent as HTMLElement | null) {
+      x += n.offsetLeft;
+      y += n.offsetTop;
+    }
+    elm.style.top = `${Math.round(y + ring.offsetHeight + 8)}px`;
+    elm.style.right = `${Math.round(window.innerWidth - (x + ring.offsetWidth))}px`;
   }
 
   private row(id: string): HTMLElement {
@@ -411,7 +546,7 @@ class Popover {
               : v.state === 'paused'
                 ? ['r', 'Resume', ic.play(12)]
                 : v.state === 'completed' && !v.missing
-                  ? ['f', 'Show in folder', ic.folder(14, 1.6)]
+                  ? ['f', revealLabel(), ic.folder(14, 1.6)]
                   : ['t', 'Retry', ic.retry];
     if (btn.dataset.k !== k) {
       btn.dataset.k = k;

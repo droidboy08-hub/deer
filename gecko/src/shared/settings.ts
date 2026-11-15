@@ -1,6 +1,7 @@
 // User settings. Same interface as app/src/shared/settings.ts (the Electron build).
 // On Gecko they are stored as vitre.* prefs by src/modules/VitreSettings.sys.ts (get / set / onChange)
 // and mirrored in every window as b.settings.
+import { isMac } from './os';
 
 export interface Settings {
   /** Appearance */
@@ -87,18 +88,55 @@ export function settingPref(key: Exclude<keyof Settings, 'homeBackground'>): str
 /** Only Deer's own verbs can be rebound (Settings › Keyboard shortcuts); the ids are ActionIds of shortcuts.ts. */
 export const REBINDABLE_ACTIONS = ['peekLink', 'openAsTab', 'switcherSearch', 'downloadVideo', 'splitView'] as const;
 
+/** A stored key's spelling: [Ctrl+][Alt+][Shift+]Key in any order; macOS also Mod and MacCtrl. */
+const REBIND_SPEC = isMac ? /^(?:(?:Ctrl|Alt|Shift|Mod|MacCtrl)\+)*[^+\s]+$/ : /^(?:(?:Ctrl|Alt|Shift)\+)*[^+\s]+$/;
+
 /**
  * A rebind map as stored: only rebindable actions, each with a non-empty "Ctrl+Shift+K" style
  * string. Anything else (a number from about:config, an unknown action) is dropped, never applied.
+ * The modifiers are Ctrl, Alt and Shift as Deer has always written them; on macOS also Mod and
+ * MacCtrl (rebindToSpec below says what each means there). Windows accepts exactly what it always
+ * has, so a value only a Mac writes is dropped there, as before.
  */
 export function cleanRebind(value: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
   for (const action of REBINDABLE_ACTIONS) {
     const spec = (value as Record<string, unknown>)[action];
-    if (typeof spec === 'string' && /^(?:(?:Ctrl|Alt|Shift)\+)*[^+\s]+$/.test(spec.trim())) out[action] = spec.trim();
+    if (typeof spec === 'string' && REBIND_SPEC.test(spec.trim())) out[action] = spec.trim();
   }
   return out;
+}
+
+/**
+ * A stored rebind as a spec of shortcuts.ts ([Mod+][Ctrl+][Alt+][Shift+]Key, "Ctrl" being the
+ * Control key) for one system. Stored values are read the way Firefox reads a WebExtension's
+ * shortcut (gre/modules/ShortcutUtils.sys.mjs chromeModifierKeyMap: Ctrl and Command are accel,
+ * MacCtrl is control):
+ *   Windows  unchanged: "Ctrl+Shift+K" is Ctrl+Shift+K, as always ("MacCtrl" and "Mod" are Ctrl too).
+ *   macOS    "Ctrl" (every rebind made on Windows) and "Mod" are ⌘; "MacCtrl" is the Control key.
+ * So a rebind saved before the Mac port means on a Mac what Ctrl means there for every other key
+ * (Ctrl+K is ⌘K), and nothing stored has to be rewritten.
+ */
+export function rebindToSpec(stored: string, os: 'win' | 'mac'): string {
+  if (os !== 'mac') return stored.replace(/(^|\+)MacCtrl(?=\+)/g, '$1Ctrl');
+  const parts = stored.split('+');
+  const key = parts.pop() ?? '';
+  const has = (m: string): boolean => parts.includes(m);
+  const mods = [has('Mod') || has('Ctrl') ? 'Mod' : '', has('MacCtrl') ? 'Ctrl' : '', has('Alt') ? 'Alt' : '', has('Shift') ? 'Shift' : ''];
+  return [...mods.filter(Boolean), key].join('+');
+}
+
+/**
+ * The value to store for a spec of shortcuts.ts (Settings' capture, shortcuts.ts eventSpec). Windows
+ * keeps the spelling it has always written ("Ctrl+Shift+K"); macOS writes ⌘ as "Mod" and the Control
+ * key as "MacCtrl", which rebindToSpec reads back as the same keys.
+ */
+export function specToRebind(spec: string, os: 'win' | 'mac'): string {
+  const parts = spec.split('+');
+  const key = parts.pop() ?? '';
+  const mods = parts.map((m) => (os === 'mac' ? (m === 'Ctrl' ? 'MacCtrl' : m) : m === 'Mod' || m === 'MacCtrl' ? 'Ctrl' : m));
+  return [...mods, key].join('+');
 }
 
 export type SearchEngine = 'google' | 'bing' | 'duckduckgo' | 'brave';

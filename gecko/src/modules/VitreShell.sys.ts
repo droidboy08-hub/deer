@@ -22,6 +22,8 @@
 //     and every other .sys.mjs is loaded once per process.
 import { VitreStartup } from 'chrome://vitre/content/modules/VitreStartup.sys.mjs';
 import { HOME_URL } from '../shared/home';
+import { isMac } from '../shared/os';
+import { installHiddenMenus } from '../window/modules/macmenu/items';
 
 // Author sheets every window gets before its first layout: the shell (hide rules, layer base), the
 // glass tokens and structure, the tab bar and window controls, the address field.
@@ -117,6 +119,61 @@ function patchClicks(): void {
   };
 }
 
+let hiddenMenusAsked = false;
+
+/**
+ * macOS: the hidden window (browser.hiddenWindowChromeURL) gets Deer's menus, the menu bar shown
+ * with no Deer window in front and the source of the app menu (src/window/modules/macmenu/items.ts
+ * installHiddenMenus): at once if its document has been parsed, else when it becomes interactive
+ * (dom/base/Document.cpp "chrome-document-interactive"), which is before its load ends and Firefox
+ * makes its menus native (xpfe/appshell/AppWindow.cpp OnChromeLoaded -> LoadNativeMenus). Once.
+ */
+function macHiddenMenuBar(): void {
+  if (hiddenMenusAsked) return;
+  hiddenMenusAsked = true;
+  const url = Services.prefs.getStringPref('browser.hiddenWindowChromeURL', '');
+  const install = (hidden: any): void => {
+    try {
+      const menubar = installHiddenMenus(hidden);
+      // 'firefox': the hidden window's menus were native already (items.ts says what that leaves).
+      if (menubar) VitreShell.timeline.push({ ms: Math.round(ChromeUtils.now() - t0), hook: 'mac-hidden-menubar', win: -1, menubar });
+    } catch (e) {
+      report('hidden window menu bar failed', e);
+    }
+  };
+  let hidden: any = null;
+  try {
+    hidden = Services.appShell.hiddenDOMWindow;
+  } catch {
+    /* not created yet */
+  }
+  const doc = hidden?.document;
+  if (doc && doc.documentURI === url && doc.readyState !== 'loading') {
+    install(hidden);
+    return;
+  }
+  const observer = {
+    observe(subject: any): void {
+      if (subject?.documentURI !== url) return;
+      Services.obs.removeObserver(observer, 'chrome-document-interactive');
+      install(subject.defaultView);
+    },
+  };
+  Services.obs.addObserver(observer, 'chrome-document-interactive');
+}
+
+/**
+ * macOS: Deer's menu bar, not Firefox's (src/window/modules/macmenu: index.ts per window). Firefox
+ * makes the first menubar:not([nonnative]) of a window native once its document has loaded and its
+ * L10n is ready (AppWindow.cpp LoadNativeMenus), so Firefox's #main-menubar is marked nonnative
+ * here, before the window's first layout, whether or not the window's menu-bar module installs: a
+ * window with no menu bar of its own shows the hidden window's (widget/cocoa/nsCocoaWindow.mm).
+ */
+function macMenuBar(win: any): void {
+  win.document.getElementById('main-menubar')?.setAttribute('nonnative', 'true');
+  macHiddenMenuBar();
+}
+
 export const VitreShell = {
   /** Open browser windows that have the shell. */
   windows: new Set<Window>(),
@@ -153,6 +210,13 @@ export const VitreShell = {
       privateStartOnHome(win);
     } catch (e) {
       report('private window start page', e);
+    }
+    if (isMac) {
+      try {
+        macMenuBar(win);
+      } catch (e) {
+        report('menu bar', e);
+      }
     }
     VitreShell.note(win, 'beforeLayout', { customtitlebar: root.hasAttribute('customtitlebar') });
   },
@@ -202,6 +266,21 @@ export const VitreShell = {
     VitreShell.beforeLayout(win);
     VitreShell.domContentLoaded(win);
     VitreShell.delayedStartup(win);
+  },
+
+  /**
+   * macOS: give the hidden window Deer's menus; idempotent, nothing elsewhere. beforeLayout asks for
+   * it with the first window, which is usually after Firefox has made the hidden window's menus
+   * native (items.ts installHiddenMenus says what is left then). Called from AutoConfig time
+   * (VitreStartup.init, before the hidden window exists) it is always in time.
+   */
+  macHiddenMenuBar(): void {
+    if (!isMac) return;
+    try {
+      macHiddenMenuBar();
+    } catch (e) {
+      report('hidden window menu bar', e);
+    }
   },
 
   /** Used by the window bundle to surface its own boot errors in the same place. */

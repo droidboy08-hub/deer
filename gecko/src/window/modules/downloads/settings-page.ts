@@ -5,6 +5,7 @@
 // with the panel's own classes (settings/index.ts header).
 import type { Browser } from '../../browser';
 import { el, svg } from '../../dom';
+import { isMac } from '../../../shared/os';
 import { ic } from './icons';
 
 export function registerSettingsPage(b: Browser): void {
@@ -65,20 +66,27 @@ function render(b: Browser, host: HTMLElement): () => void {
     ytStop,
     ytGet
   );
+  // macOS: Deer cannot get the video tools there yet (ffmpeg-install.ts and ytdlp.ts take the Windows
+  // builds, and refuse to on a Mac), so the page has no Download rows and promises nothing: ffmpeg is
+  // the file chosen here or one on PATH, and the yt-dlp section only says it is not there yet.
   host.append(
     el('h2', { class: 'vs-h2' }, 'Joining video and sound'),
-    el('div', { class: 'vs-card' }, row, getRow),
+    el('div', { class: 'vs-card' }, row, isMac ? null : getRow),
     el(
       'p',
       { class: 'vs-intro' },
-      'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise a copy beside Deer or one Deer downloaded, otherwise one on your PATH. If you have none, Deer can download it for you. Without it, the two parts are saved as separate files.'
+      isMac
+        ? 'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise one on your PATH. Deer cannot download ffmpeg for you on a Mac yet. Without it, the two parts are saved as separate files.'
+        : 'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise a copy beside Deer or one Deer downloaded, otherwise one on your PATH. If you have none, Deer can download it for you. Without it, the two parts are saved as separate files.'
     ),
     el('h2', { class: 'vs-h2' }, 'YouTube and other video sites'),
-    el('div', { class: 'vs-card' }, ytRow),
+    ...(isMac ? [] : [el('div', { class: 'vs-card' }, ytRow)]),
     el(
       'p',
       { class: 'vs-intro' },
-      'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. yt-dlp asks those sites for the video itself; it needs Deno, a JavaScript engine, for YouTube. Deer gets both from their GitHub releases (about 60 MB), checks them against their published fingerprints and keeps them in its own folder. Sites change often: update yt-dlp when a site stops working.'
+      isMac
+        ? 'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. Saving from those sites takes yt-dlp, which Deer cannot install on a Mac yet.'
+        : 'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. yt-dlp asks those sites for the video itself; it needs Deno, a JavaScript engine, for YouTube. Deer gets both from their GitHub releases (about 60 MB), checks them against their published fingerprints and keeps them in its own folder. Sites change often: update yt-dlp when a site stops working.'
     ),
     el('h2', { class: 'vs-h2' }, 'Protected video'),
     el('p', { class: 'vs-intro' }, 'Video protected by DRM (as on Netflix or Spotify) is never offered or saved. Some sites’ terms forbid saving their videos: Deer reminds you once per site.')

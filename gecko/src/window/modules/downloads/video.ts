@@ -25,13 +25,23 @@
 // renewWith() with the same quality from the page's offer: the row continues from the fresh addresses (its
 // proof decides). When that quality is no longer offered the picker opens saying so ("1080p is no longer
 // offered"), and picking another quality turns the row into File changed (the panel then shows its choice).
+//
+// macOS, One row (window/onerow.ts): the pill keeps 8 px clear of the row, as it keeps 8 px under the
+// Windows bar. The row floats over the top ROW_H px of the page; outside full screen it never hides,
+// and in window full screen it hides and comes back (reveal.ts), so the pill's least top is ROW_H + 8
+// (8, as on Windows, only for a hidden row in full screen).
+// While macOS's menu bar is down in full screen the row moves down by --vitre-row-shift: a pill
+// near that line moves down with it by what the row would cover (css.ts, macOS block; place() hands
+// it how far below the line it sits as --vd-pill-room), except while its picker hangs from it.
 import type { Browser, PageSource } from '../../browser';
 import { el } from '../../dom';
 import * as fx from '../../firefox';
 import { scrollThumb } from '../../scrollthumb';
 import { glass, lens } from '../../glass';
 import type { Tab } from '../../model';
+import { ROW_H, oneRow, rowFullScreen } from '../../onerow';
 import { setTip } from '../../tips';
+import { isMac } from '../../../shared/os';
 import type { DownloadView, PageVideo, StartOptions, VideoOffer, VideoOption } from '../../../modules/downloads/types';
 import { asPolicy, policyConstant } from '../../../modules/downloads/referrer';
 import * as f from './format';
@@ -497,7 +507,7 @@ export class VideoUI {
       if (main) {
         main.setAttribute('aria-label', `Download this video${opt ? `, ${opt.label}` : ''}`);
         main.setAttribute('aria-expanded', String(this.picker.isOpen));
-        setTip(main, 'Download this video', 'Ctrl+Shift+D');
+        setTip(main, 'Download this video', isMac ? '⇧⌘D' : 'Ctrl+Shift+D');
       }
     } else if (mode === 'continue' && dl) {
       // "Continue · 62%" (RESUME-DESIGN.md G2): the stopped row of this video, continued from the page.
@@ -544,14 +554,20 @@ export class VideoUI {
   private place(t: Target): void {
     const r = this.toWindow(t.tabId, t.video.rect);
     const w = this.pill.offsetWidth || 168;
-    const minTop = this.b.root.classList.contains('fullscreen') || this.b.bar.hidden ? 8 : 64;
+    // Clear of the bar: 8 px under it, or 8 from the window's top while it is hidden. One row (header):
+    // 8 px under the row, which floats ROW_H tall over the page in a normal window too (as the Windows
+    // bar's band does), or 8 from the top while it is hidden in window full screen.
+    const minTop = oneRow() ? (rowFullScreen(this.b.root) && this.b.bar.hidden ? 8 : ROW_H + 8) : this.b.root.classList.contains('fullscreen') || this.b.bar.hidden ? 8 : 64;
     // 12 px inside the part of the video the page shows: a video wider than the page (zoomed in)
     // must not put the pill over the page's own scrollbar.
     const view = t.video.view && t.video.view.w > 0 ? this.toWindow(t.tabId, { x: 0, y: 0, w: t.video.view.w, h: t.video.view.h }) : null;
     const right = Math.min(window.innerWidth - 8, Math.min(r.x + r.w, view ? view.x + view.w : Infinity) - 12);
     const top = Math.max(minTop, r.y + 12);
+    const y = Math.round(Math.min(top, window.innerHeight - 44));
     this.pill.style.left = `${Math.max(8, Math.round(right - w))}px`;
-    this.pill.style.top = `${Math.round(Math.min(top, window.innerHeight - 44))}px`;
+    this.pill.style.top = `${y}px`;
+    // One row: how far below the row's line the pill sits, for the full-screen shift (header; css.ts).
+    if (oneRow()) this.pill.style.setProperty('--vd-pill-room', `${Math.max(0, y - minTop)}px`);
     if (w !== this.lensWidth) {
       this.lensWidth = w;
       (this.pill.querySelector('.lens') as HTMLElement).style.backdropFilter = lens(w, 36, { radius: 18, scale: 14, blur: 2 });
@@ -922,7 +938,7 @@ export class VideoUI {
       mark.dataset.wired = '1';
       mark.replaceChildren(node(ic.download(15, 1.9)));
       mark.setAttribute('aria-label', 'Download media on this page');
-      setTip(mark, 'Download this video', 'Ctrl+Shift+D');
+      setTip(mark, 'Download this video', isMac ? '⇧⌘D' : 'Ctrl+Shift+D');
       mark.addEventListener('click', (e) => void this.downloadVideo(e.detail === 0));
     }
     const tab = this.b.active();

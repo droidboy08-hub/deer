@@ -14,12 +14,16 @@
 //     window listener would open its native textbox menu beside the glass one (any module's field,
 //     with or without a menu of its own).
 //   - The native menu is kept only where the design keeps it: the drag strip at the top of the
-//     window and the window controls show Windows' own system menu. A page inside a native panel
+//     window and the window controls show Windows' own system menu. On macOS they show nothing
+//     (mac port plan D2: the Mac has no window menu there). A page inside a native panel
 //     (an extension's popup, a separate OS window above Deer's layer) keeps Firefox's page menu;
 //     DevTools keeps its own menus.
+//   - macOS: the same menus, each hosted in a XUL panel that the system draws as real Liquid Glass
+//     (view.ts, panelhost.ts, css.ts MENU_CSS_MAC); opened by the same paths as on Windows.
 //   - Tab bar menus hang at y 64 (the bar's resting geometry, also while an auto-hidden bar is still
-//     sliding in) and hold an auto-hidden or full-screen bar on screen while they are open (any menu
-//     whose owner is inside #vitre-bar, service menus included).
+//     sliding in; y 52 under the One row on macOS: 8 px below its 36 px capsules at top 8) and hold
+//     an auto-hidden or full-screen bar on screen while they are open (any menu whose owner is
+//     inside #vitre-bar, service menus included).
 //   - The page whose navigation closes a menu is kept on its spec (Spec.page): the page for a page
 //     menu, the tab a bar menu names, the active page for a service menu.
 //
@@ -30,13 +34,16 @@
 //   Call it from your own contextmenu listener (and preventDefault there): a menu shown while a
 //   keyboard-triggered contextmenu (Shift+F10, the Menu key) is handled opens with its first row
 //   focused and access keys underlined. menus.editItems(field) gives the standard editing rows for a
-//   Deer text field (find adds Match case to them).
+//   Deer text field (find adds Match case to them). On macOS `key` is printed in Apple glyphs: pass
+//   b.keys.label(action) or shortcuts.ts displaySpec(spec, currentOS()) ("⌥⌘L"), not "Ctrl+J".
 //
 // Keys: while a menu is open every keydown goes to it through the key router's first hook
 // (b.keys.addHook(fn, { first: true }): before find's and Peek's F6 hooks) (Up, Down, Home, End,
 // Tab, Enter, Space, Right / Left for submenus, access letters; Esc, Alt, F10 close) and none
 // reaches the page, another module or Deer's shortcuts. The page keeps focus unless assistive
-// technology runs.
+// technology runs. macOS (MacKeys board): letters type-select instead of running an access key,
+// Esc and ⌘. close, ⌥ and F10 don't (view.ts handleKey); a ⌃-click is the mouse, never a
+// keyboard-opened menu (fromKeyboard below).
 // Touch: 40 px rows centred above the finger; a pen gets the 40 px rows at its hotspot (as the mouse).
 // Esc ladder priority 20. Context loss closes at once: resize, window deactivation, tab switch or
 // close, navigation of the menu's page, a crash of its page's process ('tab-crashed'), element full
@@ -48,12 +55,14 @@ import type { Browser } from '../../browser';
 import type { Tab } from '../../model';
 import type { MenuRecord } from '../../../actors/page/menus';
 import { BAR_ITEM, BAR_TOP } from '../../../shared/geometry';
+import { isMac } from '../../../shared/os';
+import { CAP_H, CAP_TOP, oneRow } from '../../onerow';
 import { capsuleRows, circleRows, fieldRows, isTextField, pillRows, plusRows, splitHalfRows } from './chrome-items';
-import { MENU_CSS } from './css';
+import { MENU_CSS, MENU_CSS_MAC } from './css';
 import * as gecko from './gecko';
 import { extensionRows, isHome, kindOf, pageMenu, withExtensions, type PageEnv, type PageKind, type SelectionHit } from './page-items';
 import { peekBrowser } from './services';
-import { flatten, isCommand, item, SEP, tidy, type Anchor, type MenuItem, type MenusApi, type MenuSource, type ShowOptions, type Spec } from './types';
+import { fixedKey, flatten, isCommand, item, SEP, tidy, type Anchor, type MenuItem, type MenusApi, type MenuSource, type ShowOptions, type Spec } from './types';
 import { labelOf, MenuView, type MenuTheme } from './view';
 
 /** Nothing focused: a keyboard-opened page menu goes here, below the tab bar (DESIGN-NOTES Placement). */
@@ -62,6 +71,17 @@ const NO_FOCUS_ANCHOR = { x: 24, y: 76 };
 const BAR_GAP = 8;
 /** A contextmenu event this recent still describes the menu being opened. */
 const TRIGGER_FRESH_MS = 1500;
+/** macOS: the drag strip and the traffic lights (with their placeholder) show no menu at all (D2). */
+const MAC_NO_MENU = '#vitre-drag, #vitre-winctl, #vitre-win-lights';
+
+/**
+ * A contextmenu from the keyboard: button 0 (Shift+F10, the Menu key: WM_CONTEXTMENU; macOS:
+ * -[ChildView showContextMenuForSelection:], reached by VoiceOver's VO-⇧M and Full Keyboard Access).
+ * On macOS a ⌃-click is button 0 too, with ctrlKey, whenever dom.event.treat_ctrl_click_as_right_click
+ * .disabled is set (-[ChildView menuForEvent:] sends eControlClick as the primary button, else button
+ * 2; widget/cocoa/nsCocoaWindow.mm): that one is the mouse, opened at the pointer with nothing focused.
+ */
+const fromKeyboard = (e: MouseEvent): boolean => e.button === 0 && !(isMac && e.ctrlKey);
 
 interface Trigger {
   keyboard: boolean;
@@ -77,7 +97,7 @@ function menuTheme(b: Browser): MenuTheme {
 }
 
 export function install(b: Browser): void {
-  b.css('menus', MENU_CSS);
+  b.css('menus', isMac ? MENU_CSS + MENU_CSS_MAC : MENU_CSS);
   const view = new MenuView(b, b.layer('menus', 50));
   let trigger: Trigger | null = null;
   /** The contextmenu event being dispatched right now (set in capture, cleared after bubble). */
@@ -198,7 +218,7 @@ export function install(b: Browser): void {
         e.stopPropagation();
         return;
       }
-      trigger = { keyboard: (e as MouseEvent).button === 0, at: performance.now(), event: e };
+      trigger = { keyboard: fromKeyboard(e as MouseEvent), at: performance.now(), event: e };
       dispatching = e;
       // Firefox's editMenuOverlay.js (gre/chrome/toolkit/content/global/editMenuOverlay.js) opens its
       // native textbox-contextmenu for any HTML input or textarea of this document from a window
@@ -416,10 +436,12 @@ export function install(b: Browser): void {
   // ---- Deer's own surfaces ----
 
   // The bar's resting geometry, not the element's live box: an auto-hidden bar that is still sliding
-  // in (or a circle mid-morph) would otherwise hang the menu higher than y 64.
+  // in (or a circle mid-morph) would otherwise hang the menu higher than y 64. The One row (macOS):
+  // 8 px under its capsules, y 52.
+  const hangTop = oneRow() ? CAP_TOP + CAP_H + BAR_GAP : BAR_TOP + BAR_ITEM + BAR_GAP;
   const hangFrom = (owner: Element, keyboard: boolean, x: number): Anchor => {
     const r = owner.getBoundingClientRect();
-    return { kind: 'hang', left: keyboard ? r.left : x - 16, top: BAR_TOP + BAR_ITEM + BAR_GAP };
+    return { kind: 'hang', left: keyboard ? r.left : x - 16, top: hangTop };
   };
 
   /** Extension items for a tab menu (contexts: ["tab"]): built into a scratch popup, cleaned up on close. */
@@ -435,7 +457,7 @@ export function install(b: Browser): void {
   };
 
   const openChrome = (target: Element, e: MouseEvent): boolean => {
-    const keyboard = e.button === 0;
+    const keyboard = fromKeyboard(e);
     // A suggestion row of the address field: Remove from history, only on a row the user moved onto.
     const suggestion = target.closest('#vitre-omni-list .omni-item');
     if (suggestion) {
@@ -445,7 +467,7 @@ export function install(b: Browser): void {
       last.kind = 'chrome';
       open(
         {
-          rows: [item('Remove from history', 'close', 'Shift+Delete', 'R', () => b.omni.removeRow(i))],
+          rows: [item('Remove from history', 'close', fixedKey('Shift+Delete', 'Shift+Backspace'), 'R', () => b.omni.removeRow(i))],
           label: 'Suggestion',
           anchor: keyboard ? { kind: 'below', left: r.left, right: r.right, top: r.top, bottom: r.bottom, gap: 4 } : { kind: 'point', x: e.clientX, y: e.clientY },
           source: keyboard ? 'keyboard' : 'mouse',
@@ -541,6 +563,11 @@ export function install(b: Browser): void {
     const shown = shownDuring === e;
     shownDuring = null;
     if (!target || typeof target.closest !== 'function') return;
+    // macOS: nothing on the drag strip and the traffic lights (D2); the system menu below is user32.
+    if (isMac && target.closest(MAC_NO_MENU)) {
+      event.preventDefault();
+      return;
+    }
     // The drag strip and the window controls keep Windows' own system menu (DESIGN-NOTES).
     if (target.closest('#vitre-drag, #vitre-winctl')) {
       event.preventDefault();
@@ -566,6 +593,12 @@ export function install(b: Browser): void {
     (_binding, e) => {
       if (!view.isOpen) return undefined;
       if (e.isComposing || e.keyCode === 229) return undefined;
+      // macOS: ⌘Q, ⌘H, ⌥⌘H and ⌘M work in every Mac app, also while a menu is open. The menu closes
+      // and the key goes on to the router (Quit, Minimize) or the native app menu (Hide).
+      if (isMac && e.metaKey && !e.ctrlKey && (e.keyCode === 81 || e.keyCode === 72 || e.keyCode === 77)) {
+        view.close('dismiss');
+        return undefined;
+      }
       view.handleKey(e);
       return 'swallow';
     },

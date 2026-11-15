@@ -7,6 +7,8 @@
 // splitpill, capsule): "New tab in split view" in the pill's menu, "Open in split view" (or "... instead
 // of <tab>") first in a circle's, a half of the split pill's menu and the pair capsule's menu. Below a
 // 648 px window the split rows grey out with "Window too narrow" in the accelerator column.
+// macOS: the accelerator column prints the Mac keymap (MacKeys board) in Apple glyphs: an action's
+// chord from the key router (types.ts actionKey), the editing keys as ⌘ chords (fixedKey).
 import type { Browser, Pair } from '../../browser';
 import type { Tab } from '../../model';
 import { titleOf } from '../../split';
@@ -14,7 +16,7 @@ import { displayHost } from '../../../shared/url';
 import * as gecko from './gecko';
 import { pasteAndGo } from './page-items';
 import { downloadsService, peekService, settingsService } from './services';
-import { item, SEP, tidy, type MenuCommand, type MenuItem } from './types';
+import { actionKey, fixedKey, item, SEP, tidy, type MenuCommand, type MenuItem } from './types';
 
 const w = window as any;
 
@@ -41,7 +43,7 @@ function muteRow(b: Browser, t: Tab): MenuCommand | null {
 const isWeb = (t: Tab): boolean => t.kind === 'web' && !!t.url && !/^about:blank$/i.test(t.url);
 
 /** The key that toggles split view, as printed (Settings › Keyboard shortcuts may rebind it). */
-export const splitKey = (b: Browser): string => b.settings.rebind?.splitView || 'Ctrl+Shift+U';
+export const splitKey = (b: Browser): string => actionKey(b, 'splitView', b.settings.rebind?.splitView || 'Ctrl+Shift+U');
 
 /**
  * A row that starts split view; under a 648 px window it greys out with "Window too narrow" where
@@ -73,7 +75,7 @@ export function pillRows(b: Browser, t: Tab): MenuItem[] {
       SEP,
       muteRow(b, t),
       SEP,
-      item('Close tab', 'close', 'Ctrl+W', 'C', () => b.closeTab(t)),
+      item('Close tab', 'close', actionKey(b, 'closeTab', 'Ctrl+W'), 'C', () => b.closeTab(t)),
     ]);
   }
   return tidy([
@@ -87,7 +89,7 @@ export function pillRows(b: Browser, t: Tab): MenuItem[] {
     web ? moveRow(b, t) : null,
     SEP,
     item('Close other tabs', '', '', 'O', () => closeOthers(b, t), { disabled: b.tabs.length < 2 }),
-    item('Close tab', 'close', 'Ctrl+W', 'C', () => b.closeTab(t)),
+    item('Close tab', 'close', actionKey(b, 'closeTab', 'Ctrl+W'), 'C', () => b.closeTab(t)),
   ]);
 }
 
@@ -129,7 +131,7 @@ export function splitHalfRows(b: Browser, t: Tab): MenuItem[] {
     muteRow(b, t),
     SEP,
     item('Close other tabs', '', '', 'O', () => closeOthersOfPair(b, p, t), { disabled: b.tabs.length <= 2 }),
-    item('Close tab', 'close', focused ? 'Ctrl+W' : '', 'C', () => b.closeTab(t, { animate: true })),
+    item('Close tab', 'close', focused ? actionKey(b, 'closeTab', 'Ctrl+W') : '', 'C', () => b.closeTab(t, { animate: true })),
   ]);
 }
 
@@ -198,26 +200,27 @@ function updateRow(b: Browser): MenuCommand | null {
 /** The + circle: routes for the page-first keys a page could keep (Ctrl+J, Ctrl+comma) and F11; Restart to update while an update waits. */
 export function plusRows(b: Browser): MenuItem[] {
   const peek = peekService(b);
+  const reopenKey = actionKey(b, 'reopenClosed', 'Ctrl+Shift+T');
   let reopen: MenuCommand;
   // Reads what comes back next: a warm peek, a tab, or a window; greyed when nothing would.
   if (peek && safeBool(() => (peek as any).canReopen?.())) {
-    reopen = item('Reopen closed peek', '', 'Ctrl+Shift+T', 'R', () => (peekService(b) as any)?.reopen?.());
+    reopen = item('Reopen closed peek', '', reopenKey, 'R', () => (peekService(b) as any)?.reopen?.());
   } else if (b.closedCount() > 0) {
-    reopen = item('Reopen closed tab', '', 'Ctrl+Shift+T', 'R', () => b.run('reopenClosed'));
+    reopen = item('Reopen closed tab', '', reopenKey, 'R', () => b.run('reopenClosed'));
   } else if (closedWindows() > 0) {
-    reopen = item('Reopen closed window', '', 'Ctrl+Shift+T', 'R', () => b.run('reopenClosed'));
+    reopen = item('Reopen closed window', '', reopenKey, 'R', () => b.run('reopenClosed'));
   } else {
-    reopen = item('Reopen closed tab', '', 'Ctrl+Shift+T', 'R', () => undefined, { disabled: true });
+    reopen = item('Reopen closed tab', '', reopenKey, 'R', () => undefined, { disabled: true });
   }
   return tidy([
-    item('New window', 'newwindow', 'Ctrl+N', 'W', () => b.run('newWindow')),
-    item('New private window', 'newwindow', 'Ctrl+Shift+N', 'P', () => b.run('newPrivateWindow')),
+    item('New window', 'newwindow', actionKey(b, 'newWindow', 'Ctrl+N'), 'W', () => b.run('newWindow')),
+    item('New private window', 'newwindow', actionKey(b, 'newPrivateWindow', 'Ctrl+Shift+N'), 'P', () => b.run('newPrivateWindow')),
     reopen,
     SEP,
-    downloadsService(b) ? item('Show downloads', 'download', 'Ctrl+J', 'S', () => downloadsService(b)?.openPanel()) : null,
-    item('Full screen', '', 'F11', 'F', () => b.run('fullscreen'), { checked: !!window.fullScreen }),
+    downloadsService(b) ? item('Show downloads', 'download', actionKey(b, 'downloads', 'Ctrl+J'), 'S', () => downloadsService(b)?.openPanel()) : null,
+    item('Full screen', '', actionKey(b, 'fullscreen', 'F11'), 'F', () => b.run('fullscreen'), { checked: !!window.fullScreen }),
     // Opens the panel (Ctrl+, toggles it; a menu row never closes it).
-    settingsService(b) ? item('Settings', '', 'Ctrl+,', 'E', () => settingsService(b)?.open()) : null,
+    settingsService(b) ? item('Settings', '', actionKey(b, 'settings', 'Ctrl+,'), 'E', () => settingsService(b)?.open()) : null,
     SEP,
     updateRow(b),
   ]);
@@ -254,13 +257,13 @@ export function fieldRows(b: Browser, field: HTMLInputElement | HTMLTextAreaElem
       }, '')
     : null;
   return tidy([
-    item('Undo', 'undo', 'Ctrl+Z', 'U', edit('cmd_undo'), { disabled: field.readOnly || !gecko.commandEnabled('cmd_undo') }),
-    isAddress ? null : item('Redo', 'redo', 'Ctrl+Y', 'R', edit('cmd_redo'), { disabled: field.readOnly || !gecko.commandEnabled('cmd_redo') }),
+    item('Undo', 'undo', fixedKey('Ctrl+Z', 'Mod+Z'), 'U', edit('cmd_undo'), { disabled: field.readOnly || !gecko.commandEnabled('cmd_undo') }),
+    isAddress ? null : item('Redo', 'redo', fixedKey('Ctrl+Y', 'Mod+Shift+Z'), 'R', edit('cmd_redo'), { disabled: field.readOnly || !gecko.commandEnabled('cmd_redo') }),
     SEP,
-    item('Cut', 'cut', 'Ctrl+X', 'T', edit('cmd_cut'), { disabled: !selected || secret || field.readOnly }),
-    item('Copy', 'copy', 'Ctrl+C', 'C', edit('cmd_copy'), { disabled: !selected || secret }),
-    item('Paste', 'paste', 'Ctrl+V', 'P', edit('cmd_paste'), { disabled: !canPaste }),
+    item('Cut', 'cut', fixedKey('Ctrl+X', 'Mod+X'), 'T', edit('cmd_cut'), { disabled: !selected || secret || field.readOnly }),
+    item('Copy', 'copy', fixedKey('Ctrl+C', 'Mod+C'), 'C', edit('cmd_copy'), { disabled: !selected || secret }),
+    item('Paste', 'paste', fixedKey('Ctrl+V', 'Mod+V'), 'P', edit('cmd_paste'), { disabled: !canPaste }),
     go,
-    item('Select all', '', 'Ctrl+A', 'A', edit('cmd_selectAll'), { disabled: !field.value }),
+    item('Select all', '', fixedKey('Ctrl+A', 'Mod+A'), 'A', edit('cmd_selectAll'), { disabled: !field.value }),
   ]);
 }

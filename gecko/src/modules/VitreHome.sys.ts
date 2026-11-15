@@ -11,6 +11,9 @@
 //   VitreHome.onTheme(fn)            fn(theme) on every change; returns an unsubscribe. The window's
 //                                    Browser forwards it to b.setHomeTheme().
 //   VitreHome.windowsWallpaper()     { path, source } of the user's Windows desktop wallpaper, or null.
+//                                    macOS: the Mac desktop picture instead (kind 'windows' stays the
+//                                    setting's name there), as a file Gecko decodes: HEIC goes through
+//                                    sips once into <profile>/vitre-home (VitrePlatform.wallpaper).
 //   VitreHome.picture(win, path, box)
 //                                    a picture ready to show as Home's background:
 //                                    { url, luma, cached }. A picture larger than the screen is
@@ -36,6 +39,9 @@
 //   VitreHome.themeFor(luma)         the rule: luma above 0.62 is light glass.
 //   VitreHome.fileURL(path)          file: URL for a Windows path (spaces, #, non-ASCII).
 // Everything here is local file access: nothing is fetched from the network.
+import { VitrePlatform } from 'chrome://vitre/content/modules/VitrePlatform.sys.mjs';
+import { isMac } from '../shared/os';
+import type { DesktopWallpaper } from './platform/wallpaper';
 
 export type HomeTheme = 'light' | 'clear';
 
@@ -220,8 +226,11 @@ export const VitreHome = {
    * The user's desktop wallpaper: HKCU\Control Panel\Desktop\WallPaper (nsIWindowsRegKey), else
    * %APPDATA%\Microsoft\Windows\Themes\TranscodedWallpaper (what the desktop shows now; it has no
    * extension). Null with a solid-colour desktop.
+   * macOS: platform/wallpaper.ts desktopWallpaper(): the picture NSWorkspace names (a JPEG copy in
+   * <profile>/vitre-home when Gecko can't decode it), else macOS's default wallpaper, else null.
    */
-  async windowsWallpaper(): Promise<{ path: string; source: 'registry' | 'transcoded' } | null> {
+  async windowsWallpaper(): Promise<{ path: string; source: 'registry' | 'transcoded' } | DesktopWallpaper | null> {
+    if (isMac) return VitrePlatform.wallpaper.desktopWallpaper(PathUtils.join(PathUtils.profileDir, CACHE_DIR));
     let fromRegistry = '';
     const key = Cc['@mozilla.org/windows-registry-key;1'].createInstance(Ci.nsIWindowsRegKey);
     try {

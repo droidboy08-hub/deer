@@ -4,9 +4,9 @@
 
 Lists the files git would keep in the repository this script belongs to (tracked plus
 untracked-but-not-ignored, so it also works before the first commit), wherever it is run from, and
-fails when one of them breaks a rule below. Absolute paths with a Windows user folder are reported
-as warnings only. Exit code: 0 ok, 1 a rule is broken, 2 git is missing or this is not a git
-repository. Standard library only.
+fails when one of them breaks a rule below. Absolute paths with a Windows or macOS user folder (or
+macOS's per-user temporary folder) are reported as warnings only. Exit code: 0 ok, 1 a rule is
+broken, 2 git is missing or this is not a git repository. Standard library only.
 """
 import os
 import re
@@ -15,15 +15,19 @@ import sys
 
 MAX_BYTES = 5 * 1024 * 1024
 
-# Never committed: Mozilla's binaries and archives, add-on packages, browser profile data.
+# Never committed: Mozilla's binaries and archives, add-on packages, browser profile data; on macOS
+# libraries, disk images, installer and update packages, signing identities, provisioning profiles.
 BAD_SUFFIXES = (
     '.exe', '.dll', '.msi', '.msix', '.ja', '.7z', '.xpi', '.crx',
     '.sqlite', '.sqlite-wal', '.sqlite-shm', '.mozlz4', '.jsonlz4', '.baklz4', '.lz4',
+    '.dylib', '.dmg', '.pkg', '.so', '.mar', '.p12', '.p8', '.cer', '.mobileprovision', '.provisionprofile',
 )
-# Never committed: engines, extracted Mozilla source, build output, dependencies, test output.
+# Never committed: engines, extracted Mozilla source, build output, dependencies, test output; on macOS
+# any app bundle (an engine copy or a built launcher), debug symbols, signatures and Xcode's build state.
 BAD_PARTS = re.compile(
     r'(^|/)(runtime|node_modules|out|out-[^/]+|build|build-[^/]+|dist|__pycache__)/'
     r'|^app/dist-[^/]+/|^gecko/engines/|^gecko/reference/omni[^/]*/|^\.workflows/'
+    r'|\.app/|\.dSYM/|(^|/)(_CodeSignature|DerivedData|xcuserdata)/'
 )
 # Files only a browser profile holds (lower case), including the markers Deer's launchers and the
 # test runner put in every profile they create.
@@ -40,10 +44,14 @@ ALLOWED = re.compile(r'^gecko/tests/[^/]+/pages/files/[^/]+\.zip$')
 # Images belong only in documentation, the browser's sources, tests' fixtures and icons.
 IMAGE = re.compile(r'\.(png|jpe?g|gif|webp|bmp)$', re.I)
 IMAGE_OK = re.compile(r'^docs/images/|^design/|^gecko/src/|^gecko/tools/runtime-overlay/|^gecko/installer/|(^|/)icon[^/]*\.png$|(^|/)pixel\.png$')
-# C:\Users\<name>, C:/Users/<name>, C:\\Users\\<name> (escaped) and the MSYS form /c/Users/<name>.
-USER_PATH = re.compile(r'\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)[^\\/\s"\'<>`]+|(?<![\w.])/[a-z]/Users/[^/\s"\'<>`]+')
+# C:\Users\<name>, C:/Users/<name>, C:\\Users\\<name> (escaped) and the MSYS form /c/Users/<name>; on
+# macOS /Users/<name>/ and the per-user temporary folder /private/var/folders/<xx>/<id> (also without
+# /private). A name never starts with "[", so this pattern does not find itself.
+USER_PATH = re.compile(r'\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)[^\\/\s"\'<>`]+|(?<![\w.])/[a-z]/Users/[^/\s"\'<>`]+'
+                       r'|(?<![\w.])/Users/[^/\s"\'<>`\[]+/|(?<![\w.])(?:/private)?/var/folders/[^/\s"\'<>`\[]+/[^/\s"\'<>`]+')
 TEXT_SUFFIXES = ('.md', '.txt', '.js', '.mjs', '.ts', '.py', '.json', '.html', '.css', '.cmd', '.ps1', '.sh', '.cs', '.ftl',
-                 '.yml', '.xhtml', '.ini', '.manifest', '.properties', '.svg')
+                 '.yml', '.xhtml', '.ini', '.manifest', '.properties', '.svg',
+                 '.swift', '.plist', '.entitlements', '.m', '.mm')
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 

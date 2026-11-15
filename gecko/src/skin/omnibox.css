@@ -134,3 +134,71 @@
   #vitre-root #vitre-omni-field { transition: none !important; }
   #vitre-root #vitre-omni-scrim { transition-duration: 150ms; }
 }
+
+/* ---- macOS: the One row (src/window/onerow.ts, omnibox.ts header; RowSpec "Typing an address",
+ * DirOneRowBehaviour 3) ----
+ * The field is the active capsule: 36 tall, radius 18, the row's glass and ink (tokens from
+ * skin/bar.css, by the theme of the page under the row, as the Windows field's: theme-light dark ink
+ * on light glass, theme-dark and theme-clear light ink; dark glass in a private window), over the
+ * page with the capsules' CSS glass (blur 14, saturate 1.9, brightness 1.04 on its lens), padding 14
+ * before the glyph and 8 after the text, 13.5 px text, a 3 px focus ring in the system blue. The page
+ * is not dimmed and the other tabs stay on the row with their glass (only the active capsule, under
+ * the field, steps aside). The suggestions hang from the field and take its colours: the board's
+ * light popover glass under a light field (theme-light), its dark glass under a dark or clear one and
+ * in a private window, so a light field never carries a dark list or the other way round (until
+ * 2026-11-15 they followed the system's appearance, as Deer's menus do); radius 18, hanging 8 px
+ * below the capsule, at 52, left-aligned to it (omnibox.ts places them). */
+@media (-moz-platform: macos) {
+  /* Clear, but still there: a click on the page closes the field. */
+  #vitre-root.one-row #vitre-omni-scrim { background: transparent; }
+
+  #vitre-root.one-row.omni-open #vitre-bar .item:not(.active) { pointer-events: auto; box-shadow: var(--g-shadow); }
+  #vitre-root.one-row.omni-open #vitre-bar .item:not(.active) > :is(.tint, .rim),
+  #vitre-root.one-row.omni-open #vitre-bar .item:not(.active) :is(.circle-face, .capsule-face) { opacity: 1; }
+  /* The other capsules keep their glass over the page (the rules above hide every lens on Windows). */
+  #vitre-root.one-row.omni-open #vitre-bar .item:not(.active) > .lens { visibility: visible; }
+  /* Split view: the other side's capsule stays beside the field. */
+  #vitre-root.one-row.omni-open #vitre-bar .item.pair.active .pill-face { opacity: 1; }
+
+  #vitre-root.one-row #vitre-omni-field {
+    border-radius: 18px;
+    box-shadow: var(--g-shadow);
+    outline: 3px solid rgba(0,122,255,0.5);
+    outline-offset: 0;
+  }
+  #vitre-root.one-row #vitre-omni-field > .lens { display: block; backdrop-filter: var(--row-glass); }
+  #vitre-root.one-row #vitre-omni-field > .tint { background: var(--g-tint); }
+  #vitre-root.one-row #vitre-omni-field > .rim { padding: 0; mask: none; background: none; box-shadow: var(--row-rim); }
+  #vitre-root.one-row #vitre-omni-field .omni-row { gap: 8px; padding: 0 8px 0 14px; }
+  #vitre-root.one-row #vitre-omni-field .omni-icon { color: var(--g-placeholder); }
+  #vitre-root.one-row #vitre-omni-field .omni-icon svg { width: 16px; height: 16px; }
+  #vitre-root.one-row #vitre-omni { font-size: 13.5px; letter-spacing: -0.1px; caret-color: auto; }
+
+  /* Suggestions (the board's popover glass: blur 30, saturate 1.8, fill #f6f6f8 at 72%). */
+  #vitre-root.one-row #vitre-omni-panel {
+    border-radius: 18px;
+    padding: 8px;
+    color: #1d1d1f;
+    font-size: 13.5px;
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1), 0 18px 48px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1);
+  }
+  #vitre-root.one-row #vitre-omni-panel > .lens { backdrop-filter: blur(30px) saturate(1.8); }
+  #vitre-root.one-row #vitre-omni-panel > .tint { background: rgba(246,246,248,0.72); }
+  #vitre-root.one-row #vitre-omni-panel > .rim { display: none; }
+  #vitre-root.one-row #vitre-omni-list .omni-group { margin: 0; padding: 10px 12px 4px; font-size: 11.5px; font-weight: 600; color: #5f5f64; }
+  #vitre-root.one-row #vitre-omni-list .omni-item { height: 34px; border-radius: 10px; gap: 10px; color: #1d1d1f; }
+  #vitre-root.one-row #vitre-omni-list .omni-item.selected { background: #0064e1; box-shadow: none; color: #fff; }
+  #vitre-root.one-row #vitre-omni-list :is(.omni-glyph, .omni-detail, .omni-tail) { color: #5f5f64; }
+  #vitre-root.one-row #vitre-omni-list .omni-glyph :is(svg, img) { width: 16px; height: 16px; }
+  #vitre-root.one-row #vitre-omni-list .omni-detail, #vitre-root.one-row #vitre-omni-list .omni-tail { font-size: 12.5px; }
+  #vitre-root.one-row #vitre-omni-list .omni-item.selected :is(.omni-glyph, .omni-detail, .omni-tail) { color: rgba(255,255,255,0.85); }
+
+  /* Under a dark or clear field (theme-dark, theme-clear) and in a private window: the board's dark
+   * glass (blur 30, saturate 1.6, #1e1e20 at 62%). */
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-panel { color: #fff; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.14), 0 18px 48px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-panel > .lens { backdrop-filter: blur(30px) saturate(1.6); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-panel > .tint { background: rgba(30,30,32,0.62); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-list .omni-group,
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-list :is(.omni-glyph, .omni-detail, .omni-tail) { color: rgba(255,255,255,0.55); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-omni-list .omni-item { color: rgba(255,255,255,0.92); }
+}

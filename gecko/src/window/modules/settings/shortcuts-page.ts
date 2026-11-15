@@ -8,13 +8,19 @@
 // Esc cancels (the field's own keydown, and an Esc layer at 55 for an Esc that arrives another way);
 // Tab or a click elsewhere cancels too. A saved key goes to settings.rebind; every window's router
 // applies it (shortcuts.ts applyRebind) from the 'settings' event.
-import type { Settings } from '../../../shared/settings';
+//
+// macOS: the Mac map (keymap.ts KEY_GROUPS_MAC) in Apple glyphs, the verbs' Mac defaults (keymap.ts
+// defaultSpec), the "Different from Chrome" card against Chrome for Mac, and capture that takes
+// ⌘ ⌥ ⌃ ⇧ and refuses the keys macOS owns (capture.ts); a new key is stored as settings.ts
+// specToRebind writes it. Screen readers hear a key as "Shift Command A" (ariaSpec).
+import { specToRebind, type Settings } from '../../../shared/settings';
+import { isMac } from '../../../shared/os';
 import { setTip } from '../../tips';
 import { conflictFor, readCapture } from './capture';
 import { h, iconBox, row, segmented, toggle, uid, type Ctx, type GroupDef, type RowDef, type SectionDef } from './controls';
 import { caretBrowsing, onCaretBrowsingChange, setCaretBrowsing } from './gecko';
 import { ico, nav } from './icons';
-import { DIFFERENT_FROM_CHROME, KEY_GROUPS, REBINDABLE, currentSpec, displaySpec, fillKeys, normalizeKeys, type KeyRow, type RebindId } from './keymap';
+import { REBINDABLE, currentSpec, defaultSpec, differences, displaySpec, fillKeys, keyGroups, normalizeKeys, spokenSpec, type KeyRow, type RebindId } from './keymap';
 
 /** Escape-ladder priority while a key is being captured: before the panel itself (60). */
 export const CAPTURE_ESC_PRIORITY = 55;
@@ -39,25 +45,32 @@ function warningFor(id: RebindId, rebind: Record<string, string>): string | unde
 }
 
 function noteFor(r: KeyRow): string {
-  if (r.note) return r.note;
+  if (r.note) return isMac ? fillKeys(r.note, {}) : r.note;
   return [r.where, r.page ? 'Sites can use this first' : ''].filter(Boolean).join('. ');
 }
+
+/** A row's label as shown: macOS labels may name a key (`<Escape>`), printed in glyphs. */
+const titleOf = (r: KeyRow): string => (isMac ? fillKeys(r.label, {}) : r.label);
 
 function keyText(r: KeyRow, rebind: Record<string, string>): string {
   return fillKeys(r.alt ? `${r.keys}, ${r.alt}` : r.keys, rebind);
 }
 
+/**
+ * Store a captured spec (or null: back to the default). macOS stores it the way settings.ts
+ * rebindToSpec reads it back (specToRebind: ⌘ as "Mod", the Control key as "MacCtrl").
+ */
 function setRebind(ctx: Ctx, id: RebindId, spec: string | null): void {
   const next = { ...ctx.s().rebind };
-  if (!spec || spec === REBINDABLE[id].spec) delete next[id];
-  else next[id] = spec;
+  if (!spec || spec === defaultSpec(id)) delete next[id];
+  else next[id] = isMac ? specToRebind(spec, 'mac') : spec;
   ctx.set({ rebind: next });
 }
 
 function keyRow(r: KeyRow): RowDef {
   const note = noteFor(r);
   return {
-    title: r.label,
+    title: titleOf(r),
     desc: note,
     keys: r.alt ? `${r.keys}, ${r.alt}` : r.keys,
     keywords: r.rebind ? `${REBINDABLE[r.rebind].label} rebind change` : undefined,
@@ -67,7 +80,7 @@ function keyRow(r: KeyRow): RowDef {
 
 function plainKeyRow(ctx: Ctx, r: KeyRow, note: string): HTMLElement {
   return row({
-    title: r.label,
+    title: titleOf(r),
     desc: note || undefined,
     class: note ? '' : 'compact',
     control: () => {
@@ -105,12 +118,12 @@ function rebindRow(ctx: Ctx, r: KeyRow, id: RebindId): HTMLElement {
     });
     const desc = el.querySelector('.vs-desc') as HTMLElement | null;
     unbind = ctx.bind((s: Settings) => {
-      const spec = displaySpec(currentSpec(id, s.rebind));
-      keyBtn.textContent = spec;
-      keyBtn.setAttribute('aria-label', `${r.label}: ${spec}. Change key`);
+      const raw = currentSpec(id, s.rebind);
+      keyBtn.textContent = displaySpec(raw);
+      keyBtn.setAttribute('aria-label', `${r.label}: ${spokenSpec(raw)}. Change key`);
       setTip(keyBtn, 'Change key');
       reset.hidden = !s.rebind[id];
-      reset.setAttribute('aria-label', `Reset ${r.label} to ${displaySpec(REBINDABLE[id].spec)}`);
+      reset.setAttribute('aria-label', `Reset ${r.label} to ${spokenSpec(defaultSpec(id))}`);
       // A key another command uses too (two rebinds set to one key outside this page) is shown as
       // a conflict; otherwise the warning given when the key was set, else the usual note.
       const conflict = conflictFor(id, s.rebind);
@@ -131,7 +144,7 @@ function rebindRow(ctx: Ctx, r: KeyRow, id: RebindId): HTMLElement {
     const msgId = uid('vs-m');
     const field = h('span', { class: 'vs-capfield', role: 'textbox', tabindex: '0', 'aria-labelledby': titleId, 'aria-describedby': msgId, 'data-key-capture': '' });
     const refusal = h('span', { class: 'vs-refusal', id: msgId, role: 'alert' });
-    const hint = h('span', { class: 'vs-hint', text: 'Esc to cancel' });
+    const hint = h('span', { class: 'vs-hint', text: isMac ? `${displaySpec('Escape')} to cancel` : 'Esc to cancel' });
     const el = h(
       'div',
       { class: 'vs-row vs-capture' },
@@ -192,8 +205,10 @@ function rebindRow(ctx: Ctx, r: KeyRow, id: RebindId): HTMLElement {
       finish(true);
     });
     field.addEventListener('keyup', (e) => {
-      // Letting go of the modifiers without a key puts the prompt back.
-      if (!e.ctrlKey && !e.altKey && !e.shiftKey && field.getAttribute('aria-invalid') !== 'true' && /\+$/.test(field.textContent ?? '')) placeholder();
+      // Letting go of the modifiers without a key puts the prompt back. macOS prints held modifiers
+      // as glyphs alone ("⇧⌘"), Windows with a trailing "+" ("Ctrl+").
+      const partial = isMac ? /^[⌃⌥⇧⌘]+$/.test(field.textContent ?? '') : /\+$/.test(field.textContent ?? '');
+      if (!e.ctrlKey && !e.altKey && !e.shiftKey && !(isMac && e.metaKey) && field.getAttribute('aria-invalid') !== 'true' && partial) placeholder();
     });
     field.addEventListener('focusout', (e) => {
       if (!el.contains(e.relatedTarget as Node | null)) finish(false);
@@ -207,14 +222,15 @@ function rebindRow(ctx: Ctx, r: KeyRow, id: RebindId): HTMLElement {
 }
 
 function shiftClickRow(): RowDef {
+  const title = isMac ? '⇧-click a link' : 'Shift+click a link';
   return {
-    title: 'Shift+click a link',
+    title,
     desc: 'Peek is Deer’s; Chrome opens a new window',
     keywords: 'peek new window shift click',
     build: (ctx) =>
       row({
         icon: ico.peek,
-        title: 'Shift+click a link',
+        title,
         desc: 'Peek is Deer’s; Chrome opens a new window',
         control: (ids) =>
           segmented(ctx, {
@@ -264,7 +280,7 @@ function caretRow(): RowDef {
 }
 
 function differenceRows(): RowDef[] {
-  return DIFFERENT_FROM_CHROME.map((d) => ({
+  return differences().map((d) => ({
     title: fillKeys(d.text, {}),
     keywords: 'different from chrome',
     build: (ctx: Ctx) => {
@@ -288,7 +304,7 @@ export const shortcutsSection: SectionDef = {
   title: 'Keyboard shortcuts',
   icon: nav.shortcuts,
   order: 80,
-  intro: 'Keys never take anything Windows, an input method or a screen reader needs.',
+  intro: isMac ? 'Keys never take anything macOS, an input source or VoiceOver needs.' : 'Keys never take anything Windows, an input method or a screen reader needs.',
   header: (ctx) => {
     const reset = h('button', { type: 'button', class: 'vs-btn subtle', text: 'Reset all shortcuts' });
     reset.addEventListener('click', () => {
@@ -303,7 +319,7 @@ export const shortcutsSection: SectionDef = {
     return h('div', { class: 'vs-headrow' }, h('h1', { class: 'vs-h1', id: 'vs-h1', text: 'Keyboard shortcuts' }), reset);
   },
   groups: (): GroupDef[] => {
-    const [peek, ...rest] = KEY_GROUPS;
+    const [peek, ...rest] = keyGroups();
     return [
       { rows: [shiftClickRow(), caretRow()] },
       { title: peek.name, rows: peek.rows.map(keyRow) },

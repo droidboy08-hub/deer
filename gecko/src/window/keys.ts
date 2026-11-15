@@ -24,6 +24,27 @@
 //      ShortcutUtils reads as a tab action (also with the Windows key held) are hidden from the
 //      system group, where tabbox and tabbrowser listen.
 //
+// macOS (the same router; every difference is behind isMac, Windows routes exactly as before)
+//   Keys     ⌘ is "Mod" in the map (shortcuts.ts, the approved Mac keymap). The guards there refuse
+//            Option with a character key and any ⌃⌥ chord, and accept ⌘. ⌘Q and ⌘M are browser-first
+//            even under keyboard lock (a page can never keep them); this router registers their
+//            actions: 'minimize' (the window goes to the Dock) and 'quit' (from ⌘Q it tells Firefox
+//            the shortcut asked, so browser.warnOnQuitShortcut asks first: mac-keys.js).
+//            ⌘. is Esc: it steps the Esc ladder with Esc's rules (escTaken); it never closes a page's
+//            own dialog, which Gecko closes on the Escape key only (PresShell FinalizeHandlingEvent).
+//   Menu bar A key that chrome and the page leave unconsumed ends in the native menu bar, which runs
+//            the item with that key equivalent (widget/cocoa/nsCocoaWindow.mm PostHandleKeyEvent, on
+//            keypress, from EventStateManager::PostHandleKeyboardEvent and, for a page, from
+//            BrowserParent::RecvReplyKeyEvent). So every key Deer acts on is consumed here
+//            (preventDefault), and so are: a Deer ⌘ chord under a window-modal dialog or an open
+//            menupopup (it does nothing there, as on Windows), a stale reply, and ⌘. that a prompt or
+//            panel owned. A ⌘ chord Deer does not bind asks the page for its reply, so the menu bar
+//            gets it when the page leaves it alone (⌘H, ⌥⌘H, Edit's ⌘Z ⌘C...): Firefox's keysets, which
+//            asked for that reply (dom/events/GlobalKeyListener.cpp), are parked. Keys Deer does not
+//            bind still reach the page exactly as before.
+//            A hook that returns 'pass' must have its own listener preventDefault() the key it uses,
+//            or the menu bar runs that key's item as well.
+//
 // For feature modules (b.keys)
 //   b.keys.addHook(fn)     fn(binding | null, event) runs on every keydown that passed the guards,
 //                          before the router acts. Return
@@ -56,7 +77,15 @@
 //   Hardware keys         Browser Back/Forward/Refresh/Stop/Search/Home keys and the mouse side
 //                          buttons arrive as AppCommand events and run the same actions.
 //   b.keys.bindings()      the map as it is now, rebinds applied: [{ action, arg, spec, priority,
-//                          repeat }] (Settings > Keyboard shortcuts lists it).
+//                          repeat }] (Settings > Keyboard shortcuts lists it). spec is "Ctrl+Shift+T"
+//                          on Windows and "Mod+Shift+T" on macOS (shortcuts.ts grammar).
+//   b.keys.label(action, arg?)
+//                          the action's key as this system prints it ("Ctrl+Shift+T", "⇧⌘T"), rebinds
+//                          applied; '' when it has none (shortcuts.ts printedBinding, displaySpec).
+//   b.keys.chordFor(action, arg?)
+//                          the spec of the action's key for a menu bar's key equivalent ("Mod+Shift+T"):
+//                          its first key held with Mod, Ctrl or Option; null for none (Stop is ⌘., not
+//                          Esc; Keyboard Shortcuts, F1 only, has none).
 //   b.keys.log             the last routed keys, for tests and diagnostics.
 //   b.keys.closePanels()   hide Firefox's open panels (not menus). A browser-first action does this
 //                          itself: the app menu must not stay hanging over the new tab's field.
@@ -66,7 +95,8 @@
 //                          focus left that page (a Deer panel, field or the switcher took it), or the
 //                          answer comes more than STALE_REPLY_MS after the key went down. The key
 //                          never acts on whatever the user opened in the meantime.
-import { BINDINGS, find, keyInput, specOf, type ActionId, type Binding, type Priority } from '../shared/shortcuts';
+import { isMac } from '../shared/os';
+import { BINDINGS, currentOS, displaySpec, find, keyInput, printedBinding, specOf, stepsEscLadder, type ActionId, type Binding, type Priority } from '../shared/shortcuts';
 import { HOME_URL } from '../shared/url';
 import type { Browser } from './browser';
 import * as fx from './firefox';
@@ -78,7 +108,7 @@ export type KeyHow = 'browser-first' | 'page-first/reply' | 'page-first/local' |
 export interface KeyRoute {
   action: ActionId;
   arg?: number;
-  /** "Ctrl+Shift+T", or the AppCommand name. */
+  /** "Ctrl+Shift+T" (macOS "Mod+Shift+T"), or the AppCommand name. */
   spec: string;
   how: KeyHow;
   repeat: boolean;
@@ -86,7 +116,14 @@ export interface KeyRoute {
   browser: XULBrowser | null;
 }
 
-type Mode = 'browser' | 'page' | 'lock' | 'swallow';
+/**
+ * How one press is routed. 'consume' (macOS): the key goes where it was going (a prompt, a panel),
+ * and its keypress is consumed after them so the menu bar does not run it too.
+ */
+type Mode = 'browser' | 'page' | 'lock' | 'swallow' | 'consume';
+
+/** Actions a page can never keep, keyboard lock or not (macOS ⌘Q, ⌘M). */
+const NEVER_LOCKED: ReadonlySet<ActionId> = new Set<ActionId>(['quit', 'minimize']);
 
 /** Hardware browser keys and mouse side buttons (AppCommand event.command) -> action. */
 const APP_COMMANDS: Record<string, ActionId | null> = {
@@ -144,6 +181,18 @@ export class Keys {
     return BINDINGS.map((x) => ({ action: x.action, arg: x.arg, spec: specOf(x), priority: x.priority, repeat: !!x.repeat }));
   }
 
+  /** The action's key as this system prints it ("Ctrl+Shift+T", "⇧⌘T"), '' when it has none. */
+  label(action: string, arg?: number): string {
+    const b = printedBinding(action as ActionId, arg);
+    return b ? displaySpec(specOf(b), currentOS()) : '';
+  }
+
+  /** The spec of the action's key for a menu's key equivalent ("Mod+Shift+T"), null when it has none. */
+  chordFor(action: string, arg?: number): string | null {
+    const b = printedBinding(action as ActionId, arg, true);
+    return b ? specOf(b) : null;
+  }
+
   addHook(fn: KeyHook, opts: { first?: boolean } = {}): () => void {
     if (opts.first) this.hooks.unshift(fn);
     else this.hooks.push(fn);
@@ -197,6 +246,14 @@ export class Keys {
     b.on('page-message', (_tab, name, _data, from) => {
       if (name === 'keys:esc-layer') this.pageLayer.set(from.browser, performance.now());
     });
+
+    if (isMac) {
+      // ⌘M: the core has no built-in for it (the yellow button calls the same, winctl.ts).
+      b.registerAction('minimize', () => window.minimize());
+      // ⌘Q tells Firefox the shortcut asked, so it confirms first (mac-keys.js); Deer › Quit Deer and
+      // the downloads prompt's own quit (b.run('quit')) quit as the built-in does, without that note.
+      b.registerAction('quit', () => void fx.quit({ shortcut: this.current?.action === 'quit' && this.current.how !== 'app-command' }));
+    }
   }
 
   /** Firefox's delayed startup has run: its own AppCommand handler exists now. */
@@ -235,6 +292,58 @@ export class Keys {
     e.preventDefault();
     e.stopPropagation();
     this.hidden.add(e);
+  }
+
+  /**
+   * A reply Deer will not act on (stale). Firefox's system-group listeners never see it; on macOS it
+   * is also consumed, or the menu bar would run the key's item on whatever is in front now.
+   */
+  private dropReply(e: KeyboardEvent): void {
+    this.hidden.add(e);
+    if (isMac) e.preventDefault();
+  }
+
+  /**
+   * macOS, a window-modal dialog or menupopup owns the keyboard: a ⌘ chord Deer binds does nothing,
+   * as on Windows, instead of reaching the menu bar's item for it under the dialog. Esc and ⌘. go on
+   * to the dialog (toolkit/content/widgets/dialog.js cancels on ⌘. too).
+   */
+  private holdMenuChord(e: KeyboardEvent, code: string): void {
+    const binding = find({ ...keyInput(e), repeat: false });
+    if (!binding?.meta || stepsEscLadder(binding)) return;
+    this.take(e);
+    this.swallowUp.add(code);
+    this.mode.set(code, 'swallow');
+    this.note(`held ${specOf(binding)} under a dialog`);
+  }
+
+  /**
+   * macOS ⌘. while a prompt, a native panel or a page layer owns Esc. An open panel closes, as Esc
+   * would close it. Otherwise the key goes on to the prompt (dialog.js cancels on ⌘.), and its
+   * keypress is consumed afterwards: the menu bar's Stop (⌘.) must not run under the prompt.
+   */
+  private cancelKeyTaken(e: KeyboardEvent, code: string): void {
+    if (this.popupOpen('panel')) {
+      this.take(e);
+      this.swallowUp.add(code);
+      this.mode.set(code, 'swallow');
+      this.closePanels();
+      return;
+    }
+    this.mode.set(code, 'consume');
+  }
+
+  /**
+   * macOS: a ⌘ chord Deer does not bind, pressed in a page. Firefox's own keysets asked for the page's
+   * reply on such keys (GlobalKeyListener::HandleEventOnCaptureInSystemEventGroup); they are parked,
+   * so ask here: when the page leaves the key alone, the reply reaches the menu bar
+   * (BrowserParent::RecvReplyKeyEvent -> PostHandleKeyEvent) and ⌘H hides Deer. The page sees the key
+   * exactly as before.
+   */
+  private askPageForMenuKey(e: KeyboardEvent): void {
+    const ev = e as any;
+    if (!e.metaKey || !isRemote(e) || ev.isReplyEventFromRemoteContent || ev.isWaitingReplyFromRemoteContent) return;
+    if (typeof ev.requestReplyFromRemoteContent === 'function') ev.requestReplyFromRemoteContent();
   }
 
   private popupOpen(kind: 'menupopup' | 'panel'): boolean {
@@ -355,6 +464,7 @@ export class Keys {
     // A window-modal dialog or an open native menu owns the keyboard.
     if (fx.windowModalOpen() || this.popupOpen('menupopup')) {
       this.forget(code);
+      if (isMac) this.holdMenuChord(e, code);
       return;
     }
     const binding = find({ ...keyInput(e), repeat: false });
@@ -377,14 +487,15 @@ export class Keys {
         this.typeOnHome(e);
         return;
       }
-      if (binding.key === 'Escape' && this.escTaken(e)) {
+      if (stepsEscLadder(binding) && this.escTaken(e)) {
         this.forget(code);
+        if (binding.key !== 'Escape') this.cancelKeyTaken(e, code);
         return;
       }
       // F11 can be kept by a page when it enters full screen, never when it leaves.
       const priority: Priority = verdict ?? (binding.action === 'fullscreen' && fx.inFullScreen() ? 'browser' : binding.priority);
-      // Only keyboard lock hands browser-first keys to the page first.
-      const locked = priority === 'browser' && !verdict && binding.priority === 'browser' && isRemote(e) && fx.keyboardLocked();
+      // Only keyboard lock hands browser-first keys to the page first (never macOS ⌘Q or ⌘M).
+      const locked = priority === 'browser' && !verdict && binding.priority === 'browser' && isRemote(e) && fx.keyboardLocked() && !NEVER_LOCKED.has(binding.action);
       mode = locked ? 'lock' : priority;
     }
     this.bind.set(code, binding as Binding);
@@ -414,7 +525,7 @@ export class Keys {
     }
     if (!this.replyIsCurrent(e, code)) {
       this.note(`stale reply dropped ${specOf(binding)}`);
-      this.hidden.add(e);
+      this.dropReply(e);
       this.forget(code);
       return;
     }
@@ -426,7 +537,11 @@ export class Keys {
     if (!e.isTrusted || inCaptureField(e)) return;
     const code = codeOf(e);
     const mode = this.mode.get(code);
-    if (!mode) return;
+    if (!mode) {
+      if (isMac) this.askPageForMenuKey(e);
+      return;
+    }
+    if (mode === 'consume') return; // decided in onKeyPressLocal, after the prompt or panel had it
     if (mode === 'swallow' || mode === 'browser') {
       this.take(e); // (a prevented keydown has no keypress; belt and braces)
       return;
@@ -454,7 +569,7 @@ export class Keys {
     // The page answered after the user moved to another tab: the key was for the old page only.
     if (!this.replyIsCurrent(e, code)) {
       this.note(`stale reply dropped ${specOf(binding)}`);
-      this.hidden.add(e);
+      this.dropReply(e);
       this.forget(code);
       return;
     }
@@ -473,6 +588,10 @@ export class Keys {
   private onKeyPressLocal(e: KeyboardEvent): void {
     if (!e.isTrusted || e.defaultPrevented || isRemote(e) || inCaptureField(e)) return;
     const code = codeOf(e);
+    if (this.mode.get(code) === 'consume') {
+      e.preventDefault();
+      return;
+    }
     const binding = this.bind.get(code);
     if (!binding || this.mode.get(code) !== 'page') return;
     e.preventDefault();
@@ -519,7 +638,8 @@ export class Keys {
   private typeOnHome(e: KeyboardEvent): void {
     const b = this.b;
     if (!b.settings.typeToSearch || b.omni.open || e.repeat) return;
-    if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || e.key.length !== 1 || e.key === ' ') return;
+    // On a Mac Option types characters (⌥E é, ⌥C ç): it starts a search too, unless ⌃ or ⌘ is held.
+    if (e.ctrlKey || (e.altKey && !isMac) || e.metaKey || e.isComposing || e.key.length !== 1 || e.key === ' ') return;
     const t = b.active();
     if (!t || t.url !== HOME_URL) return;
     const doc = (e.target as Node | null)?.ownerDocument;

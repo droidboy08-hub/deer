@@ -10,7 +10,10 @@
 //     (the extensions panel). Placements persist in browser.uiCustomization.state.
 //   - re-homes extension widgets that land in Firefox's hidden toolbars (default_area "navbar",
 //     the overflow panel, the bookmarks toolbar) into AREA: one CustomizableUI listener for the
-//     process plus a scan at start (correction 2).
+//     process plus a scan at start (correction 2). At the first window's DOMContentLoaded only the
+//     panel areas can be read: CustomizableUI restores a toolbar area's placements when its first
+//     toolbar node registers (handleNewBrowserWindow, which runs after Deer's hook), so each of
+//     those is scanned once, at its onAreaNodeRegistered (placementsOf).
 //   - locks extensions.unifiedExtensions.button.always_visible to true (correction 1: with false the
 //     extensions button disappears and nothing is left to reach unpinned extensions) and turns off
 //     Firefox's abuse report entry points (extensions.abuseReport.enabled: "Report" is not offered).
@@ -38,8 +41,10 @@
 //
 // Firefox 157 internals used here (checked against reference/omni; re-check on a runtime update):
 //   CustomizableUI   gre/moz-src/browser/components/customizableui/CustomizableUI.sys.mjs
-//                    registerArea, addListener({ onWidgetAdded, onWidgetMoved }), areas,
-//                    getWidgetIdsInArea, isWebExtensionWidget, addWidgetToArea, AREA_ADDONS
+//                    registerArea, addListener({ onWidgetAdded, onWidgetMoved,
+//                    onAreaNodeRegistered }), areas, getWidgetIdsInArea (throws "Area <id> not yet
+//                    restored" before registerToolbarNode -> restoreStateForArea), isWebExtensionWidget,
+//                    addWidgetToArea, AREA_ADDONS
 //   ExtensionsUI     browser/modules/ExtensionsUI.sys.mjs: updates, sideloaded (Sets), on/off('change'),
 //                    showUpdate(gBrowser, info), showSideloaded(gBrowser, addon)
 //   AddonManager     gre/modules/AddonManager.sys.mjs: getAddonsByTypes, getAddonByID,
@@ -187,6 +192,35 @@ function rehome(id: string, area: string | null | undefined): void {
   }
 }
 
+/**
+ * The widget ids of an area, or null while CustomizableUI has not restored its placements yet
+ * (CustomizableUI.sys.mjs getWidgetIdsInArea throws "Area <id> not yet restored"). Panel areas are
+ * restored when they are registered; toolbar areas (nav-bar, TabsToolbar, PersonalToolbar, ...)
+ * only when their first toolbar node registers: registerToolbarNode -> restoreStateForArea, called
+ * from handleNewBrowserWindow, a browser-window-domcontentloaded consumer that runs after Deer's
+ * (entries run sorted by module URL, see VitreShell). It then notifies onAreaNodeRegistered.
+ */
+function placementsOf(area: string): string[] | null {
+  try {
+    return CUI().getWidgetIdsInArea(area) as string[];
+  } catch {
+    return null;
+  }
+}
+
+/** Toolbar areas the start scan could not read yet: each is scanned at its onAreaNodeRegistered. */
+const unscanned = new Set<string>();
+
+/** Re-home the extension widgets of one area; false when the area cannot be read yet. */
+function scanArea(area: string): boolean {
+  const C = CUI();
+  if (area === AREA || area === C.AREA_ADDONS) return true;
+  const ids = placementsOf(area);
+  if (!ids) return false;
+  for (const id of ids) rehome(id, area);
+  return true;
+}
+
 function registerArea(): void {
   const C = CUI();
   // defaultCollapsed: null, so a toolbar reset never collapses (hides) the pill's toolbar.
@@ -194,10 +228,14 @@ function registerArea(): void {
   C.addListener({
     onWidgetAdded: (id: string, area: string) => rehome(id, area),
     onWidgetMoved: (id: string, area: string) => rehome(id, area),
+    // Fires for every window; only the first registration of an area the start scan skipped counts.
+    onAreaNodeRegistered: (area: string) => {
+      if (!unscanned.delete(area)) return;
+      if (!scanArea(area)) console.error(`VitreExtensions: the ${area} area was registered but cannot be read`);
+    },
   });
   for (const area of C.areas as string[]) {
-    if (area === AREA || area === C.AREA_ADDONS) continue;
-    for (const id of C.getWidgetIdsInArea(area) as string[]) rehome(id, area);
+    if (!scanArea(area)) unscanned.add(area);
   }
 }
 

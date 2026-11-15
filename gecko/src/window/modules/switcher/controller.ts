@@ -30,6 +30,7 @@ import { svg } from '../../dom';
 import * as fx from '../../firefox';
 import { icons } from '../../icons';
 import type { KeyVerdict } from '../../keys';
+import { isMac } from '../../../shared/os';
 import type { Binding } from '../../../shared/shortcuts';
 import type { Tab } from '../../model';
 import { DeckView } from './deck';
@@ -704,8 +705,19 @@ export class Switcher {
     const m = this.model;
     if (!m) return undefined;
     if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'AltGraph' || e.key === 'Meta' || e.key === 'OS') return 'pass';
+    // macOS: ⌘Q, ⌘H, ⌥⌘H and ⌘M work in every Mac app; the switcher cancels and lets them through.
+    if (isMac && e.metaKey && !e.ctrlKey && (e.keyCode === 81 || e.keyCode === 72 || e.keyCode === 77)) {
+      this.cancel();
+      return undefined;
+    }
     const action = binding?.action;
     if (action === 'nextTabMru' || action === 'prevTabMru' || action === 'closeTab') return undefined;
+    // macOS: ⌃W, with the ⌃ held for the switcher, closes the selected card as Ctrl+W does on Windows
+    // (MacKeys board, Tab switcher; ⌘W is closeTab there, above). Letters go by virtual key.
+    if (isMac && e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.keyCode === 87) {
+      if (!e.repeat) this.closeKey();
+      return 'swallow';
+    }
     if (action === 'switcherSearch') {
       if (!e.repeat) this.search();
       return 'swallow';
@@ -786,7 +798,10 @@ export class Switcher {
       case 'Escape':
         if (!e.repeat) this.cancel();
         return 'swallow';
+      case 'Backspace':
       case 'Delete':
+        // macOS: ⌫ closes the card as well (MacKeys board); elsewhere Backspace edits the search.
+        if (e.key === 'Backspace' && !isMac) break;
         if (!empty) return this.edit();
         if (!e.repeat) this.closeCard();
         return 'swallow';

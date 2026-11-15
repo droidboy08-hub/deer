@@ -8,9 +8,25 @@
 // Keys never reach the menu through focus: the page (or Deer's field) keeps focus and the module
 // hands every keydown to handleKey() from the key router's hook (index.ts). With assistive
 // technology running the menu takes real focus instead (aria-activedescendant follows the plate).
+//
+// macOS: each panel (the menu, each submenu) is shown in a XUL <panel> of its own level instead of
+// the layer (panelhost.ts): a popup window that macOS 26 draws as real Liquid Glass. The same
+// element, rows, plate, keys and placement; the window is the material (css.ts MENU_CSS_MAC), so the
+// menu's own open / close motion and the dark-backdrop sampling are left out there, and the panel
+// appears and goes at once as the system's menus do. Presses and the wheel outside are Gecko's rollup
+// (the catcher stays up as on Windows, but the rollup takes those presses first); a panel the system
+// closes is reported back (panelLost) and closes the menu or that submenu. A panel that cannot open
+// falls back to the layer.
+//
+// macOS keys (MacKeys board, "Menus and focus"): no underlined access keys; a typed letter moves the
+// highlight to the next row whose label starts with it (type-select) and Return runs it; Esc and ⌘.
+// close, ⌥ and F10 never do. Accelerators arrive printed in Apple glyphs (types.ts actionKey) and are
+// read back into aria-keyshortcuts with Meta for ⌘.
 import type { Browser } from '../../browser';
+import { isMac } from '../../../shared/os';
 import * as gecko from './gecko';
 import { iconNode } from './icons';
+import { PanelHost } from './panelhost';
 import { isCaption, isCommand, isSeparator, tidy, type Anchor, type CloseMode, type MenuCommand, type MenuItem, type MenuKey, type Spec } from './types';
 
 const SPRING = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -55,6 +71,8 @@ interface Panel {
   parentIndex: number;
   child: Panel | null;
   box: { left: number; top: number; width: number; height: number };
+  /** macOS: shown in the XUL panel of its level (panelhost.ts), not in the layer. */
+  hosted: boolean;
 }
 
 export interface MenuState {
@@ -229,7 +247,29 @@ export function place(a: Anchor, w: number, h: number, W: number, H: number): Pl
   };
 }
 
+/** Apple's modifier glyphs as aria-keyshortcuts names them (WAI-ARIA: the UI Events key values). */
+const MAC_MODIFIERS: Record<string, string> = { '⌃': 'Control', '⌥': 'Alt', '⇧': 'Shift', '⌘': 'Meta' };
+const MAC_KEYS: Record<string, string> = {
+  '↩': 'Enter', '⎋': 'Escape', '⌫': 'Backspace', '⌦': 'Delete', '⇥': 'Tab', '␣': 'Space',
+  '←': 'ArrowLeft', '→': 'ArrowRight', '↑': 'ArrowUp', '↓': 'ArrowDown', '⇞': 'PageUp', '⇟': 'PageDown', '↖': 'Home', '↘': 'End',
+  '+': 'Plus', '−': '-',
+};
+
+/**
+ * macOS: an accelerator printed in glyphs ("⇧⌘T", "⌃⌘F", "⎋") as aria-keyshortcuts ("Shift+Meta+T").
+ * Like the Windows spelling, only chords with a modifier, Esc and function keys; not "⇧-click".
+ */
+function macAriaKeys(accel: string): string | null {
+  const m = /^([⌃⌥⇧⌘]*)(\S+)$/.exec(accel);
+  if (!m || /-click$/i.test(m[2])) return null;
+  const mods = [...m[1]].map((g) => MAC_MODIFIERS[g]);
+  const key = MAC_KEYS[m[2]] ?? (/^F\d{1,2}$/.test(m[2]) ? m[2] : [...m[2]].length === 1 ? m[2].toUpperCase() : m[2]);
+  if (!mods.length && key !== 'Escape' && !/^F\d/.test(key)) return null;
+  return [...mods, key].join('+');
+}
+
 function ariaKeys(accel: string | undefined): string | null {
+  if (isMac && accel) return macAriaKeys(accel);
   if (!accel || !/^(Ctrl|Alt|Shift|Esc|F\d)/.test(accel) || /click$/i.test(accel)) return null;
   return accel
     .replace(/\bCtrl\b/g, 'Control')
@@ -262,7 +302,8 @@ function itemElement(r: MenuCommand, id: string): { el: HTMLElement; access: str
 
   const { text, index, access } = labelOf(r);
   const label = h('span', 'vt-mi-label');
-  if (index >= 0) {
+  // macOS menus underline nothing (MacKeys board: "Menus have no underlined letters").
+  if (index >= 0 && !isMac) {
     const ak = h('span', 'vt-ak', text.slice(index, index + 1));
     label.append(text.slice(0, index), ak, text.slice(index + 1));
   } else {
@@ -285,6 +326,8 @@ export class MenuView {
 
   private readonly host: HTMLElement;
   private readonly catcher: HTMLElement;
+  /** macOS: the XUL panels the menus are shown in (the system's glass); null elsewhere. */
+  private readonly panels: PanelHost | null;
   private top: HTMLElement | null = null;
   private spec: Spec | null = null;
   private root: Panel | null = null;
@@ -315,6 +358,7 @@ export class MenuView {
     this.host.append(this.catcher);
     layer.append(this.host);
     this.wireCatcher();
+    this.panels = isMac ? new PanelHost((level) => this.panelLost(level)) : null;
   }
 
   get isOpen(): boolean {
@@ -325,7 +369,7 @@ export class MenuView {
   state(): MenuState {
     const p = this.root;
     const spec = this.spec;
-    const rect = p ? p.el.getBoundingClientRect() : null;
+    const rect = p ? this.inWindow(p, p.el.getBoundingClientRect()) : null;
     let submenus = 0;
     for (let c = p?.child ?? null; c; c = c.child) submenus++;
     return {
@@ -357,7 +401,7 @@ export class MenuView {
     let p = this.root;
     for (let i = 0; i < depth && p; i++) p = p.child;
     if (!p) return null;
-    return { rows: p.entries.map((e) => labelOf(e.row).text), active: p.active, rect: p.el.getBoundingClientRect() };
+    return { rows: p.entries.map((e) => labelOf(e.row).text), active: p.active, rect: this.inWindow(p, p.el.getBoundingClientRect()) };
   }
 
   /** Row element of the root panel (tests click it). */
@@ -397,14 +441,14 @@ export class MenuView {
     this.root = panel;
     this.focus = panel;
     this.catcher.removeAttribute('data-off');
-    this.host.append(panel.el);
+    this.mount(panel);
     this.showWash(spec.wash ?? [], off);
     if (spec.owner) {
       spec.owner.classList.add('vt-menu-owner');
       spec.owner.setAttribute('aria-expanded', 'true');
     }
     this.takeFocus(panel.el);
-    this.animateIn(panel.el, at);
+    this.animateIn(panel.el, at, panel.hosted);
     if (spec.source === 'keyboard') {
       panel.el.classList.add('keys');
       this.lastInput = 'key';
@@ -413,7 +457,8 @@ export class MenuView {
     } else {
       this.lastInput = 'mouse';
     }
-    if (theme === 'dark') this.sampleBackdrop(panel.el, spec, at, w, hgt);
+    // The system's glass (macOS) reads the backdrop itself.
+    if (theme === 'dark' && !panel.hosted) this.sampleBackdrop(panel.el, spec, at, w, hgt);
   }
 
   /** The spec of the open menu (the object given to open()), or null. */
@@ -434,6 +479,10 @@ export class MenuView {
     const at = place(anchor, p.box.width, p.box.height, window.innerWidth, window.innerHeight);
     p.box.left = at.left;
     p.box.top = at.top;
+    if (p.hosted) {
+      this.panels?.place(0, p.box);
+      return;
+    }
     p.el.style.left = `${at.left - off.left}px`;
     p.el.style.top = `${at.top - off.top}px`;
     p.el.style.transformOrigin = `${at.leftward ? '100%' : '0'} ${at.up ? '100%' : '0'}`;
@@ -451,7 +500,7 @@ export class MenuView {
     if (!tidied.some(isCommand)) return;
     const activeLabel = old.active >= 0 ? old.entries[old.active]?.row.label : null;
     spec.rows = tidied;
-    for (let c = old.child; c; c = c.child) c.el.remove();
+    this.unmount(old.child);
     old.child = null;
     const panel = this.build(tidied, this.theme, null, -1);
     panel.el.className = old.el.className;
@@ -467,6 +516,13 @@ export class MenuView {
     panel.el.style.opacity = old.el.style.opacity || '1';
     panel.box = { left: at.left, top: at.top, width: w, height: hgt };
     old.el.replaceWith(panel.el);
+    if (old.hosted) {
+      // Same XUL panel: the new element took the old one's place in it; the panel follows the size.
+      panel.hosted = true;
+      panel.el.style.left = '';
+      panel.el.style.top = '';
+      this.panels?.place(0, panel.box);
+    }
     this.root = panel;
     this.focus = panel;
     const i = activeLabel === null ? -1 : panel.entries.findIndex((e) => e.row.label === activeLabel);
@@ -506,9 +562,11 @@ export class MenuView {
       spec.owner.classList.remove('vt-menu-owner');
       spec.owner.removeAttribute('aria-expanded');
     }
-    for (let c = root.child; c; c = c.child) c.el.remove();
+    this.unmount(root.child);
     root.child = null;
-    this.animateOut(root.el, mode);
+    // A XUL panel (macOS) goes at once, as the system's menus do; the layer fades.
+    if (root.hosted) this.unmount(root);
+    else this.animateOut(root.el, mode);
     if (this.tookFocus) this.restoreFocus();
     this.tookFocus = false;
     this.prevFocus = null;
@@ -528,7 +586,8 @@ export class MenuView {
   handleKey(e: MenuKey): boolean {
     const p = this.keyPanel;
     if (!this.spec || !p) return false;
-    const k = e.key;
+    // macOS: ⌘. is Esc (MacKeys board: "⌘. works like ⎋").
+    const k = isMac && e.key === '.' && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey ? 'Escape' : e.key;
     if (k === 'ArrowDown' || (k === 'Tab' && !e.shiftKey)) this.move(p, 1);
     else if (k === 'ArrowUp' || (k === 'Tab' && e.shiftKey)) this.move(p, -1);
     else if (k === 'Home') this.moveTo(p, 0);
@@ -544,10 +603,12 @@ export class MenuView {
       if (e.repeat) return true;
       if (p.parent) this.closeSub(p.parent);
       else this.close('dismiss');
-    } else if (k === 'Alt' || k === 'F10' || k === 'ContextMenu') {
+    } else if (k === 'ContextMenu' || (!isMac && (k === 'Alt' || k === 'F10'))) {
+      // macOS: ⌥ alone and F10 never close a menu.
       if (!e.repeat) this.close('dismiss');
     } else if (k.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && !e.repeat) {
-      this.accessKey(p, k);
+      if (isMac) this.typeSelect(p, k);
+      else this.accessKey(p, k);
     }
     return true;
   }
@@ -597,6 +658,57 @@ export class MenuView {
     else done();
   }
 
+  // ---- hosting: the layer, or a XUL panel per level on macOS ----
+
+  /**
+   * Put a built panel (its box set) on screen. macOS: in the XUL panel of its level, where the
+   * system's glass is its material; the layer when that panel cannot open. Elsewhere: the layer.
+   */
+  private mount(p: Panel): void {
+    if (this.panels?.show(this.depthOf(p), p.el, p.box, this.theme)) {
+      p.hosted = true;
+      // The XUL panel is placed on the screen; inside it the menu is laid out in flow.
+      p.el.style.left = '';
+      p.el.style.top = '';
+      return;
+    }
+    this.host.append(p.el);
+  }
+
+  /** Take `from` and every submenu below it off screen at once. */
+  private unmount(from: Panel | null): void {
+    for (let c = from; c; c = c.child) {
+      if (c.hosted) this.panels?.hide(this.depthOf(c));
+      else c.el.remove();
+    }
+  }
+
+  /**
+   * A rectangle measured inside a panel, in window coordinates. In a XUL panel the content is laid
+   * out in the popup's own box, so it is taken relative to the panel and added to the panel's place.
+   */
+  private inWindow(p: Panel, r: DOMRect): DOMRect {
+    if (!p.hosted) return r;
+    const o = p.el.getBoundingClientRect();
+    return new DOMRect(p.box.left + r.left - o.left, p.box.top + r.top - o.top, r.width, r.height);
+  }
+
+  /**
+   * macOS: the system closed the XUL panel of `level` (a press or the wheel outside, which Gecko's
+   * rollup takes before the catcher could; b.closePanels()). The menu goes as a dismiss would; a
+   * submenu's panel takes only that submenu (and those below it) with it.
+   */
+  private panelLost(level: number): void {
+    if (!this.spec || !this.root) return;
+    if (level <= 0) {
+      this.close('dismiss');
+      return;
+    }
+    let p: Panel | null = this.root;
+    for (let d = 1; d < level && p; d++) p = p.child;
+    if (p?.child) this.closeSub(p);
+  }
+
   private build(rows: MenuItem[], theme: MenuTheme, parent: Panel | null, parentIndex: number): Panel {
     const el = h('div', `vt-menu t-${theme}${this.touchRows ? ' touch' : ''}`);
     if (this.top) el.classList.add('solid');
@@ -605,7 +717,7 @@ export class MenuView {
     const list = h('div', 'vt-menu-list');
     const plate = h('div', 'vt-plate');
     list.append(plate);
-    const panel: Panel = { el, list, plate, entries: [], active: -1, plateShown: false, pressed: -1, parent, parentIndex, child: null, box: { left: 0, top: 0, width: 0, height: 0 } };
+    const panel: Panel = { el, list, plate, entries: [], active: -1, plateShown: false, pressed: -1, parent, parentIndex, child: null, box: { left: 0, top: 0, width: 0, height: 0 }, hosted: false };
     const depth = parent ? this.depthOf(parent) + 1 : 0;
     for (const r of rows) {
       if (isSeparator(r)) {
@@ -663,7 +775,13 @@ export class MenuView {
 
   // ---- motion ----
 
-  private animateIn(el: HTMLElement, at: Placed): void {
+  private animateIn(el: HTMLElement, at: Placed, hosted = false): void {
+    if (hosted) {
+      // In a XUL panel (macOS) the window appears at once, as the system's menus do: content that
+      // scaled or faded on its own would not match the glass around it.
+      this.lastMotion = { open: '', reduced: reducedMotion() };
+      return;
+    }
     el.style.transformOrigin = `${at.leftward ? '100%' : '0'} ${at.up ? '100%' : '0'}`;
     el.style.opacity = '0';
     const reduced = reducedMotion();
@@ -771,6 +889,23 @@ export class MenuView {
     this.setActive(p, next, 'key');
   }
 
+  /**
+   * macOS type-select: a letter moves the highlight to the next enabled row whose label starts with
+   * it, after the highlighted one and wrapping around; nothing runs until Return (MacKeys board).
+   */
+  private typeSelect(p: Panel, ch: string): void {
+    const k = ch.toLocaleLowerCase();
+    const n = p.entries.length;
+    for (let step = 1; step <= n; step++) {
+      const i = (p.active + step + n) % n;
+      const entry = p.entries[i];
+      if (entry.row.disabled || !labelOf(entry.row).text.trimStart().toLocaleLowerCase().startsWith(k)) continue;
+      this.lastInput = 'key';
+      this.setActive(p, i, 'key');
+      return;
+    }
+  }
+
   private activate(p: Panel, i: number): void {
     const entry = p.entries[i];
     if (!entry || entry.row.disabled) return;
@@ -784,7 +919,7 @@ export class MenuView {
     this.setActive(p, i, 'key');
     entry.el.classList.remove('pressed');
     const run = entry.row.run;
-    const icon = (entry.el.querySelector('.vt-mi-icon') ?? entry.el).getBoundingClientRect();
+    const icon = this.inWindow(p, (entry.el.querySelector('.vt-mi-icon') ?? entry.el).getBoundingClientRect());
     this.lastIcon = { x: Math.round(icon.left + icon.width / 2), y: Math.round(icon.top + icon.height / 2) };
     // Assistive technology moved focus to the menu: the page gets it back before an edit command runs.
     if (this.tookFocus) this.restoreFocus();
@@ -820,8 +955,8 @@ export class MenuView {
     const H = window.innerHeight;
     const W = window.innerWidth;
     const hgt = Math.min(menuHeight(rows, this.touchRows ? 40 : 34), H - 2 * MARGIN);
-    const r = entry.el.getBoundingClientRect();
-    const pr = p.el.getBoundingClientRect();
+    const r = this.inWindow(p, entry.el.getBoundingClientRect());
+    const pr = this.inWindow(p, p.el.getBoundingClientRect());
     let left = pr.right - 2;
     let leftward = false;
     if (left + w > W - MARGIN) {
@@ -839,8 +974,8 @@ export class MenuView {
     if (this.root?.el.classList.contains('t-raised')) child.el.classList.add('t-raised');
     p.child = child;
     entry.el.setAttribute('aria-expanded', 'true');
-    this.host.append(child.el);
-    this.animateIn(child.el, { left, top, up: false, leftward });
+    this.mount(child);
+    this.animateIn(child.el, { left, top, up: false, leftward }, child.hosted);
     if (focusFirst) {
       this.focus = child;
       this.focusFirst(child);
@@ -863,7 +998,7 @@ export class MenuView {
   private closeSub(p: Panel): void {
     const child = p.child;
     if (!child) return;
-    for (let c: Panel | null = child; c; c = c.child) c.el.remove();
+    this.unmount(child);
     p.child = null;
     if (!this.keyPanelOpen()) this.focus = p;
     p.entries[child.parentIndex]?.el.removeAttribute('aria-expanded');

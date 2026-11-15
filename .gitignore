@@ -21,6 +21,10 @@ runtime/
 *.tar.gz
 *.zip
 !/gecko/tests/**/pages/files/*.zip
+# macOS: the engine's disk image and libraries, installer packages
+*.dmg
+*.dylib
+*.pkg
 
 # Firefox's own UI source extracted from omni.ja (116 MB); regenerate it with
 #   python gecko/tools/extract-reference.py
@@ -39,6 +43,12 @@ __pycache__/
 *.tsbuildinfo
 *.xpi
 *.crx
+# macOS: debug symbols, Swift and Xcode build folders, the built launcher app and helper tools
+*.dSYM/
+.build/
+DerivedData/
+/gecko/launcher/*.app/
+/gecko/tools/mac/bin/
 
 # --- Test and spike output: captures, logs, throwaway profiles ------------------------------------
 out/
@@ -106,8 +116,17 @@ vitre-harness
 Thumbs.db
 desktop.ini
 .DS_Store
+._*
 .env
 .env.*
+# Xcode's per-user state and the local Python environment (Pillow for the tests and make-icon.py)
+xcuserdata/
+/gecko/.venv/
+# Apple signing identities and provisioning profiles: never committed
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
 
 # A downloader engine kept for reading by its author ("All rights reserved", no licence granted):
 # not part of the public, MPL-licensed repository.

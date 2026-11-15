@@ -19,6 +19,8 @@
 import { el, svg } from '../../dom';
 import { icons } from '../../icons';
 import { setTip } from '../../tips';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
 import { type Ease, type Fade, fadeAt, lerp, tween } from './motion';
 import * as gk from './gecko';
 
@@ -66,7 +68,10 @@ const CLOSE_ICON =
 const BACK_ICON =
   '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.8 6.8 10l5.2 5.2"/></svg>';
 
-/** The area the sheet lives in (the tab panels, i.e. the window below nothing: pages fill the window). */
+/**
+ * The area the sheet lives in (the tab panels, i.e. the window below nothing: pages fill the window,
+ * on macOS too, under the One row: skin/shell.css section 8).
+ */
 export function area(): DOMRect {
   return gk.tabpanels().getBoundingClientRect();
 }
@@ -75,6 +80,11 @@ export function area(): DOMRect {
  * The sheet for this window (window coordinates): 72% of the width in 8 px steps (720 to 1120), the
  * full height minus 96, under the bar. 1040×804 at (200, 72) in a 1440×900 window. Below 900×600 it
  * fills the window under the bar with 8 px margins.
+ * The area is the window (pages run under the floating bar, whose 68 px band TOP clears). One row
+ * (macOS): the same, in a normal window and in window full screen alike (pages run under the floating
+ * row since 2026-11-15), so the sheet is the boards' window box (1040×804 at (200, 72) in 1440×900),
+ * 20 px below the row's 52. (Until then a normal window's pages started below the row and this took
+ * that part back out of TOP.)
  */
 export function sheetBox(a: DOMRect = area()): Box {
   const W = a.width;
@@ -161,6 +171,8 @@ export interface SheetHandlers {
   back(): void;
   dimClick(e: MouseEvent): void;
   headerMenu(e: MouseEvent): void;
+  /** macOS: an action's chord as printed (b.keys.label), for the header's tooltips. */
+  keyLabel(action: string): string;
 }
 
 export class Sheet {
@@ -193,13 +205,13 @@ export class Sheet {
 
     this.back = el('button', { type: 'button', class: 'vp-back', 'aria-label': 'Back' });
     this.back.append(svg(BACK_ICON));
-    setTip(this.back, 'Back', 'Alt+Left');
+    setTip(this.back, 'Back', isMac ? h.keyLabel('back') : 'Alt+Left');
     this.site = el('div', { class: 'vp-site' });
     this.open = el('button', { type: 'button', class: 'vp-open', 'aria-label': 'Open as tab' });
     this.open.append(svg(OPEN_TAB_ICON));
     this.closeBtn = el('button', { type: 'button', class: 'vp-close', 'aria-label': 'Close peek' });
     this.closeBtn.append(svg(CLOSE_ICON));
-    setTip(this.closeBtn, 'Close peek', 'Esc');
+    setTip(this.closeBtn, 'Close peek', isMac ? displaySpec('Escape', currentOS()) : 'Esc');
     this.load = el('div', { class: 'vp-load', 'aria-hidden': 'true' });
     this.head = el('header', { class: 'vp-head' }, this.back, this.site, el('div', { class: 'vp-actions' }, this.open, this.closeBtn), this.load);
     this.cover = el('div', { class: 'vp-cover', 'aria-hidden': 'true' });
@@ -292,7 +304,7 @@ export class Sheet {
     if (this.snap.style.top !== top) this.snap.style.top = top;
   }
 
-  /** The Open as tab key (rebindable), in its tooltip as plain dim text. */
+  /** The Open as tab key (rebindable), in its tooltip as plain dim text (macOS: in Apple glyphs, "⌥↩"). */
   promoteKey(spec: string): void {
     setTip(this.open, 'Open as tab', spec);
   }

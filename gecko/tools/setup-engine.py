@@ -38,7 +38,8 @@ so both runtimes get the same Deer files:
   1. a copy of the engine folder;
   2. tools/runtime-overlay/** (config.js AutoConfig loader, defaults/pref/config-prefs.js and
      vitre-prefs.js, distribution/policies.json: no app update, no telemetry, no default-browser
-     check or agent; browser/chrome/icons/default/vitre.ico: the window icon);
+     check or agent; browser/chrome/icons/default/vitre.ico: the window icon), but not the
+     macOS-only defaults/vitre-platform/ (setup-runtime.py MAC_ONLY_OVERLAY);
   3. firefox.exe renamed deer.exe. Every child process then runs as deer.exe too. Mozilla's unbranded
      build is NOT Authenticode-signed, so editing its resources loses nothing: unless --keep-exe, the
      main and window-class icons become --icon and the version strings that say "Nightly" (Task
@@ -120,6 +121,7 @@ _spec.loader.exec_module(setup_runtime)
 OVERLAY = setup_runtime.OVERLAY
 is_junction = setup_runtime.is_junction
 same_target = setup_runtime.same_target
+mac_only = setup_runtime.mac_only  # overlay files a Windows engine never gets (defaults/vitre-platform/)
 
 EXE = 'deer.exe'
 MARKER = 'deer-engine.json'
@@ -973,7 +975,8 @@ def engine_files(out):
     """{relative path ('/' separators): [size, sha256]} of every file of the engine folder `out` except
     deer-engine.json, the overlay (compared with tools/runtime-overlay on its own) and the package
     (<out>/vitre: a junction or a copy, compared on its own). Junctions are never followed."""
-    overlay = {os.path.normcase(os.path.relpath(os.path.join(f, n), OVERLAY)) for f, _d, names in os.walk(OVERLAY) for n in names}
+    overlay = {os.path.normcase(os.path.relpath(os.path.join(f, n), OVERLAY)) for f, _d, names in os.walk(OVERLAY) for n in names
+               if not mac_only(os.path.relpath(os.path.join(f, n), OVERLAY))}
     files = {}
     for folder, dirs, names in os.walk(out):
         rel_dir = os.path.relpath(folder, out)
@@ -1033,7 +1036,8 @@ def expected(engine, keep_all):
     for folder, _dirs, names in os.walk(OVERLAY):
         for name in names:
             src = os.path.join(folder, name)
-            files[os.path.relpath(src, OVERLAY)] = src
+            if not mac_only(os.path.relpath(src, OVERLAY)):
+                files[os.path.relpath(src, OVERLAY)] = src
     absent = [] if keep_all else [p for p in STRIP if os.path.lexists(os.path.join(engine, p))]
     return files, absent
 
@@ -1162,12 +1166,14 @@ def main():
     open(os.path.join(out, MARKER), 'w').close()
     shutil.copytree(engine, out, symlinks=True, dirs_exist_ok=True)
 
-    # 1. overlay (the same files setup-runtime.py puts into runtime/)
+    # 1. overlay (the same files setup-runtime.py puts into a Windows runtime/: not the macOS-only ones)
     overlay = []
     for folder, _dirs, names in os.walk(OVERLAY):
         for name in names:
             src = os.path.join(folder, name)
             rel = os.path.relpath(src, OVERLAY)
+            if mac_only(rel):
+                continue
             dst = os.path.join(out, rel)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)

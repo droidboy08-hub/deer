@@ -24,6 +24,18 @@
 //     document scrolls what holds the frame). With the page inset on, Gecko's find would centre a
 //     match that sits inside the inset's scroll padding (it counts as off-screen), so while find is
 //     open the page module sets that padding back to 0 in the top document (page find.ts).
+//   - One row (macOS, ../../onerow.ts; board RowFind: find is the active capsule, in the row): the
+//     page fills the window from y 0 under the floating row, in a normal window and in window full
+//     screen alike (pagearea.ts, skin/shell.css section 8), so the row covers the top of the page as
+//     the Windows bar's band does: the guard's zone is the row's ROW_H (52) across the window,
+//     inflated 12 px as chromeZones does (rowZones: #vitre-bar's box, which also carries the menu-bar
+//     shift of window full screen; with the row hidden there, the face's own glass instead). A match
+//     under it is scrolled GUARD_AIR below the zone (window y 88, as GUARD_Y is 24 below the Windows
+//     band's 68), and a match on fixed content there gives the face its parked tint (vf-under), as on
+//     Windows. The zones are measured, not assumed: a page whose top edge is below the row gets none.
+//     (Until 2026-11-15 a normal window's page started at the row's bottom edge and had no zone.) The
+//     row hides only in window full screen (reveal.ts), so barHidden asks the bar alone, not the
+//     fullscreen class.
 //   - Peeks: a find open in a sheet that closes is closed with it (the 'vitre:peek' event, or a check
 //     after the capsule leaves); a promoted sheet's find carries over to its new tab. The poll that
 //     follows the sheet's header runs only while a peek is up.
@@ -37,7 +49,9 @@
 //   - The native findbar is never created: gLazyFindCommand is Deer's, the content find shortcut
 //     can never match, and type-ahead find is off (runtime prefs).
 import type { Browser, OpenRequest, Tab } from '../../browser';
-import { find as findBinding, keyInput } from '../../../shared/shortcuts';
+import { oneRow } from '../../onerow';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec, find as findBinding, keyInput } from '../../../shared/shortcuts';
 import * as gk from './gecko';
 import { LandingRing, type Rect } from './ring';
 import { CSS } from './styles';
@@ -113,6 +127,8 @@ interface Target {
 type MenuItem = Parameters<VitreServices['menus']['show']>[0][number];
 
 const GUARD_Y = 92;
+/** One row: how far below the chrome that covers it the guard puts a match (GUARD_Y is the 68 px band + 24; the row's zone is 52 + 12, so y 88). */
+const GUARD_AIR = 24;
 const RAPID_MS = 140;
 const TYPE_PAUSE_MS = 400;
 const COUNT_REPAIR_MS = 120;
@@ -366,6 +382,9 @@ export class FindController {
   }
 
   private barHidden(): boolean {
+    // One row: whether the row is out is reveal.ts's alone (it hides only in window full screen and
+    // comes back with the pointer at the top): ask the bar.
+    if (oneRow()) return this.b.bar.hidden;
     return this.b.bar.hidden || (this.b.root.classList.contains('fullscreen') && !this.b.root.classList.contains('bar-revealed'));
   }
 
@@ -742,9 +761,10 @@ export class FindController {
     if (!st?.open) return;
     const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
     if (e.key === 'Enter') {
-      if (e.altKey || e.metaKey) return; // Alt+Enter goes to the router (a peek's Open as tab)
+      // Alt+Enter goes to the router (a peek's Open as tab). macOS: ⌘↩ is Ctrl+Enter (MacKeys board, Find).
+      if (e.altKey || (e.metaKey && !isMac)) return;
       e.preventDefault();
-      if (e.ctrlKey) {
+      if (e.ctrlKey || e.metaKey) {
         if (!e.shiftKey && !e.repeat) this.close(st, 'activate', { focusPage: true });
       } else this.step(st, e.shiftKey ? -1 : 1, true, e.repeat);
     } else if (e.key === 'Escape') {
@@ -763,7 +783,7 @@ export class FindController {
     }
   }
 
-  /** Keys on the face's buttons (Tab moved focus there): Alt+C still toggles match case. */
+  /** Keys on the face's buttons (Tab moved focus there): Alt+C (⌥⌘C on macOS) still toggles match case. */
   private onButtonKey(e: KeyboardEvent): void {
     const st = this.shown();
     if (!st?.open || !this.isAltC(e)) return;
@@ -773,8 +793,21 @@ export class FindController {
 
   /** Alt+C, never with Ctrl or AltGr, so AltGr+C still types. Letters follow the key's label. */
   private isAltC(e: KeyboardEvent): boolean {
+    if (isMac) return this.isMacMatchCase(e);
     if (!e.altKey || e.ctrlKey || e.metaKey || e.getModifierState('AltGraph')) return false;
     return /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() === 'c' : e.code === 'KeyC';
+  }
+
+  /**
+   * macOS: ⌥⌘C, field-local (MacKeys board, Find): ⌥C alone types ç and stays the field's. Gecko
+   * sets AltGraph with every Option press there (widget/cocoa/nsCocoaUtils.mm ModifiersForEvent),
+   * so that state says nothing. The letter is the virtual key, from the ⌘ layout while ⌘ is down
+   * (widget/cocoa/TextInputHandler.mm ComputeGeckoKeyCode), as the key router matches letters; the
+   * physical key when there is none.
+   */
+  private isMacMatchCase(e: KeyboardEvent): boolean {
+    if (!e.altKey || !e.metaKey || e.ctrlKey || e.shiftKey) return false;
+    return e.keyCode ? e.keyCode === 67 : e.code === 'KeyC';
   }
 
   private focusChanged(): void {
@@ -806,16 +839,18 @@ export class FindController {
     } catch {
       edit = null;
     }
+    // macOS: the ⌘ editing keys in Apple glyphs (⌘Z, ⇧⌘Z...).
+    const key = (win: string, mac: string): string => (isMac ? displaySpec(mac, currentOS()) : win);
     edit ??= [
-      cmd('Undo', 'Ctrl+Z', 'undo', 'cmd_undo'),
-      cmd('Redo', 'Ctrl+Y', 'redo', 'cmd_redo'),
+      cmd('Undo', key('Ctrl+Z', 'Mod+Z'), 'undo', 'cmd_undo'),
+      cmd('Redo', key('Ctrl+Y', 'Mod+Shift+Z'), 'redo', 'cmd_redo'),
       { separator: true },
-      cmd('Cut', 'Ctrl+X', 'cut', 'cmd_cut'),
-      cmd('Copy', 'Ctrl+C', 'copy', 'cmd_copy'),
-      cmd('Paste', 'Ctrl+V', 'paste', 'cmd_paste'),
-      cmd('Select all', 'Ctrl+A', undefined, 'cmd_selectAll'),
+      cmd('Cut', key('Ctrl+X', 'Mod+X'), 'cut', 'cmd_cut'),
+      cmd('Copy', key('Ctrl+C', 'Mod+C'), 'copy', 'cmd_copy'),
+      cmd('Paste', key('Ctrl+V', 'Mod+V'), 'paste', 'cmd_paste'),
+      cmd('Select all', key('Ctrl+A', 'Mod+A'), undefined, 'cmd_selectAll'),
     ];
-    const items: MenuItem[] = [...edit, { separator: true }, { label: 'Match case', key: 'Alt+C', checked: st.matchCase, run: () => this.toggleCase(st) }];
+    const items: MenuItem[] = [...edit, { separator: true }, { label: 'Match case', key: isMac ? displaySpec('Mod+Alt+C', currentOS()) : 'Alt+C', checked: st.matchCase, run: () => this.toggleCase(st) }];
     // A keyboard-opened menu (button 0) hangs from the field; a mouse one opens at the pointer.
     menus.show(items, e.button === 0 ? view.input : { x: e.clientX, y: e.clientY });
   }
@@ -1297,6 +1332,20 @@ export class FindController {
   }
 
   /**
+   * One row (header): where the visible chrome covers this page, inflated 12 px as chromeZones does:
+   * the row, #vitre-bar's box (full width, ROW_H tall, moved down with the row while macOS's menu bar
+   * is over a full-screen window; it paints nothing between the capsules), or with the row hidden
+   * the face's own glass. It counts only where it reaches below the page's top edge: the page fills
+   * the window from y 0, so in a normal window and in full screen alike it does.
+   */
+  private rowZones(browser: XULBrowser): Rect[] {
+    const top = browser.getBoundingClientRect().top;
+    const chrome = this.barHidden() ? this.face.rectNow() : document.getElementById('vitre-bar')?.getBoundingClientRect();
+    if (!chrome || !chrome.width || chrome.bottom <= top) return [];
+    return [{ x: chrome.x - 12, y: 0, width: chrome.width + 24, height: chrome.bottom + 12 }];
+  }
+
+  /**
    * After a step: if the match is under the glass, scroll it clear (its top to y 92); on fixed or
    * sticky content the pill takes its parked tint instead. Then the ring lands ('ring' only).
    * onlyIfChanged: typing paused; the ring lands only if the active match moved.
@@ -1312,10 +1361,11 @@ export class FindController {
     // A match in a frame is guarded by scrolling what holds that frame in the top document.
     const frame = found.top ? 0 : this.topFrameOf(st);
     if (!peek && (found.top || frame)) {
-      const hit = this.chromeZones().some((z) => r.x < z.x + z.width && r.x + r.width > z.x && r.y < z.y + z.height && r.y + r.height > z.y);
+      const zones = oneRow() ? this.rowZones(st.browser) : this.chromeZones();
+      const hit = zones.some((z) => r.x < z.x + z.width && r.x + r.width > z.x && r.y < z.y + z.height && r.y + r.height > z.y);
       if (hit) {
         const zoom = this.zoom(st.browser);
-        const dy = (r.y - GUARD_Y) / zoom;
+        const dy = (r.y - (oneRow() ? Math.max(...zones.map((z) => z.y + z.height)) + GUARD_AIR : GUARD_Y)) / zoom;
         st.guardedAt = performance.now();
         const g = await this.b.page(st.browser).query<{ moved?: unknown; pinned?: unknown }>('find:guard', { dy, frame });
         if (!st.open || this.shown() !== st) return;

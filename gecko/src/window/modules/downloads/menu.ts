@@ -10,7 +10,7 @@ import { ic, node } from './icons';
 
 export interface Entry {
   label: string;
-  /** Accelerator printed on the right ("Ctrl+J", "Delete"). */
+  /** Accelerator printed on the right ("Ctrl+J", "Delete"; macOS in Apple glyphs, "⌥⌘L", "⌫"). */
   key?: string;
   /** Access key: a letter of the label. */
   access?: string;

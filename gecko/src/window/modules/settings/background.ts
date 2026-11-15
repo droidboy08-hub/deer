@@ -25,6 +25,7 @@
 import type { WallpaperTile } from '../../../modules/VitreWallpapers.sys';
 import type { Settings } from '../../../shared/settings';
 import type { Browser } from '../../browser';
+import { isMac } from '../../../shared/os';
 import { builtinWallpapers, exists, extOf, knownFolder, pickFile, PHOTO_EXT, VIDEO_EXT } from './gecko';
 
 export type HomeBg = Settings['homeBackground'];
@@ -53,7 +54,7 @@ const folderOf = (p: string): string => p.split(/[\\/]/).slice(-2, -1)[0] ?? '';
 /** ...\Wallpaper\ThemeA\img21.jpg -> 'Glow 2' (numbered among the tiles shown from that theme). */
 function builtinName(p: string, all: string[]): string {
   const dir = folderOf(p);
-  const name = THEME_NAMES[dir] ?? 'Windows wallpaper';
+  const name = THEME_NAMES[dir] ?? (isMac ? 'Mac wallpaper' : 'Windows wallpaper');
   const siblings = all.filter((x) => folderOf(x) === dir);
   return siblings.length > 1 ? `${name} ${siblings.indexOf(p) + 1}` : name;
 }
@@ -199,7 +200,7 @@ export class HomeBackground {
     const own: Tile[] = mine.map((r) => ({ kind: r.kind, path: r.path, label: baseName(r.path) }));
     if (kind === 'video') return own;
     const builtins: Tile[] = wp.builtins.map((p) => ({ kind: 'image', path: p, label: builtinName(p, wp.builtins) }));
-    return [{ kind: 'windows', path: wp.windows ?? '', label: 'Your Windows wallpaper' }, ...own, ...builtins];
+    return [{ kind: 'windows', path: wp.windows ?? '', label: isMac ? 'Your Mac wallpaper' : 'Your Windows wallpaper' }, ...own, ...builtins];
   }
 
   /**

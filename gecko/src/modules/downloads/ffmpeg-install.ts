@@ -11,6 +11,8 @@
 //   4. bin\ffmpeg.exe, bin\*.dll and LICENSE.txt are unpacked into a fresh folder that then replaces
 //      %LOCALAPPDATA%\Deer\ffmpeg; the zip is deleted. The caller points vitre.ffmpegPath at the exe.
 // One install at a time per process; the state is kept here so a reopened Settings page shows it.
+// macOS: not ported. The builds above are Windows ones, so installFfmpeg refuses there and fetches
+// nothing (Settings › Video downloads shows no Download row on a Mac).
 //
 // Deer's folders under %LOCALAPPDATA% (deerFolder, also used for yt-dlp and Deno): new downloads go
 // to %LOCALAPPDATA%\Deer. A copy downloaded while the browser was called Vitre, in
@@ -27,9 +29,12 @@
 // extract), Services.dirsvc "LocalAppData".
 import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
+import { isMac } from '../../shared/os';
 import { fileFor } from './partfile';
 
 const RELEASE = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/';
+/** macOS: why nothing is installed there (the state's error, after "Couldn’t install ffmpeg:"). */
+const MAC_NOT_YET = 'it is not available on a Mac yet';
 const BUILD = /^([0-9a-f]{64})\s+\*?(ffmpeg-n(\d+)\.(\d+)-latest-win64-lgpl-shared-([\d.]+)\.zip)$/i;
 
 export type FfmpegInstallPhase = 'idle' | 'checking' | 'downloading' | 'verifying' | 'unpacking' | 'done' | 'failed' | 'cancelled';
@@ -243,6 +248,11 @@ async function run(): Promise<string> {
 /** Download, check and unpack ffmpeg; resolves with the path of ffmpeg.exe. One at a time. */
 export function installFfmpeg(): Promise<string> {
   if (running) return running;
+  if (isMac) {
+    // The release holds Windows builds only (BUILD): nothing that would run on a Mac.
+    set({ phase: 'failed', version: '', received: 0, total: 0, path: '', error: MAC_NOT_YET });
+    return Promise.reject(new Error(MAC_NOT_YET));
+  }
   cancelled = false;
   running = run().finally(() => {
     running = null;

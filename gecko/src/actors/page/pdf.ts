@@ -13,6 +13,10 @@
 // becomes a tab) puts the offset in or takes it out to match. A page under a hidden bar (the bar in
 // hiding mode: auto-hide, F11; INSET_BAR_HIDDEN_KEY, ./inset.ts "Hidden bar") gets no offset either:
 // the bar keeps no band there, and the viewer's toolbar goes to the top of the window.
+// macOS (src/shared/os.ts isMac): the viewer is under the floating One row in a normal window (in
+// window full screen the row hides and the viewer gets no offset), and the offset is ROW_AREA (64 px,
+// src/shared/geometry.ts) as the inset module's strip: MAC_SHEET goes in and out with skin/pdf.css
+// and overrides its 68 (skin/pdf.css stays the Windows sheet as it is).
 // The viewer document keeps the PDF's own URL (file:, https:) as documentURI: PdfStreamConverter
 // streams viewer.html into the PDF's channel (gre/modules/PdfStreamConverter.sys.mjs). What
 // identifies it is its principal, resource://pdf.js/web/viewer.html.
@@ -21,10 +25,13 @@
 // through Firefox's PdfjsParent / FinderParent ("updatematchescount" protocol of
 // gre/moz-src/toolkit/components/pdfjs/content/PdfjsParent.sys.mjs).
 import type { PageContext } from '../page-api';
-import { INSET_BAR_HIDDEN_KEY, INSET_OFF_KEY } from '../../shared/geometry';
+import { INSET_BAR_HIDDEN_KEY, INSET_OFF_KEY, ROW_AREA } from '../../shared/geometry';
+import { isMac } from '../../shared/os';
 
 const VIEWER = 'resource://pdf.js/web/viewer.html';
 const SHEET = 'chrome://vitre/content/skin/pdf.css';
+/** macOS: the viewer ROW_AREA px down (header). `:root #mainContainer` outranks skin/pdf.css's rule whatever the order. */
+const MAC_SHEET = 'data:text/css,' + encodeURIComponent(`:root #mainContainer { inset-block-start: ${ROW_AREA}px !important; }`);
 
 export const events = {
   DOMContentLoaded: {},
@@ -69,6 +76,10 @@ function apply(ctx: PageContext): void {
     const utils = (win as any).windowUtils;
     if (want) utils.loadSheetUsingURIString(SHEET, utils.AUTHOR_SHEET);
     else utils.removeSheetUsingURIString(SHEET, utils.AUTHOR_SHEET);
+    if (isMac) {
+      if (want) utils.loadSheetUsingURIString(MAC_SHEET, utils.AUTHOR_SHEET);
+      else utils.removeSheetUsingURIString(MAC_SHEET, utils.AUTHOR_SHEET);
+    }
     ctx.state.sheet = want;
   } catch (e) {
     console.error('Deer pdf: could not change the viewer sheet', e);

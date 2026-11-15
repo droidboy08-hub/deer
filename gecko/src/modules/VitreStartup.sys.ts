@@ -10,6 +10,7 @@
 //   - registers about: pages whose files are in the package (about:vitre-home once src/pages/home exists)
 //     and makes Home the new-tab and home page
 //   - gives every top-level window Deer's icon and taskbar group
+//   - macOS: has the hidden window built with Deer's menu bar (VitreShell.macHiddenMenuBar)
 //   - starts Deer's updater at final-ui-startup (VitreUpdater: it only reads the install there; its
 //     first check of GitHub is minutes later, and only in an installed release)
 //   - under the test harness (VITRE_LOG set) mirrors Deer's console errors into the run log
@@ -29,6 +30,7 @@ import { VitreAppIcon } from 'chrome://vitre/content/modules/VitreAppIcon.sys.mj
 import { VitreSettings } from 'chrome://vitre/content/modules/VitreSettings.sys.mjs';
 import { VitreUpdater } from 'chrome://vitre/content/modules/VitreUpdater.sys.mjs';
 import { HOME_URL } from '../shared/home';
+import { isMac } from '../shared/os';
 
 const PACKAGE = 'chrome://vitre/content/';
 /** Taskbar identity (AppUserModelID) shared by all of Deer's windows: the installer's shortcuts and file types carry the same. */
@@ -211,6 +213,12 @@ export const VitreStartup = {
       Services.obs.addObserver(VitreStartup, 'domwindowopened');
       Services.obs.addObserver(VitreStartup, 'final-ui-startup');
     });
+    // macOS: the hidden window, created after AutoConfig (toolkit/xre/nsAppRunner.cpp XRE_mainRun ->
+    // nsAppStartup::CreateHiddenWindow), makes the app menu and the menu bar shown with no window
+    // open. Asked from here, VitreShell gives it Deer's menus before Firefox makes them native
+    // (src/window/modules/macmenu/items.ts installHiddenMenus); from the first window it is late.
+    // VitreShell imports this module, so it is loaded here rather than at the top.
+    if (isMac) step('mac menu bar', () => ChromeUtils.importESModule('chrome://vitre/content/modules/VitreShell.sys.mjs').VitreShell.macHiddenMenuBar());
   },
 
   get inited(): boolean {
@@ -370,8 +378,11 @@ export const VitreStartup = {
    * <runtime>\browser\chrome\icons\default\vitre.ico. Which icon follows Settings › App icon (VitreAppIcon).
    * setGroupIdForWindow (nsIWinTaskbar) throws NS_ERROR_ILLEGAL_VALUE for windows that have no
    * native widget yet; VitreShell calls this again for browser windows before layout.
+   * macOS has neither: its windows carry no icon of their own and the Dock shows the app bundle's,
+   * so nothing is done there.
    */
   brandWindow(win: any): void {
+    if (isMac) return;
     const setIcon = (): void => {
       try {
         const root = win.document?.documentElement;

@@ -17,6 +17,18 @@
 // another window). The entry is shared by every window: each window adds and removes only its own
 // ids (read-modify-write).
 //
+// macOS one row (./onerow.ts oneRow(); the owner, 2026-11-15: "remove the gray bar like windows"):
+// nothing here is different. The page fills the window from y 0 as on Windows (skin/shell.css
+// section 8), in a normal window and in window full screen alike, and the row floats over it (the
+// traffic lights and glass capsules, skin/bar.css), so the list follows the row's hiding mode
+// exactly as it follows the Windows bar's. The row hides only in window full screen (reveal.ts
+// `hiding`, the Mac's F11), so every page is listed there and gets no strip; in a normal window the
+// row stays, no page is listed and every page gets the top strip (src/actors/page/inset.ts: ROW_AREA,
+// 64 px on macOS, src/shared/geometry.ts; the PDF viewer moves down as far, src/actors/page/pdf.ts):
+// its content starts below the row at scroll top and scrolls under the capsules. (Until 2026-11-15
+// the page area started at the row's bottom edge, under a band of macOS's gray title-bar material,
+// and every page of a normal window was listed.)
+//
 // Firefox internals: gBrowser.tabs / tab.linkedBrowser / browser.browserId (Tabbrowser.sys.mjs,
 // browser-custom-element.mjs), the TabBrowserInserted event (Tabbrowser.sys.mjs _insertBrowser),
 // Services.ppmm.sharedData (gre/modules SharedMap: flush() sends the change to every content process
@@ -61,6 +73,7 @@ export class PageArea {
 
   /** Bring the shared list in line with this window's state; tell the pages when the mode changed. */
   update(): void {
+    // The Mac row too (header: macOS one row): it floats over the page and hides only in full screen.
     const hidden = this.covered();
     const want = new Set(hidden ? windowBrowserIds() : []);
     const changedMode = hidden !== this.hidden;

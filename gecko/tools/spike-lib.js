@@ -119,6 +119,19 @@ window.spike = (() => {
       for (let i = 0; i < 200 && !(await IOUtils.exists(done)); i++) await sleep(50);
     },
 
+    /**
+     * macOS: screenshot the screen area of this window with every window of this run in it, so menus
+     * and other popups (separate OS windows) are in the picture. Elsewhere the same as capture().
+     */
+    async captureScreen(name) {
+      if (Services.appinfo.OS !== "Darwin") return this.capture(name);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await sleep(250);
+      const done = PathUtils.join(outDir, name + ".png.done");
+      write("@@capture " + name + " " + hwnd() + " screen " + [window.screenX, window.screenY, window.outerWidth, window.outerHeight].map(Math.round).join(" "));
+      for (let i = 0; i < 200 && !(await IOUtils.exists(done)); i++) await sleep(50);
+    },
+
     /** Ask the runner which loaded DLLs match `text` in this run's processes; printed as a [modules] line. */
     async modules(text) {
       const done = PathUtils.join(outDir, "modules.done");

@@ -225,4 +225,108 @@ export const CSS = `
 #vitre-root .vx-page .vx-confirm { display: flex; align-items: center; gap: 8px; }
 #vitre-root .vx-page .vx-confirm-text { font-size: 12.5px; color: var(--vs-text2, rgba(255,255,255,0.6)); }
 #vitre-root .vx-page button.vs-link.vx-danger:hover { color: var(--vs-error, #ff99a4) !important; }
+
+/* ---- macOS, One row (window/onerow.ts; Mac canvas boards RowSpec, RowExtensions, RowDark,
+   DirOneRowBehaviour): the cluster in its own 36 px capsule at the row's right end, after Downloads and
+   joined to it by the liquid bridge; 30 px buttons 6 px apart, 3 px from the ends. The capsule's glass
+   is the tab capsules' (skin/bar.css, One row; downloads/css.ts does the same): the row's tokens on
+   #vitre-row-end give its fill (--g-tint), ink (--g-text), inset rim (--row-rim) and full shadow
+   (--g-shadow), and bar.css gives it the capsules' blur, over the page. They follow the theme of the
+   page under the row (theme-light: ink #1d1d1f on white 42 %; theme-dark and theme-clear: white ink),
+   not the system's appearance; dark glass in a private window. The buttons' hover and press, the
+   badge ring and the accent key on the same classes here (bar.ts sets brighttext to match). In split
+   view a capsule over the other side's page carries that page's theme (window/bar.ts paintRowSplit:
+   class over-light, over-dark or over-clear, never in a private window): its tokens come from
+   skin/bar.css, its hover, press, ring and accent from the over-* rules here. ---- */
+@media (-moz-platform: macos) {
+  #vitre-root #vitre-row-end > .vx-rowcap {
+    --vx-fill: var(--g-tint);
+    --vx-hover: rgba(29,29,31,0.08);
+    --vx-press: rgba(29,29,31,0.14);
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0 3px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    color: var(--g-text);
+    background: var(--vx-fill);
+    box-shadow: var(--row-rim), var(--g-shadow);
+    pointer-events: auto;
+    -moz-window-dragging: no-drag;
+  }
+  /* Downloads joined to Extensions: a 12 px neck across the 8 px gap, 2 px into each capsule's box.
+     Its ends are the two capsules' own circles (radius 18, centres 16 px left of the neck's box and
+     28 px right of its left edge), so it never paints over a capsule: the fill is translucent, and
+     the strip of it doubled inside each circle showed as a dark band at both ends over the page.
+     Part of the capsule: it takes the pointer as the capsule does, where it is painted (the
+     clip-path limits the hit area too), so a press on it lands on the Extensions capsule, which does
+     nothing with a bare click, never on a link of the page under the row; above and below it the gap
+     is the page's (#vitre-row-end is click-through: skin/bar.css). */
+  #vitre-root #vitre-row-end > .vd-ring + .vx-rowcap::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 0;
+    width: 12px;
+    height: 36px;
+    clip-path: path('M0.12 10 Q6 15 11.88 10 A18 18 0 0 0 11.88 26 Q6 21 0.12 26 A18 18 0 0 0 0.12 10 Z');
+    background: var(--vx-fill);
+    pointer-events: auto;
+  }
+  #vitre-root.popup #vitre-row-end > .vx-rowcap { display: none; }
+  #vitre-root .vx-rowcap > .vx-cluster { --vx-ring: rgba(255,255,255,0.92); --vx-accent: #005fb8; height: 30px; gap: 6px; margin-right: 0; }
+  #vitre-root .vx-rowcap :is(.vx-pas, #vitre-ext-bar) { gap: 6px; }
+  #vitre-root .vx-rowcap #vitre-ext-bar { height: 30px; color: inherit; }
+  #vitre-root .vx-rowcap #vitre-ext-bar > toolbaritem { height: 30px; }
+  :is(#vitre-root .vx-rowcap #vitre-ext-bar .unified-extensions-item-action-button, #vitre-root .vx-rowcap #unified-extensions-button, #vitre-root .vx-rowcap .vx-pa) {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 15px !important;
+    color: inherit !important;
+  }
+  :is(#vitre-root .vx-rowcap #vitre-ext-bar .unified-extensions-item-action-button, #vitre-root .vx-rowcap #unified-extensions-button, #vitre-root .vx-rowcap .vx-pa):hover { background: var(--vx-hover) !important; }
+  :is(#vitre-root .vx-rowcap #vitre-ext-bar .unified-extensions-item-action-button, #vitre-root .vx-rowcap #unified-extensions-button, #vitre-root .vx-rowcap .vx-pa):is(:hover:active, [open]) { background: var(--vx-press) !important; }
+  :is(#vitre-root .vx-rowcap #vitre-ext-bar .unified-extensions-item-action-button, #vitre-root .vx-rowcap #unified-extensions-button, #vitre-root .vx-rowcap .vx-pa):focus-visible { outline-color: currentColor !important; }
+  #vitre-root .vx-rowcap #vitre-ext-bar .unified-extensions-item-action-button[disabled] { background: transparent !important; }
+  /* The pill's rule for these is under #vitre-bar, which the row's right end is not in. */
+  #vitre-root #vitre-row-end .vx-rowcap .vx-pa:is([hidden], .vx-overflow) { display: none !important; }
+  #vitre-root .vx-rowcap #vitre-ext-bar .toolbarbutton-badge { font-family: -apple-system, system-ui, sans-serif !important; }
+  /* Hang points span the capsule (the cluster is 3 px inside it): routed popups open 8 px under the
+     capsule, doorhangers at the door's bottom edge, which is that line. */
+  #vitre-root .vx-rowcap .vx-cluster .vx-hang { top: -3px; height: 36px; }
+  #vitre-root .vx-rowcap .vx-cluster .vx-door { top: -3px; width: 30px; height: 44px; }
+}
+@media (-moz-platform: macos) {
+  /* theme-dark, theme-clear and a private window: light ink (the fill and ink come from the tokens). */
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-row-end > .vx-rowcap { --vx-hover: rgba(255,255,255,0.12); --vx-press: rgba(255,255,255,0.2); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) .vx-rowcap > .vx-cluster { --vx-ring: rgba(26,26,30,0.92); --vx-accent: #4cc2ff; }
+  /* Split view: over the other side's page the capsule takes that page's (bar.ts paintRowSplit). */
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vx-rowcap.over-light { --vx-hover: rgba(29,29,31,0.08); --vx-press: rgba(29,29,31,0.14); }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vx-rowcap.over-light > .vx-cluster { --vx-ring: rgba(255,255,255,0.92); --vx-accent: #005fb8; }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vx-rowcap:is(.over-dark, .over-clear) { --vx-hover: rgba(255,255,255,0.12); --vx-press: rgba(255,255,255,0.2); }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vx-rowcap:is(.over-dark, .over-clear) > .vx-cluster { --vx-ring: rgba(26,26,30,0.92); --vx-accent: #4cc2ff; }
+
+  /* Firefox's panels and menus opened from the cluster: on macOS not the Windows design's opaque
+     material above but the system's own. Menus get Firefox's Mac values back (toolkit/themes/shared/
+     popup.css: no background, border or CSS shadow of their own over the native menu material), and
+     the panels take the menu appearance too: layout/xul/nsMenuPopupFrame.cpp GetShadowStyle() gives
+     a -moz-default-appearance: menupopup popup WindowShadow::Menu, which widget/cocoa/nsCocoaWindow.mm
+     (newEffectViewWrapperForStyle:) puts on an NSGlassEffectView from macOS 26 (Liquid Glass, corner
+     radius 12: GetMenuCornerRadius()), and nsNativeThemeCocoa draws nothing over it (Menupopup is
+     eTransparent). */
+  :is(#unified-extensions-panel, #customizationui-widget-panel, #pageActionActivatedActionPanel, #unified-extensions-context-menu, #toolbar-context-menu) {
+    --panel-background-color: none;
+    --panel-border-color: transparent;
+    --panel-box-shadow: none;
+    --panel-border-radius: 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  :is(#unified-extensions-panel, #customizationui-widget-panel, #pageActionActivatedActionPanel) {
+    appearance: auto;
+    -moz-default-appearance: menupopup;
+  }
+}
 `;

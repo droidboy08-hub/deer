@@ -376,4 +376,86 @@ export const CSS = `
   #vitre-root .vd-bar > i, #vitre-root .vd-segs > span > i, #vitre-root .vd-pop-segs > span > i, #vitre-root .vd-ring .arc, #vitre-root .vd-pill-prog .arc { transition: none; }
   #vitre-root .vd-ring.indeterminate .spin { animation: none; }
 }
+
+/* ---- macOS, One row (window/onerow.ts; Mac canvas boards RowSpec, RowDownloads, RowDark,
+   DirOneRowBehaviour): the ring is a 36 px capsule at the row's right end (#vitre-row-end), over the
+   page, always there; the arc shows while anything downloads (.shown). Its glass is the tab capsules'
+   (skin/bar.css, One row): the row's tokens, which #vitre-row-end carries, give its fill (--g-tint),
+   ink (--g-text), inset rim (--row-rim), hover fill (--row-tint-hover) and full shadow (--g-shadow),
+   and bar.css gives it the capsules' blur. They follow the theme of the page under the row
+   (theme-light: ink #1d1d1f on white 42 %; theme-dark and theme-clear: white ink on white 14 % or
+   10 %), not the system's appearance; a private window's capsules are dark glass with white ink. The
+   pressed fill, the track and the dot key on the same classes here. In split view the capsule over
+   the other side's page takes that page's theme (window/bar.ts paintRowSplit: class over-light,
+   over-dark or over-clear on it, never in a private window): its tokens come from skin/bar.css, its
+   pressed fill, track and dot from the over-* rules here. The quick view (.under-row) is a popover
+   that hangs from the capsule: 8 px under it, right edges aligned (ring.ts sets top and right), 380
+   wide, radius 16, and in the colours of the capsule it hangs from: light glass under a light
+   capsule (ring.ts sets class row-light: the row's theme-light, or the capsule's over-light), dark
+   glass under a dark or clear one and in a private window, so a light capsule never carries a dark
+   panel (until 2026-11-15 it followed the system's appearance). The video pill moves down with the
+   full-screen row while macOS's menu bar is down (video.ts header). ---- */
+@media (-moz-platform: macos) {
+  #vitre-root #vitre-row-end > .vd-ring { position: relative; flex: none; width: 36px; height: 36px; border-radius: 18px; color: var(--g-text);
+    background: var(--g-tint); pointer-events: auto; -moz-window-dragging: no-drag;
+    box-shadow: var(--row-rim), var(--g-shadow); }
+  #vitre-root #vitre-row-end > .vd-ring:hover { background: var(--row-tint-hover); }
+  #vitre-root #vitre-row-end > .vd-ring:is(:active, .open) { background: rgba(255,255,255,0.52); }
+  #vitre-root #vitre-row-end > .vd-ring button { width: 36px; height: 36px; border-radius: 18px; color: inherit; background: transparent; }
+  #vitre-root #vitre-row-end > .vd-ring button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+  /* The face at the board's 28 px, strokes 2.2 (glyph 1.8); the track at 16 % ink (24 % on dark). */
+  #vitre-root #vitre-row-end > .vd-ring svg { width: 28px; height: 28px; }
+  #vitre-root #vitre-row-end > .vd-ring :is(.track, .arc) { stroke-width: 2.2px; }
+  #vitre-root #vitre-row-end > .vd-ring path { stroke-width: 1.8px; }
+  #vitre-root #vitre-row-end > .vd-ring .track { opacity: 0.16; }
+  #vitre-root #vitre-row-end > .vd-ring:not(.shown) .arc { visibility: hidden; }
+  #vitre-root #vitre-row-end > .vd-ring .vd-ring-dot { top: 2px; right: 2px; background: #005fb8; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8); }
+
+  #vitre-root .module-layer > .vd-pop.glass.under-row { left: auto; bottom: auto; width: 380px; border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.12); transform-origin: calc(100% - 18px) -26px; }
+
+  /* Download this video in window full screen while macOS's menu bar is down (reveal.ts: row-shifted,
+     --vitre-row-shift): a pill near the row's line moves down by what the moved row would cover
+     (video.ts place() sets --vd-pill-room, how far below ROW_H + 8 it sits). Not while its picker
+     hangs from it (.open), which stays where it opened. */
+  #vitre-root.one-row.fullscreen.row-shifted .module-layer > .vd-pill.glass:not(.open) {
+    translate: 0 max(0px, var(--vitre-row-shift, 0px) - var(--vd-pill-room, 0px)); }
+}
+@media (-moz-platform: macos) {
+  /* theme-dark and theme-clear: light ink (the fill, ink and hover come from the tokens). */
+  #vitre-root.one-row:is(.theme-dark, .theme-clear) #vitre-row-end > .vd-ring:is(:active, .open) { background: rgba(255,255,255,0.18); }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear) #vitre-row-end > .vd-ring .track { opacity: 0.24; }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear) #vitre-row-end > .vd-ring .vd-ring-dot { background: #4cc2ff; box-shadow: 0 0 0 1.5px rgba(16,16,20,0.55); }
+  /* Private window: dark glass whatever the page (DirOneRowBehaviour "Private"). */
+  #vitre-root.one-row.private #vitre-row-end > .vd-ring:hover { background: rgba(44,44,48,0.66); }
+  #vitre-root.one-row.private #vitre-row-end > .vd-ring:is(:active, .open) { background: rgba(38,38,42,0.64); }
+  #vitre-root.one-row.private #vitre-row-end > .vd-ring .track { opacity: 0.24; }
+  #vitre-root.one-row.private #vitre-row-end > .vd-ring .vd-ring-dot { background: #4cc2ff; box-shadow: 0 0 0 1.5px rgba(16,16,20,0.55); }
+  /* Split view: over the other side's page the capsule takes that page's (bar.ts paintRowSplit). */
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring.over-light:is(:active, .open) { background: rgba(255,255,255,0.52); }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring.over-light .track { opacity: 0.16; }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring.over-light .vd-ring-dot { background: #005fb8; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8); }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring:is(.over-dark, .over-clear):is(:active, .open) { background: rgba(255,255,255,0.18); }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring:is(.over-dark, .over-clear) .track { opacity: 0.24; }
+  #vitre-root.one-row:not(.private) #vitre-row-end > .vd-ring:is(.over-dark, .over-clear) .vd-ring-dot { background: #4cc2ff; box-shadow: 0 0 0 1.5px rgba(16,16,20,0.55); }
+}
+@media (-moz-platform: macos) {
+  /* The quick view in light glass under a light capsule (board RowDownloads; ring.ts row-light); a
+     dark or clear capsule and a private window keep the dark one. */
+  #vitre-root.one-row:not(.private) .module-layer > .vd-pop.glass.under-row.row-light { color: #1d1d1f; }
+  #vitre-root.one-row:not(.private) .module-layer > .vd-pop.glass.under-row.row-light > .tint { background: rgba(255,255,255,0.72); }
+  #vitre-root.one-row:not(.private) .module-layer > .vd-pop.glass.under-row.row-light > .rim { background: linear-gradient(165deg, rgba(255,255,255,0.95), rgba(255,255,255,0.45) 30%, rgba(255,255,255,0.3) 60%, rgba(255,255,255,0.7)); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light :focus-visible { outline-color: #1d1d1f; }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light :is(.vd-pop-head span, .vd-pop-meta, .vd-pop-empty) { color: #6e6e73; }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-row:hover { background: rgba(29,29,31,0.05); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-row:focus-visible { box-shadow: inset 0 0 0 2px #1d1d1f; }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-tile { background: rgba(29,29,31,0.06); color: rgba(29,29,31,0.8); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-segs > span { background: rgba(29,29,31,0.1); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-segs > span > i { background: #005fb8; }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-segs.dim > span > i { background: rgba(29,29,31,0.35); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light :is(.vd-round, .vd-pop-open) { background: rgba(29,29,31,0.07); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light :is(.vd-round, .vd-pop-open):hover { background: rgba(29,29,31,0.12); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light :is(.vd-round, .vd-pop-open):active { background: rgba(29,29,31,0.05); }
+  #vitre-root.one-row:not(.private) .vd-pop.under-row.row-light .vd-pop-sep { background: rgba(29,29,31,0.1); }
+}
 `;

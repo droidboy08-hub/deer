@@ -1,5 +1,8 @@
 // Types of the menus module. MenuItem / MenusApi are the 'menus' service contract other modules use
 // (b.service('menus')); Spec and Anchor are what the view draws.
+import type { Browser } from '../../browser';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
 
 /**
  * One row of a Deer menu.
@@ -9,9 +12,11 @@
  *   key       the accelerator printed in the right column, Windows spelling, plain dim text
  *             ("Ctrl+W", "Shift+click", or a reason such as "Protected"). A single letter or digit
  *             here is taken as the access key instead and not printed (an accelerator is never one
- *             bare letter).
+ *             bare letter). macOS prints Apple glyphs in ⌃⌥⇧⌘ order with no "+" ("⌘W", "⇧-click"):
+ *             build it with actionKey / fixedKey below.
  *   access    the access-key letter; wins over a '&' marker. Underlined at the first word starting
- *             with it. '' means none.
+ *             with it. '' means none. macOS underlines nothing: a typed letter moves the highlight
+ *             to the next row whose label starts with it (view.ts).
  *   icon      a glyph name of the menu set (icons.ts: 'copy', 'download', 'link'...) or an image URL
  *             (chrome:, moz-extension:, data:, moz-remote-image:) drawn at 16 px. The icon column is
  *             always kept, so rows without an icon still line up.
@@ -54,8 +59,9 @@ export type MenuItem = MenuCommand | { separator: true } | { caption: string };
  *   onClose   called once when the menu closes, however it closes (after the chosen row ran);
  *             also called once, at once, when nothing could be shown (no command row).
  *   keyboard  opened from the keyboard: the first enabled row is focused and access keys are
- *             underlined. Detected by itself when show() is called while a keyboard-triggered
- *             contextmenu event (Shift+F10, the Menu key) is being handled.
+ *             underlined (not on macOS). Detected by itself when show() is called while a
+ *             keyboard-triggered contextmenu event (Shift+F10, the Menu key) is being handled; a
+ *             ⌃-click on macOS is the mouse.
  *   label     accessible name of the menu (default "Context").
  *   owner     an element that keeps its pressed look (class vt-menu-owner) and aria-expanded while
  *             the menu is open (a bar circle, the downloads ring).
@@ -142,6 +148,26 @@ export const SEP: MenuItem = { separator: true };
 export const isCommand = (r: MenuItem | null | undefined | false): r is MenuCommand => !!r && 'label' in r;
 export const isSeparator = (r: MenuItem): r is { separator: true } => 'separator' in r;
 export const isCaption = (r: MenuItem): r is { caption: string } => 'caption' in r;
+
+/**
+ * The accelerator a row prints for one of Deer's actions (shortcuts.ts ActionId). Windows prints
+ * `win` as it always has ("Ctrl+W"); macOS prints the action's chord as the key router has it now
+ * (b.keys.label: "⌘W", "⇧⌘T"), '' when the action has no chord there.
+ */
+export function actionKey(b: Browser, action: string, win: string): string {
+  return isMac ? (b.keys?.label(action) ?? '') : win;
+}
+
+/**
+ * A chord that is none of Deer's actions (the editing keys, a field's own key): Windows prints
+ * `win`; macOS prints `mac`, a spec in shortcuts.ts grammar ("Mod+Shift+Z"), as "⇧⌘Z".
+ */
+export function fixedKey(win: string, mac: string): string {
+  return isMac ? displaySpec(mac, currentOS()) : win;
+}
+
+/** "Shift+click" in the accelerator column; macOS prints the modifier's glyph, "⇧-click" (MacKeys board). */
+export const shiftClickKey = (): string => (isMac ? '⇧-click' : 'Shift+click');
 
 /** A command row (the builders' shorthand): label, icon, accelerator, access key, run, extras. */
 export function item(label: string, icon: string, key: string, access: string, run: () => void, extra: Partial<MenuCommand> = {}): MenuCommand {

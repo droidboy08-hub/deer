@@ -5,13 +5,27 @@
 // launcher/Vitre.exe (the launcher's name before the rename, still on old taskbar pins and in old
 // scripts) is written as a copy of the same program, so whatever starts it opens Deer's development
 // profile like Deer.exe, never the pre-rename profile on its own.
+// On macOS the development launcher is the shell script launcher/deer: nothing to compile, this only
+// makes it executable.
 //   node tools/build-launcher.mjs
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+if (process.platform === 'darwin') {
+  const script = join(ROOT, 'launcher', 'deer');
+  try {
+    // chmod +x: a checkout or a copy can lose the bit git records.
+    chmodSync(script, (statSync(script).mode & 0o7777) | 0o111);
+  } catch (e) {
+    console.error(`launcher/deer cannot be made executable: ${e.message}`);
+    process.exit(1);
+  }
+  console.log(`macOS: nothing to build, ${script} is the launcher (made executable)`);
+  process.exit(0);
+}
 const windir = process.env.WINDIR ?? 'C:\\Windows';
 const csc = [join(windir, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe'), join(windir, 'Microsoft.NET', 'Framework', 'v4.0.30319', 'csc.exe')].find(existsSync);
 if (!csc) {

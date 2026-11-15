@@ -10,6 +10,8 @@
 //               .zip.sha256sum (PowerShell Get-FileHash text); yt-dlp needs a JavaScript runtime for
 //               YouTube since 2025.11 (--js-runtimes deno:<path>).
 // Nothing is installed when a fingerprint does not match.
+// macOS: not ported. Both downloads above are Windows builds, so installTools refuses there and fetches
+// nothing, and ytdlpTools looks in no folder of Deer's there (only the test pref's stand-in command).
 //
 // Use:
 //   probe(pageUrl)  yt-dlp -J: title, duration, live, DRM and formats -> a VideoOffer (mode 'ytdlp');
@@ -46,6 +48,7 @@
 import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { Subprocess } from 'resource://gre/modules/Subprocess.sys.mjs';
 import { clearTimeout, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
+import { isMac } from '../../shared/os';
 import { deerFolder, fetchText, oldFolder, sha256 } from './ffmpeg-install';
 import { AbortedError, AddressRefusedError, DownloadError, REFUSED_STATUS } from './net';
 import { fileFor } from './partfile';
@@ -95,7 +98,8 @@ export function ytdlpTools(): { command: string[]; deno: string } | null {
     }
   }
   // Deer's folder first: once an update has put a pair there, the old folder is no longer used.
-  for (const dir of [toolsDir(), oldToolsDir()]) {
+  // macOS: Deer installs no pair there (installTools), and %LOCALAPPDATA% does not exist on a Mac.
+  for (const dir of isMac ? [] : [toolsDir(), oldToolsDir()]) {
     const ytdlp = PathUtils.join(dir, 'yt-dlp.exe');
     const deno = PathUtils.join(dir, 'deno.exe');
     if (exists(ytdlp) && exists(deno)) return { command: [ytdlp], deno };
@@ -1136,6 +1140,11 @@ async function installAll(force: boolean): Promise<void> {
 /** Download, check and put in place yt-dlp (always) and Deno (when missing, or always with `force`). */
 export function installTools(force = false): Promise<void> {
   if (installing) return installing;
+  if (isMac) {
+    // yt-dlp.exe and Deno's Windows zip (DENO_ZIP): nothing that would run on a Mac.
+    setState({ phase: 'failed', tool: '', received: 0, total: 0, error: 'it is not available on a Mac yet' });
+    return Promise.reject(new Error('yt-dlp is not available on a Mac yet'));
+  }
   cancelled = false;
   installing = installAll(force).finally(() => {
     installing = null;

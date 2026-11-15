@@ -28,7 +28,15 @@
 //                           buttons are not drawn and the placeholder is centred in the whole pill.
 //   b.bar.reserve           width kept free at the right edge for the window controls; nothing that
 //                           takes clicks may be drawn there (Windows hit-tests the caption buttons
-//                           by their place, whatever is painted over them).
+//                           by their place, whatever is painted over them). On macOS only the
+//                           Private label's (0 without one): the controls are at the left there.
+//                           One row (macOS, below): everything right of the tab strip (EDGE, the
+//                           Downloads and Extensions group and a gap, a private window's capsule).
+//   b.bar.reserveLeft       width kept free at the left edge: the traffic lights' capsule on macOS
+//                           (12 + 76 + 12; one row: TABS_LEFT, TABS_LEFT_FULL in window full
+//                           screen), 0 on Windows.
+//   b.bar.editing(on)       one row only: the address field is open in the active capsule, which
+//                           grows to ACTIVE_TYPING (omnibox.ts calls it; b.bar.layout follows at once).
 //   b.bar.hidden            true while the bar is slid away (auto-hide setting or F11 full screen).
 //   b.bar.hiding            true while the bar is in hiding mode (auto-hide or F11), shown or not:
 //                           it keeps no band at the top, so pages get no top strip then
@@ -109,7 +117,8 @@
 // Many tabs (the Electron build only shrinks the pill; the rest is this build's answer, see render):
 //   1. the pill gives way from 480 down to 220 px (360 for a split pill; not below a claimPill
 //      width), the group stays centred;
-//   2. the group moves left of centre, into the room beside the window controls;
+//   2. the group moves off centre, into the room beside the window controls (left of centre on
+//      Windows, right of it on macOS, where the controls are at the left);
 //   3. the circles shrink from 44 to 30 px (gaps 8 -> 4);
 //   4. only the tabs nearest the active one are drawn (the rest stay reachable by keys and the
 //      switcher); a background pair counts as two circles.
@@ -117,12 +126,75 @@
 // Window move: pressing on a bar item and dragging more than 5 px starts a native window move
 // (fx.beginWindowMove); a plain click still does what the control does. A press held 300 ms on a
 // background circle without moving 5 px lifts it instead (split view; see above).
+// macOS: a capsule is never a drag region (-moz-window-dragging: no-drag, so Gecko covers it with a
+// view that does not move the window: widget/cocoa/nsCocoaWindow.mm UpdateWindowDraggingRegion,
+// NonDraggableView), and fx.beginWindowMove has no Mac path yet (port plan D9: false). A press that
+// moved 5 px therefore counts as a drag only when the move really started; otherwise its click
+// still does what the capsule does. The drag strip at the top of the window and the lights' capsule
+// move the window natively (One row, below).
+//
+// One row (macOS, oneRow() in ./onerow; boards RowSpec, DirOneRow, DirOneRowBehaviour)
+//   Everything above is the Windows bar and stays as it is there. On macOS the bar is one 52 px row,
+//   floating over the page as the Windows bar does (the owner, 2026-11-15: "remove the gray bar like
+//   windows"; the page fills the window from y 0, skin/shell.css section 8, and web content starts
+//   below the row at scroll top through the page's top strip, pagearea.ts):
+//   - Moving the window, as on Windows: only #vitre-drag, the 18 px strip at the top of the window
+//     (made in the constructor, under every layer; skin/shell.css section 4, skin/bar.css), and the
+//     lights' capsule move it, and a double-click on them zooms, as on a Mac title bar (nothing here
+//     prevents the strip's mouseup, which -[ChildView mouseUp:] needs for that). Nothing else lies
+//     across the row: #vitre-bar and #vitre-row-end are click-through between their capsules, so the
+//     page under the row gets the pointer, hover, right-click and the wheel wherever no capsule is.
+//     (Until 2026-11-15 a full-width 52 px band, #vitre-row-band, was the drag region and took them.)
+//   - #vitre-row-end, right-aligned at EDGE from the right, CAP_TOP from the top: the downloads and
+//     extensions modules put their 36 px capsules in it. Its width is watched (ResizeObserver) and
+//     the tabs stay clear of it, and of a private window's "Private" capsule left of it (winctl.ts;
+//     --vitre-row-end-room on the layer places that capsule). b.bar.reserve is all of that plus EDGE.
+//   - Tabs from TABS_LEFT, left to right, GAP apart, every one a 36 px capsule at CAP_TOP (radius 18):
+//     the active one is the item's pill face, ACTIVE_W wide (Back and Forward are not drawn: keys and
+//     the trackpad; favicon and host centred, Reload at the right end); the others are the circle
+//     face with the favicon and the title (13 px), as wide as the title needs up to COMPACT_MAX; then
+//     the + capsule. No lens maps: every capsule is Deer's CSS glass, fill, rim, full shadow and a
+//     blur on its .lens (skin/bar.css), in the colours of the page under the row: #vitre-root's
+//     theme-light / theme-dark / theme-clear, as the Windows bar's (a private window: dark glass).
+//   - Crowded: 1. the compact tabs' titles shrink together (a short title keeps its width, the
+//     longer ones share what is left, ellipsis), down to COMPACT_MIN (the owner, 2026-11-15: "make
+//     the titles shrink gradually first"; until then every title folded at once, and in any window
+//     under 900 px, with room to spare); 2. below that they drop their titles (36 px favicon
+//     capsules, class "icons" on the bar); 3. the active capsule gives way down to ACTIVE_MIN; 4. the
+//     strip scrolls sideways (the wheel or the trackpad over a capsule; between the capsules the wheel
+//     stays the page's) between TABS_LEFT and the right group, a 40 px fade at an end that has more (class "overflow", --strip-l/-r and --fade-l/-r).
+//     The active capsule is brought into view when it changes, when the address is edited and when
+//     find claims the pill.
+//   - Hover: after 300 ms a compact tab grows to its whole title and a close x (up to 280, from the
+//     room the row has to spare and, when that is not enough, from the other titles down to
+//     ROW_HOVER_YIELD: hovering never folds titles or scrolls), its neighbours slide aside; with favicons only
+//     it grows from the spare room alone, and not at all when that is too little for the x beside
+//     the favicon and some title. It folds 150 ms after the pointer leaves, and moving to a
+//     neighbour hands the growth over.
+//   - Editing the address (b.bar.editing(true), omnibox.ts): the active capsule grows to
+//     ACTIVE_TYPING, the compact tabs' titles shrinking and then folding to favicons first when that
+//     is what makes room.
+//   - Split view: an active pair is two capsules, one per page, joined by a bridge (2 x 308 + 16,
+//     down to 2 x 140 + 16); in the background it is two favicons in one 80 px capsule. The morphs,
+//     the mixed tint and the theme cross-fade are Windows' (the row takes the focused side's theme;
+//     a capsule's fill eases into a new theme by its own 150 ms transition, skin/bar.css): the row's
+//     items fade and slide as any tab does. A capsule over the other side's page, when that page's
+//     theme is not the focused side's, takes that page's colours (paintRowSplit: over-light /
+//     over-dark / over-clear), so its ink reads over the page under it.
+//   - claimPill(width) holds the active capsule at that width while the row can afford it.
+//   - The window is never narrower than the row needs (onerow.ts minWindowWidth: 564, a private
+//     window 676): buildRow sets the root's --window-min-width, which becomes the NSWindow's minSize.
+//   - Window full screen (boards RowFullScreen, RowFullScreenReveal; onerow.ts header): the first tab
+//     is at TABS_LEFT_FULL (b.bar.reserveLeft), there is no drag strip, the row hides as the Windows
+//     bar does in F11 and comes back with the pointer at the top (./reveal), and moves down below
+//     macOS's menu bar.
 import type { Browser } from './browser';
 import { el, fill, svg } from './dom';
 import * as fx from './firefox';
 import { glass, lens, lensCount, MAX_ROW_SHAPES, rowLens, type RowLens } from './glass';
 import { icons } from './icons';
 import type { Tab, Theme } from './model';
+import { ACTIVE_MIN, ACTIVE_TYPING, ACTIVE_W, CAP_H, CAP_TOP, COMPACT_MAX, COMPACT_MIN, EDGE, GAP as ROW_GAP, minWindowWidth, oneRow } from './onerow';
 import { Reveal } from './reveal';
 import { titleOf, type Pair, type Unit } from './split';
 import { Lift } from './splitlift';
@@ -130,7 +202,16 @@ import { circleShape, fadeIn, ghost, halfShape, MORPH_MS, reduced, SPRING } from
 import { setTip, Tips } from './tips';
 import { WindowControls } from './winctl';
 import { BAR_ITEM, BAR_TOP } from '../shared/geometry';
+import { isMac } from '../shared/os';
+import { currentOS, displaySpec } from '../shared/shortcuts';
 import { displayHost } from '../shared/url';
+
+/**
+ * A tooltip's key for one of Deer's actions: Windows prints `win` as before; macOS the action's
+ * chord as the key router has it (b.keys.label: "⌘[", "⌘R"). Stop prints Esc, the ladder's key.
+ */
+const tipKey = (b: Browser, action: string, win: string): string => (isMac ? (b.keys?.label(action) ?? '') : win);
+const escKey = (): string => (isMac ? displaySpec('Escape', currentOS()) : 'Esc');
 
 const PILL = 480;
 const PILL_MIN = 220;
@@ -152,6 +233,37 @@ const SETTLE_REDUCED = 160;
 const DRAG_THRESHOLD = 5;
 /** The mixed tint's layers stay this long after the last split showed (its 150-200 ms fade out). */
 const MIX_LINGER = 400;
+
+// One row (macOS; see the header and ./onerow).
+/** A compact tab around its title (RowSpec "Compact tab"): padding 10, favicon 16, 8, the title, padding 14. */
+const ROW_TAB_PAD = 10 + 16 + 8 + 14;
+/**
+ * The title's text as skin/bar.css draws it (13 px in the root's font, -0.08 px tracking): compact
+ * widths are measured with it, laid out in the window itself (titleWidth). A canvas does not measure
+ * the same font: an OffscreenCanvas in this window resolves neither system-ui nor -apple-system and
+ * falls back to a serif ("Refract" 38.7 px against 44 drawn), a document canvas takes another cut of
+ * the system font (48), so every compact title was cut short with room to spare on the row.
+ */
+const ROW_TITLE_STYLE = 'position:absolute;left:0;top:0;width:max-content;visibility:hidden;pointer-events:none;white-space:nowrap;font-size:13px;letter-spacing:-0.08px';
+/** Hover (DirOneRowBehaviour 2): the whole title and a 20 px close x (6 before it, 8 after, less the 14 of padding), up to 280. */
+const ROW_HOVER_CLOSE = 6 + 20 + 8 - 14;
+const ROW_HOVER_MAX = 280;
+/**
+ * A full row (shrunk titles): while the pointer is on a tab, the other compact tabs give it room down
+ * to this (favicon and a few letters; 20 more with the close x always shown), never folding. At
+ * COMPACT_MIN they could give too little: the x would take more of the hovered title than it showed.
+ */
+const ROW_HOVER_YIELD = 72;
+const ROW_HOVER_IN = 300;
+const ROW_HOVER_OUT = 150;
+/** Split view (board DirOneRowBehaviour, "Split view"): two capsules of 308 joined over 16 px; each gives way down to 140. */
+const ROW_PAIR_HALF = 308;
+const ROW_PAIR_HALF_MIN = 140;
+const ROW_PAIR_JOIN = 16;
+/** A crowded strip scrolls; an end that has more fades over 40 px (DirOneRowBehaviour 4). */
+const ROW_FADE = 40;
+/** A wheel's line, in px (trackpads report pixels). */
+const ROW_WHEEL_LINE = 16;
 
 export interface BarHandlers {
   activate(id: number): void;
@@ -181,6 +293,18 @@ interface Place {
   total: number;
   /** The units that are drawn, in order (a tab, or a split pair). */
   shown: Unit[];
+  /** One row: every drawn unit's width by its key (the + is CAP_H), and the crowded strip's state. */
+  row?: {
+    widths: Map<number | string, number>;
+    /** Compact tabs show their favicon only. */
+    icons: boolean;
+    /** How far the strip is scrolled, and how far it could be (0: it fits). */
+    scroll: number;
+    overflow: number;
+    /** The strip's window in x: from TABS_LEFT (TABS_LEFT_FULL in full screen) to the right group. */
+    left: number;
+    right: number;
+  };
 }
 
 type Tone = 'light' | 'dark' | 'ok';
@@ -249,6 +373,42 @@ function paintFav(fav: HTMLElement, t: Tab, want: string): void {
   } else fill(fav, svg(icons.globe));
 }
 
+/** A tab's name as the bar shows it: a circle's tooltip and label, a compact tab's title (one row). */
+function labelOf(t: Tab): string {
+  return t.kind === 'home' ? 'Home' : t.title || displayHost(t.url) || 'New tab';
+}
+
+/** One row: compact titles' widths by text, measured once each. */
+const titleWidths = new Map<string, number>();
+let titleProbe: HTMLElement | null = null;
+
+/**
+ * One row: how wide `text` is in a compact tab's title font (skin/bar.css; letter-spacing included),
+ * from a hidden probe in #vitre-root laid out with the title's own font (ROW_TITLE_STYLE). A new text
+ * costs one layout of the probe; a window not laid out yet (width 0) gets COMPACT_MAX, not cached.
+ */
+function titleWidth(text: string): number {
+  let w = titleWidths.get(text);
+  if (w !== undefined) return w;
+  try {
+    const root = document.getElementById('vitre-root');
+    if (!root) return COMPACT_MAX;
+    if (!titleProbe || titleProbe.parentNode !== root) {
+      titleProbe = el('span', { class: 'row-title-probe', 'aria-hidden': 'true', style: ROW_TITLE_STYLE });
+      root.append(titleProbe);
+    }
+    titleProbe.textContent = text;
+    w = titleProbe.getBoundingClientRect().width;
+    titleProbe.textContent = '';
+  } catch {
+    return COMPACT_MAX;
+  }
+  if (!(w > 0)) return text ? COMPACT_MAX : 0;
+  titleWidths.set(text, w);
+  if (titleWidths.size > 600) titleWidths.delete(titleWidths.keys().next().value as string);
+  return w;
+}
+
 export class Bar {
   layout: BarLayout = { pillRect: null, left: 0, right: 0 };
   /** Starts the native window move; a test may replace it. */
@@ -303,6 +463,21 @@ export class Bar {
   private rekeyed = new Map<number | string, string>();
   /** The circle lift (split view's drag to an edge). */
   readonly lift: Lift;
+  // One row (macOS; see the header).
+  /** #vitre-row-end's width (0 while it is empty). */
+  private endWidth = 0;
+  /** The address field is open in the active capsule (editing()). */
+  private editingRow = false;
+  /** The compact tab the hover has grown, the one about to grow, their timer, and where the pointer last really was. */
+  private hoverId = 0;
+  private hoverNext = 0;
+  private hoverTimer = 0;
+  private pointer = { x: -1, y: -1 };
+  /** The strip's scroll, what it was last brought into view for (active unit, editing, claim), and the wheel's quiet timer. */
+  private scrollX = 0;
+  private scrollKey = '';
+  private wheelTimer = 0;
+  private wheelFrame = 0;
   /** Watches each tab's accessories slot: its width balances the address (see the header). */
   private accessoriesWatch = new ResizeObserver((entries) => {
     for (const entry of entries) {
@@ -328,6 +503,7 @@ export class Bar {
     this.controls = new WindowControls(b, layer);
     this.visibility = new Reveal(b, this.host);
     this.tips = new Tips(b);
+    if (oneRow()) this.buildRow(layer);
     // In split view native popups hang from the focused half (spec "Prompts and other per-pane surfaces").
     b.setAnchor('site', () => this.activeItem()?.querySelector<HTMLElement>('.half.focused') ?? this.activeItem() ?? null);
     b.setAnchor('menu', () => this.items.get('plus') ?? null);
@@ -378,9 +554,29 @@ export class Bar {
     return this.visibility.hiding;
   }
 
-  /** Width kept free at the right edge of the window for the window controls (and the Private label). */
+  /** Width kept free at the right edge of the window for the window controls (and the Private label). One row: everything right of the tab strip. */
   get reserve(): number {
+    if (oneRow()) {
+      const priv = this.controls.privateWidth;
+      return EDGE + this.endRoom() + (priv ? priv + ROW_GAP : 0);
+    }
     return this.controls.reserve;
+  }
+
+  /**
+   * One row: the address field is open in the active capsule (omnibox.ts). The capsule grows to
+   * ACTIVE_TYPING (as far as the row allows) and is brought into view; b.bar.layout is the new slot
+   * when this returns. Nothing on Windows.
+   */
+  editing(on: boolean): void {
+    if (!oneRow() || on === this.editingRow) return;
+    this.editingRow = on;
+    this.relayout();
+  }
+
+  /** Width kept free at the left edge of the window: the traffic lights' capsule on macOS, 0 on Windows. */
+  get reserveLeft(): number {
+    return this.controls.reserveLeft;
   }
 
   reveal(): void {
@@ -427,7 +623,11 @@ export class Bar {
   private arrange(units: Unit[], activeId: number): Place {
     const W = Math.floor(window.innerWidth); // fractional at 125 % / 150 % scaling
     const popup = this.b.isPopup;
-    const reserve = this.controls.reserve;
+    // What each side keeps free (winctl.ts): on Windows the controls are at the right and the left
+    // keeps LEFT_MARGIN; on macOS the traffic lights are at the left and the right keeps LEFT_MARGIN,
+    // or the Private label's room. (On Windows these are exactly the controls' reserve and LEFT_MARGIN.)
+    const reserve = Math.max(LEFT_MARGIN, this.controls.reserve);
+    const reserveLeft = Math.max(LEFT_MARGIN, this.controls.reserveLeft);
     const activeIndex = Math.max(0, units.findIndex((u) => u.tabs.some((t) => t.id === activeId)));
     const activeUnit = units[activeIndex];
     // A popup window shows its one page: a read-only pill and the window controls.
@@ -442,10 +642,10 @@ export class Bar {
     let size = CIRCLE;
     let gap = GAP;
     // 1. As designed: centred between two equal margins that clear the window controls.
-    const centred = W - 2 * reserve;
+    const centred = W - 2 * Math.max(reserveLeft, reserve);
     let pill = Math.max(pillMin, Math.min(PILL, centred - circles(shown) * (CIRCLE + GAP)));
-    // 2. Beyond that the group may use all the room left of the window controls.
-    const room = W - LEFT_MARGIN - reserve;
+    // 2. Beyond that the group may use all the room beside the window controls.
+    const room = W - reserveLeft - reserve;
     // A claimed width (find's face) is not given up to the number of tabs: the pill keeps what the
     // window would give it beside CLAIM_CIRCLES circles, and the other circles shrink and give way
     // instead (3, 4). A narrow window still narrows it (DESIGN-NOTES Find: under 400 px, Aa moves
@@ -475,30 +675,301 @@ export class Bar {
     }
     let x0 = Math.round((W - total) / 2);
     if (x0 + total > W - reserve) x0 = W - reserve - total;
-    x0 = Math.max(LEFT_MARGIN, x0);
+    x0 = Math.max(reserveLeft, x0);
     return { size, gap, pill, x0, total, shown };
+  }
+
+  // ---- one row (macOS; see the header) ----
+
+  /** The window's least width, #vitre-row-end, and the strip's wheel and pointer. */
+  private buildRow(layer: HTMLElement): void {
+    this.b.root.classList.add('one-row');
+    // The window's least width is what the row needs (onerow.ts minWindowWidth). Firefox's
+    // `:root:not([popup-window]) { min-width: var(--window-min-width) }` (browser-shared.css) reads it,
+    // and a change of the root's style syncs it to the NSWindow (layout/generic/nsIFrame.cpp
+    // DidSetComputedStyle -> PresShell::SyncWindowPropertiesIfNeeded); the inline value wins over
+    // skin/shell.css's 480. A popup window keeps Firefox's 95.
+    document.documentElement.style.setProperty('--window-min-width', `${minWindowWidth(this.b.isPrivate)}px`);
+    const end = el('div', { id: 'vitre-row-end' });
+    // A popup window shows its one page and the traffic lights: no Downloads or Extensions capsules.
+    if (this.b.isPopup) end.style.display = 'none';
+    layer.append(end);
+    new ResizeObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      const w = Math.round(entry?.borderBoxSize?.[0]?.inlineSize ?? end.getBoundingClientRect().width);
+      if (w === this.endWidth) return;
+      this.endWidth = w;
+      // The Private capsule stands left of the group (skin/bar.css).
+      layer.style.setProperty('--vitre-row-end-room', `${this.endRoom()}px`);
+      this.relayout();
+    }).observe(end);
+    // A crowded strip scrolls under the wheel and the trackpad over a capsule. Between the capsules
+    // #vitre-bar is click-through, so the wheel there scrolls the page under the row, as does every
+    // wheel while nothing overflows (it is left alone here).
+    const wheel = (e: WheelEvent): void => {
+      const r = this.place.row;
+      if (!r?.overflow) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const px = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? d * ROW_WHEEL_LINE : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? d * (r.right - r.left) : d;
+      e.preventDefault();
+      this.scrollRow(px);
+    };
+    this.host.addEventListener('wheel', wheel, { passive: false });
+    // Hover: only a pointer that really moved onto a compact tab counts. The growth's own re-flow
+    // slides capsules under a pointer that stays (Gecko then reports the pointer over another one),
+    // and they would hand the growth on and on.
+    this.host.addEventListener(
+      'mousemove',
+      (e) => {
+        if (e.screenX === this.pointer.x && e.screenY === this.pointer.y) return;
+        this.pointer = { x: e.screenX, y: e.screenY };
+        const item = (e.target as Element).closest<HTMLElement>('.item.tab:not(.pair)');
+        if (item) this.hoverIn(Number(item.dataset.id));
+      },
+      true
+    );
+  }
+
+  /** One row: #vitre-row-end's width and the gap before it (0 while it is empty). */
+  private endRoom(): number {
+    return this.endWidth > 0 ? this.endWidth + ROW_GAP : 0;
+  }
+
+  /**
+   * One row: where everything goes. The active unit wants ACTIVE_W (ACTIVE_TYPING while the address
+   * is edited, a claim's width while find holds one; a pair 2 x 308 + 16); the others are compact
+   * tabs as wide as their titles. Crowded: the titles shrink together down to COMPACT_MIN
+   * (titleCap), then they go, then the active capsule gives way to ACTIVE_MIN, then the strip
+   * scrolls. A hovered compact tab grows into what is left over.
+   */
+  private arrangeRow(units: Unit[], activeId: number): Place {
+    const W = Math.floor(window.innerWidth);
+    const popup = this.b.isPopup;
+    // TABS_LEFT, or TABS_LEFT_FULL in window full screen (winctl.ts reserveLeft).
+    const left = this.controls.reserveLeft;
+    const right = Math.max(left + ACTIVE_MIN, W - this.reserve);
+    const room = right - left;
+    const activeIndex = Math.max(0, units.findIndex((u) => u.tabs.some((t) => t.id === activeId)));
+    const activeUnit = units[activeIndex];
+    // A popup window shows its one page: a read-only capsule and the traffic lights.
+    const shown = popup ? units.slice(activeIndex, activeIndex + 1) : units;
+    const others = shown.filter((u) => u !== activeUnit);
+    const pair = activeUnit?.kind === 'pair';
+    const claim = popup ? 0 : Math.max(0, ...[...this.claims].map((c) => c.width));
+    const want = pair ? 2 * ROW_PAIR_HALF + ROW_PAIR_JOIN : Math.max(this.editingRow ? ACTIVE_TYPING : ACTIVE_W, claim);
+    const least = pair ? 2 * ROW_PAIR_HALF_MIN + ROW_PAIR_JOIN : ACTIVE_MIN;
+    const always = this.b.settings.closeButton === 'always';
+    const plus = popup ? 0 : ROW_GAP + CAP_H;
+    const twin = 2 * CAP_H + ROW_GAP;
+    const titled = (u: Unit): number => (u.kind === 'pair' ? twin : this.compactWidth(u.tab, always));
+    const bare = (u: Unit): number => (u.kind === 'pair' ? twin : CAP_H);
+    const beside = (w: (u: Unit) => number): number => others.reduce((n, u) => n + w(u) + ROW_GAP, 0) + plus;
+
+    let icons = false;
+    let pill = want;
+    // 1. The titles shrink together (titleCap: a short title keeps its width, the others share what
+    // is left); 2. below COMPACT_MIN, favicons only; 3. the active capsule gives way; 4. (below) the
+    // strip scrolls.
+    // The least a shrunk tab keeps: COMPACT_MIN, and the close x's room on top when it always shows.
+    const fold = COMPACT_MIN + (always ? ROW_HOVER_CLOSE : 0);
+    const cap = want + beside(titled) > room ? this.titleCap(others, room - want - plus, titled) : Infinity;
+    if (cap < fold) {
+      icons = true;
+      pill = Math.max(least, Math.min(want, room - beside(bare)));
+    }
+    const widths = new Map<number | string, number>();
+    for (const u of shown) widths.set(u.key, u === activeUnit ? pill : icons ? bare(u) : u.kind === 'pair' ? twin : Math.min(titled(u), cap));
+    let total = pill + beside((u) => widths.get(u.key) ?? CAP_H);
+
+    // Hover: the whole title and the close x; it never folds titles or makes the strip scroll. With
+    // titles it takes what the row has to spare, then what the other titles can give down to
+    // ROW_HOVER_YIELD (titleCap again without it, so the longest give first), so a shrunk tab shows its
+    // whole title as an unshrunk one does (shrunk titles fill the row: nothing is spare). Favicons only: what the row has to
+    // spare, and only when that holds the x beside the favicon and some title (or the whole hover
+    // width); a narrower growth would put the x on the favicon. A grown tab that was closed (its
+    // own x) holds the hover no more.
+    if (this.hoverId && !this.b.tab(this.hoverId)) this.hoverId = 0;
+    const hovered = popup || !this.hoverId ? undefined : others.find((u) => u.kind === 'tab' && u.tab.id === this.hoverId);
+    if (hovered?.kind === 'tab') {
+      const base = widths.get(hovered.key) ?? CAP_H;
+      const target = this.hoverWidth(hovered.tab);
+      if (!icons) {
+        const rest = others.filter((u) => u !== hovered);
+        const give = ROW_HOVER_YIELD + (always ? ROW_HOVER_CLOSE : 0);
+        const floor = rest.reduce((n, u) => n + (u.kind === 'pair' ? twin : Math.min(titled(u), give)) + ROW_GAP, 0);
+        const w = Math.max(base, Math.min(target, room - pill - plus - floor - ROW_GAP));
+        if (w > base) {
+          const rested = this.titleCap(rest, room - pill - plus - w - ROW_GAP, titled);
+          for (const u of rest) if (u.kind === 'tab') widths.set(u.key, Math.min(titled(u), rested));
+          widths.set(hovered.key, w);
+          total = pill + beside((u) => widths.get(u.key) ?? CAP_H);
+        }
+      } else {
+        const grow = Math.min(room - total, target - base);
+        if (grow > 0 && base + grow >= Math.min(target, COMPACT_MIN + ROW_HOVER_CLOSE)) {
+          widths.set(hovered.key, base + grow);
+          total += grow;
+        }
+      }
+    }
+
+    // Crowded: the strip scrolls. The active capsule is brought into view (a fade's width from the
+    // ends) when it changes, when the address is edited and when a claim comes or goes; otherwise the
+    // strip stays where the wheel left it.
+    const overflow = Math.max(0, Math.ceil(total - room));
+    let scroll = Math.min(this.scrollX, overflow);
+    const key = overflow ? `${String(activeUnit?.key)}|${this.editingRow}|${claim}` : '';
+    if (overflow && key !== this.scrollKey) {
+      let ax = 0;
+      for (const u of shown) {
+        if (u === activeUnit) break;
+        ax += (widths.get(u.key) ?? CAP_H) + ROW_GAP;
+      }
+      if (ax - scroll < ROW_FADE) scroll = Math.max(0, ax - ROW_FADE);
+      else if (ax + pill - scroll > room - ROW_FADE) scroll = Math.min(overflow, ax + pill - room + ROW_FADE);
+    }
+    this.scrollKey = key;
+    this.scrollX = scroll;
+    return { size: CAP_H, gap: ROW_GAP, pill, x0: left - scroll, total, shown, row: { widths, icons, scroll, overflow, left, right } };
+  }
+
+  /**
+   * One row, a crowded strip: the most any compact tab may take so that `others` (each with the GAP
+   * after it) fit in `free` px. A tab narrower than its share keeps its width and leaves the rest to
+   * the longer ones, which all get the same (their titles end in an ellipsis); a pair's two
+   * favicons keep theirs. Whole px, so the row never overflows by rounding. Under 0 when even the
+   * pairs do not fit; 0 when there is no compact tab to shrink.
+   */
+  private titleCap(others: Unit[], free: number, titled: (u: Unit) => number): number {
+    let left = free - others.length * ROW_GAP;
+    const tabs: number[] = [];
+    for (const u of others) {
+      if (u.kind === 'pair') left -= titled(u);
+      else tabs.push(titled(u));
+    }
+    if (!tabs.length) return left >= 0 ? Infinity : 0;
+    tabs.sort((p, q) => p - q);
+    for (let i = 0; i < tabs.length; i++) {
+      const share = Math.floor(left / (tabs.length - i));
+      if (tabs[i] > share) return share;
+      left -= tabs[i];
+    }
+    return Infinity;
+  }
+
+  /** One row: a compact tab's width with its title (and the close x when it always shows), up to COMPACT_MAX. */
+  private compactWidth(t: Tab, always: boolean): number {
+    const w = ROW_TAB_PAD + titleWidth(labelOf(t)) + (always ? ROW_HOVER_CLOSE : 0) + 1;
+    return Math.max(CAP_H, Math.min(COMPACT_MAX, Math.ceil(w)));
+  }
+
+  /** One row: a hovered compact tab's width: its whole title and the close x, up to 280. */
+  private hoverWidth(t: Tab): number {
+    return Math.max(CAP_H, Math.min(ROW_HOVER_MAX, Math.ceil(ROW_TAB_PAD + titleWidth(labelOf(t)) + ROW_HOVER_CLOSE + 1)));
+  }
+
+  /** One row: the crowded strip's state on the bar (skin/bar.css: icons, overflow, the fades). */
+  private paintRow(p: Place): void {
+    const r = p.row;
+    if (!r) return;
+    this.host.classList.toggle('icons', r.icons);
+    this.host.classList.toggle('overflow', r.overflow > 0);
+    const s = this.host.style;
+    s.setProperty('--strip-l', `${r.left}px`);
+    s.setProperty('--strip-r', `${r.right}px`);
+    s.setProperty('--fade-l', `${r.scroll > 0 ? ROW_FADE : 0}px`);
+    s.setProperty('--fade-r', `${r.scroll < r.overflow ? ROW_FADE : 0}px`);
+  }
+
+  /** One row: scroll the crowded strip by `px`; the capsules follow without the spring, one layout per frame. */
+  private scrollRow(px: number): void {
+    const r = this.place.row;
+    if (!r) return;
+    const next = Math.max(0, Math.min(r.overflow, this.scrollX + px));
+    if (next === this.scrollX) return;
+    this.scrollX = next;
+    this.host.classList.add('scrolling');
+    window.clearTimeout(this.wheelTimer);
+    this.wheelTimer = window.setTimeout(() => this.host.classList.remove('scrolling'), 200);
+    if (this.wheelFrame) return;
+    this.wheelFrame = requestAnimationFrame(() => {
+      this.wheelFrame = 0;
+      this.relayout();
+    });
+  }
+
+  /**
+   * One row: the pointer moved onto tab `id`. A compact tab grows after 300 ms, at once when another
+   * one is grown (the growth moves over); coming back onto the grown one keeps it; the active capsule
+   * folds a grown one as leaving it does.
+   */
+  private hoverIn(id: number): void {
+    if (!id) return;
+    if (id === this.hoverId) {
+      window.clearTimeout(this.hoverTimer);
+      return;
+    }
+    if (id === this.hoverNext) return;
+    window.clearTimeout(this.hoverTimer);
+    this.hoverNext = 0;
+    if (this.items.get(id)?.classList.contains('active')) {
+      if (this.hoverId) this.hoverTimer = window.setTimeout(() => this.setHover(0), ROW_HOVER_OUT);
+      return;
+    }
+    if (this.hoverId) {
+      this.setHover(id);
+      return;
+    }
+    this.hoverNext = id;
+    this.hoverTimer = window.setTimeout(() => {
+      this.hoverNext = 0;
+      if (this.items.get(id)?.matches(':hover')) this.setHover(id);
+    }, ROW_HOVER_IN);
+  }
+
+  /** One row: the pointer left tab `id`: its growth does not start, or it folds after 150 ms. */
+  private hoverOut(id: number): void {
+    if (id === this.hoverNext) {
+      window.clearTimeout(this.hoverTimer);
+      this.hoverNext = 0;
+    }
+    if (!this.hoverId || id !== this.hoverId) return;
+    window.clearTimeout(this.hoverTimer);
+    this.hoverTimer = window.setTimeout(() => this.setHover(0), ROW_HOVER_OUT);
+  }
+
+  private setHover(id: number): void {
+    if (id === this.hoverId) return;
+    this.hoverId = id;
+    this.relayout();
   }
 
   render(tabs: Tab[], activeId: number): void {
     const popup = this.b.isPopup;
+    const row = oneRow();
     const first = !this.started;
     const units = this.b.units();
-    const p = this.arrange(units, activeId);
-    const circleTop = TOP + (CIRCLE - p.size) / 2;
+    const p = row ? this.arrangeRow(units, activeId) : this.arrange(units, activeId);
+    // One row: every capsule is CAP_H tall at CAP_TOP (p.size is CAP_H there).
+    const top = row ? CAP_TOP : TOP;
+    const tall = row ? CAP_H : CIRCLE;
+    const circleTop = row ? CAP_TOP : TOP + (CIRCLE - p.size) / 2;
     this.lastTabs = tabs;
     this.place = p;
     this.activeId = activeId;
     this.host.classList.toggle('close-always', this.b.settings.closeButton === 'always');
-    this.host.classList.toggle('compact', p.size < CIRCLE);
+    this.host.classList.toggle('compact', !row && p.size < CIRCLE);
+    if (row) this.paintRow(p);
 
     let x = p.x0;
     const seen = new Set<number | string>();
     const shapes: string[] = [`${p.size}`];
-    this.layout = { pillRect: null, left: x, right: x + p.total };
+    this.layout = row && p.row ? { pillRect: null, left: Math.max(x, p.row.left), right: Math.min(x + p.total, p.row.right) } : { pillRect: null, left: x, right: x + p.total };
     // Split view's morphs (see the header): where each tab was drawn, when a pair forms or ends.
     this.unitKeys = new Set(units.map((u) => u.key));
     this.rekeyed.clear();
-    const was = first || popup || reduced() ? null : this.before(units);
+    // One row: no split morphs (their ghosts are the Windows bar's glass); items fade and slide.
+    const was = first || popup || reduced() || row ? null : this.before(units);
     /** Items whose look a morph carries on: they go at once instead of fading out. */
     const replaced = new Set<number | string>();
     this.fresh.clear();
@@ -507,8 +978,8 @@ export class Bar {
     const put = (item: HTMLElement, left: number, width: number, active: boolean): void => {
       item.style.left = `${left}px`;
       item.style.width = `${width}px`;
-      item.style.top = `${active ? TOP : circleTop}px`;
-      item.style.height = `${active ? CIRCLE : p.size}px`;
+      item.style.top = `${active ? top : circleTop}px`;
+      item.style.height = `${active ? tall : p.size}px`;
     };
 
     for (const u of p.shown) {
@@ -516,7 +987,7 @@ export class Bar {
       seen.add(key);
       const active = u.tabs.some((t) => t.id === activeId);
       if (active) this.activeKey = key;
-      const width = active ? p.pill : u.kind === 'pair' ? 2 * p.size + p.gap : p.size;
+      const width = p.row?.widths.get(key) ?? (active ? p.pill : u.kind === 'pair' ? 2 * p.size + p.gap : p.size);
       let item = this.items.get(key);
       if (!item) {
         item = u.kind === 'pair' ? this.createPair(u.key) : this.createTab(u.tab.id);
@@ -562,7 +1033,7 @@ export class Bar {
       if (before !== undefined && before !== width) item.classList.add('morphing');
       this.widths.set(item, width);
       put(item, x, width, active);
-      if (active) this.layout.pillRect = new DOMRect(x, TOP, width, CIRCLE);
+      if (active) this.layout.pillRect = new DOMRect(x, top, width, tall);
       shapes.push(`${key}${active ? 'P' : 'c'}${x}:${width}`);
       x += width + p.gap;
     }
@@ -571,7 +1042,7 @@ export class Bar {
       let plus = this.items.get('plus');
       if (!plus) {
         const face = el('button', { type: 'button', class: 'face', 'aria-label': 'New tab' }, svg(icons.plus));
-        setTip(face, 'New tab', 'Ctrl+T');
+        setTip(face, 'New tab', tipKey(this.b, 'newTab', 'Ctrl+T'));
         face.addEventListener('click', () => this.h.newTab());
         plus = el('div', { class: 'item circle plus' }, face);
         glass(plus);
@@ -856,7 +1327,8 @@ export class Bar {
    * theme class) fades out over the new glass, which fades in under it; text and icons follow.
    */
   crossFade(from: Theme, ms: number): void {
-    if (this.b.root.classList.contains('omni-open')) return;
+    // One row: no veil; a capsule's fill eases into the new theme by its own transition (skin/bar.css).
+    if (oneRow() || this.b.root.classList.contains('omni-open')) return;
     for (const [, item] of this.items) {
       if (item.classList.contains('leaving') || item.classList.contains('sv-hidden')) continue;
       const rim = item.querySelector(':scope > .rim');
@@ -901,6 +1373,13 @@ export class Bar {
    * page under them. Without a showing pair nothing is set (the bar is as it always was).
    */
   private paintSplitTheme(): void {
+    // One row: the row takes the focused side's theme (the root's), no mixed tint and no theme of the
+    // controls' own; a capsule over the other side's page takes that page's colours instead (below).
+    if (oneRow()) {
+      this.controls.setTheme(null);
+      this.paintRowSplit();
+      return;
+    }
     const split = this.b.splitView;
     const pair = split.showing();
     const rects = pair ? split.paneRects() : null;
@@ -913,8 +1392,8 @@ export class Bar {
       const or = o === pair.left ? rects.left : rects.right;
       other = { l: or.left, r: or.right };
       mixed = (active.theme === 'light') !== (o.theme === 'light');
-      // The capsule's place: 12 px from the right, 108 wide.
-      const mid = window.innerWidth - 12 - 54;
+      // The capsule's middle: 12 px from the right, 108 wide (macOS: 12 px from the left, 76 wide).
+      const mid = this.controls.centre;
       const under = mid >= or.left && mid < or.right ? o : active;
       // A module's hold (the switcher's deck) is read by the controls too: no theme of their own then.
       if (this.b.theme() === active.theme && under.theme !== active.theme) controls = under.theme;
@@ -980,6 +1459,62 @@ export class Bar {
     this.controls.setTheme(controls);
   }
 
+  /**
+   * One row, split view: a capsule over the other side's page, when that page's theme is not the
+   * focused side's (the row's), takes that page's colours: class over-light, over-dark or over-clear
+   * (skin/bar.css gives it that theme's tokens), so its ink reads over the page under it (light ink
+   * over a dark page, dark over a light one), as the Windows bar's mixed tint keeps its circles
+   * readable there. Every capsule goes by where its middle is, not by whose it is: the compact tabs,
+   * + and a background pair by their slot, each half of the active pair, the row-end capsules and
+   * the lights' capsule by their box (the active pair sits at the left of the row, so the other
+   * side's half is often over the focused side's page). Nothing carries one without a showing pair,
+   * in a private window (dark glass whatever the page), while a module holds the theme (the
+   * switcher's deck) or with both pages alike. The modules that paint for a row-end capsule watch its
+   * class: the extensions capsule's icons (extensions/bar.ts paintBright: brighttext) and the
+   * Downloads quick view (downloads/ring.ts paintTheme), so they follow without a render.
+   */
+  private paintRowSplit(): void {
+    const split = this.b.splitView;
+    const pair = split.showing();
+    const rects = pair ? split.paneRects() : null;
+    const active = this.b.active();
+    let other: { l: number; r: number; theme: Theme } | null = null;
+    if (pair && rects && active && !this.b.isPrivate && this.b.theme() === active.theme) {
+      const o = pair.left === active ? pair.right : pair.left;
+      const or = o === pair.left ? rects.left : rects.right;
+      if (o.theme !== active.theme) other = { l: or.left, r: or.right, theme: o.theme };
+    }
+    const mark = (node: Element, over: boolean): void => {
+      for (const t of ['light', 'dark', 'clear'] as const) node.classList.toggle(`over-${t}`, over && other?.theme === t);
+    };
+    const inOther = (mid: number): boolean => !!other && mid >= other.l && mid < other.r;
+    const boxIn = (node: Element): boolean => {
+      if (!other) return false;
+      const r = node.getBoundingClientRect();
+      return r.width > 0 && inOther(r.left + r.width / 2);
+    };
+    for (const [key, item] of this.items) {
+      if (item.classList.contains('leaving')) continue;
+      const halves = [...item.querySelectorAll('.half')];
+      // Where the slot will be (its left and width transition): the halves are placed within it.
+      const left = parseFloat(item.style.left) || 0;
+      const w = parseFloat(item.style.width) || 0;
+      if (isPairKey(key) && item.classList.contains('active') && halves.length) {
+        mark(item, false);
+        const box = other ? item.getBoundingClientRect() : null;
+        for (const half of halves) {
+          const r = box && box.width > 0 ? half.getBoundingClientRect() : null;
+          mark(half, !!box && !!r && inOther(left + ((r.left + r.width / 2 - box.left) * w) / box.width));
+        }
+        continue;
+      }
+      for (const half of halves) mark(half, false);
+      mark(item, inOther(left + w / 2));
+    }
+    const end = document.getElementById('vitre-row-end');
+    for (const node of [...(end?.children ?? []), this.controls.element]) mark(node, boxIn(node));
+  }
+
   /** Something moves: per-item filters until it stops. */
   private unsettle(): void {
     for (const row of this.rows.splice(0)) {
@@ -1004,6 +1539,12 @@ export class Bar {
     for (const row of this.rows.splice(0)) {
       row.element.remove();
       row.lens.release();
+    }
+    if (oneRow()) {
+      // The capsules' glass is CSS (skin/bar.css: a blur on each .lens), no lens map to install.
+      for (const [, item] of this.items) item.classList.remove('morphing');
+      this.host.classList.remove('moving');
+      return;
     }
     const p = this.place;
     const circles: { x: number; w: number }[] = [];
@@ -1049,14 +1590,18 @@ export class Bar {
     const mark = el('button', { type: 'button', class: 'nav dl-mark empty', 'aria-hidden': 'true', tabindex: '-1' });
     const reload = el('button', { type: 'button', class: 'nav reload', 'aria-label': 'Reload' });
     const pill = el('div', { class: 'pill-face' }, back, forward, address, accessories, mark, reload);
-    const circle = el('button', { type: 'button', class: 'circle-face' }, el('span', { class: 'fav' }));
+    // One row: a compact tab shows its title after the favicon.
+    const row = oneRow();
+    const circle = el('button', { type: 'button', class: 'circle-face' }, el('span', { class: 'fav' }), row ? el('span', { class: 'title', 'aria-hidden': 'true' }) : null);
     const close = el('button', { type: 'button', class: 'close-badge', 'aria-label': 'Close tab' }, svg(icons.closeSmall));
     const item = el('div', { class: 'item tab', 'data-id': id }, pill, circle, close, el('div', { class: 'load-line' }));
     glass(item);
     this.accessoriesWatch.observe(accessories);
+    // One row: the hover's growth (hoverIn comes from the bar's mousemove, buildRow).
+    if (row) item.addEventListener('mouseleave', () => this.hoverOut(id));
 
-    setTip(back, 'Back', 'Alt+Left');
-    setTip(forward, 'Forward', 'Alt+Right');
+    setTip(back, 'Back', tipKey(this.b, 'back', 'Alt+Left'));
+    setTip(forward, 'Forward', tipKey(this.b, 'forward', 'Alt+Right'));
     setTip(close, 'Close tab');
     back.addEventListener('click', () => this.h.back());
     forward.addEventListener('click', () => this.h.forward());
@@ -1086,8 +1631,17 @@ export class Bar {
     item.classList.toggle('active', active);
     item.classList.toggle('loading', t.loading);
     item.classList.toggle('home', home);
-    const label = home ? 'Home' : t.title || displayHost(t.url) || 'New tab';
+    const label = labelOf(t);
     const circle = item.querySelector('.circle-face') as HTMLElement;
+    // One row: the compact tab's title, and whether the hover holds it (class hovered: its close x
+    // shows; a favicon-only capsule shows its title too, once the row had room to grow it).
+    const title = circle.querySelector<HTMLElement>(':scope > .title');
+    if (title) {
+      if (title.textContent !== label) title.textContent = label;
+      const r = this.place.row;
+      const grown = !r?.icons || (r.widths.get(t.id) ?? CAP_H) > CAP_H;
+      item.classList.toggle('hovered', !active && t.id === this.hoverId && grown);
+    }
     const close = item.querySelector('.close-badge') as HTMLElement;
     circle.setAttribute('aria-label', label);
     setTip(circle, label);
@@ -1126,7 +1680,7 @@ export class Bar {
       reload.dataset.icon = reloadKey;
       fill(reload, svg(t.loading ? icons.stop : icons.reload));
       reload.setAttribute('aria-label', t.loading ? 'Stop' : 'Reload');
-      setTip(reload, t.loading ? 'Stop' : 'Reload', t.loading ? 'Esc' : 'Ctrl+R');
+      setTip(reload, t.loading ? 'Stop' : 'Reload', t.loading ? escKey() : tipKey(this.b, 'reload', 'Ctrl+R'));
     }
   }
 
@@ -1184,8 +1738,8 @@ export class Bar {
     const item = el('div', { class: 'item tab pair', 'data-pair': key }, face, capsule);
     glass(item);
     this.accessoriesWatch.observe(accessories);
-    setTip(back, 'Back', 'Alt+Left');
-    setTip(forward, 'Forward', 'Alt+Right');
+    setTip(back, 'Back', tipKey(this.b, 'back', 'Alt+Left'));
+    setTip(forward, 'Forward', tipKey(this.b, 'forward', 'Alt+Right'));
     back.addEventListener('click', () => this.h.back());
     forward.addEventListener('click', () => this.h.forward());
     reload.addEventListener('click', (e) => this.h.reloadOrStop(e.shiftKey));
@@ -1280,14 +1834,14 @@ export class Bar {
       reload.dataset.icon = reloadKey;
       fill(reload, svg(f.loading ? icons.stop : icons.reload));
       reload.setAttribute('aria-label', `${f.loading ? 'Stop' : 'Reload'}, ${where} page`);
-      setTip(reload, f.loading ? 'Stop' : 'Reload', f.loading ? 'Esc' : 'Ctrl+R');
+      setTip(reload, f.loading ? 'Stop' : 'Reload', f.loading ? escKey() : tipKey(this.b, 'reload', 'Ctrl+R'));
     }
     // Spec "Motion": Focus moves, Swap sides. Not for an item made a moment ago (a pair forming is its
     // own motion: the plate fades in) and not with reduced motion.
     const nowSide = focusedTab ? (pair.left === focusedTab ? 'left' : 'right') : '';
     const prevSide = item.dataset.focus ?? '';
     item.dataset.focus = nowSide;
-    if (active && wasActive && !reduced() && !this.fresh.has(item) && performance.now() - (this.born.get(item) ?? 0) > 450) {
+    if (active && wasActive && !reduced() && !oneRow() && !this.fresh.has(item) && performance.now() - (this.born.get(item) ?? 0) > 450) {
       const hw = this.finalHalf(item, 'left').width;
       if (swapped) {
         // The halves' contents cross over (320 ms, spring); the pages swap in one re-layout (split.ts).
@@ -1390,7 +1944,9 @@ export class Bar {
         if (window.fullScreen) return; // nothing to move: the press stays a press, as before
         dragged = true;
         this.tips.hide();
-        this.moveWindow(e.screenX, e.screenY);
+        const moved = this.moveWindow(e.screenX, e.screenY);
+        // macOS: no move started (see the header, "Window move"): the press stays a click.
+        if (isMac && !moved) dragged = false;
       },
       true
     );

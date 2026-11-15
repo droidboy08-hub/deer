@@ -34,12 +34,24 @@
 //   fades out at the pointer and back in at its slot.
 // - Forced colours: the plate is Canvas with a 2 px Highlight outline and no frost; with
 //   transparency effects off it is solid #2C2C2C.
+// - One row (macOS, oneRow() in ./onerow; boards RowSpec, DirOneRowBehaviour): everything above
+//   holds, on the row's geometry. A background tab is a compact capsule (CAP_H tall at CAP_TOP,
+//   radius CAP_H / 2, as wide as its title: bar.ts arrangeRow), so the copy is that capsule at its
+//   real width, radius 18, with the favicon (16 px, 10 from the left) and the title when the capsule
+//   shows one (centred favicon alone in a 36 px favicon capsule), in the row's colours (copied from
+//   the item: they follow the theme of the page under the row and a private window, as the Windows
+//   bar's; LIFT_ROW_CSS) and over the page the board's Liquid Glass Regular (blur 14, saturate 1.9,
+//   brightness 1.04) instead of the Windows strip lens; its mixed tint goes by the row's theme too.
+//   The zones are the window's thirds below the ROW_H row, which floats over the panes' top (they run
+//   under it from y 0, as under the Windows bar), and a plate stands PLATE_INSET below the row and
+//   inside its pane's other sides, so its top is ROW_H + 8 (60) instead of 64.
 // Tests read b.bar.lift.state ({ tabId, zone }) and may lower b.bar.lift.holdMs.
 import type { Bar } from './bar';
 import type { Browser } from './browser';
 import { el } from './dom';
 import { glass, lens } from './glass';
 import type { Tab } from './model';
+import { oneRow, ROW_H } from './onerow';
 import { GUTTER, PANE_MIN, titleOf, type Side } from './split';
 import { FADE_MS, fadeIn, reduced, SPRING } from './splitmotion';
 import { BAR_AREA } from '../shared/geometry';
@@ -52,6 +64,21 @@ const CLICK_SLOP = 5;
 /** The plate's top (SplitDrop: 64) and its inset inside the pane it previews. */
 const PLATE_TOP = 64;
 const PLATE_INSET = 8;
+/**
+ * One row: the band the zones start below (the row; Windows: the bar's BAR_AREA band) and the
+ * plate's top, PLATE_INSET below the row's bottom edge as it is inside the pane's other sides (the
+ * panes start at y 0, under the row, as under the Windows bar).
+ */
+const zonesTop = (): number => (oneRow() ? ROW_H : BAR_AREA);
+const plateTop = (): number => (oneRow() ? ROW_H + PLATE_INSET : PLATE_TOP);
+/**
+ * RowSpec "Liquid Glass Regular": a capsule over the page (the copy of a lifted tab, One row). The
+ * row's own glass is the --row-glass token (skin/bar.css: calmer over a photo or the wallpaper); this
+ * is its value where the copy finds none.
+ */
+const ROW_GLASS = 'blur(14px) saturate(1.9) brightness(1.04)';
+/** The row's colour tokens a capsule reads (skin/bar.css, One row), copied onto the lifted copy. */
+const ROW_TOKENS = ['--g-tint', '--g-shadow', '--g-text', '--g-icon', '--row-rim', '--row-ink-2', '--row-glass'];
 
 interface Lifted {
   tab: Tab;
@@ -84,6 +111,7 @@ export class Lift {
     private bar: Bar
   ) {
     b.css('split-lift', LIFT_CSS);
+    if (oneRow()) b.css('split-lift-row', LIFT_ROW_CSS);
     b.whenReady.then(() => {
       // Esc cancels a lifted circle: a first rung of the ladder (spec "Keys": right after the IME).
       b.addEscLayer(5, () => {
@@ -143,7 +171,8 @@ export class Lift {
     layers.tint.after(el('div', { class: 'tint-mix' }));
     clone.append(favCopy(item.querySelector('.circle-face .fav'), 'fav'));
     Object.assign(clone.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
-    layers.lens.style.backdropFilter = lens(box.width, box.height, { blur: 1.4 });
+    if (oneRow()) asCapsule(clone, item, layers.lens);
+    else layers.lens.style.backdropFilter = lens(box.width, box.height, { blur: 1.4 });
     this.layer.append(cover, clone);
     this.cur = {
       tab: t,
@@ -199,7 +228,7 @@ export class Lift {
   /** The zone for a pointer at (x, y) (client coordinates; beyond the window's edges too). */
   zoneAt(x: number, y: number): Side | null {
     const W = window.innerWidth;
-    if (y < BAR_AREA) return null;
+    if (y < zonesTop()) return null;
     if (x < W / 3) return 'left';
     if (x > (2 * W) / 3) return 'right';
     return null;
@@ -222,7 +251,7 @@ export class Lift {
     // The circle keeps the bar's theme, and the mixed tint over a plate of the other theme.
     const plate = zone ? c.plates[zone] : null;
     const over = !!plate && overlaps(c.clone.getBoundingClientRect(), plate.getBoundingClientRect());
-    c.clone.classList.toggle('mixed', over && this.b.theme() === 'light');
+    c.clone.classList.toggle('mixed', over && (oneRow() ? rowLight(this.b) : this.b.theme() === 'light'));
   }
 
   private showZone(c: Lifted, zone: Side | null): void {
@@ -286,7 +315,8 @@ export class Lift {
       l = side === 'left' ? 0 : lw + GUTTER;
       r = side === 'left' ? lw : W;
     }
-    return new DOMRect(l + PLATE_INSET, PLATE_TOP, Math.max(0, r - l - 2 * PLATE_INSET), Math.max(0, H - PLATE_INSET - PLATE_TOP));
+    const top = plateTop();
+    return new DOMRect(l + PLATE_INSET, top, Math.max(0, r - l - 2 * PLATE_INSET), Math.max(0, H - PLATE_INSET - top));
   }
 
   private release(x: number, y: number): void {
@@ -402,6 +432,29 @@ function favCopy(fav: Element | null, cls: string): HTMLElement {
   return out;
 }
 
+/**
+ * One row: make the copy the compact capsule it was lifted from (header, One row): class "row" for
+ * LIFT_ROW_CSS, the row's colour tokens as the item has them now, its title when the capsule shows
+ * one (class "icon" when it is a favicon capsule), and the board's glass instead of the strip lens.
+ */
+function asCapsule(clone: HTMLElement, item: HTMLElement, lensEl: HTMLElement): void {
+  clone.classList.add('row');
+  const cs = getComputedStyle(item);
+  for (const name of ROW_TOKENS) {
+    const value = cs.getPropertyValue(name).trim();
+    if (value) clone.style.setProperty(name, value);
+  }
+  const title = item.querySelector<HTMLElement>('.circle-face > .title');
+  if (title && title.getClientRects().length > 0) clone.append(el('span', { class: 'title' }, title.textContent ?? ''));
+  else clone.classList.add('icon');
+  lensEl.style.backdropFilter = `var(--row-glass, ${ROW_GLASS})`;
+}
+
+/** One row: the row is light (skin/bar.css: #vitre-root.theme-light, not a private window). */
+function rowLight(b: Browser): boolean {
+  return !b.root.classList.contains('private') && b.root.classList.contains('theme-light');
+}
+
 /** The lift's look (b.css('split-lift')). Sizes and colours: SplitDrop. */
 export const LIFT_CSS = `
 #layer-split-lift > .sv-lift-cover { position: absolute; inset: 0; pointer-events: auto; -moz-window-dragging: no-drag; }
@@ -444,4 +497,28 @@ export const LIFT_CSS = `
 @media (prefers-reduced-motion: reduce) {
   #layer-split-lift > .sv-lifted.up { transform: none; }
 }
+`;
+
+/**
+ * One row (macOS; b.css('split-lift-row'), injected only there): the copy is a compact capsule
+ * (skin/bar.css One row, RowSpec "Compact tab": radius 18, favicon 16 at 10, 8, a 13 px title,
+ * padding 10 left and 14 right; a favicon capsule centres its favicon), with the row's fill, rim and
+ * shadow from the tokens asCapsule copies onto it, the mixed tint of a light row over a plate, and
+ * the favicon's contrast plate by the row's theme (skin/bar.css): the page's, and dark in a private
+ * window.
+ */
+export const LIFT_ROW_CSS = `
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row {
+  border-radius: 18px; display: flex; align-items: center; gap: 8px; padding: 0 14px 0 10px; box-sizing: border-box;
+  color: var(--row-ink-2); font-size: 13px; letter-spacing: -0.08px; white-space: nowrap;
+}
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row.icon { justify-content: center; padding: 0; }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .rim { padding: 0; mask: none; background: none; box-shadow: var(--row-rim); }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .tint-mix { background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.54)); }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .fav { position: relative; left: auto; top: auto; flex: none; width: 16px; height: 16px; margin: 0; }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .fav :is(img, svg) { width: 16px; height: 16px; }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .title { position: relative; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#vitre-root.one-row #layer-split-lift > .sv-lifted.row > .fav[data-tone] img { padding: 0; background: none; }
+#vitre-root.one-row.theme-light:not(.private) #layer-split-lift > .sv-lifted.row > .fav[data-tone="light"] img { padding: 2px; border-radius: 4.5px; background: #1d1f24; }
+#vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #layer-split-lift > .sv-lifted.row > .fav[data-tone="dark"] img { padding: 2px; border-radius: 4.5px; background: #f4f2ec; }
 `;

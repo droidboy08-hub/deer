@@ -210,4 +210,63 @@ export const CSS = `
   #vitre-root #layer-find .vf-count, #vitre-root #layer-find .vf-count.none { color: CanvasText !important; }
   #vitre-root #layer-find-ring .vf-ring-edge { border-color: Highlight; box-shadow: none; }
 }
+
+/* ---- macOS, One row (window/onerow.ts; boards RowSpec, DirOneRowBehaviour) ----
+   The active capsule the face lies over is 36 tall at top 8 (CAP_H, CAP_TOP), radius 18, and has no
+   Back or Forward (skin/bar.css): the face takes that box, its parts are centred on 36 instead of 44,
+   and the morph's Back and Forward glyphs are not drawn. The row's glass follows the theme of the
+   page under it, as the Windows bar's does (skin/bar.css), so the face's text and controls do too,
+   in RowSpec's colours: the light set below on #vitre-root.theme-light, the dark one on theme-dark
+   and theme-clear and in a private window, never by the system's appearance. In a normal window the
+   row never hides (reveal.ts), so the face never needs its own glass there; in window full screen it
+   can, and the face's own glass is then the row's (RowSpec "Liquid Glass Regular": blur 14, saturate
+   1.9, brightness 1.04, as skin/bar.css gives the capsules), not the Windows lens map views.ts
+   setLens draws.
+   Across, the parts sit where board RowFind puts them in its 400 px capsule (views.ts FAV_X, FIELD_X,
+   COUNT_R): the glyph at 12, the field from 40, the counter's right edge at 260 (140 from the right),
+   previous and next 26 px at 268 and 298 (top 5), the divider at 331, Aa (28 px) at 337 and the close
+   button 4 from the right. Narrow (no Aa or divider): next where Aa was, previous 30 left of it, the
+   counter 8 left of that. The loading line keeps the capsule's 18 px ends (skin/bar.css .load-line).
+   The landing ring is drawn whole, as on Windows: the page fills the window from y 0 under the
+   floating row (skin/shell.css section 8; until 2026-11-15 a normal window's page started below the
+   row and the ring was cut at its bottom edge). */
+@media (-moz-platform: macos) {
+  #vitre-root.one-row #layer-find .vf-face { top: 8px; height: 36px; border-radius: 18px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-navs { display: none; }
+  #vitre-root.one-row #layer-find .vf-face .vf-domain { height: 36px; line-height: 36px; }
+  #vitre-root.one-row #layer-find .vf-face :is(.vf-input, .vf-count) { height: 36px; }
+  #vitre-root.one-row #layer-find .vf-face :is(.vf-reload, .vf-btn) { top: 4px; }
+  #vitre-root.one-row #layer-find .vf-face :is(.vf-fav, .vf-div) { top: 10px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-fav { left: 12px; }
+  #vitre-root.one-row #layer-find .vf-face :is(.vf-domain, .vf-input) { left: 40px; }
+  #vitre-root.one-row #layer-find .vf-face.vf-tight .vf-input { left: 12px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-count { right: 140px; }
+  #vitre-root.one-row #layer-find .vf-face :is(.vf-prev, .vf-next) { top: 5px; width: 26px; height: 26px; border-radius: 13px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-prev { right: 106px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-next { right: 76px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-div { right: 68px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-case { right: 35px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-close { right: 4px; }
+  #vitre-root.one-row #layer-find .vf-face.vf-narrow .vf-prev { right: 66px; }
+  #vitre-root.one-row #layer-find .vf-face.vf-narrow .vf-next { right: 36px; }
+  #vitre-root.one-row #layer-find .vf-face.vf-narrow .vf-count { right: 100px; }
+  #vitre-root.one-row #layer-find .vf-face .vf-load { left: 18px; right: 18px; }
+  #vitre-root.one-row #layer-find .vf-face.vf-own > .lens { backdrop-filter: var(--row-glass) !important; }
+  #vitre-root.one-row #layer-find {
+    --vf-focus: linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.40));
+    --vf-text: #1d1d1f; --vf-icon: rgba(29,29,31,0.78); --vf-icon-dis: rgba(29,29,31,0.28);
+    --vf-placeholder: rgba(29,29,31,0.45); --vf-caret: #005fb8; --vf-divider: rgba(29,29,31,0.12);
+    --vf-count: rgba(29,29,31,0.55); --vf-none: #c42b1c; --vf-text-shadow: none;
+    --vf-hover: rgba(29,29,31,0.06); --vf-press: rgba(29,29,31,0.10);
+    --vf-case-bg: rgba(0,95,184,0.12); --vf-case-ring: inset 0 0 0 1px rgba(0,95,184,0.35); --vf-case-on: #005fb8;
+  }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #layer-find {
+    --vf-focus: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.46);
+    --vf-text: #ffffff; --vf-icon: rgba(255,255,255,0.85); --vf-icon-dis: rgba(255,255,255,0.3);
+    --vf-placeholder: rgba(255,255,255,0.45); --vf-caret: #4cc2ff; --vf-divider: rgba(255,255,255,0.12);
+    --vf-count: rgba(255,255,255,0.6); --vf-none: #ff99a4; --vf-text-shadow: none;
+    --vf-hover: rgba(255,255,255,0.10); --vf-press: rgba(255,255,255,0.16);
+    --vf-case-bg: rgba(76,194,255,0.24); --vf-case-ring: inset 0 0 0 1px rgba(76,194,255,0.45); --vf-case-on: #9fe3ff;
+  }
+}
 `;

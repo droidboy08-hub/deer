@@ -10,6 +10,7 @@
 import type { UpdateState } from '../../../modules/VitreUpdater.sys';
 import { SEARCH_ENGINES, type SearchEngine, type Settings } from '../../../shared/settings';
 import { updateStatus } from '../../../shared/update';
+import { isMac } from '../../../shared/os';
 import { backgroundPicker } from './bg-picker';
 import { button, checkRow, dropdown, h, liveDesc, localDropdown, localToggle, radioRows, row, segmented, toggle, type Option, type RowDef, type SectionDef } from './controls';
 import { engineInfo, fileURL, forgetClosedEverywhere, openFolder, pickFolder, sanitize, type SanitizeItem } from './gecko';
@@ -17,18 +18,24 @@ import { ico, icon, nav } from './icons';
 import { fillKeys } from './keymap';
 import { shortcutsSection } from './shortcuts-page';
 
+/** The switcher key as this system prints it (Ctrl+Tab, or ⌃⇥ on a Mac). */
+const TAB_KEY = isMac ? '⌃⇥' : 'Ctrl+Tab';
+
+/** Mode's line: the system's appearance setting it follows (macOS: System Settings › Appearance). */
+const MODE_DESC = isMac ? 'System follows your Mac setting' : 'System follows your Windows setting';
+
 // ---- rows shared by a page and General ----
 
 const modeRow = (unlisted = false): RowDef => ({
   title: 'Mode',
-  desc: 'System follows your Windows setting',
+  desc: MODE_DESC,
   keywords: 'theme dark light appearance colour color',
   unlisted,
   build: (ctx) =>
     row({
       icon: ico.mode,
       title: 'Mode',
-      desc: 'System follows your Windows setting',
+      desc: MODE_DESC,
       control: (ids) =>
         segmented(ctx, {
           labelledBy: ids.title,
@@ -206,52 +213,61 @@ const appIconRow: RowDef = {
   },
 };
 
+const barAutoHideRow: RowDef = {
+  title: 'Show the tab bar',
+  desc: 'While you’re reading a page',
+  keywords: 'auto-hide autohide hide tabs bar',
+  build: (ctx) =>
+    row({
+      icon: ico.tabBar,
+      title: 'Show the tab bar',
+      desc: 'While you’re reading a page',
+      control: (ids) =>
+        dropdown(ctx, {
+          labelledBy: ids.title,
+          options: [
+            { value: 'always', label: 'Always' },
+            { value: 'auto', label: 'When I point at the top' },
+          ],
+          get: (s) => (s.barAutoHide ? 'auto' : 'always'),
+          set: (v) => ctx.set({ barAutoHide: v === 'auto' }),
+        }),
+    }),
+};
+
+/**
+ * The page inset's line. macOS: the One row is always shown in a normal window (window full screen
+ * hides it and gives pages no strip, as F11 does on Windows), so the line says what the strip is for.
+ */
+const INSET_DESC = isMac
+  ? 'Leaves room for the tab bar at the top of each page; it scrolls away with the page'
+  : 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page';
+
+const pageInsetRow: RowDef = {
+  title: 'Start pages below the tab bar',
+  desc: INSET_DESC,
+  keywords: 'inset space gap top margin overlap cover header',
+  build: (ctx) =>
+    row({
+      icon: ico.inset,
+      title: 'Start pages below the tab bar',
+      desc: INSET_DESC,
+      control: (ids) => toggle(ctx, { labelledBy: ids.title, describedBy: ids.desc, get: (s) => s.pageInset, set: (v) => ctx.set({ pageInset: v }) }),
+    }),
+};
+
 const appearance: SectionDef = {
   id: 'appearance',
   title: 'Appearance',
   icon: nav.appearance,
   order: 20,
+  // macOS: the Dock shows the app bundle's own icon, and the One row never hides in a normal window
+  // (reveal.ts), so App icon and "Show the tab bar" are Windows-only. "Start pages below the tab bar"
+  // applies on a Mac too: the 64 px strip under the floating row (src/actors/page/inset.ts ROW_AREA).
   groups: () => [
     { title: 'Theme', rows: [modeRow()] },
-    { title: 'App icon', rows: [appIconRow] },
-    {
-      title: 'Tab bar',
-      rows: [
-        {
-          title: 'Show the tab bar',
-          desc: 'While you’re reading a page',
-          keywords: 'auto-hide autohide hide tabs bar',
-          build: (ctx) =>
-            row({
-              icon: ico.tabBar,
-              title: 'Show the tab bar',
-              desc: 'While you’re reading a page',
-              control: (ids) =>
-                dropdown(ctx, {
-                  labelledBy: ids.title,
-                  options: [
-                    { value: 'always', label: 'Always' },
-                    { value: 'auto', label: 'When I point at the top' },
-                  ],
-                  get: (s) => (s.barAutoHide ? 'auto' : 'always'),
-                  set: (v) => ctx.set({ barAutoHide: v === 'auto' }),
-                }),
-            }),
-        },
-        {
-          title: 'Start pages below the tab bar',
-          desc: 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page',
-          keywords: 'inset space gap top margin overlap cover header',
-          build: (ctx) =>
-            row({
-              icon: ico.inset,
-              title: 'Start pages below the tab bar',
-              desc: 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page',
-              control: (ids) => toggle(ctx, { labelledBy: ids.title, describedBy: ids.desc, get: (s) => s.pageInset, set: (v) => ctx.set({ pageInset: v }) }),
-            }),
-        },
-      ],
-    },
+    ...(isMac ? [] : [{ title: 'App icon', rows: [appIconRow] }]),
+    { title: 'Tab bar', rows: isMac ? [pageInsetRow] : [barAutoHideRow, pageInsetRow] },
   ],
 };
 
@@ -268,7 +284,7 @@ const home: SectionDef = {
       rows: [
         {
           title: 'Background',
-          desc: 'A photo, a video, your Windows wallpaper or none',
+          desc: isMac ? 'A photo, a video, your Mac wallpaper or none' : 'A photo, a video, your Windows wallpaper or none',
           // "deer wallpapers", "gallery": the picker's Deer wallpapers group (VitreWallpapers); "live
           // wallpapers", "animated": its videos. Not "download": that search is for the Downloads settings.
           keywords: 'wallpaper picture photo video image home none deer wallpapers gallery collection live animated',
@@ -300,10 +316,13 @@ const home: SectionDef = {
 
 // ---- Tabs ----
 
+/** How the switcher starts: the physical Control key on both systems (shortcuts.ts nextTabMru), named as the keyboard names it. */
+const HOLD_TAB = isMac ? 'Hold Control and tap Tab.' : 'Hold Ctrl and tap Tab.';
+
 const STYLE_NOTES: Record<Settings['switcherStyle'], string> = {
-  deck: 'Hold Ctrl and tap Tab. Big cards slide past, and the one you stop on opens when you let go.',
-  grid: 'Hold Ctrl and tap Tab. Every tab shows as a card in a grid, and the one you stop on opens when you let go.',
-  strip: 'Hold Ctrl and tap Tab. A row of small cards appears over the page, and the one you stop on opens when you let go.',
+  deck: `${HOLD_TAB} Big cards slide past, and the one you stop on opens when you let go.`,
+  grid: `${HOLD_TAB} Every tab shows as a card in a grid, and the one you stop on opens when you let go.`,
+  strip: `${HOLD_TAB} A row of small cards appears over the page, and the one you stop on opens when you let go.`,
 };
 
 /** A span with inline layout (CSSOM, never a style attribute: see glass.ts). */
@@ -432,7 +451,7 @@ const tabs: SectionDef = {
         switcherStyleRow,
         {
           title: 'Order of tabs',
-          desc: 'Ctrl+Tab starts at the tab you used before this one',
+          desc: `${TAB_KEY} starts at the tab you used before this one`,
           keywords: 'ctrl+tab mru most recently used bar order',
           build: (ctx) => {
             const el = row({
@@ -450,7 +469,7 @@ const tabs: SectionDef = {
                   set: (v) => ctx.set({ tabOrder: v }),
                 }),
             });
-            liveDesc(ctx, el, (s) => (s.tabOrder === 'bar' ? 'Ctrl+Tab starts at the tab on the right' : 'Ctrl+Tab starts at the tab you used before this one'));
+            liveDesc(ctx, el, (s) => (s.tabOrder === 'bar' ? `${TAB_KEY} starts at the tab on the right` : `${TAB_KEY} starts at the tab you used before this one`));
             return el;
           },
         },
@@ -786,7 +805,7 @@ const about: SectionDef = {
   title: 'About Deer',
   icon: nav.about,
   order: 90,
-  intro: 'A see-through browser for Windows.',
+  intro: isMac ? 'A see-through browser for Mac.' : 'A see-through browser for Windows.',
   groups: () => [
     {
       rows: [

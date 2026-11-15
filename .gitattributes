@@ -1,0 +1,8 @@
+# Line endings that must not depend on a checkout's core.autocrlf.
+# Shell scripts run on macOS (and in WSL or Git Bash), where a CR at the end of a line breaks them.
+*.sh text eol=lf
+gecko/launcher/deer text eol=lf
+# Batch files keep their CRLF exactly as committed, on every system. Not "text eol=crlf": the
+# repository stores them with CRLF, and that attribute would store them with LF (git would show
+# every .cmd file as changed until they were committed again).
+*.cmd -text

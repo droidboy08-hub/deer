@@ -12,6 +12,9 @@
 //     tint, rim and body fade, and the lens is shown at once / hidden first.
 //   - Scrollbars: the sidebar and the page scroll under the board's 2 px overlay thumb (right 3,
 //     white 0.4 dark / black 0.4 light): src/window/scrollthumb.ts, colour --vt-thumb below.
+//   - macOS: no lens. The sheet and Home's Background popover carry a plain frost themselves under
+//     the same tint and rim (MAC below, appended to CSS on macOS only).
+import { isMac } from '../../../shared/os';
 
 const DARK = `
   --vs-text: #ffffff;
@@ -113,6 +116,23 @@ const LIGHT = `
 
 const RIM_MASK = 'mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;';
 const R = '#vitre-root';
+
+// macOS: Deer's dark frost without the drawn refraction. The Settings sheet creates no lens there
+// (panel.ts); Home's Background popover still builds its lens (home-button.ts), hidden here. The
+// sheet and the popover carry the blur themselves, as a menu does (menus/css.ts): nothing between
+// #vitre-root and them is ever faded, and their own scale and box-shadow leave their backdrop alone.
+// The frost comes on with `open` / `shown` and goes first on close, as the lens did. A CSS blur() in
+// a backdrop-filter samples past its edges in mirror mode (Firefox:
+// gfx/wr/webrender/src/scene_building.rs, "edgeMode=Mirror"), so unlike the SVG lens it needs no
+// opaque step to keep the sharp page out of the edges.
+const MAC = `
+${R} .hb-pop-lens { display: none; }
+${R} .vs-root.open .vs-sheet { backdrop-filter: blur(30px) saturate(1.6); }
+${R} .hb-pop.shown { backdrop-filter: blur(24px) saturate(1.6); }
+@media (forced-colors: active) {
+  ${R} :is(.vs-sheet, .hb-pop) { backdrop-filter: none !important; }
+}
+`;
 
 export const CSS = `
 /* The scrim leaves the window's drag strip working (the region is geometric, shell.css #vitre-drag);
@@ -420,4 +440,4 @@ ${R} .hb-add:active { background: rgba(255,255,255,0.08); }
   ${R} .vs-seg-btn:is([aria-checked="true"], [aria-selected="true"]) { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   ${R} :is(.vs-style, .hb-tile)[aria-checked="true"] :is(.vs-style-preview, .hb-face) { outline: 3px solid Highlight; outline-offset: 2px; }
 }
-`;
+` + (isMac ? MAC : '');

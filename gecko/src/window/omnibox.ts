@@ -6,11 +6,12 @@
 // them on keydown so the key router never sees them):
 //   Enter            go to the highlighted row, or to what was typed (an address, or a search with
 //                    the engine from Settings); on a "Switch to tab" row, switch to that tab
-//   Alt+Enter        the same, in a new tab
+//   Alt+Enter        the same, in a new tab (macOS also ⌘↩, MacKeys board)
 //   Ctrl+Enter       add www. and .com to a bare word, then go
 //   Shift+Enter      peek it when Peek is installed (window.vitrePeek), otherwise like Enter
 //   Up / Down        move through the rows
-//   Shift+Delete     remove a history row, only one the user moved onto (otherwise it stays Cut)
+//   Shift+Delete     remove a history row, only one the user moved onto (otherwise it stays Cut);
+//                    macOS ⇧⌫ (the key is Backspace there), otherwise deleting as usual
 //   Esc              first press puts the address back and closes the suggestions; the next one
 //                    closes the field and returns focus to the page
 //   Tab / Shift+Tab  leave for the rest of the tab bar (handlers.tabOut)
@@ -37,12 +38,25 @@
 // glyph and it is named "Address for the left page"; over pages that disagree (light and dark) it
 // takes the mixed tint. On an empty Home side, this window's tabs that match read "Show here":
 // choosing one moves that tab into the side and drops the Home tab (handlers.showHere).
+// One row (macOS, ./onerow; RowSpec "Typing an address", DirOneRowBehaviour 3): there is no field in
+// the middle of the window. The field IS the active capsule: it lies over the capsule's slot (36 tall
+// at CAP_TOP), which the bar grows to ACTIVE_TYPING while it is open (b.bar.editing; the compact
+// tabs' titles shrink, and below COMPACT_MIN fold to favicons, to make room), and it follows the slot
+// when the row re-flows. In split view it
+// lies over the focused side's capsule, grown to the typing width where the row has room. The
+// suggestions hang 8 px below the capsule, at 52 (CAP_TOP + CAP_H + 8, as the + menu and the
+// Downloads quick view), left-aligned to the capsule, at least 400 wide. The
+// page is not dimmed (the scrim stays, clear, so a click on the page still closes the field), and the
+// other tabs stay on the row. No mixed tint: the field takes the row's colours, the focused page's
+// theme as the whole row does (skin/bar.css, skin/omnibox.css).
 import { displayHost, looksLikeAddress, resolveInput, searchUrl, stripUrl } from '../shared/url';
 import type { Browser } from './browser';
 import { el, fill, svg } from './dom';
 import { glass, lens } from './glass';
 import { icons } from './icons';
 import type { Tab } from './model';
+import { ACTIVE_TYPING, CAP_H, CAP_TOP, oneRow } from './onerow';
+import { isMac } from '../shared/os';
 import { HistorySearch, pageIcon, removeFromHistory } from './places';
 
 const FIELD_W = 640;
@@ -54,6 +68,9 @@ const MAX_SWITCH = 3;
 /** History waits this long after a keystroke: at 60 000 places one search takes 20-150 ms. */
 const HISTORY_DELAY = 60;
 const GROW_MS = 240;
+/** One row: the suggestions' top, 8 below the capsule (52, as the board hangs them, the + menu and the Downloads quick view), and their least width. */
+const ROW_PANEL_TOP = CAP_TOP + CAP_H + 8;
+const ROW_PANEL_MIN = 400;
 
 export interface OmniHandlers {
   go(url: string, where: 'current' | 'newTab'): void;
@@ -105,6 +122,8 @@ export class Omnibox {
   private icon: HTMLElement;
   /** The side the field is for in split view, or null. */
   private side: 'left' | 'right' | null = null;
+  /** One row: the capsule slot the field was last put over. */
+  private placed: { x: number; w: number } | null = null;
 
   constructor(
     private b: Browser,
@@ -181,8 +200,16 @@ export class Omnibox {
       }
     });
     window.addEventListener('resize', () => {
-      if (this.open) this.place(null);
+      // One row: the bar lays the row out again on the render that follows; the field follows that.
+      if (this.open && !oneRow()) this.place(null);
     });
+    if (oneRow()) {
+      // The row re-flowed while the field is open (a tab opened, closed or retitled, the window
+      // resized, the strip scrolled): the field stays on its capsule.
+      b.on('render', () => {
+        if (this.open) this.follow();
+      });
+    }
     // The split changed while the field is open (Ctrl+Shift+U separated it, the sides swapped, the
     // divider moved): its side glyph, its name and the mixed tint follow the active tab's side now,
     // so Narrator never names a side that is gone.
@@ -191,6 +218,7 @@ export class Omnibox {
       const side = this.b.splitView.sideOf(this.b.active());
       this.setSide(side);
       this.paintMixed(!!side && this.b.splitView.mixed());
+      if (oneRow()) this.follow();
     });
   }
 
@@ -229,6 +257,8 @@ export class Omnibox {
       void this.scrim.offsetWidth;
       this.scrim.classList.add('on');
       this.b.root.classList.add('omni-open');
+      // One row: the active capsule grows to the typing width first (the bar lays the row out at once).
+      if (oneRow()) this.b.bar.editing(true);
       this.place(from);
       this.h.visibility();
     }
@@ -239,8 +269,9 @@ export class Omnibox {
     this.refresh(true);
   }
 
-  /** Split view's mixed tint on the field and its suggestions (spec "Split pill": Mixed tint). */
+  /** Split view's mixed tint on the field and its suggestions (spec "Split pill": Mixed tint). Not in the one row. */
   private paintMixed(on: boolean): void {
+    if (oneRow()) on = false;
     this.field.classList.toggle('mixed', on);
     this.panel.classList.toggle('mixed', on);
   }
@@ -269,6 +300,8 @@ export class Omnibox {
     this.historyRows = [];
     this.input.setAttribute('aria-expanded', 'false');
     this.b.root.classList.remove('omni-open');
+    this.placed = null;
+    if (oneRow()) this.b.bar.editing(false);
     this.h.visibility();
     if (refocus) this.h.closed();
   }
@@ -307,13 +340,20 @@ export class Omnibox {
 
   /** Put the field at its place; with `from` it grows out of that rectangle (the pill). */
   private place(from: DOMRect | null): void {
+    if (oneRow()) {
+      this.placeInRow(from, false);
+      return;
+    }
     const W = window.innerWidth;
     // Centred, 24 px from the left edge at least, and never over the window controls: Windows
     // hit-tests the caption buttons by their place, so a field drawn over them would minimize or
-    // close the window on a click. (The Electron build lets the field cover them.)
-    const limit = W - this.b.bar.reserve;
-    const fw = Math.max(200, Math.min(FIELD_W, W - 48, limit - 24));
-    const left = Math.max(24, Math.min(Math.round((W - fw) / 2), limit - fw));
+    // close the window on a click. (The Electron build lets the field cover them.) macOS: the
+    // traffic lights are at the left (b.bar.reserveLeft, 0 on Windows) and sit above anything Deer
+    // draws there, so the field keeps clear of them too, and 24 px from the right edge.
+    const start = Math.max(24, this.b.bar.reserveLeft);
+    const limit = Math.min(W - 24, W - this.b.bar.reserve);
+    const fw = Math.max(200, Math.min(FIELD_W, W - 48, limit - start));
+    const left = Math.max(start, Math.min(Math.round((W - fw) / 2), limit - fw));
     const f = this.field.style;
     this.panel.style.left = `${left}px`;
     this.panel.style.width = `${fw}px`;
@@ -348,6 +388,63 @@ export class Omnibox {
     }
   }
 
+  /**
+   * One row: the capsule the field is (see the header): the active slot, which the bar has grown for
+   * typing; in split view the focused side's capsule, grown to the typing width where the row has room.
+   */
+  private rowSlot(): DOMRect | null {
+    const half = this.side ? this.b.bar.halfRect(this.b.activeId) : null;
+    if (!half) return this.b.bar.layout.pillRect;
+    const room = window.innerWidth - this.b.bar.reserve - half.x;
+    return new DOMRect(half.x, CAP_TOP, Math.max(half.width, Math.min(ACTIVE_TYPING, room)), CAP_H);
+  }
+
+  /**
+   * One row: lay the field over its capsule and hang the suggestions below the row. With `from` it
+   * grows out of that rectangle (the capsule at rest); `glide` keeps the transition (the row re-flowed
+   * under it), otherwise it is put there at once.
+   */
+  private placeInRow(from: DOMRect | null, glide: boolean): void {
+    const slot = this.rowSlot();
+    if (!slot) return;
+    this.placed = { x: slot.x, w: slot.width };
+    const W = window.innerWidth;
+    const pw = Math.max(200, Math.min(Math.max(slot.width, ROW_PANEL_MIN), W - 24));
+    this.panel.style.left = `${Math.max(12, Math.min(slot.x, W - 12 - pw))}px`;
+    this.panel.style.width = `${pw}px`;
+    this.panel.style.top = `${ROW_PANEL_TOP}px`;
+    window.clearTimeout(this.growTimer);
+    this.field.classList.remove('morphing');
+    const f = this.field.style;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animate = !reduced && (glide || !!from);
+    if (from && animate) {
+      f.transition = 'none';
+      f.left = `${from.x}px`;
+      f.top = `${from.y}px`;
+      f.width = `${from.width}px`;
+      f.height = `${from.height}px`;
+      void this.field.offsetWidth;
+      f.transition = '';
+    } else if (!animate) f.transition = 'none';
+    f.left = `${slot.x}px`;
+    f.top = `${slot.y}px`;
+    f.width = `${slot.width}px`;
+    f.height = `${slot.height}px`;
+    if (!animate) {
+      void this.field.offsetWidth;
+      f.transition = '';
+    }
+  }
+
+  /** One row: the capsule moved or changed width under the open field: the field glides after it. */
+  private follow(): void {
+    const slot = this.rowSlot();
+    const was = this.placed;
+    if (!slot || (was && Math.abs(slot.x - was.x) < 0.5 && Math.abs(slot.width - was.w) < 0.5)) return;
+    this.placeInRow(null, true);
+  }
+
   // ---- keys ----
 
   private onKey(e: KeyboardEvent): void {
@@ -380,7 +477,7 @@ export class Omnibox {
           return;
         }
       }
-      this.choose(e.altKey && !e.ctrlKey ? 'newTab' : 'current');
+      this.choose((e.altKey || (isMac && e.metaKey)) && !e.ctrlKey ? 'newTab' : 'current');
       return;
     }
     if (e.key === 'Escape' && plain && !e.shiftKey) {
@@ -388,7 +485,7 @@ export class Omnibox {
       if (!e.repeat) this.escape();
       return;
     }
-    if (e.key === 'Delete' && e.shiftKey && plain) {
+    if ((e.key === 'Delete' || (isMac && e.key === 'Backspace')) && e.shiftKey && plain) {
       // Only a row the user moved onto; the default top match never counts, and otherwise this is Cut.
       const row = this.moved && this.sel >= 0 ? this.rows[this.sel] : undefined;
       if (row?.removable) {

@@ -7,14 +7,16 @@
 // videoPicker, find.open, settings.open) and the row is left out when that service is missing.
 // Page-derived URLs load through b.openLink with the page's principals (nsContextMenu.
 // _openLinkInParameters), never with the system principal.
+// macOS: the accelerator column prints the Mac keymap in Apple glyphs (types.ts actionKey / fixedKey).
 import type { Browser, OpenRequest } from '../../browser';
 import type { DownloadOptions } from '../downloads/index';
 import * as fx from '../../firefox';
+import { isMac } from '../../../shared/os';
 import type { Tab } from '../../model';
 import { isHomeUrl, looksLikeAddress, resolveInput, searchUrl } from '../../../shared/url';
 import * as gecko from './gecko';
 import { downloadsService, findService, peekService, settingsService } from './services';
-import { item, SEP, tidy, type MenuCommand, type MenuItem } from './types';
+import { actionKey, fixedKey, item, SEP, shiftClickKey, tidy, type MenuCommand, type MenuItem } from './types';
 import { literal, rowFits } from './view';
 
 export type PageKind = 'misspelled' | 'editable' | 'media' | 'imagelink' | 'link' | 'image' | 'selection' | 'page' | 'home';
@@ -83,7 +85,7 @@ function nextTo(env: PageEnv): number | undefined {
 }
 
 /** Open as tab is rebindable (Settings › Keyboard shortcuts); menus print the current key. */
-export const openAsTabKey = (b: Browser): string => b.settings.rebind?.openAsTab || 'Alt+Enter';
+export const openAsTabKey = (b: Browser): string => actionKey(b, 'openAsTab', b.settings.rebind?.openAsTab || 'Alt+Enter');
 
 const devtoolsAllowed = (): boolean => !gecko.devtoolsDisabled();
 
@@ -115,10 +117,10 @@ export function quote(text: string, max = 24): string {
 }
 
 /** The longest quote (24 characters at most) that leaves “Find … on page” uncut at the widest menu. */
-function fittedQuote(text: string): string {
+function fittedQuote(text: string, key: string): string {
   for (let n = 24; n > 8; n--) {
     const q = quote(text, n);
-    if (rowFits(`Find ${q} on page`, 'Ctrl+F')) return q;
+    if (rowFits(`Find ${q} on page`, key)) return q;
   }
   return quote(text, 8);
 }
@@ -207,27 +209,28 @@ function editRows(env: PageEnv, opts: { undo: boolean }): (MenuItem | null)[] {
   const run = (id: string) => () => gecko.doCommand(id);
   const rich = !!(cm.isDesignMode || (cm.onEditable && !cm.onTextInput));
   return [
-    opts.undo ? item('Undo', 'undo', 'Ctrl+Z', 'U', run('cmd_undo'), { disabled: !en('cmd_undo') }) : null,
-    opts.undo ? item('Redo', 'redo', 'Ctrl+Y', 'R', run('cmd_redo'), { disabled: !en('cmd_redo') }) : null,
+    opts.undo ? item('Undo', 'undo', fixedKey('Ctrl+Z', 'Mod+Z'), 'U', run('cmd_undo'), { disabled: !en('cmd_undo') }) : null,
+    opts.undo ? item('Redo', 'redo', fixedKey('Ctrl+Y', 'Mod+Shift+Z'), 'R', run('cmd_redo'), { disabled: !en('cmd_redo') }) : null,
     opts.undo ? SEP : null,
-    item('Cut', 'cut', 'Ctrl+X', 'T', run('cmd_cut'), { disabled: pw || !en('cmd_cut') }),
-    item('Copy', 'copy', 'Ctrl+C', 'C', run('cmd_copy'), { disabled: pw || !en('cmd_copy') }),
-    item('Paste', 'paste', 'Ctrl+V', 'P', run('cmd_paste'), { disabled: !en('cmd_paste') }),
-    opts.undo && rich && gecko.clipboardHasHtml() ? item('Paste as plain text', '', 'Ctrl+Shift+V', 'L', run('cmd_pasteNoFormatting'), { disabled: !en('cmd_paste') }) : null,
-    item('Select all', '', 'Ctrl+A', 'A', run('cmd_selectAll'), { disabled: !en('cmd_selectAll') }),
+    item('Cut', 'cut', fixedKey('Ctrl+X', 'Mod+X'), 'T', run('cmd_cut'), { disabled: pw || !en('cmd_cut') }),
+    item('Copy', 'copy', fixedKey('Ctrl+C', 'Mod+C'), 'C', run('cmd_copy'), { disabled: pw || !en('cmd_copy') }),
+    item('Paste', 'paste', fixedKey('Ctrl+V', 'Mod+V'), 'P', run('cmd_paste'), { disabled: !en('cmd_paste') }),
+    // Paste and Match Style on the Mac (MacKeys board, Editing): ⌥⇧⌘V.
+    opts.undo && rich && gecko.clipboardHasHtml() ? item('Paste as plain text', '', fixedKey('Ctrl+Shift+V', 'Mod+Alt+Shift+V'), 'L', run('cmd_pasteNoFormatting'), { disabled: !en('cmd_paste') }) : null,
+    item('Select all', '', fixedKey('Ctrl+A', 'Mod+A'), 'A', run('cmd_selectAll'), { disabled: !en('cmd_selectAll') }),
   ];
 }
 
 function pageRows(env: PageEnv): MenuItem[] {
   const { b, browser } = env;
   const nav = [
-    item('Back', 'back', 'Alt+Left', 'B', () => browser.goBack(), { disabled: !safe(() => browser.canGoBack, false) }),
-    item('Forward', 'forward', 'Alt+Right', 'F', () => browser.goForward(), { disabled: !safe(() => browser.canGoForward, false) }),
-    item('Reload', 'reload', 'Ctrl+R', 'R', () => fx.reload(browser)),
+    item('Back', 'back', actionKey(b, 'back', 'Alt+Left'), 'B', () => browser.goBack(), { disabled: !safe(() => browser.canGoBack, false) }),
+    item('Forward', 'forward', actionKey(b, 'forward', 'Alt+Right'), 'F', () => browser.goForward(), { disabled: !safe(() => browser.canGoForward, false) }),
+    item('Reload', 'reload', actionKey(b, 'reload', 'Ctrl+R'), 'R', () => fx.reload(browser)),
   ];
   const finder = findService(b);
-  const find = finder ? item('Find on page…', 'find', 'Ctrl+F', 'I', () => findService(b)?.open({ browser })) : null;
-  const print = item('Print…', 'print', 'Ctrl+P', 'P', () => fx.print(browser));
+  const find = finder ? item('Find on page…', 'find', actionKey(b, 'find', 'Ctrl+F'), 'I', () => findService(b)?.open({ browser })) : null;
+  const print = item('Print…', 'print', actionKey(b, 'print', 'Ctrl+P'), 'P', () => fx.print(browser));
   if (env.inPeek) {
     // The page inside a peek, starting with Open as tab.
     const peek = peekService(b);
@@ -248,9 +251,9 @@ function pageRows(env: PageEnv): MenuItem[] {
     SEP,
     find,
     print,
-    item('Save page as…', 'download', 'Ctrl+S', 'A', () => fx.savePage(browser)),
+    item('Save page as…', 'download', actionKey(b, 'savePage', 'Ctrl+S'), 'A', () => fx.savePage(browser)),
     SEP,
-    item('View page source', '', 'Ctrl+U', 'V', () => fx.viewSource(browser)),
+    item('View page source', '', actionKey(b, 'viewSource', 'Ctrl+U'), 'V', () => fx.viewSource(browser)),
     inspect(env),
   ]);
 }
@@ -315,7 +318,7 @@ function linkRows(env: PageEnv, withInspect: boolean): MenuItem[] {
   if (cm.linkProtocol === 'mailto') return tidy([item('Copy email address', 'copy', '', 'E', () => gecko.copyEmail(cm)), SEP, ins]);
   if (cm.linkProtocol === 'tel') return tidy([item('Copy phone number', 'copy', '', 'E', () => gecko.copyPhone(cm)), SEP, ins]);
   // Copy only for a selection inside the link (DESIGN-NOTES Link), not one elsewhere on the page.
-  const copySelection = cm.isTextSelected && (!env.hit || env.hit.linkSelected) ? item('Copy', 'copy', 'Ctrl+C', 'C', () => gecko.doCommand('cmd_copy')) : null;
+  const copySelection = cm.isTextSelected && (!env.hit || env.hit.linkSelected) ? item('Copy', 'copy', fixedKey('Ctrl+C', 'Mod+C'), 'C', () => gecko.doCommand('cmd_copy')) : null;
   const copyLink = item('Copy link address', 'link', '', 'E', () => gecko.copyLink(cm));
   const dl =
     downloadsService(b) && gecko.saveableLink(cm)
@@ -328,13 +331,13 @@ function linkRows(env: PageEnv, withInspect: boolean): MenuItem[] {
   return tidy([
     item('Open link in new tab', 'newtab', '', 'T', () => openTab(env, url)),
     peek
-      ? item('Peek link', 'peek', shiftPeeks ? 'Shift+click' : '', 'P', () => {
+      ? item('Peek link', 'peek', shiftPeeks ? shiftClickKey() : '', 'P', () => {
           const origin = union(env.linkRects) ?? env.targetRect;
           peekService(b)?.open(requestFor(env, url), origin ? { origin } : {});
         })
       : null,
     withInspect ? linkSplitRow(env, url) : null,
-    item('Open link in new window', 'newwindow', !shiftPeeks && !env.inPeek ? 'Shift+click' : '', 'W', () => openWindow(env, url)),
+    item('Open link in new window', 'newwindow', !shiftPeeks && !env.inPeek ? shiftClickKey() : '', 'W', () => openWindow(env, url)),
     // In a private window the row above already opens a private one (Firefox shows neither twice).
     env.b.isPrivate ? null : item('Open link in new private window', 'newwindow', '', 'R', () => openWindow(env, url, true)),
     SEP,
@@ -388,7 +391,8 @@ function imageRows(env: PageEnv, inLink: boolean): MenuItem[] {
 function selectionRows(env: PageEnv): MenuItem[] {
   const { b, cm } = env;
   const text = String(cm.selectionInfo?.fullText || cm.selectedText || '').trim();
-  const q = literal(fittedQuote(text));
+  const findKey = actionKey(b, 'find', 'Ctrl+F');
+  const q = literal(fittedQuote(text, findKey));
   const address = !/\s/.test(text) && looksLikeAddress(text);
   const finder = findService(b);
   const search = (): void => {
@@ -403,11 +407,11 @@ function selectionRows(env: PageEnv): MenuItem[] {
     }
   };
   return tidy([
-    item('Copy', 'copy', 'Ctrl+C', 'C', () => gecko.doCommand('cmd_copy')),
+    item('Copy', 'copy', fixedKey('Ctrl+C', 'Mod+C'), 'C', () => gecko.doCommand('cmd_copy')),
     SEP,
     address ? item(`Go to ${q.slice(1, -1)}`, 'newtab', '', 'G', () => openTab(env, resolveInput(text), false)) : item(`Search for ${q}`, 'search', '', 'S', search),
     // Find seeds its field from this text and starts on the selected occurrence.
-    finder ? item(`Find ${q} on page`, 'find', 'Ctrl+F', 'I', () => findService(b)?.open({ query: text.split(/\r?\n/)[0].slice(0, 120), browser: env.browser })) : null,
+    finder ? item(`Find ${q} on page`, 'find', findKey, 'I', () => findService(b)?.open({ query: text.split(/\r?\n/)[0].slice(0, 120), browser: env.browser })) : null,
     SEP,
     inspect(env),
   ]);
@@ -436,7 +440,7 @@ function mediaRows(env: PageEnv): MenuItem[] {
     // DRM-protected media is never downloadable: the row stays, disabled, with the reason.
     dl
       ? video
-        ? item('Download video…', 'download', drm ? 'Protected' : 'Ctrl+Shift+D', 'D', () => downloadsService(b)?.videoPicker(), { disabled: drm })
+        ? item('Download video…', 'download', drm ? 'Protected' : actionKey(b, 'downloadVideo', 'Ctrl+Shift+D'), 'D', () => downloadsService(b)?.videoPicker(), { disabled: drm })
         : item('Download audio', 'download', drm ? 'Protected' : '', 'D', () => download(env, src), { disabled: drm || noAddress })
       : null,
     // Not for blob: or MSE sources (DESIGN-NOTES Video; Electron's noAddress): a page-made address
@@ -483,9 +487,10 @@ function homeRows(env: PageEnv): MenuItem[] {
         })
       : null,
     video ? item(video.paused ? 'Play background' : 'Pause background', video.paused ? 'play' : 'pause', '', 'P', () => (video.paused ? void video.play().catch(() => undefined) : video.pause())) : null,
-    item('Show tab bar', '', '', 'T', () => b.sys('VitreSettings').set({ barAutoHide: !b.settings.barAutoHide }), { checked: !b.settings.barAutoHide }),
+    // macOS: the row never hides (reveal.ts), so there is nothing to switch.
+    isMac ? null : item('Show tab bar', '', '', 'T', () => b.sys('VitreSettings').set({ barAutoHide: !b.settings.barAutoHide }), { checked: !b.settings.barAutoHide }),
     SEP,
-    settings ? item('Settings', '', 'Ctrl+,', 'E', () => settingsService(b)?.open()) : null,
+    settings ? item('Settings', '', actionKey(b, 'settings', 'Ctrl+,'), 'E', () => settingsService(b)?.open()) : null,
   ]);
 }
 

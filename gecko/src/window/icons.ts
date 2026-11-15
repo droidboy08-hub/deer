@@ -22,6 +22,8 @@ export const icons = {
   closeHalf: svg(10, '<path d="M4 4l12 12M16 4 4 16"/>', 'stroke-width="3.2"'),
   sideLeft: svg(16, '<path d="M5 4.5h5v11H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z" fill="currentColor" fill-opacity="0.35" stroke="none"/><path d="M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11"/>'),
   sideRight: svg(16, '<path d="M10 4.5h5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-5z" fill="currentColor" fill-opacity="0.35" stroke="none"/><path d="M5 4.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM10 4.5v11"/>'),
+  // One row (macOS): the glasses before "Private" in a private window's capsule (board DirOneRowBehaviour).
+  privateGlasses: svg(18, '<circle cx="6" cy="12.5" r="2.8"/><circle cx="14" cy="12.5" r="2.8"/><path d="M8.8 12.5h2.4M3.3 11.4 5.2 5.6h2.2M16.7 11.4 14.8 5.6h-2.2"/>', 'stroke-width="1.5"'),
   minimize: '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4.5 10h11"/></svg>',
   maximize: '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2"/></svg>',
   restore: '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="6.5" width="9.5" height="9.5" rx="1.8"/><path d="M7 6.5V5.8A1.8 1.8 0 0 1 8.8 4h5.4A1.8 1.8 0 0 1 16 5.8v5.4a1.8 1.8 0 0 1-1.8 1.8h-.7"/></svg>',

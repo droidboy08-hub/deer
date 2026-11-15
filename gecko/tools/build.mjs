@@ -32,11 +32,15 @@
 // tsc); the bundles read the same index through a virtual module, so --modules never touches the file
 // and parallel builds into different --out folders do not race.
 import * as esbuild from 'esbuild';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, watch as fsWatch, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// On macOS the checkout's real path, with no symlink in it (a build started through a symlinked
+// folder still names the files the engine's vitre link and the content sandbox resolve to).
+// Windows keeps the path as it is.
+const HERE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = process.platform === 'darwin' ? realpathSync(HERE) : HERE;
 const SRC = join(ROOT, 'src');
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const flag = (name) => process.argv.includes(`--${name}`);

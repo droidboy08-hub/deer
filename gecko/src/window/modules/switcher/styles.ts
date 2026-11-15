@@ -3,9 +3,25 @@
 // app/src/renderer/modules/switcher/styles.ts. Every selector starts with
 // "#vitre-root #layer-switcher" so it outranks the shell's module-layer and .glass rules
 // (skin/shell.css, skin/glass.css), which are author sheets that come later in the cascade.
+// macOS, One row (window/onerow.ts): MAC below, appended only when oneRow() is on (Windows gets the
+// same text as before). Its rules key on #vitre-root.one-row (bar.ts), which also outranks the grid's
+// Windows rules: the grid's field is a capsule in the row's place (CAP_TOP 8, CAP_H 36, radius 18;
+// grid.ts centres it clear of the traffic lights) and the cards scroll below the row (ROW_H 52). In
+// window full screen, while macOS's menu bar is over the window (reveal.ts: row-shifted,
+// --vitre-row-shift), the field moves down with it as the row does (skin/bar.css).
+import { oneRow } from '../../onerow';
+
 const CLEAR_RIM = 'linear-gradient(165deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.35))';
 const FROST_RIM = 'linear-gradient(165deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.2))';
 const S = '#vitre-root #layer-switcher';
+const M = '#vitre-root.one-row #layer-switcher';
+
+const MAC = `
+/* ---- macOS, One row ---- */
+${M} .sw-gfield { top: 8px; height: 36px; border-radius: 18px; }
+${M} .sw-gscroll { top: 52px; }
+#vitre-root.one-row.fullscreen.row-shifted #layer-switcher .sw-gfield { translate: 0 var(--vitre-row-shift, 0px); }
+`;
 
 export const CSS = `
 ${S} > .sw {
@@ -221,4 +237,4 @@ ${S} .sw-strip.sw-expanding .sw-panel, ${S} .sw-strip.sw-expanding .sw-sfield { 
   ${S} .sw-expanding .sw-dock, ${S} .sw-sfield { transform: none; }
   ${S} .sw-expanding .sw-dcard.sel .sw-dface { border-radius: 22px; }
 }
-`;
+${oneRow() ? MAC : ''}`;

@@ -3,11 +3,18 @@
 // x 96/415/734/1053, rows at y 248/508, label 12 px under the card, 13 px title, 12 px host at 0.55,
 // selection ring 3 px #4cc2ff plus 4 px at 0.22, close badge 24 px at the top right on hover).
 // Ported from app/src/renderer/modules/switcher/grid.ts.
+// macOS, One row (window/onerow.ts): the field takes the row's place as it takes the bar's on Windows:
+// a CAP_H (36) capsule at CAP_TOP (8) in a ROW_H (52) band (styles.ts, macOS block), centred and
+// clear of the traffic lights (TABS_LEFT on both sides) and, in a private window, of the row's Private
+// capsule (privateRoom), the cards below the row.
 import { svg } from '../../dom';
 import { lens } from '../../glass';
 import { icons } from '../../icons';
 import type { Tab } from '../../model';
+import { CAP_H, GAP, oneRow, ROW_H, TABS_LEFT } from '../../onerow';
 import { setTip } from '../../tips';
+import { isMac } from '../../../shared/os';
+import { currentOS, displaySpec } from '../../../shared/shortcuts';
 import { cardAt, cardName, el, EXPAND, fadeLayers, flight, glassBox, labelChanged, labelIcon, labelParts, Media, nextCard, optionId, play, reducedMotion, settle, SPRING } from './parts';
 import type { Model, View, ViewHandlers } from './types';
 
@@ -16,11 +23,13 @@ const CH = 182;
 const COL_GAP = 28;
 const LABEL = 48;
 const ROW_GAP = 30;
-const BAND = 68; // the tab bar's band, where the search field sits
+const BAND = oneRow() ? ROW_H : 68; // the tab bar's band, where the search field sits (macOS: the One row's)
 const SIDE = 24;
 const MAX_COLS = 6;
 const FIELD_W = 480;
-const FIELD_H = 44;
+const FIELD_H = oneRow() ? CAP_H : 44;
+/** The field's least margin on each side: macOS keeps it clear of the traffic lights (the row's first tab is at TABS_LEFT). */
+const FIELD_SIDE = oneRow() ? TABS_LEFT : 16;
 const DROP_MS = 220;
 
 interface Card {
@@ -155,7 +164,19 @@ export class GridView implements View {
 
   layout(): void {
     const W = this.root.clientWidth || window.innerWidth;
-    const fw = Math.min(FIELD_W, W - 32);
+    if (oneRow()) {
+      // macOS: the row's Private capsule stays over the switcher in the same band (styles.ts lifts
+      // #layer-bar), so the field ends GAP short of it; centred while there is room, else it moves left.
+      const right = W - Math.max(FIELD_SIDE, this.privateRoom(W));
+      const fw = Math.max(0, Math.min(FIELD_W, right - FIELD_SIDE));
+      const x = Math.max(FIELD_SIDE, Math.min(Math.round((W - fw) / 2), right - fw));
+      Object.assign(this.field.style, { left: `${x}px`, width: `${fw}px` });
+      (this.field.querySelector('.lens') as HTMLElement).style.backdropFilter = lens(fw, FIELD_H, { blur: 1.5, scale: 20 });
+      this.place();
+      this.paintVisible();
+      return;
+    }
+    const fw = Math.min(FIELD_W, W - 2 * FIELD_SIDE);
     Object.assign(this.field.style, { left: `${Math.round((W - fw) / 2)}px`, width: `${fw}px` });
     (this.field.querySelector('.lens') as HTMLElement).style.backdropFilter = lens(fw, FIELD_H, { blur: 1.5, scale: 20 });
     this.place();
@@ -164,6 +185,13 @@ export class GridView implements View {
 
   columns(): number {
     return this.L.cols;
+  }
+
+  /** macOS: room the row's Private capsule takes from the right edge, GAP included (0 when there is none). */
+  private privateRoom(W: number): number {
+    const cap = document.getElementById('vitre-private');
+    const r = cap?.getBoundingClientRect();
+    return r && r.width ? Math.max(0, W - r.left + GAP) : 0;
   }
 
   // ---- cards ----
@@ -200,8 +228,8 @@ export class GridView implements View {
     close.tabIndex = -1;
     close.setAttribute('aria-hidden', 'true');
     close.append(svg(icons.closeSmall));
-    // A split pair's card closes both tabs (spec "Switcher").
-    setTip(close, this.m.pair(t.id) ? 'Close both tabs' : 'Close tab', 'Ctrl+W');
+    // A split pair's card closes both tabs (spec "Switcher"). macOS: ⌃W, the Control key held for the switcher.
+    setTip(close, this.m.pair(t.id) ? 'Close both tabs' : 'Close tab', isMac ? displaySpec('Ctrl+W', currentOS()) : 'Ctrl+W');
     const label = el('sw-glabel');
     label.setAttribute('aria-hidden', 'true');
     inner.append(face, close, label);

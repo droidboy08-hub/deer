@@ -18,6 +18,16 @@ and the canvas boards in `../design/canvas/project/*.dc.html` (exact sizes, colo
 The Electron build in `../app` is the reference implementation of that design (see `../app/ARCHITECTURE.md`);
 port behaviour and look from it, and take the Gecko mechanics from the verified spike results below.
 
+Windows is the shipping platform. The same codebase also runs on macOS (the Mac port; "macOS" below
+and in each section): every Mac difference sits behind `isMac` (`src/shared/os.ts`) or `oneRow()`
+(`src/window/onerow.ts`) in TypeScript, `-moz-platform: macos` in CSS, or a Darwin check in Python, so
+Windows behaviour and Windows outputs stay byte for byte what they were. The Mac design is the "Deer
+for Mac" canvas (boards RowSpec, DirOneRow, DirOneRowBehaviour, RowFind, RowSettings, RowDownloads,
+RowExtensions, RowFullScreen, MacSpec, MacKeys, MacMenuReference, AppIcon; not yet in
+`../design/canvas/`), and `../design/keymap.json` carries the Mac keys as `keys_mac`. "D1", "D2", ...
+in code comments are decisions of the Mac port plan (not in the repository); D1 (one keymap, ⌘ as the
+main modifier) and D2 (native traffic lights, Deer's own menu bar) are the owner's.
+
 ## Verified recipes (read the one for your area before writing code)
 
 Each spike was run on this runtime and then independently re-verified. `RESULT.md` holds the recipe,
@@ -42,18 +52,24 @@ gecko/
                   distribution/policies.json, browser/chrome/icons/default/*.ico,
                   vitre.exe (byte copy of firefox.exe; the process Deer runs as in development),
                   vitre/ (junction -> ../build; content processes can only read files inside runtime/)
+                  macOS: runtime/Deer Dev.app, Mozilla's unbranded Firefox 157 for arm64, with the
+                  same overlay in Contents/Resources and Contents/Resources/vitre a relative symbolic
+                  link -> gecko/build (tools/engine_paths.py has both layouts)
   engines/        Mozilla's unbranded builds and the release engine made from one
                   (deer-runtime: deer.exe with Deer's identity and icon, tools/setup-engine.py; its
                   deer-engine.json lists every engine file with its SHA-256, which --check compares)
   src/
     chrome.manifest
-    modules/      *.sys.ts  process-wide singletons (startup, settings, downloads engine, updater, ...)
+    modules/      *.sys.ts  process-wide singletons (startup, settings, downloads engine, updater, ...);
+                  platform/ is the platform layer behind VitrePlatform.sys.ts (macOS below)
     actors/       JSWindowActor parents/children (page-side code)
     window/       per-window UI: core (*.ts) + feature modules (modules/<name>.ts or <name>/index.ts)
     pages/        privileged pages (home)
     shared/       code used by several bundles. settings.ts and home.ts are pure; shortcuts.ts
                   (BINDINGS) and url.ts (the search engine) hold per-bundle state that each bundle
-                  applies itself (applyRebind / setSearchEngine), so a singleton imports only home.ts
+                  applies itself (applyRebind / setSearchEngine), so a singleton imports only home.ts.
+                  os.ts (which system: isMac, isWin, revealLabel, exe) reads Services.appinfo.OS once
+                  and is otherwise pure: any bundle but a worker may import it
     skin/         css (shell, glass, bar, omnibox for the window; pages.css for Firefox's own pages
                   and prompts, pdf.css for the PDF viewer)
     locales/      brand strings and the few Firefox strings Deer overrides (L10nRegistry source)
@@ -64,10 +80,14 @@ gecko/
                   runtime/: run the script after changing it), setup-engine.py (the release engine
                   from an unbranded build, with the same overlay: its --check compares the overlay
                   byte for byte, so run it again too), build-launcher.mjs, make-icon.py (the two app
-                  icons from ../design/icon), extract-reference.py
-  tests/          boot scripts that drive the app and capture (one folder per feature)
+                  icons from ../design/icon), extract-reference.py; engine_paths.py (where the
+                  engine's parts are, Windows and macOS), harness/ (run.py's platform halves), mac/
+                  (deer-wintool, the macOS window and capture helper), start.mjs and py.mjs (npm start,
+                  npm run setup-runtime and npm test on either system)
+  tests/          boot scripts that drive the app and capture (one folder per feature); _platform.py
+                  (skip_unless, accel_name) for suite runners
   launcher/       development launcher: Deer.cmd (+ Launcher.cs for Deer.exe; Vitre.cmd forwards to it,
-                  Vitre.exe, for old pins, is a copy of Deer.exe)
+                  Vitre.exe, for old pins, is a copy of Deer.exe); deer, the macOS shell launcher
   installer/      release launcher (Deer.exe), setup and uninstaller; build.py, test.py
   spikes/, reference/omni/   evidence and Firefox's own UI source for grepping
 ```
@@ -108,6 +128,9 @@ gecko/
    once). Every window carries the AppUserModelID
    `Deer.Browser` (`VitreStartup.APP_ID`), the id of the installer's shortcuts and file types, so the
    taskbar groups them together. The Electron build owns `%APPDATA%\Vitre`.
+6. macOS loads the same way, from `runtime/Deer Dev.app/Contents/Resources` (Gecko's GreD there);
+   the differences in steps 1, 4 and 5 (the launch guard, the content sandbox, the Mac defaults, the
+   profile) are under "macOS: engine, launcher, platform layer" below.
 
 ## Build
 
@@ -140,6 +163,96 @@ gecko/
   through `any`.
 - `.sys.mjs`, actors and window modules are cached for the process: restart to reload
   (`python tools/run.py` always starts fresh).
+- `npm start` builds, then runs this system's development launcher through `tools/start.mjs`
+  (`launcher\Deer.cmd`, or `launcher/deer` on macOS); `npm run setup-runtime` and `npm test` run their
+  Python script through `tools/py.mjs` (`python`, else `py -3`, on Windows; `python3` on macOS). On
+  macOS the build resolves the checkout's real path, so the files it names are the ones the engine's
+  `vitre` link and the content sandbox resolve to, and `tools/build-launcher.mjs` only marks
+  `launcher/deer` executable.
+
+## macOS: engine, launcher, platform layer
+
+Every Python tool here keeps to Python 3.9 and the standard library (`/usr/bin/python3` of a fresh Mac).
+
+- **Engine** (`tools/engine_paths.py`): `runtime/Deer Dev.app`, a private, git-ignored copy of Mozilla's
+  unbranded Firefox 157 for arm64 (`platform/objc.ts` relies on arm64's calling convention). GreD
+  is `Contents/Resources` (omni.ja, `config.js`, `defaults/`, `distribution/`, `browser/`, the `vitre`
+  package link), the programs are in `Contents/MacOS`. The engine always runs as
+  `Contents/MacOS/firefox`: never rename, copy or link that file (`xpcom/base/nsMacUtilsImpl.cpp`
+  GetAppPath finds the bundle by "/Contents/MacOS/" in the binary's path), so there is no `vitre.exe`.
+- **Wiring** (`python3 tools/setup-runtime.py [--check] [--copy]`, its Mac branch `wire_mac`): the overlay
+  into `Contents/Resources` (`defaults/vitre-platform/` included; the `.ico` files go along unused);
+  `Contents/Resources/vitre` a relative symbolic link to `gecko/build` (`--copy` puts a copy there
+  instead, to run again after every build); `crashreporter.app` renamed `.off` (it would tidy
+  `~/Library/Application Support/Firefox/Crash Reports`); `Info.plist` (and `InfoPlist.strings`) named
+  "Deer Dev", identifier `io.github.droidboy08-hub.deer.dev` (privacy grants and the app's preferences
+  are keyed on it: keep it), `LSEnvironment` with `XRE_PROFILE_PATH` = the development profile and
+  `MOZ_CRASHREPORTER_DISABLE=1`, so a start from the Dock, Finder, `open` or a clicked link uses Deer's
+  profile; the development profile and its `vitre-profile` marker; `com.apple.quarantine` removed and
+  the bundle registered again with LaunchServices (`lsregister -f`). Nothing is re-signed.
+- **Installed app** (`tools/mac/install-app.py`, not a release: no .dmg, no notarisation yet): builds,
+  wires the dev engine, then copies `runtime/Deer Dev.app` to `/Applications/Deer.app` with a real copy
+  of `build/` as `Contents/Resources/vitre`, the name "Deer", identifier `io.github.droidboy08-hub.deer`,
+  Deer's version, and `LSEnvironment` `XRE_PROFILE_PATH` = `~/Library/Application Support/Deer/Profile`
+  (made with its marker). An existing `Deer.app` is replaced only when it is Deer and not running. Run
+  it again to install a newer build.
+- **Launcher** (`launcher/deer`, a POSIX shell script; `npm start` runs it): the counterpart of
+  `Launcher.cs` with the same rules and exit codes (0 started, 1 bad `-osint` shape, 2 engine or
+  package missing, 3 anything else). Profile: `-profile <dir>`, else `$DEER_PROFILE`, else
+  `$VITRE_PROFILE`, else `~/Library/Application Support/Deer Dev/Profile` (never the installed Deer's
+  `~/Library/Application Support/Deer/Profile`; there is no pre-rename profile on the Mac to copy). It
+  creates the folder and its `vitre-profile` marker, drops the arguments that make Gecko pick a profile
+  (`-P`, `-ProfileManager`, `-CreateProfile`, `-migration`), enforces Gecko's `-osint` shape, keeps an
+  inherited `XRE_PROFILE_PATH` only when that folder holds `vitre-profile`, clears `XUL_APP_FILE`,
+  `XRE_PROFILE_LOCAL_PATH` and `MOZ_NEW_INSTANCE`, and starts `Contents/MacOS/firefox -profile ...`
+  detached (`DEER_FOREGROUND=1`: in the foreground). Never `-no-remote` and never `open --args`:
+  Gecko's remoting is keyed by profile path, so a second start hands its URL to the running instance.
+- **`config.js` on Darwin** (`tools/runtime-overlay/config.js`, `const mac`): the launch guard fails
+  closed: a start in a profile without `vitre-profile` ends with `_exit(3)` from `libSystem.B.dylib`,
+  and when that cannot run (or the guard cannot decide) steps 2 to 4 are skipped, so Deer never loads
+  into a foreign profile (Windows keeps its `ExitProcess(3)` and goes on as before). Step 3 takes the
+  package's real path (the `vitre` link resolved) and, when that lies outside the bundle and
+  `<profile>/chrome`, adds it to the content sandbox's read paths on the default branch:
+  `security.sandbox.content.mac.testing_read_path1` for the development link,
+  `security.sandbox.content.mac.testing_read_path2` for the harness's `VITRE_APP_DIR` (`--app`). The
+  sandbox reads only the bundle, `<profile>/chrome`, `<profile>/extensions` and those prefs, by real
+  path (`security/sandbox/mac/SandboxPolicyContent.h`), and the prefs are read once, when the first
+  content process starts (`dom/ipc/ContentParent.cpp` CacheSandboxParams), which is after AutoConfig.
+- **Mac defaults** (`tools/runtime-overlay/defaults/vitre-platform/mac-*.js`): `config.js` step 2 runs
+  every `mac*.js` there, in name order, after `vitre-prefs.js` and only when `Services.appinfo.OS` is
+  "Darwin", with `pref()` writing the default branch. Not in `defaults/pref/`, because Gecko reads
+  every `.js` there on every system (`modules/libpref/Preferences.cpp` pref_LoadPrefsInDir), so a Mac
+  file there would change Windows. One file per area: `mac-base.js` (Control-click opens the context
+  menu: `dom.event.treat_ctrl_click_as_right_click.disabled` false), `mac-keys.js`
+  (`browser.warnOnQuit` and `browser.warnOnQuitShortcut` true: ⌘Q asks first; `ui.key.contentAccess`
+  6, page access keys on ⌃⌥ as in Firefox for Mac; `browser.fullscreen.exit_on_escape` false),
+  `mac-menubar.js` (`browser.macAppMenu.setAsDefaultShown` false). Only decided values, only
+  `pref(name, value)` lines.
+- **Profile**: `~/Library/Application Support/Deer Dev/Profile` with the `vitre-profile` marker (made
+  by the launcher and by `setup-runtime.py`); the bundle's `LSEnvironment` points every start that
+  does not come through the launcher at it.
+- **Platform layer**: words and path rules every bundle needs are in `src/shared/os.ts` (`os`,
+  `isMac`, `isWin`, `osName()`, `fileManager()`, `revealLabel()` "Show in Finder" / "Show in folder",
+  `exe(base)`, `nfc()`, `samePath()`); everything else that differs below the UI is the singleton
+  `VitrePlatform` (`src/modules/VitrePlatform.sys.ts`; window code `b.sys('VitrePlatform')`), one file
+  per capability in `src/modules/platform/`, each naming its Firefox internals at its top:
+  `dirs.ts` (data root `~/Library/Application Support` or `%LOCALAPPDATA%`, `deerDir()`, `legacyDir()`
+  null on a Mac, `cacheRoot()` `~/Library/Caches`, Pictures and Movies; the pref `vitre.localAppData`
+  stands in for the data root on both systems, `<pref>/Caches` for the Mac cache root), `objc.ts`
+  (an Objective-C bridge through js-ctypes: `cls`, `sel`,
+  `send(ret, ...argTypes)(receiver, selector, ...args)` with one non-variadic `objc_msgSend`
+  declaration per signature, `nsString` / `jsString`; throws on Windows), `window-native.ts`
+  (`nativeHandle`, `windowId`: the HWND or `[NSWindow windowNumber]`; the window move started from the
+  bar; Windows' system menu, nothing on a Mac),
+  `progress.ts` (taskbar progress per window, or the one Dock tile: `progressIsGlobal`), `a11y.ts`
+  (Sticky Keys; false on a Mac for now), `tools.ts` (`toolName`, `trustInstalledTool`: 0755 and no
+  quarantine on a Mac) and `wallpaper.ts` (the Mac desktop picture for Home: the file `NSWorkspace`
+  names, else `DefaultDesktop.heic`; HEIC and other formats Gecko 157 cannot decode are converted
+  once with `/usr/bin/sips` into `<profile>/vitre-home`). Windows behaviour there is the code that
+  lived in `firefox.ts`, `VitreStartup` and `VitreSwitcher`, moved or copied unchanged. Today the window
+  core (`firefox.ts` nativeHandle / canMoveWindow / beginWindowMove) and `VitreHome` use the layer;
+  the downloads engine (`downloads/system.ts`, `ffmpeg-install.ts`), the updater and the switcher
+  still read their Windows services and folders themselves.
 
 ## Window architecture (`src/window/`)
 
@@ -171,7 +284,8 @@ gecko/
   missing from Deer's file falls through to Firefox's). The PDF viewer is pushed under the bar by
   the `pdf` page module (`skin/pdf.css`).
 - Web pages start below the bar: the `inset` page module (setting `pageInset`) gives a tab's top
-  document a strip of the bar area's height (`BAR_AREA`, `src/shared/geometry.ts`) as root padding in a
+  document a strip of the bar area's height (`BAR_AREA`, `src/shared/geometry.ts`; on macOS, under the
+  floating One row, `ROW_AREA`, 64 px, the row's 52 plus 12) as root padding in a
   user sheet (added to the site's own root padding), in the page's own canvas colour, that scrolls away
   with the page; a canvas background image starts below it with the content. Boxes pinned to the top
   of the viewport (fixed, sticky) are moved below it by `var(--vitre-inset)` from the screen-only
@@ -199,7 +313,8 @@ gecko/
   through js-ctypes for dragging the bar (`firefox.ts` `beginWindowMove`), JS reveal rule for auto-hide
   and full screen (`reveal.ts`). Styles: `skin/shell.css` (hide rules, layer), `skin/glass.css`
   (tokens, themes, `.glass`), `skin/bar.css` (bar, window controls, tooltips), `skin/omnibox.css`
-  (address field), all loaded by `VitreShell.beforeLayout`.
+  (address field), all loaded by `VitreShell.beforeLayout`. On macOS the window chrome is the One row
+  (below): the native traffic lights, no caption buttons, no system menu.
 
 ### Browser API for feature modules (`window.vitre`, class `Browser` in `src/window/browser.ts`)
 
@@ -312,6 +427,45 @@ address field's Enter, a menu's arrows) are handled by that surface on keydown w
 Hardware browser keys and mouse side buttons arrive as `AppCommand` and run the same actions.
 Page actions act on the topmost page: `window.vitrePeek` (`{ browser(), close(), open?(url) }`, set by
 the Peek module) while its page has focus, else the active tab.
+
+macOS (owner's decision D1; the MacKeys board, `keys_mac` in `../design/keymap.json`):
+
+- One table for both systems (`src/shared/shortcuts.ts`). A spec is `[Mod+][Ctrl+][Alt+][Shift+]Key`:
+  `Mod` is the main modifier (Ctrl on Windows, ⌘ on macOS) and `Ctrl` is always the physical Control
+  key (Peek's ⌃Q, the switcher's ⌃⇥, since ⌘⇥ is the system's app switcher). Rows one system lacks are
+  `win(...)` or `mac(...)`; `bindingsFor(os)` resolves the table for one system, and for `'win'` it is
+  exactly the map Deer has always had, in the same order. `currentOS()` is `'mac'` or `'win'`;
+  `specOf(binding)` gives a binding's spec back; `displaySpec(spec, os)` prints it ("Ctrl+Shift+T", or
+  "⇧⌘T": glyphs in ⌃⌥⇧⌘ order, no "+"), `ariaSpec(spec, os)` says it in words ("Shift Command T").
+  The Mac rows: ⌘Q quits and ⌘M minimizes (both browser-first), History ⌘Y (⌘H hides Deer), Back and
+  Forward ⌘[ ⌘] and ⌘← ⌘→ (page-first), full screen ⌃⌘F (F11 an unprinted alias), Downloads ⌥⌘L
+  and ⇧⌘J, next and previous tab ⇧⌘] ⇧⌘[ and ⌥⌘→ ⌥⌘←, Clear browsing data ⇧⌘⌫, developer tools
+  ⌥⌘I / ⌥⌘J / ⌥⌘C, page source ⌥⌘U, and ⌘. on the Esc ladder.
+- Matching adds brackets (keyCode 219 / 221) and period (190): with ⌘ down Gecko takes keyCode from
+  the unshifted character of the ⌘ layout (`widget/cocoa/TextInputHandler.mm` ComputeGeckoKeyCode).
+  Guards: Option sets ALT and ALTGRAPH together (`widget/cocoa/nsCocoaUtils.mm` ModifiersForEvent),
+  so the AltGraph rule is dropped; Option with a character key (it types: ⌥C is ç) and any ⌃⌥ chord
+  (VoiceOver) never match. `macRefusal(spec)` says why macOS keeps a key from Deer (keys macOS, input
+  sources and VoiceOver own; the Deer menu's ⌘Q ⌘H ⌥⌘H ⌘M), or null; Settings' capture uses it.
+- Rebinds stay stored in the Windows spelling and are read through `settings.ts rebindToSpec()`: on a
+  Mac a stored "Ctrl" (and "Mod") is ⌘ and "MacCtrl" the Control key, as Firefox reads a WebExtension
+  shortcut, so a rebind made on Windows needs no rewrite; `specToRebind()` writes a Mac capture. A
+  stored key macOS owns keeps the action's Mac default.
+- The router (`src/window/keys.ts`, every difference behind `isMac`): ⌘Q and ⌘M stay browser-first
+  under keyboard lock; it registers the actions `minimize` and `quit` (from ⌘Q, `fx.quit({ shortcut })`
+  tells Firefox the shortcut asked, so `browser.warnOnQuitShortcut` asks first; Deer › Quit Deer and
+  the downloads prompt quit without that question). ⌘. is Esc for the ladder (`escTaken` rules) but
+  never closes a page's own dialog. Because the native menu bar runs the item of any key nobody
+  consumed (`widget/cocoa/nsCocoaWindow.mm` PostHandleKeyEvent, on keypress), every key Deer acts on
+  is consumed, and so are a Deer ⌘ chord under a window-modal dialog or an open menupopup, a stale
+  reply and a ⌘. a prompt or panel owned; a ⌘ chord Deer does not bind asks the page for its reply,
+  so the menu bar gets it when the page leaves it (⌘H, ⌥⌘H, Edit's ⌘Z ⌘C). A key hook that returns
+  `'pass'` must have its own listener `preventDefault()` the key, or the menu bar runs it as well.
+- `b.keys.label(action, arg?)` prints an action's key as this system does (rebinds applied) and
+  `b.keys.chordFor(action, arg?)` gives the spec a menu bar item shows; module code prints keys through
+  them (or `displaySpec(spec, currentOS())`), never as literal "Ctrl+...". Deer's glass menus underline
+  nothing on a Mac: a typed letter type-selects, Return runs the row, Esc and ⌘. close (⌥ and F10
+  don't); ⌘Q, ⌘H, ⌥⌘H and ⌘M close an open menu and go on to the router or the app menu.
 
 ### Split view (`src/window/split.ts`)
 
@@ -440,6 +594,179 @@ source. Its header is the contract.
 - Tests: `python tests/split/all.py [--app build-x]` (start, end, bar, panes, divider, keys, narrow,
   fixes, restore; phase 2: lift, motion, reduced, glass, switcher, ring, extras).
 
+### One row (macOS, `src/window/onerow.ts`)
+
+The Mac tab bar the owner chose (boards RowSpec, DirOneRow, DirOneRowBehaviour). Everything above about
+the bar is the Windows bar and stays as it is there. On a Mac the bar is one 52 px row at the top of the
+window, floating over the page as the Windows bar does (the owner, 2026-11-15: "remove the gray bar
+like windows"): the window's own traffic lights at the left, the tabs as 36 px capsules from x 96 (the
+active one, 400 wide, is also the address field), a + capsule, and Downloads and Extensions at the
+right end. `onerow.ts` holds the shared geometry (`ROW_H` 52, `CAP_H` 36,
+`CAP_TOP` 8, `GAP` 8, `LIGHTS_LEFT` 20, `TABS_LEFT` 96, `EDGE` 20, `ACTIVE_W` 400, `ACTIVE_MIN` 280,
+`ACTIVE_TYPING` 640, `COMPACT_MAX` 160, `COMPACT_MIN` 96), pure constants any bundle may import, and `oneRow()` (true on
+macOS), the one switch that turns the layout on. `skin/bar.css` and `skin/omnibox.css` carry the same
+numbers in their macOS sections (CSS cannot import the file): change them together. The headers of
+`bar.ts`, `winctl.ts`, `omnibox.ts` and `pagearea.ts` are the contract; for full screen, the window's
+minimum size and moving the window from the row, read the current headers of `bar.ts`, `reveal.ts`
+and `pagearea.ts` (and `splitlift.ts`, find's `controller.ts` for their row geometry).
+
+- Moving the window (`skin/bar.css` "Moving the window", `skin/shell.css` section 4): as on Windows,
+  nothing lies across the row. Only `#vitre-drag`, the window's drag strip (made by the bar on both
+  systems, under every layer: full width, 18 px tall at the top, `pointer-events: auto`,
+  `-moz-window-dragging: drag`; all 18 px drag on a Mac, which has no resize band in the client area,
+  zoomed too), and the traffic lights' capsule move the window, and a double-click there zooms (or
+  minimises) as on a Mac title bar (`-[ChildView mouseUp:]`, when the DOM mouseup was not prevented:
+  nothing in Deer prevents it there). The capsules painted over the strip are no-drag and take the
+  pointer, a private window's Private capsule too, and so does the liquid bridge between Downloads
+  and Extensions (part of the Extensions capsule). Everywhere
+  else in the row where no capsule is, the page gets the pointer, hover, right-click and the wheel:
+  `#vitre-bar` and `#vitre-row-end` are click-through between their capsules (`pointer-events: none`,
+  no drag region), and the bar's wheel handler takes the wheel only over a capsule of a crowded strip.
+  A capsule cannot move the window yet (`fx.beginWindowMove` has no Mac path). Until 2026-11-15 a
+  full-width, `ROW_H` tall band, `#vitre-row-band`, was the drag region (before that with macOS's gray
+  Titlebar material, `appearance: -moz-window-titlebar`, and the page below it) and took the page's
+  clicks, hover, right-click and wheel between the capsules.
+- Row (`bar.ts`): `buildRow()` makes `#vitre-row-end`, a right-aligned flex box at `EDGE` from
+  the right and `CAP_TOP` from the top, which the downloads module (the Downloads capsule, first) and
+  the extensions module (its capsule after it) fill once the bar has built it; its width is watched,
+  and `b.bar.reserve` is that box, a private window's "Private" capsule left of it, and `EDGE`.
+  `arrangeRow()` (in place of `arrange()`) lays the units out left to right: the active capsule
+  (favicon and host centred, Reload at its right end; no Back and Forward), compact tabs with favicon
+  and title up to `COMPACT_MAX`, then +. Crowded: the compact tabs' titles shrink together (a short
+  title keeps its width, the longer ones share what is left) down to `COMPACT_MIN` (96), and only then
+  drop their titles (the owner, 2026-11-15: "make the titles shrink gradually first"; before that every
+  title folded at once, and always under 900 px). Then the active capsule gives way to `ACTIVE_MIN`,
+  then the strip scrolls sideways with 40 px fades
+  (the active capsule is brought into view). A hovered compact tab grows to its whole title and a
+  close x after 300 ms, from the spare room and, when that is not enough, from the other titles down to
+  72 px (`ROW_HOVER_YIELD`, favicon and a few letters; never folding them, back when the pointer leaves); with favicons only, from the spare room when that holds
+  the x beside the favicon and some title. An active split pair is two capsules joined by a bridge, a background pair one
+  80 px capsule of two favicons. No lens maps: every capsule is Deer's CSS Liquid Glass (RowSpec
+  "Liquid Glass Regular": a blur 14, saturate 1.9, brightness 1.04 lens under the fill, the inset rim,
+  the full 0 8 24 shadow), and Downloads and Extensions get the same. The lens is the `--row-glass`
+  token on the root; over a photo or the wallpaper (`theme-clear`) it is calmer, saturate 1.3 and
+  brightness 0.96 with a 22 % dark fill under the white, as Apple's clear glass dims busy content
+  (at 1.9 the red Home wallpaper made the whole row neon red). The row's colours follow the
+  page under it as the Windows bar's do: `#vitre-root`'s `theme-light` (dark ink on light glass),
+  `theme-dark` and `theme-clear` (light ink), set by `browser.ts` render() from the luma of the strip
+  of the page under the row (Home reports its own); never the system's appearance. Private windows:
+  dark glass whatever the page. The tokens are in `skin/bar.css` (macOS section); the address field
+  (`skin/omnibox.css`), the row-end capsules (`downloads/css.ts`, `extensions/css.ts`), find's face on
+  the row (`find/styles.ts`) and a lifted capsule (`splitlift.ts`) read them or key on the same
+  classes. The address suggestions and the Downloads quick view hang from their capsules and take
+  their theme too (`skin/omnibox.css`; `downloads/css.ts` and `ring.ts` paintTheme: class `row-light`);
+  the menus are the system's popovers and keep the system's appearance. Split view: the row takes the
+  focused side's theme, and a capsule over the other side's page, when that page's theme differs,
+  takes that page's (`bar.ts` paintRowSplit: `over-light` / `over-dark` / `over-clear`; private
+  windows never); the row-end capsules' own rules key on those classes too (`extensions/css.ts`
+  hover, press, badge ring and accent, `downloads/css.ts` pressed fill, track and dot), and the
+  extension icons (`extensions/bar.ts` paintBright: `brighttext`) and the Downloads quick view watch
+  the capsule's class, since paintRowSplit runs on every divider move without a render. Compact titles are measured in the
+  window (`bar.ts` titleWidth: a hidden probe; a canvas resolves another font and cut them short).
+- Traffic lights (`winctl.ts`, owner's decision D2): the empty placeholder `#vitre-win-lights` with
+  `-moz-default-appearance: -moz-window-button-box` sits at `LIGHTS_LEFT`, centred on the row, in a
+  76x36 capsule of the row's glass at (12, 8) (in the page's colours, as the tabs; with the lights
+  plain over the page a scrolled page's text ran through them), a drag region; Gecko moves the native
+  close, minimise and zoom buttons onto the first painted element
+  of that appearance (`widget/cocoa/nsCocoaWindow.mm` UpdateThemeGeometries -> placeWindowButtons:),
+  so they bring the green button's full-screen and tiling menu, VoiceOver's names and the inactive
+  grey. When it is not painted the buttons go above the window's top edge, out of sight. The drag
+  strip and the lights show no menu on a right-click (`menus/index.ts` MAC_NO_MENU,
+  `window-native.ts` showSystemMenu false). Minimise is also ⌘M (`window.minimize()`).
+- Pages under the row (`pagearea.ts`, `skin/shell.css` section 8): the page area fills the window from
+  y 0 as on Windows, in a normal window and in window full screen alike, and the page list follows the
+  row's hiding mode exactly as it follows the Windows bar's. In a normal window the row never hides
+  (`reveal.ts`), no page is on `INSET_BAR_HIDDEN_KEY`, and every web page gets the top strip
+  (`ROW_AREA`, 64) and the PDF viewer its offset: content starts below the row at scroll top and
+  scrolls under the capsules; boxes pinned to the top move below the strip. In window full screen the
+  row hides as the Windows bar does in F11 (whatever the auto-hide setting) and comes back with the
+  pointer at the top, so every page is listed there and gets no strip (headers of `reveal.ts` and
+  `pagearea.ts`). The tab dialogs hang 64 px down as on Windows, the notification card 8 px below the
+  row.
+- Address field (`omnibox.ts`): no field in the middle of the window. The field is the active capsule:
+  it lies over the capsule's slot, which the bar grows to `ACTIVE_TYPING` while it is open
+  (`b.bar.editing(true)`; the compact tabs' titles shrink, then fold to favicons below `COMPACT_MIN`), follows it when the row re-flows, and
+  in split view lies over the focused side's capsule. Suggestions hang 8 px below the capsule, at 52
+  (`CAP_TOP` + `CAP_H` + 8, as the + menu and the Downloads quick view), left-aligned to the capsule,
+  at least 400 wide; the page is not dimmed (the scrim stays, clear, so a
+  click on the page still closes the field); no mixed tint.
+- Menus (`menus/panelhost.ts`, `view.ts`): each menu, and each submenu level, is hosted in a reusable
+  XUL `<panel>` in `#mainPopupSet` opened at the screen point Deer computes (`openPopupAtScreen`),
+  so macOS draws its material: every `<panel>` is a transparent popup window of its own, popup.css's
+  `-moz-default-appearance: menupopup` gives it `WindowShadow::Menu` (`layout/xul/nsMenuPopupFrame.cpp`
+  GetShadowStyle), and `nsCocoaWindow.mm` newEffectViewWrapperForStyle wraps its content in an
+  NSGlassEffectView on macOS 26 (real Liquid Glass, corner 12) or the Menu vibrancy material before it
+  (corner 6). Deer paints the rows on a transparent menu (`css.ts` MENU_CSS_MAC); the panel's
+  `color-scheme` follows the menu's theme. Rows, plate, keys and placement are the layer's; the open
+  and close motion is left out. `PANEL_ATTRS` lists the popup manager's attributes: presses and the
+  wheel outside are Gecko's rollup (a left or middle press is swallowed, a right press reaches the
+  page), `noautofocus` keeps the page's focus and selection, `ignorekeys` sends every key through
+  Deer's router; the panel never becomes the key window. A panel the system closes is reported to the
+  view; one that cannot open falls back to the layer. Tab bar menus hang at y 52.
+- Settings (`settings/styles.ts` MAC, `panel.ts`, `home-button.ts`): no lens. The sheet carries a plain
+  `backdrop-filter: blur(30px) saturate(1.6)` and Home's Background popover `blur(24px)
+  saturate(1.6)` under the same tint and rim; no SVG lens filter is built. Settings › Appearance has
+  no App icon group, and its Tab bar group only "Start pages below the tab bar" (`pageInset`: the 64 px
+  strip under the row; no "Show the tab bar", the row never auto-hides in a normal window), the
+  Keyboard shortcuts page shows the Mac map (`keymap.ts`
+  KEY_GROUPS_MAC, DIFFERENT_FROM_CHROME_MAC) and its capture refuses what `macRefusal` refuses
+  (`capture.ts`), and the Home background calls the desktop picture "Your Mac wallpaper". Settings ›
+  Video downloads (`downloads/settings-page.ts`) has no Download rows on a Mac and says Deer cannot
+  get ffmpeg or yt-dlp there yet (the installers take Windows builds and refuse on a Mac: see
+  Downloads below); ffmpeg is the file chosen there or one on PATH.
+- The other modules each keep a macOS block named in their headers (downloads `ring.ts` and
+  `panel.ts`, extensions `bar.ts`, find, peek, switcher): search for `oneRow()` and `isMac`. A module
+  that hangs something from a row capsule hangs it 8 px below it (boards RowDownloads, RowExtensions).
+  What covers a page is the row (0..52) as the Windows bar's band (0..68) is on Windows: find's
+  scroll guard lifts a match under the row to y 88 (its zone, 52 + 12, and 24) and a match on fixed
+  content there gives the face its parked tint (`find/controller.ts` rowZones, measured from
+  `#vitre-bar`); a split-drop zone starts below the row and its plate at 60 (`splitlift.ts`); the
+  video pill keeps 8 px under the row (`downloads/video.ts`); the peek sheet is the window box at y 72
+  as on Windows (`peek/sheet.ts`). Tests: `tests/find` core and contexts, `tests/split` lift,
+  `tests/downloads` mac-row, `tests/switcher/mac-grid.js`, `tests/peek` promote.
+
+### Menu bar (macOS, `src/window/modules/macmenu/`)
+
+Deer's own native menu bar replaces Firefox's (owner's decision D2; board MacMenuReference). Windows
+never builds it. `items.ts` has the menus as data, how Firefox 157 makes XUL menus native, and the
+hidden window's copy; `index.ts` installs one menu bar per browser window; `keyattr.ts` turns a spec
+into the attributes of a XUL `<key>`.
+
+- Menus: Deer (About Deer, Check for Updates… | Settings… | Services | Hide Deer, Hide Others, Show
+  All | Quit Deer), File, Edit, View (with Developer ›), History (Recently Closed ›), Window (the open
+  windows, which macOS adds) and Help (Keyboard Shortcuts, Deer on GitHub). No access keys. A click
+  runs the Deer action the item's key runs (`b.run`) or its verb (`runVerb`: About and Check for
+  Updates open Settings › About, the latter also checking; Zoom; Bring All to Front; GitHub). Edit's
+  standard items keep Firefox's ids and commands (`menu_undo` ... `menu_selectAll`), so they go
+  through the responder chain to native fields as well. Items are dimmed, never removed: Back and
+  Forward with nothing behind or ahead, Stop while nothing loads, an empty Recently Closed; View says
+  Exit Full Screen in full screen.
+- A window's bar: `<menubar id="vitre-menubar">`, built whole at install and put after Firefox's
+  `#main-menubar`, which `VitreShell.beforeLayout` marks `nonnative` before the window's first layout.
+  Firefox makes the first `menubar:not([nonnative])` of a document native once it has loaded and its
+  L10n is ready (`xpfe/appshell/AppWindow.cpp` OnChromeLoaded -> LoadNativeMenus), and a live menu
+  bar's top-level menus can never change (`nsMenuBarX::ObserveContentInserted`). A window whose menu
+  bar was already native (adopted before Deer's package) keeps Firefox's.
+- The app menu and the menu bar macOS shows with no Deer window in front come from the hidden window
+  (`browser.hiddenWindowChromeURL`), built once from fixed element ids (`nsMenuBarX.mm`
+  CreateApplicationMenu: `aboutName`, `menu_referralsPage`, `menu_settings`, `menu_mac_services`, ...,
+  `menu_FileQuitItem`; `collapsed="true"` leaves one out). `VitreStartup.init()` calls
+  `VitreShell.macHiddenMenuBar()` at AutoConfig, before the hidden window exists
+  (`toolkit/xre/nsAppRunner.cpp` XRE_mainRun -> CreateHiddenWindow), so `items.ts installHiddenMenus()`
+  runs at its `chrome-document-interactive`, in time: Deer's app items and menu bar go in before
+  Firefox's, and `browser.referrals.enabled` is set on the default branch so the `menu_referralsPage`
+  slot shows "Check for Updates…". Late (`VitreShell.timeline` entry `mac-hidden-menubar` says
+  `'firefox'`): Firefox's menus that open Firefox UI are hidden, File, Edit and Window stay Firefox's,
+  and the app menu has no Check for Updates. From the hidden window a "new" item opens a window, an
+  "app" item runs in the front window (opening one first), and the rest are dimmed.
+- Keys: each item shows its action's key from the window's router (`b.keys.chordFor`, rebinds applied,
+  set again on a rebind) through a `<key>` outside every `<keyset>`, which Gecko only reads as a
+  label (`nsMenuItemX::SetKeyEquiv`; only a `<keyset>` attaches a key handler). The router consumes
+  every key it acts on, and macOS runs a key equivalent only for a keypress nobody consumed, so a key
+  never acts twice; a command for a router key that arrives inside a key task with ⌘, ⌃ or ⌥ held is
+  that key coming back unconsumed (the router or a surface chose not to act) and is ignored. Esc can
+  never be a key equivalent. While a window-modal dialog is open Firefox dims every menu itself.
+
 ## Feature modules and their services
 
 Seven feature modules sit on the core. Each lives in `src/window/modules/<key>/` (contract in its
@@ -487,7 +814,9 @@ local look-alike type, so a contract change fails `tsc`.
   No submenus (design): a row with children is listed in place under a caption with its label
   (`types.ts flatten`: an extension's nested items). A right-click away from the page's selection gets
   the page or link menu, and a link's menu adds Copy only for a selection inside the link (the page
-  module's `menus:hit`). Destructive rows are drawn like any row.
+  module's `menus:hit`). Destructive rows are drawn like any row. macOS: every menu is a XUL panel
+  the system draws as Liquid Glass, accelerators in Apple glyphs (`types.ts` actionKey / fixedKey),
+  nothing on the drag strip and the traffic lights (One row, above).
   Tests: `tests/menus` (pages, keyboard, chrome, ext, look + `check.py`, real, integration),
   `tests/menus-verify` (+ attack, modules, extpopup, leak, idle, scale, restore).
 - **Switcher** (`modules/switcher/`, singleton `modules/VitreSwitcher.sys.ts`): Ctrl+Tab held or
@@ -499,7 +828,9 @@ local look-alike type, so a contract change fails `tsc`.
 - **Settings** (`modules/settings/`): the 960x688 panel (Ctrl+, F1, Ctrl+Shift+Delete), every page
   wired to `VitreSettings`, rebinding of the four rebindable verbs, Clear browsing data (Sanitizer),
   Home's background popover; other modules add pages with `registerPage`. Panel state `panel-open`
-  and `settings-open` on `b.root`; Esc and close layers 60. Tests: `tests/settings` (pages, rebind,
+  and `settings-open` on `b.root`; Esc and close layers 60. macOS: frost without the lens, the Mac
+  keymap, no App icon or "Show the tab bar" rows, Mac words where a page named Windows or Ctrl (One
+  row, above). Tests: `tests/settings` (pages, rebind,
   clear, picker, appicon, wallpapers), `tests/settings-verify` (ladder, keyboard, windows, scale, restart,
   hung, a11y, integration).
 - **Downloads** (`modules/downloads/`, engine `modules/VitreDownloads.sys.ts` + `modules/downloads/*`,
@@ -518,6 +849,9 @@ local look-alike type, so a contract change fails `tsc`.
   or downloaded again (ffmpeg is looked for in the settings path, beside the program, Deer's folder,
   the old folder, then PATH). The pref `vitre.localAppData` stands in for `%LOCALAPPDATA%`:
   `tools/run.py` points it into each throwaway profile, so tests never read the person's real copies.
+  macOS (not ported yet): `installFfmpeg` and `installTools` refuse there and fetch nothing (their
+  downloads are Windows builds), no folder under `%LOCALAPPDATA%` is looked in (a Mac has none), and
+  the ffmpeg picker takes any file (`platform.ts` pickProgram: no `.exe` filter).
   Safety as Firefox's own downloads: names through Firefox's validator
   (`naming.ts`), Safe Browsing on every file the engine fetched (`reputation.ts`), Firefox's prompt
   before opening an executable that is not an .exe, page-derived addresses fetched with the page's
@@ -844,11 +1178,15 @@ auto-hidden bar on screen.
   switches open windows (`nsIWindowsUIUtils.setWindowIcon`) and points an installed Deer's shortcuts
   (install.ini's Start menu / Desktop, the taskbar pin) at the .ico (`nsIWindowsShellService.setShortcutsIcon`);
   at startup it re-points them if an update recreated them. Firefox's CustomIconManager stays off.
+  macOS: none of this. Windows there carry no icon (`brandWindow` returns), the Dock shows the app
+  bundle's icon, and Settings has no App icon row (`settings/pages.ts`).
 - History, session restore, closed tabs, clear-data: Firefox's (Places, SessionStore, Sanitizer).
 - Home: `about:vitre-home` (registered synchronously at boot; new-tab and home page), a static
   privileged page (`src/pages/home`) with a strict CSP showing the wallpaper/image/video background.
   `VitreHome.sys.ts` finds the Windows wallpaper, keeps a screen-sized copy in `<profile>/vitre-home`
   and holds the glass theme the background calls for (light or clear), which every window follows.
+  On macOS the same background kind (still `'windows'` in the setting, so nothing is migrated) is the
+  Mac desktop picture, "Your Mac wallpaper" (`VitrePlatform.wallpaper.desktopWallpaper`).
   New tabs never flash white or grey: Firefox's new-tab preloading (`NewTabPagePreloading`) is
   switched back on for Home (`VitreStartup.useHomeAsNewTab`), so each window keeps one Home drawn in
   a hidden browser for the next new tab; a Home page that does load from scratch starts from the
@@ -908,7 +1246,9 @@ auto-hidden bar on screen.
   upload, shortcut creation, default-browser prompts, native find/typeahead, Ctrl+Tab panel: off;
   standard scrollbars, plain error pages). Edit the tracked copy in `tools/runtime-overlay/` and run
   `python tools/setup-runtime.py` (and `tools/setup-engine.py` for the release engine). Gecko reads that folder before Firefox's own `firefox.js`, so
-  `config.js` applies the file again afterwards.
+  `config.js` applies the file again afterwards. Defaults for macOS only are in
+  `tools/runtime-overlay/defaults/vitre-platform/mac-*.js`, which `config.js` applies on a Mac only
+  ("macOS: engine, launcher, platform layer").
 
 ## Updates
 
@@ -1038,20 +1378,97 @@ and ladder (Esc and Ctrl+W with menu, find, peek, Settings, switcher, address fi
 layered). Its downloads go to `%TEMP%\vitre-integrate`; native file dialogs are answered by a stand-in
 `nsIFilePicker` (`I.mockFilePicker` in `tests/integrate/lib.js`).
 
+macOS (`python3 tools/run.py ...`, the same arguments and script protocol):
+
+- `tools/run.py` is a front end over `tools/harness/`: `common.py` (OS-neutral: the test prefs, the
+  throwaway profile, the test-script wiring, the arguments, the run loop), `win.py` and `mac.py`; only
+  this system's half is imported (`harness.backend()`), and `run.py` re-exports its names, so
+  `import run` keeps working (assigning `run.capture` reaches the half: `tests/extensions/runx.py`).
+- `mac.py` starts `runtime/Deer Dev.app/Contents/MacOS/firefox -no-remote -foreground -profile
+  <$TMPDIR/vitre-gecko-NAME>` (`$TMPDIR` with links resolved, as the engine reports paths), never with
+  an inherited `XRE_PROFILE_PATH`; `--env XRE_PROFILE_PATH` / `XRE_PROFILE_LOCAL_PATH` and
+  `--arg -profile` / `-P` / `-ProfileManager` / `-CreateProfile` are refused, `--exe` is
+  Windows-only, and `--app` links the build into `<profile>/chrome/vitre-app` (`config.js` adds its
+  real folder to the sandbox's read paths). The run's processes are the one it started, their
+  descendants, the ones the script reports (`@@pid`) and those whose command line names this run's
+  profile, never the person's own Deer Dev running from the same bundle; they stop with SIGTERM, then
+  SIGKILL (`@@kill`: SIGKILL at once).
+  Extra test prefs: no Notification Center (`alerts.useSystemBackend` false), no Core Location.
+- Windows and captures go through `tools/mac/wintool.py`, which builds `tools/mac/deer-wintool.swift`
+  (macOS 14+, ScreenCaptureKit) with `xcrun swiftc -O` on first use into the git-ignored
+  `tools/mac/bin/`: `preflight`, `list`, `front`, `capture`, `capture-rect` (its header documents the
+  JSON and exit codes). A capture brings the window to the front first (macOS stops drawing a covered
+  window that is not active) and is in physical pixels (2 per point on Retina). A window on another
+  Space (the person moved to another Space or app in full screen while the run went on) is captured
+  too: `mac.py` find_window falls back to the largest titled off-screen window, and bringing its app to
+  the front takes macOS to its Space; a capture that fails is tried once more after 1.2 s. Bringing
+  the window to the front also hands it the person's keys: a ⌘Q typed meanwhile opens the quit prompt
+  (`tests/menus/mac-hunt-look.js` notices and closes such a dialog before each capture).
+- Captures need the Screen Recording permission for the app that runs the harness (Terminal, an
+  editor, the Claude app: System Settings › Privacy & Security › Screen & System Audio Recording).
+  Without it the run stops with exit code 4 before writing blank pictures; `--no-capture` runs a
+  script without screenshots. A sandboxed shell may be refused the window server (the window list then
+  fails and says so). While the screen is locked (the session's `CGSSessionScreenIsLocked`) no capture
+  can be taken (ScreenCaptureKit fails with -3811, `screencapture` finds no display) and the harness
+  does not detect it: each capture prints its failure. Unlock first, or run with `--no-capture`.
+- Menus, panels and popups are separate windows on a Mac too: `spike.captureScreen(name)`
+  (`tools/spike-lib.js`) captures the window's screen area with every window of the run in it
+  (`@@capture NAME ID screen x y w h` -> `mac.py` shoot_screen -> `deer-wintool capture-rect --pid`);
+  elsewhere it is `spike.capture(name)`.
+- Mac checks: `tests/menus/mac-onerow-look.js` (no band across the row, the 18 px drag strip and
+  `#vitre-row-end` exist, the page starts at y 0 under the row, no gray band; captures of the row over a light page and scrolled, typing, the +
+  and page menus as Liquid Glass, a dark page, Home, Settings, Downloads),
+  `tests/menus/mac-onerow-behaviour.js` (drag, least width, the 18 px drag strip, the capsules'
+  glass, full screen, the row's ink following the page in both system appearances, the page under the
+  row's empty space: elementFromPoint, hover, click, wheel and right-click between the capsules reach
+  the page, the bridge between Downloads and Extensions is the capsule's, a capsule's right-click is
+  still Deer's; a crowded strip's wheel, the suggestions at 52,
+  Settings' page inset on a Mac),
+  `tests/menus/mac-row-titles.js` (a crowded row: the background titles shrink together, a short one
+  keeping its width, down to `COMPACT_MIN`, and fold to favicons once below it; a hovered shrunk tab
+  shows its whole title, the others giving room down to 72 px without folding; editing the address; a window being narrowed; an
+  860 px window keeps its titles),
+  `tests/menus/mac-hunt-look.js` (the bug hunt after the gray band went: captures of a light page with
+  five tabs, a hovered tab, a scrolled page, sticky and fixed headers, a dark page, typing with
+  suggestions, the + and page menus, Home, Settings, the Downloads quick view and panel, Find, split
+  view, Peek, a window-modal dialog and a private window, each with checks of what it shows: among them
+  no Windows words on any Settings page or in the menus, and in split view the row-end capsules, the
+  extension icons, the ring and the quick view (its painted glass and ink) in the theme of the page
+  under them, and the Private capsule no-drag and solid; run it with
+  `ui.systemUsesDarkTheme` 1 and 0 under different `--name`s, the captures carry the suffix),
+  `tests/menus/mac-fullscreen-look.js` and `tests/menus/mac-keys-menubar.js` (the `mac-keys.js` prefs, the
+  hidden window got Deer's menus in time, Firefox's menu bar `nonnative`, Deer's menus, key labels in
+  glyphs, ⌘T / ⌘W / ⇧⌘T / ⌘L, no underlined access keys). Their commands are in their first lines;
+  synthesized keys prove the router, not Cocoa's key equivalents. A suite runner meant for one system
+  is to call `tests/_platform.py` `skip_unless('win' | 'mac', reason)` at the top of its main(), so the
+  other system prints a SKIP line instead of failing.
+
 ## Rules
 
 - Every Firefox internal used (ids, private methods, category names) is version-157 behaviour: keep it
   behind one small function with a comment naming the source file in `reference/omni`, so a runtime
   update is a checklist (`src/window/firefox.ts` for the window core, the top of each `.sys.ts` for
   singletons, the page module's header for page-side internals).
-- Never touch the user's real Firefox (`C:\Program Files\Mozilla Firefox`, `%APPDATA%\Mozilla`).
+- Never touch the user's real Firefox (`C:\Program Files\Mozilla Firefox`, `%APPDATA%\Mozilla`; on
+  macOS `/Applications/Firefox.app`, `~/Library/Application Support/Firefox`, `~/Library/Caches/Firefox`).
 - Never download extensions or executables in tests. DRM-protected media is never downloadable.
 - Never touch the person's own Deer data in tests (`%LOCALAPPDATA%\Deer`, `%APPDATA%\Deer`, the old
-  `%LOCALAPPDATA%\Vitre`): throwaway profiles in `%TEMP%`, and `vitre.localAppData` for the tool and
-  update folders. Tests never contact GitHub and never start a real setup.
+  `%LOCALAPPDATA%\Vitre`; on macOS `~/Library/Application Support/Deer Dev/Profile`, the development
+  profile, and `~/Library/Application Support/Deer`): throwaway profiles in `%TEMP%` (`$TMPDIR` on a
+  Mac), and `vitre.localAppData` for the tool and update folders. Tests never contact GitHub and never
+  start a real setup. The person's own Deer Dev runs from the same bundle as the tests: stop or follow
+  only the processes a run started.
+- Windows stays as it is: every macOS change goes behind `isMac`, `oneRow()`, `-moz-platform: macos` or
+  a Darwin check, and Windows outputs stay byte for byte the same. Keep each file's line endings (many
+  `.ts` and `.css` files are CRLF, others LF; `../.gitattributes` pins `launcher/deer` and `*.sh` to LF
+  and leaves `*.cmd` as committed). Python tools stay 3.9-compatible and standard-library only.
+- macOS engine: never rename, copy or link `Contents/MacOS/firefox`; start it through `launcher/deer`
+  or the harness, which always pass `-profile` (a start from the Dock or Finder gets the development
+  profile from the bundle's `LSEnvironment`); never put a Mac-only pref in `defaults/pref/`.
 - Publishing: `runtime/` is Mozilla's branded Firefox binary with changed behaviour: never publish it.
   Releases ship Mozilla's unbranded build through `tools/setup-engine.py` and `installer/build.py`
-  (`../docs/BUILDING.md`).
+  (`../docs/BUILDING.md`). `runtime/Deer Dev.app` is a development engine and is never published
+  either (`../.github/scripts/check-repo.py` refuses any `.app/` path and `runtime/`).
 
 ## Decisions for the user
 
@@ -1122,3 +1539,63 @@ the code as described; the user may want it otherwise.
   possible but turns signature checks off for every add-on while active. Settings › Extensions is laid
   out as the other Settings pages (a card of rows: Get add-ons [Browse], Load a temporary add-on
   [Choose…], Updates [Check for updates]; the add-ons manager as a last row with "Open ›").
+
+macOS (the Mac port; where an entry says "owner's" the owner decided it, the rest are the builds'):
+
+- **One row instead of the floating pill** (owner's choice; RowSpec, DirOneRow, DirOneRowBehaviour):
+  no 68 px band of glass circles and pill over the page, but one 52 px row with the native traffic
+  lights, tab capsules (the active one is the address field), + and Downloads and Extensions at the
+  right end (`onerow.ts`, "One row" above). The row floats over the page as RowSpec draws it and as the
+  Windows bar does (owner's decision, 2026-11-15: "remove the gray bar like windows"): no band of the
+  system's Titlebar material, the page under the row from y 0 with the top strip, every capsule in
+  Deer's CSS glass with the full shadow, and the colours following the page under the row, not the
+  system's appearance (`skin/bar.css`, macOS section). Build v1 (until 2026-11-15) had the page below
+  a gray title-bar band and the colours by the system's appearance, which made white text over light
+  pages in dark mode. Moving the window is as on Windows: only the 18 px drag strip at the top and the
+  traffic lights' capsule move it; wherever no capsule is the rest of the row belongs to the page (the
+  review of 2026-11-15: a transparent 52 px drag band had taken the page's clicks, hover, right-click
+  and wheel between the capsules). A right-click on the drag strip or the traffic lights shows nothing
+  (owner's decision D2).
+- **Menus are native Liquid Glass panels**: every Deer menu is shown in a XUL `<panel>`
+  (`menus/panelhost.ts`) that macOS 26 draws as Liquid Glass (the Menu vibrancy material before it),
+  in place of Deer's CSS frost; the menu's own open and close motion and its dark-backdrop
+  sampling are left out (it appears and goes at once, as the system's menus do), and a panel that
+  cannot open falls back to the layer.
+- **Settings frost without the lens**: the Settings sheet and Home's Background popover are a plain
+  `backdrop-filter` frost (30 px and 24 px blur, saturate 1.6) under the usual tint and rim, not the
+  SVG lens (`settings/styles.ts` MAC).
+- **⌃Q for Peek** (owner's decision D1): the physical Control key on both systems (`shortcuts.ts` row
+  `Ctrl+Q`), because ⌘Q quits. ⌘Q is browser-first and asks first (`browser.warnOnQuit` and
+  `browser.warnOnQuitShortcut` true in `mac-keys.js`; the router passes the shortcut to `fx.quit`);
+  Deer › Quit Deer and closing a window never get that question (`browser.tabs.warnOnClose` stays
+  false).
+- **⌘Q with no window open quits without asking**: from the hidden window's menu bar ⌘Q goes to
+  Firefox's `goQuitApplication` with ⌘ held (`macmenu/items.ts` runFromHidden), and Firefox asks only
+  while a browser window is open (`browser/components/BrowserGlue.sys.mjs` _onQuitRequest: "No windows
+  open so no need for a warning"), so with every window closed Firefox's question never comes. A click
+  on Deer › Quit Deer quits as the built-in does, as it does with a window open.
+- **⌘Y History** (owner's decision D1): ⌘H is the app menu's Hide Deer (`shortcuts.ts`
+  `mac('history', 'Mod+Y')`); ⌘H and ⌥⌘H are left to the menu bar.
+- **⌃⌘F full screen, and Esc never leaves it** (owner's decision D1): full screen is ⌃⌘F, the green
+  button or View › Enter Full Screen (F11 an unprinted alias). The router consumes every Esc it routes
+  and `browser.fullscreen.exit_on_escape` is false (`mac-keys.js`; `widget/cocoa/nsCocoaWindow.mm`
+  PostHandleKeyEvent), so Esc does not leave window full screen; element full screen (a video) still
+  leaves on Esc (PresShell's own).
+- **"Check for Updates…" through `browser.referrals.enabled`**: the app menu is built once from fixed
+  ids and has no free slot between About and Settings, so Deer's item takes the slot of Firefox's
+  "Share Firefox", `menu_referralsPage`, which shows only while `browser.referrals.enabled` is true
+  (`nsMenuBarX.mm` ApplicationMenuOpened). `installHiddenMenus` sets that pref on the default branch
+  at run time, and only when Deer's items made the app menu: after a late start Firefox's items made
+  it, the slot would read "Share Deer", and the pref stays off. The pref's other readers in Firefox are
+  interface Deer does not show (its main menu panel, its menu bar, its About dialog).
+- **Settings hides App icon and "Show the tab bar" on a Mac** (`settings/pages.ts` appearance): the
+  Dock shows the app bundle's icon, and the One row stays shown in a normal window, so "Show the tab
+  bar" would do nothing there; window full screen always hides it as F11 does on Windows
+  (`reveal.ts`). "Start pages below the tab bar" (`pageInset`) is shown on a Mac too, alone in the Tab
+  bar group: the page runs under the row and the setting turns its 64 px top strip off and on. Windows
+  keeps both rows in the same order. Home's right-click menu has no "Show tab bar" on a Mac
+  (`menus/page-items.ts`). A Mac auto-hide while reading is not designed yet; the hiding mode in
+  `reveal.ts` is ready for it.
+- **No window icon on a Mac**: `VitreStartup.brandWindow` does nothing there (no icon attribute, no
+  taskbar group): macOS windows carry no icon of their own; the `.ico` files are copied into the
+  bundle unused.

@@ -17,12 +17,43 @@
 // State is mirrored on #vitre-root as classes: `bar-hiding` (the bar is in hiding mode) and
 // `bar-revealed` (it is showing anyway). The window controls (and a private window's label) hide and
 // come back with the bar.
+//
+// macOS, One row (./onerow.ts). In a normal window the row never hides, whatever the setting: it
+// floats over the page there as the Windows bar does with the setting off, and pages get the top
+// strip (pagearea.ts; Mac auto-hide while reading is not designed yet). In window
+// full screen (native Spaces) it hides as the Windows bar does in F11 full screen, whatever the
+// setting (the owner, 2026-11-15: "full screen browser with no bars at the top ... just like the
+// Windows browser Deer"): the page fills the screen and the row comes back by the rules above
+// (pointer at the top, on the row, focus, a hold). Settings shows no "Show the tab bar" row on a Mac
+// (settings/pages.ts) and Home's menu no "Show tab bar" (menus/page-items.ts). The row's own end,
+// #vitre-row-end, counts as the bar for focus and for a popover open from one of its capsules
+// (wanted()).
+// In window full screen, when the pointer reaches the top of the screen macOS slides in its menu bar and, under
+// it, a title-bar strip with the traffic lights (Gecko makes that strip opaque in full screen:
+// widget/cocoa/nsCocoaWindow.mm, windowDidEnterFullScreen:), over the top of the window. Gecko
+// reports how far they reach, frame by frame as they slide: -[ToolbarWindow
+// updateTitlebarShownAmount:] (nsCocoaWindow.mm; the title bar's height plus, without a notch, the
+// menu bar's, times how far they are in, in desktop px, which are CSS px in this chrome document),
+// dispatched to the window as the chrome-only CustomEvent "MacFullscreenMenubarRevealUpdate"
+// (xpfe/appshell/AppWindow.cpp and dom/base/nsGlobalWindowOuter.cpp,
+// MacFullscreenMenubarOverlapChanged). The row goes down by that much (class `row-shifted` and
+// --vitre-row-shift on #vitre-root; skin/bar.css), so it lands below them as Firefox's toolbox does
+// (browser-fullScreenAndPointerLock.js, FullScreen.shiftMacToolbarDown / updateMacToolbarShift; its
+// listener stays, on a toolbox Deer does not show). The first frame of the slide also brings a hidden
+// row in, and the row stays while the menu bar is down; both slide back when it leaves. macOS takes
+// the menu bar away as soon as the pointer goes below its title-bar strip, which is where the row
+// then is: the row slides back up from under the pointer. So until the row hides again, the
+// "rests on the bar" zone reaches down by the farthest the menu bar came (`reach`).
 import type { Browser } from './browser';
+import { oneRow, rowFullScreen } from './onerow';
 
 const REVEAL_BELOW = 28;
 const KEEP_ABOVE = 76;
 const HIDE_DELAY = 400;
 const FAR = 9999;
+/** The root's class and custom property while the row is moved down below macOS's menu bar (skin/bar.css). */
+const SHIFTED = 'row-shifted';
+const SHIFT_VAR = '--vitre-row-shift';
 
 export class Reveal {
   /** The bar is in hiding mode (auto-hide setting or full screen). */
@@ -34,6 +65,10 @@ export class Reveal {
   private lastY = FAR;
   private watch = 0;
   private idleSince = 0;
+  /** macOS window full screen: how far the menu bar and the title-bar strip reach over the window now (CSS px). */
+  private shift = 0;
+  /** macOS window full screen: the farthest they reached since the row last hid (the keep zone grows by it). 0 on Windows. */
+  private reach = 0;
 
   constructor(
     private b: Browser,
@@ -63,6 +98,8 @@ export class Reveal {
     // Another application has the pointer now.
     window.addEventListener('deactivate', () => (this.lastY = FAR));
     bar.addEventListener('focusin', () => this.show());
+    // macOS full screen: the menu bar and the title-bar strip slide in or out (see the header).
+    if (oneRow()) window.addEventListener('MacFullscreenMenubarRevealUpdate', (e) => this.menuBar(Number((e as CustomEvent).detail) || 0), true);
   }
 
   /** True when the bar is not on screen. */
@@ -72,10 +109,17 @@ export class Reveal {
 
   /** Re-read the mode (called on every render: settings and window state changes re-render). */
   update(): void {
-    const hiding = this.b.root.classList.contains('fullscreen') || !!this.b.settings.barAutoHide;
+    const fullscreen = this.b.root.classList.contains('fullscreen');
+    // Windows: F11 full screen or the setting. macOS: window full screen, as F11 on Windows (header;
+    // not for a page element in full screen, which hides Deer's layer anyway).
+    const hiding = oneRow() ? rowFullScreen(this.b.root) : fullscreen || !!this.b.settings.barAutoHide;
+    // Out of full screen macOS reports no more overlap: the row goes back up (Firefox does the same
+    // when it leaves full screen, FullScreen.toggle -> shiftMacToolbarDown(0)).
+    if (!fullscreen && this.shift) this.menuBar(0);
     if (hiding !== this.hiding) {
       this.hiding = hiding;
       this.revealed = false;
+      this.reach = this.shift;
       this.stopWatch();
       if (hiding && this.wanted()) {
         this.revealed = true;
@@ -112,12 +156,38 @@ export class Reveal {
     };
   }
 
+  /**
+   * macOS window full screen: the menu bar and the title-bar strip reach `overlap` CSS px over the
+   * window (0: gone). The row follows them down at once, every frame of their slide (no transition:
+   * the system animates); the first frame of a slide in brings a hidden row in, as the pointer at
+   * the top does.
+   */
+  private menuBar(overlap: number): void {
+    const shift = this.b.root.classList.contains('fullscreen') ? Math.max(0, Math.round(overlap * 100) / 100) : 0;
+    if (shift === this.shift) return;
+    const opening = shift > 0 && this.shift === 0;
+    this.shift = shift;
+    this.reach = Math.max(this.reach, shift);
+    const root = this.b.root;
+    root.classList.toggle(SHIFTED, shift > 0);
+    if (shift > 0) root.style.setProperty(SHIFT_VAR, `${shift}px`);
+    else root.style.removeProperty(SHIFT_VAR);
+    if (opening) this.show();
+  }
+
   /** Is there a reason for the bar to be on screen right now? */
   private wanted(): boolean {
-    if (this.lastY <= KEEP_ABOVE) return true;
+    if (this.lastY <= KEEP_ABOVE + this.reach) return true;
+    // macOS full screen: the menu bar is down (the pointer is up there, or on its way back).
+    if (this.shift > 0) return true;
     if (this.holds.size || this.b.omni?.open) return true;
     const focus = document.activeElement;
-    return !!focus && this.bar.contains(focus);
+    if (focus && this.bar.contains(focus)) return true;
+    // macOS: the row's Downloads and Extensions capsules (#vitre-row-end) sit outside the bar but are
+    // the row too: keyboard focus on one keeps it, and so does a popover open from one (its
+    // aria-expanded; the downloads quick view also holds the row itself, ring.ts Popover.open).
+    const end = oneRow() ? document.getElementById('vitre-row-end') : null;
+    return !!end && ((!!focus && end.contains(focus)) || !!end.querySelector('[aria-expanded="true"]'));
   }
 
   private startWatch(): void {
@@ -136,6 +206,7 @@ export class Reveal {
       if (!this.idleSince) this.idleSince = now;
       else if (now - this.idleSince >= HIDE_DELAY) {
         this.revealed = false;
+        this.reach = 0;
         this.stopWatch();
         this.apply();
       }
@@ -152,8 +223,9 @@ export class Reveal {
     const root = this.b.root;
     root.classList.toggle('bar-hiding', this.hiding);
     root.classList.toggle('bar-revealed', this.hiding && this.revealed);
-    // Hidden controls must not take focus or be read out.
-    for (const el of [this.bar, document.getElementById('vitre-winctl')]) {
+    // Hidden controls must not take focus or be read out. (#vitre-row-end, the row's Downloads and
+    // Extensions, exists only on macOS: bar.ts buildRow.)
+    for (const el of [this.bar, document.getElementById('vitre-winctl'), document.getElementById('vitre-row-end')]) {
       if (!el) continue;
       if (this.hidden) el.setAttribute('inert', '');
       else el.removeAttribute('inert');

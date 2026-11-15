@@ -9,6 +9,9 @@ spike.main(async () => {
   const $ = (id) => document.getElementById(id);
   const shown = (el) => !!el && getComputedStyle(el).display !== "none" && el.getClientRects().length > 0;
   const page = (html) => "data:text/html;charset=utf-8," + encodeURIComponent("<!doctype html><meta charset=utf-8><title>t</title>" + html);
+  // macOS: the page fills the window under the One row, as under the Windows bar (the owner,
+  // 2026-11-15: "remove the gray bar like windows"); windows carry no icon of their own.
+  const mac = Services.appinfo.OS === "Darwin";
   const nodes = () => gBrowser.tabs.filter((t) => !t.hidden && !t.closing);
   const mirrors = () => b.tabs.length === nodes().length && b.tabs.every((t, i) => t.node === nodes()[i]);
 
@@ -29,10 +32,10 @@ spike.main(async () => {
   check("toolbox takes no space", $("navigator-toolbox").getBoundingClientRect().height === 0);
   check("sidebar not rendered", !shown($("sidebar-main")) && !shown($("sidebar-box")));
   const br = gBrowser.selectedBrowser.getBoundingClientRect();
-  check("page fills the window", br.x === 0 && br.y === 0 && br.width === window.innerWidth && br.height === window.innerHeight, [br.x, br.y, br.width, br.height, window.innerWidth, window.innerHeight]);
+  check(mac ? "page fills the window, under the row" : "page fills the window", br.x === 0 && br.y === 0 && br.width === window.innerWidth && br.height === window.innerHeight, [br.x, br.y, br.width, br.height, window.innerWidth, window.innerHeight]);
   check("no native caption (customtitlebar)", document.documentElement.hasAttribute("customtitlebar"));
   check("tab box carries the glass filter", getComputedStyle($("tabbrowser-tabbox")).filter.startsWith("saturate"), getComputedStyle($("tabbrowser-tabbox")).filter);
-  check("window icon attribute and title", document.documentElement.getAttribute("icon") === "vitre" && /Deer$/.test(document.title), document.title);
+  check(mac ? "no window icon (macOS) and title" : "window icon attribute and title", (mac ? !document.documentElement.hasAttribute("icon") : document.documentElement.getAttribute("icon") === "vitre") && /Deer$/.test(document.title), document.title);
   check("ready after delayed startup", b.ready === true);
   check("product defaults applied over Firefox's", Services.prefs.getDefaultBranch("").getIntPref("browser.startup.page") === 3 && Services.prefs.getDefaultBranch("").getBoolPref("browser.shell.customIcon.enabled") === false && Services.prefs.getIntPref("gfx.webrender.max-filter-ops-per-chain") === 256);
 
@@ -150,13 +153,14 @@ spike.main(async () => {
   let take = true;
   const offOpen = b.interceptOpen((r) => (requests.push(r), take));
   const tabsBefore = b.tabs.length;
-  spike.click(300, 250, { shiftKey: true });
+  const linkY = gBrowser.selectedBrowser.getBoundingClientRect().top + 250;
+  spike.click(300, linkY, { shiftKey: true });
   await waitFor(() => requests.length === 1, { what: "Shift+click reaching interceptOpen" });
   await sleep(300);
   check("Shift+click is offered as new-window with its opener", requests[0].url === "https://example.org/vitre-test" && requests[0].disposition === "new-window" && requests[0].opener === t4 && requests[0].source === "click", [requests[0].url, requests[0].disposition]);
   check("taken requests open nothing", b.tabs.length === tabsBefore && [...Services.wm.getEnumerator("navigator:browser")].length === 1);
   take = false;
-  spike.click(300, 250, { ctrlKey: true });
+  spike.click(300, linkY, mac ? { metaKey: true } : { ctrlKey: true });
   await waitFor(() => requests.length === 2 && b.tabs.length === tabsBefore + 1, { what: "declined Ctrl+click opening a tab" });
   check("declined requests fall through to Firefox (Ctrl+click opens a background tab)", requests[1].disposition === "background-tab" && b.activeId === t4.id);
   offOpen();
@@ -236,7 +240,7 @@ spike.main(async () => {
   // ---- 8. a private window gets the shell ----
   const pw = await spike.openWindow({ private: true });
   check("a private window gets the shell", !!pw.vitre && pw.vitre.isPrivate === true && pw.document.documentElement.hasAttribute("vitre") && pw.document.documentElement.getAttribute("privatebrowsingmode") === "temporary" && pw.getComputedStyle(pw.document.getElementById("nav-bar")).display === "none" && pw.vitre.root.classList.contains("private"));
-  check("its icon attribute is Vitre's", pw.document.documentElement.getAttribute("icon") === "vitre");
+  check(mac ? "it has no window icon (macOS)" : "its icon attribute is Vitre's", mac ? !pw.document.documentElement.hasAttribute("icon") : pw.document.documentElement.getAttribute("icon") === "vitre");
   pw.resizeTo(1000, 640);
   pw.moveTo(160, 160);
   await sleep(1200);

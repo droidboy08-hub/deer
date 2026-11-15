@@ -1,0 +1,127 @@
+#!/bin/sh
+# Deer, development launcher for macOS: the counterpart of launcher\Deer.cmd and launcher\Launcher.cs
+# on Windows, with the same rules. Starts the development engine, runtime/Deer Dev.app, with the
+# chrome package built from gecko/src (npm start builds first, then runs this through tools/start.mjs).
+#   launcher/deer                 start Deer, or open a window in the instance that is already running
+#   launcher/deer https://...     open the URL (handed to the running instance: one instance per profile)
+#   launcher/deer -private-window
+#   DEER_FOREGROUND=1 launcher/deer   stay in the foreground, with the engine's output in this console
+#
+# What it does:
+#   * checks for the engine, runtime/Deer Dev.app/Contents/MacOS/firefox, and the chrome package,
+#     Contents/Resources/vitre/chrome.manifest (tools/setup-runtime.py links vitre to gecko/build);
+#   * profile: -profile <dir>, else $DEER_PROFILE, else $VITRE_PROFILE (the name older test scripts
+#     set), else ~/Library/Application Support/Deer Dev/Profile: the development profile, never the
+#     installed Deer's ~/Library/Application Support/Deer/Profile (the two engines differ). There is no
+#     profile from before the rename on the Mac, so nothing is copied;
+#   * creates the profile folder and the marker file "vitre-profile" in it (config.js refuses to run
+#     in a profile without the marker);
+#   * starts firefox -profile <profile> plus every other argument, detached. Always -profile, so the
+#     engine never opens ~/Library/Application Support/Firefox (the user's real Firefox). Arguments
+#     that would make Gecko pick a profile itself are dropped (-P [name], -ProfileManager,
+#     -createprofile <x>, -migration; -profile <dir> is taken as the profile). Flags are -name or
+#     --name in any case, as Gecko reads them on the Mac; a leading / is a path, not a flag;
+#   * runs Contents/MacOS/firefox by that path: never a renamed copy or a link (nsMacUtilsImpl::GetAppPath,
+#     xpcom/base/nsMacUtilsImpl.cpp, needs /Contents/MacOS/ in argv[0]) and never "open --args";
+#   * never passes -no-remote: Gecko's own remoting is keyed by profile path, so a second launch hands
+#     its URL to the running instance and exits (single instance, URL hand-off);
+#   * keeps an inherited XRE_PROFILE_PATH only when its folder holds "vitre-profile" (a Deer profile,
+#     such as the one Deer Dev.app's LSEnvironment names); Gecko prefers that variable to -profile
+#     (nsToolkitProfileService.cpp), so when it is kept the engine opens that profile. Removes
+#     XUL_APP_FILE and XRE_PROFILE_LOCAL_PATH (Gecko prefers them to the application and the profile
+#     given here) and MOZ_NEW_INSTANCE (it turns Gecko's remoting off: a second start would not hand
+#     its URL over).
+# Exit codes are Launcher.cs's: 0 started, 1 bad -osint shape, 2 engine or package missing, 3 any other
+# failure (the profile folder or its marker could not be made).
+# SPDX-License-Identifier: MPL-2.0
+
+unset CDPATH
+
+# This script's folder, through a symlink to the script (from ~/bin, say).
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self") || break
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+gecko=$(cd "$(dirname "$self")/.." && pwd -P) || exit 3
+app="$gecko/runtime/Deer Dev.app"
+exe="$app/Contents/MacOS/firefox"
+if [ ! -f "$exe" ] || [ ! -f "$app/Contents/Resources/vitre/chrome.manifest" ]; then
+  echo "Deer: runtime/Deer Dev.app or the chrome package is missing. Run: python3 tools/setup-runtime.py, then node tools/build.mjs" >&2
+  exit 2
+fi
+
+# The name of a flag (-name or --name), lower-cased (Gecko's CheckArg ignores ASCII case); nothing
+# for an argument that is not a flag.
+flag() {
+  case $1 in
+    --?*) printf '%s' "${1#--}" | LC_ALL=C tr 'A-Z' 'a-z' ;;
+    -?*) printf '%s' "${1#-}" | LC_ALL=C tr 'A-Z' 'a-z' ;;
+  esac
+}
+
+profile=
+if [ "$(flag "${1-}")" = osint ]; then
+  # Gecko accepts -osint only as the FIRST argument followed by exactly one flag and one value
+  # (protection against argument injection through crafted URLs). That shape is impossible once
+  # -profile is added, so enforce the same rule here and forward the pair without -osint, as
+  # Launcher.cs does.
+  [ $# -eq 3 ] || exit 1
+  case $3 in ''|-*) exit 1 ;; esac
+  case $(flag "$2") in url|new-tab|new-window|private-window) ;; *) exit 1 ;; esac
+  set -- "$2" "$3"
+else
+  # One pass over the arguments: each one is taken off the front and, when kept, put back at the end.
+  n=$#
+  while [ "$n" -gt 0 ]; do
+    a=$1
+    shift
+    n=$((n - 1))
+    case $(flag "$a") in
+      osint) exit 1 ;; # only valid as the first argument
+      profile)
+        if [ "$n" -gt 0 ]; then profile=$1; shift; n=$((n - 1)); fi ;;
+      p|createprofile)
+        if [ "$n" -gt 0 ]; then
+          case $1 in -*) ;; *) shift; n=$((n - 1)) ;; esac
+        fi ;;
+      profilemanager|migration) ;;
+      *) set -- "$@" "$a" ;;
+    esac
+  done
+fi
+
+[ -n "$profile" ] || profile=${DEER_PROFILE-}
+[ -n "$profile" ] || profile=${VITRE_PROFILE-}
+if [ -z "$profile" ]; then
+  if [ -z "${HOME-}" ]; then
+    echo "Deer: HOME is not set, so there is no default profile; set DEER_PROFILE" >&2
+    exit 3
+  fi
+  profile="$HOME/Library/Application Support/Deer Dev/Profile"
+fi
+case $profile in /*) ;; *) profile="$PWD/$profile" ;; esac
+mkdir -p "$profile" || exit 3
+# The full path without . or .. parts or a trailing slash (symlinks are kept, as Launcher.cs keeps them).
+profile=$(cd "$profile" && pwd) || exit 3
+[ -f "$profile/vitre-profile" ] || : > "$profile/vitre-profile" || exit 3
+
+# The engine inherits this environment and working directory (Gecko resolves relative file arguments
+# against it).
+if [ -z "${XRE_PROFILE_PATH-}" ] || [ ! -f "$XRE_PROFILE_PATH/vitre-profile" ]; then
+  unset XRE_PROFILE_PATH
+fi
+unset XUL_APP_FILE XRE_PROFILE_LOCAL_PATH MOZ_NEW_INSTANCE DEER_PROFILE VITRE_PROFILE DEER_TEST_LOCALAPPDATA
+# Never Firefox's crash reporter UI.
+MOZ_CRASHREPORTER_DISABLE=1
+export MOZ_CRASHREPORTER_DISABLE
+
+if [ "${DEER_FOREGROUND-}" = 1 ]; then
+  exec "$exe" -profile "$profile" "$@"
+fi
+# Detached: no handle of this console is held, and closing it does not stop the browser.
+nohup "$exe" -profile "$profile" "$@" </dev/null >/dev/null 2>&1 &
+exit 0

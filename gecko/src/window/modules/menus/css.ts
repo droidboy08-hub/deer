@@ -189,3 +189,82 @@ export const MENU_CSS = `
 #vitre-menus-top .vt-catcher[data-off] { display: none; }
 #vitre-menus-top .vt-wash { display: none; }
 `;
+
+/**
+ * macOS only (added to MENU_CSS by index.ts): the menu hosted in a XUL panel (panelhost.ts). The
+ * panel's window is the material, Liquid Glass on macOS 26 (an NSGlassEffectView with Gecko's menu
+ * corner radius, 12) and the Menu vibrancy before it (radius 6), with the system's menu shadow. So
+ * Deer draws none of its own: no tint, no frost, no rim, no shadow. The panel's box adds nothing
+ * either (toolkit popup.css gives a non-arrow panel a block padding and a 1 px border on its
+ * ::part(content)); its appearance is left alone, because appearance menupopup is what makes the
+ * window glass. Rows, plate, separators, captions and text are the rules above; the text colours
+ * follow the menu's theme class, and the panel's color-scheme is the same theme (panelhost.ts), so
+ * the glass is light or dark with them. The menu clips its content at the glass's own radius.
+ */
+export const MENU_CSS_MAC = `
+panel.vt-menu-host {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  --panel-padding: 0px;
+  --panel-border-color: transparent;
+  --panel-background-color: transparent;
+  --panel-border-radius: 12px;
+}
+panel.vt-menu-host::part(content) {
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+.vt-menu-host .vt-menu {
+  --m-text: #ffffff;
+  --m-sec: rgba(255,255,255,0.70);
+  --m-sep: rgba(255,255,255,0.10);
+  --m-plate: rgba(255,255,255,0.12);
+  --m-plate-in: inset 0 0.5px 0 rgba(255,255,255,0.22);
+  --m-press: rgba(255,255,255,0.08);
+  --m-dis-plate: rgba(255,255,255,0.05);
+  --m-row: 34px;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: 12px;
+  overflow: clip;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--m-text);
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  text-align: start;
+  outline: none;
+  user-select: none;
+  cursor: default;
+}
+.vt-menu-host .vt-menu::after { content: none; }
+.vt-menu-host .vt-menu.t-light {
+  --m-text: rgba(0,0,0,0.90);
+  --m-sec: rgba(0,0,0,0.62);
+  --m-sep: rgba(0,0,0,0.08);
+  --m-plate: rgba(0,0,0,0.06);
+  --m-plate-in: none;
+  --m-press: rgba(0,0,0,0.04);
+  --m-dis-plate: rgba(0,0,0,0.03);
+}
+.vt-menu-host .vt-menu.touch { --m-row: 40px; }
+/* Before macOS 26 the vibrancy view rounds at 6 (nsCocoaWindow.mm GetMenuCornerRadius). */
+@media not (-moz-mac-tahoe-theme) {
+  panel.vt-menu-host { --panel-border-radius: 6px; }
+  .vt-menu-host .vt-menu { border-radius: 6px; }
+}
+`;

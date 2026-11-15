@@ -3,11 +3,17 @@
 // and typed text kept, placed right of its source tab; the page gets its top strip back (it now
 // sits under the bar). Over Home the new tab takes Home's place. Selecting the peek's tab from
 // outside (DevTools, an extension) promotes it.   python tests/peek/all.py promote
+// macOS: the strip is the floating One row's ROW_AREA, 64 px (src/shared/geometry.ts), not 68;
+// Alt+Enter is ⌥↩ there too (design/keymap.json keys_mac); the mid-motion sheet is read before its
+// capture, which takes longer there.
 /* global spike, P, gBrowser, Services */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 spike.main(async () => {
   const { check, log, sleep, waitFor } = spike;
   const { b, peek, sheet } = P;
+  const mac = Services.appinfo.OS === "Darwin";
+  /** The top strip a page under the bar gets (page inset.ts): BAR_AREA, or ROW_AREA under the macOS One row. */
+  const STRIP = mac ? 64 : 68;
   await P.size(1440, 900);
   await spike.activate();
   await spike.loaded();
@@ -34,8 +40,11 @@ spike.main(async () => {
   Services.prefs.setIntPref("vitre.debug.peekMotionScale", 5);
   P.press("Alt+Enter");
   await sleep(60);
+  // macOS: a capture brings the window to the front first and outlasts the slowed motion (2 s), so
+  // the sheet is read before it.
+  const midMac = mac ? sheet() : null;
   await spike.capture("promote-1-expanding");
-  const mid = sheet();
+  const mid = midMac ?? sheet();
   log("mid promote", mid.chrome, mid.panel);
   await waitFor(() => !document.querySelector("#layer-peek > .vp-sheet.on") && gBrowser.selectedTab === node, { timeout: 6000, what: "promotion" });
   Services.prefs.clearUserPref("vitre.debug.peekMotionScale");
@@ -54,7 +63,7 @@ spike.main(async () => {
   const inset = await b.page(br).query("inset:state");
   check("the promoted page gets its top strip back (it is under the bar now)", inset?.browserOff === false && inset.applied === true, inset && { off: inset.browserOff, applied: inset.applied, decision: inset.decision });
   const pageTop = await P.inContent(br, (w) => w.document.querySelector("header").getBoundingClientRect().top);
-  check("the page's own header sits below the bar band", pageTop >= 67, pageTop);
+  check("the page's own header sits below the bar band", pageTop >= STRIP - 1, pageTop);
   check("the source page went to sleep and back to normal", !gBrowser.tabpanels.querySelector(".vitre-peek-under") && !src.browser.docShellIsActive);
   check("its tab no longer carries the hidden-tab session value", window.SessionStore.getCustomTabValue(node, "vitre-hidden") === "");
   check("keyboard focus is in the promoted page", document.activeElement === br);
@@ -113,7 +122,7 @@ spike.main(async () => {
   // ---- 6. a scrolled page that reflows at the window's width -----------------------------------------
   // The sheet (1040 px) is narrower than the window (1440 px). A responsive page (pages/reflow.html,
   // laid out as Wikipedia's Vector 2022 skin) pins side columns once it is a tab, its text column gets
-  // narrower and the text above the reader wraps into more lines. The strip adds 68 px above, and
+  // narrower and the text above the reader wraps into more lines. The strip adds 68 px above (64 on macOS), and
   // scroll anchoring keeps the paragraph at the top of the view where it was: scrollY grows by the
   // strip plus what the text above grew by, not by the strip alone (tests/peek/real.js on Wikipedia,
   // 2026-10-08: 68 + 26). ?js pins the columns from the page's script a moment after the resize.
@@ -144,7 +153,7 @@ spike.main(async () => {
     check(`(${name}) the page reflows at the window's width: its side columns are pinned in the tab, not in the sheet`, v0.width < v1.width && v0.side === "none" && v1.side === "block" && v0.y > 0, { v0, v1 });
     check(
       `(${name}) Open as tab on a page that reflows: no reload, the paragraph at the top of the view stays where it was, scrollY grows by the strip and the text above that rewrapped`,
-      loadsR.loads === 0 && v0.top === v1.top && Math.abs(v1.at - v0.at) <= 1 && v1.y - v0.y > 68 + 2,
+      loadsR.loads === 0 && v0.top === v1.top && Math.abs(v1.at - v0.at) <= 1 && v1.y - v0.y > STRIP + 2,
       { top: [v0.top, v0.at, v1.at], dy: v1.y - v0.y, loads: loadsR.loads }
     );
   }

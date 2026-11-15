@@ -527,9 +527,14 @@ export function onSessionRestored(fn: () => void): () => void {
  * Quit the application the way Firefox's own Exit does: observers of quit-application-requested may
  * cancel, then nsIAppStartup.quit(eAttemptQuit) closes every window (the session is saved).
  * gre/chrome/toolkit/content/global/globalOverlay.js goQuitApplication(event).
+ * `shortcut`: the quit key asked (⌘Q on macOS, keys.ts). goQuitApplication takes the event's accel
+ * key (metaKey on macOS, ctrlKey elsewhere) as "the shortcut", and BrowserGlue then asks first while
+ * browser.warnOnQuitShortcut is on (browser/components/BrowserGlue.sys.mjs _onQuitRequest; the Mac
+ * defaults in mac-keys.js turn it on). Without it, as before: no shortcut, no question.
  */
-export function quit(): boolean {
-  return !!w.goQuitApplication({});
+export function quit(opts: { shortcut?: boolean } = {}): boolean {
+  const accel = Services.appinfo.OS === 'Darwin' ? 'metaKey' : 'ctrlKey';
+  return !!w.goQuitApplication(opts.shortcut ? { [accel]: true } : {});
 }
 
 // ---- zoom (browser/chrome/browser/content/browser/tabbrowser/browser-fullZoom.js, toolkit viewZoomOverlay.js ZoomManager) ----
@@ -616,18 +621,22 @@ export function parkKeysets(): number {
 }
 
 /**
- * An extension's command is bound to this chord ("Ctrl+Shift+U"): a <key> in one of the keysets
- * ExtensionShortcuts makes (gre/modules/ExtensionShortcuts.sys.mjs: keyset id "ext-keyset-id-...",
- * key attribute, modifiers "accel,shift"). Those keysets are never parked (parkKeysets), so the
- * extension's command runs on that key: Deer's own action for it then stays out of the way.
+ * An extension's command is bound to this chord ("Ctrl+Shift+U"; macOS "Mod+Shift+U"): a <key> in one
+ * of the keysets ExtensionShortcuts makes (gre/modules/ExtensionShortcuts.sys.mjs: keyset id
+ * "ext-keyset-id-...", key attribute, modifiers "accel,shift" from ShortcutUtils.getModifiersAttribute:
+ * the manifest's Ctrl and Command are "accel", MacCtrl is "control"). Those keysets are never parked
+ * (parkKeysets), so the extension's command runs on that key: Deer's own action for it then stays
+ * out of the way. Windows: Deer's Ctrl and both "accel" and "control" are one key. macOS: Deer's Mod
+ * is "accel" (⌘, also written "meta"), and Deer's Ctrl, the Control key, is "control" only.
  */
 export function extensionKeyFor(spec: string): boolean {
+  const mac = Services.appinfo.OS === 'Darwin';
   const parts = spec.split('+');
   const key = (parts.pop() ?? '').toLowerCase();
-  const want = new Set(parts.map((p) => (p === 'Ctrl' ? 'accel' : p.toLowerCase())));
+  const want = new Set(parts.map((p) => (p === 'Mod' || (p === 'Ctrl' && !mac) ? 'accel' : p === 'Ctrl' ? 'control' : p.toLowerCase())));
   for (const k of Array.from(doc.querySelectorAll('keyset[id^="ext-keyset-id-"] key'))) {
     if ((k.getAttribute('key') ?? '').toLowerCase() !== key) continue;
-    const mods = new Set((k.getAttribute('modifiers') ?? '').split(/[,\s]+/).filter(Boolean).map((m) => (m === 'control' ? 'accel' : m)));
+    const mods = new Set((k.getAttribute('modifiers') ?? '').split(/[,\s]+/).filter(Boolean).map((m) => (mac ? (m === 'meta' ? 'accel' : m) : m === 'control' ? 'accel' : m)));
     if (mods.size === want.size && [...want].every((m) => mods.has(m))) return true;
   }
   return false;
@@ -872,42 +881,19 @@ export function windowState(): { maximized: boolean; fullscreen: boolean; domFul
 /** The attributes windowState() reads, for a MutationObserver. */
 export const WINDOW_STATE_ATTRIBUTES = ['sizemode', 'inFullscreen', 'inDOMFullscreen'];
 
-/**
- * The window's HWND as a hex string: nsIBaseWindow.nativeHandle (xpcom idl; the same call
- * tools/spike-lib.js uses for captures).
- */
-export function nativeHandle(): string {
-  return w.docShell.treeOwner.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIBaseWindow).nativeHandle;
-}
+// The native window (HWND on Windows, NSWindow on macOS) lives in the platform layer,
+// src/modules/platform/window-native.ts; these keep the window core's names and signatures.
 
-interface User32 {
-  ReleaseCapture: () => unknown;
-  PostMessageW: (...args: unknown[]) => unknown;
-  IsWindow: (hwnd: unknown) => unknown;
-  hwnd: () => unknown;
-}
-let user32: User32 | null = null;
+/** Deer's platform layer (src/modules/VitrePlatform.sys.ts), a process singleton. */
+const windowNative = (): VitreSysModules['VitrePlatform']['windowNative'] => sysModule('VitrePlatform').windowNative;
 
-/** user32.dll through js-ctypes (gre/modules/ctypes.sys.mjs), declared once per window. */
-function win32(): User32 {
-  if (!user32) {
-    const { ctypes } = ChromeUtils.importESModule('resource://gre/modules/ctypes.sys.mjs');
-    const lib = ctypes.open('user32.dll');
-    user32 = {
-      ReleaseCapture: lib.declare('ReleaseCapture', ctypes.winapi_abi, ctypes.int32_t),
-      PostMessageW: lib.declare('PostMessageW', ctypes.winapi_abi, ctypes.int32_t, ctypes.voidptr_t, ctypes.uint32_t, ctypes.uintptr_t, ctypes.intptr_t),
-      IsWindow: lib.declare('IsWindow', ctypes.winapi_abi, ctypes.int32_t, ctypes.voidptr_t),
-      hwnd: () => ctypes.voidptr_t(ctypes.UInt64(nativeHandle())),
-    };
-  }
-  return user32;
-}
+/** The window's native handle as a hex string (nsIBaseWindow.nativeHandle): the HWND on Windows, the NSWindow* on macOS. */
+export const nativeHandle = (): string => windowNative().nativeHandle(window);
 
-/** Whether a native window move can be started: user32 is reachable and the HWND is this window's. */
+/** Whether a native window move can be started: on Windows, user32 is reachable and the HWND is this window's (macOS: not yet). */
 export function canMoveWindow(): boolean {
   try {
-    const u = win32();
-    return !!u.IsWindow(u.hwnd());
+    return windowNative().canMoveWindow(window);
   } catch {
     return false;
   }
@@ -915,22 +901,13 @@ export function canMoveWindow(): boolean {
 
 /**
  * Start a native window move from script, as if the caption had been grabbed at this screen point
- * (CSS px, as in MouseEvent.screenX/Y). window.beginWindowMove does not exist on Windows in 157, so
- * this is the borderless-window recipe: give up Gecko's mouse capture, then post WM_NCLBUTTONDOWN /
- * HTCAPTION and Windows runs its own move loop, with Aero Snap and drag-restore from maximized
- * (spikes/shell/RESULT.md, recipe correction 4; the WM_SYSCOMMAND form leaves :active stuck).
- * Call it from a mousemove while the left button is down, never without a real button press:
- * Windows would wait for a click to end the move.
+ * (CSS px, as in MouseEvent.screenX/Y): on Windows the WM_NCLBUTTONDOWN / HTCAPTION recipe
+ * (window-native.ts); false on macOS for now. Call it from a mousemove while the left button is down,
+ * never without a real button press: Windows would wait for a click to end the move.
  */
 export function beginWindowMove(screenX: number, screenY: number): boolean {
   try {
-    const u = win32();
-    const dpr = window.devicePixelRatio;
-    const lParam = ((Math.round(screenY * dpr) & 0xffff) << 16) | (Math.round(screenX * dpr) & 0xffff);
-    const WM_NCLBUTTONDOWN = 0x00a1;
-    const HTCAPTION = 2;
-    u.ReleaseCapture();
-    return !!u.PostMessageW(u.hwnd(), WM_NCLBUTTONDOWN, HTCAPTION, lParam);
+    return windowNative().beginWindowMove(window, screenX, screenY);
   } catch (e) {
     console.error('Deer: window move failed', e);
     return false;

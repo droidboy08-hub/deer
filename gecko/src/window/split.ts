@@ -90,6 +90,7 @@ import type { Browser } from './browser';
 import { el } from './dom';
 import * as fx from './firefox';
 import type { Tab } from './model';
+import { oneRow } from './onerow';
 import { FADE_MS, fadeIn, paneEnter, paneLeave, reduced, within } from './splitmotion';
 
 export type Side = 'left' | 'right';
@@ -1209,8 +1210,8 @@ export class SplitView {
     this.divider.removeAttribute('inert');
     const H = window.innerHeight;
     if (!this.ghost) this.placeDivider(rects.left.right);
-    place(this.rims.left, rects.left);
-    place(this.rims.right, rects.right);
+    place(this.rims.left, this.toLayer(rects.left));
+    place(this.rims.right, this.toLayer(rects.right));
     if (!wasOn) {
       // The rims take this pair's colours at once (they fade in: enterPane), not over 150 ms from the
       // last pair's: their colour transition is for focus moving within a pair.
@@ -1223,16 +1224,31 @@ export class SplitView {
     const p = this.showing();
     for (const [id, card] of this.crash) {
       const t = this.b.tab(id);
-      const r = t ? this.paneOf(t) : null;
+      const pane = t ? this.paneOf(t) : null;
+      const r = pane ? this.toLayer(pane) : null;
       card.hidden = !r || t === this.b.active();
       if (r) {
         card.style.left = `${Math.round(r.left + r.width / 2)}px`;
         card.style.top = `${Math.round(r.top + r.height / 2)}px`;
       }
     }
-    this.divider.style.setProperty('--sp-grip-top', `${Math.round(H / 2 - 20)}px`);
+    // macOS One row: the layer is as tall as the tab panels (the whole window, as on Windows).
+    const tall = oneRow() ? tabpanels().getBoundingClientRect().height : H;
+    this.divider.style.setProperty('--sp-grip-top', `${Math.round(tall / 2 - 20)}px`);
     if (p) this.aria(p, rects);
     this.moved(rects.left.right);
+  }
+
+  /**
+   * A window rectangle in this layer's coordinates. macOS One row: relative to the tab panels, which
+   * this layer is inset 0 in (they fill the window from y 0, skin/shell.css section 8, so this is the
+   * rectangle as it is unless they move again). Elsewhere the layer is at the window's origin and the
+   * rectangle is returned as it is.
+   */
+  private toLayer(r: DOMRect): DOMRect {
+    if (!oneRow()) return r;
+    const o = tabpanels().getBoundingClientRect();
+    return new DOMRect(r.left - o.left, r.top - o.top, r.width, r.height);
   }
 
   /**
@@ -1321,7 +1337,7 @@ export class SplitView {
     const r = this.paneOf(t);
     if (!r) return;
     const cover = el('div', { class: `sp-frost side-${side}`, 'aria-hidden': 'true' });
-    place(cover, r);
+    place(cover, this.toLayer(r));
     this.layer.append(cover);
     const offs: (() => void)[] = [];
     const done = (): void => {

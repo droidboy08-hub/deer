@@ -7,6 +7,8 @@
 //     Nothing between #vitre-root and the lens may be faded (opacity < 1 makes a backdrop root and
 //     the lens would see nothing), so the open / close motion scales the sheet and fades its tint,
 //     rim and body; the lens itself is shown at once and goes first on close.
+//     macOS has no lens: the sheet itself carries a plain frost under the same tint and rim
+//     (styles.ts MAC), shown and hidden at the same moments.
 //   - State on b.root: `panel-open` (the core then sends Ctrl+F / F3 to the panel as the
 //     'vitre:panel-find' document event) and `settings-open`. One panel at a time: when another
 //     panel puts `downloads-open` on b.root, Settings steps aside, and opening Settings runs the
@@ -18,6 +20,7 @@
 //   - Page keys (reload, print, zoom, Ctrl+Q...) do nothing while the panel is open (browser.ts run(),
 //     keymap.json "Topmost surface"); an Esc pressed in the sheet is the ladder's even when a tab
 //     prompt (alert, print preview) sits under the panel (keys.ts escTaken).
+import { isMac } from '../../../shared/os';
 import type { Settings } from '../../../shared/settings';
 import type { Browser } from '../../browser';
 import * as fx from '../../firefox';
@@ -273,7 +276,7 @@ export class SettingsPanel {
     const layer = this.b.layer('settings', PANEL_Z);
 
     const closeBtn = h('button', { type: 'button', class: 'vs-close', 'aria-label': 'Close settings' }, iconBox(ico.close, 'vs-close-ico'));
-    setTip(closeBtn, 'Close', 'Esc');
+    setTip(closeBtn, 'Close', isMac ? '⎋' : 'Esc');
     closeBtn.addEventListener('click', () => this.close());
 
     this.search = h('input', { type: 'text', role: 'searchbox', class: 'vs-search-input', placeholder: 'Find a setting', 'aria-label': 'Find a setting', spellcheck: 'false', autocomplete: 'off', 'aria-controls': 'vs-main' });
@@ -304,8 +307,9 @@ export class SettingsPanel {
     scrollThumb(this.main);
 
     // opaque: a blur this large would otherwise let the sharp page through along the edges (glass.ts).
-    const lensEl = h('div', { class: 'vs-lens' });
-    lensEl.style.backdropFilter = lens(W, H, { radius: 22, scale: 24, blur: 22, opaque: true });
+    // None on macOS: the sheet carries a plain frost there (styles.ts MAC).
+    const lensEl = isMac ? null : h('div', { class: 'vs-lens' });
+    if (lensEl) lensEl.style.backdropFilter = lens(W, H, { radius: 22, scale: 24, blur: 22, opaque: true });
     this.sheet = h(
       'section',
       { class: 'vs-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'vs-title' },

@@ -1,10 +1,34 @@
 // Find in page: the core battery (see tests/find/all.py). Local page served over http, with a
 // cross-site frame from localhost (another content process).
+// macOS (One row, src/window/onerow.ts; MacKeys board, design/keymap.json keys_mac): Mod chords go
+// with ⌘ (pressMod), Match case is ⌥⌘C and there is no F3 (⌘G instead). The face is the active
+// capsule's, 36 tall (find views.ts FACE_H). Pages run under the floating 52 px row as under the
+// Windows bar (the owner, 2026-11-15): a match under the row is moved clear of its zone (the row and
+// 12 px, 64) to about window y 88 (find controller.ts rowZones, GUARD_AIR), a match on fixed content
+// there gives the face its parked tint, and pages get the 64 px top strip (ROW_AREA, page inset.ts),
+// so jumps land below the row at window y 64. The face's colours, the 'No matches' red with them,
+// follow the theme of the page under the row, as the Windows bar's (find styles.ts, One row).
 /* global spike, FL, gBrowser, Services */
 Services.scriptloader.loadSubScript("resource://vitre-boot/flib.js", window);
 spike.main(async () => {
   const b = window.vitre;
   const { check, log, sleep, capture } = spike;
+  const mac = Services.appinfo.OS === "Darwin";
+  /**
+   * A Mod chord ("Ctrl+F": Ctrl on Windows, ⌘ on macOS). spike.press sends Ctrl as the physical
+   * Control key, which is ⌃ on a Mac and never Mod there (src/shared/shortcuts.ts), so on a Mac the
+   * chord goes with ⌘ instead.
+   */
+  const pressMod = (spec) => (mac ? spike.press(spec.replace(/^Ctrl\+/, ""), { metaKey: true }) : spike.press(spec));
+  /** Match case: Alt+C; ⌥⌘C on macOS, where ⌥C alone types ç (find controller.ts isMacMatchCase). */
+  const pressCase = () => (mac ? spike.press("Alt+C", { metaKey: true }) : spike.press("Alt+C"));
+  /** Find again with find closed: F3; ⌘G on macOS, which has no F3 (Mission Control; shortcuts.ts findNext). */
+  const pressAgain = () => (mac ? spike.press("G", { metaKey: true }) : spike.press("F3"));
+  const againKey = mac ? "⌘G" : "F3";
+  /** macOS: the row's band (onerow.ts ROW_H, 52) and 12 px: the page's top strip and the guard's zone (geometry.ts ROW_AREA). */
+  const ROW_AREA = 64;
+  /** macOS: the row is dark (a dark or clear page under it, or a private window: find styles.ts, One row). */
+  const rowDark = () => ["private", "theme-dark", "theme-clear"].some((c) => b.root.classList.contains(c));
   await spike.resize(1280, 860);
   await spike.activate();
   log("modules", b.modules, "errors", b.moduleErrors);
@@ -18,14 +42,15 @@ spike.main(async () => {
   const tabA = b.active();
 
   // ---- open from the page ----
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open");
   await sleep(450);
   let s = FL.st();
   check("Ctrl+F from the page opens find in the pill, focused", s?.open && s.view === "pill" && s.focused, s);
   const pill = b.bar.layout.pillRect;
   const faceR = FL.rectOf(FL.face());
-  check("the face lies exactly over the pill", pill && faceR && faceR.x === Math.round(pill.x) && faceR.y === Math.round(pill.y) && faceR.w === Math.round(pill.width) && faceR.h === 44, { pill: pill && { x: pill.x, y: pill.y, w: pill.width }, faceR });
+  // macOS: the pill is the row's active capsule, CAP_H (36) tall.
+  check("the face lies exactly over the pill", pill && faceR && faceR.x === Math.round(pill.x) && faceR.y === Math.round(pill.y) && faceR.w === Math.round(pill.width) && faceR.h === (mac ? 36 : 44), { pill: pill && { x: pill.x, y: pill.y, w: pill.width }, faceR });
   check("the pill's own face is hidden", b.root.classList.contains("find-face") && getComputedStyle(b.bar.item(tabA.id).querySelector(".pill-face")).visibility === "hidden");
   check("focused tint (find-focused)", b.root.classList.contains("find-focused"));
   check("empty counter, chevrons disabled", s.counter === "" && FL.face().querySelector(".vf-prev").getAttribute("aria-disabled") === "true");
@@ -46,16 +71,19 @@ spike.main(async () => {
   spike.press("Shift+Enter");
   s = await FL.counter("2 of 13");
   check("Shift+Enter -> 2 of 13", s?.counter === "2 of 13", s);
-  spike.press("F3");
-  s = await FL.counter("3 of 13");
-  check("F3 -> 3 of 13", s?.counter === "3 of 13", s);
-  spike.press("Shift+F3");
-  s = await FL.counter("2 of 13");
-  check("Shift+F3 -> 2 of 13", s?.counter === "2 of 13", s);
-  spike.press("Ctrl+G");
+  if (mac) log("macOS has no F3 (Mission Control; keymap.json keys_mac): F3 and Shift+F3 are not checked, ⌘G and ⇧⌘G are below");
+  else {
+    spike.press("F3");
+    s = await FL.counter("3 of 13");
+    check("F3 -> 3 of 13", s?.counter === "3 of 13", s);
+    spike.press("Shift+F3");
+    s = await FL.counter("2 of 13");
+    check("Shift+F3 -> 2 of 13", s?.counter === "2 of 13", s);
+  }
+  pressMod("Ctrl+G");
   s = await FL.counter("3 of 13");
   check("Ctrl+G -> 3 of 13", s?.counter === "3 of 13", s);
-  spike.press("Ctrl+Shift+G");
+  pressMod("Ctrl+Shift+G");
   s = await FL.counter("2 of 13");
   check("Ctrl+Shift+G -> 2 of 13", s?.counter === "2 of 13", s);
   FL.face().querySelector(".vf-next").click();
@@ -94,7 +122,7 @@ spike.main(async () => {
 
   // Ctrl+F in the field selects all, no motion; Tab cycles field -> previous -> next -> Aa -> ×.
   FL.input().setSelectionRange(5, 5);
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await sleep(150);
   check("Ctrl+F while open selects the field's text, find stays as it is", FL.st()?.open && FL.input().selectionStart === 0 && FL.input().selectionEnd === 5 && FL.F().face.mode === "open");
   const order = [];
@@ -147,7 +175,7 @@ spike.main(async () => {
   await capture("core-03-frame-ring");
 
   // ---- match case ----
-  spike.press("Alt+C");
+  pressCase();
   await FL.until(() => FL.st()?.total === 11, "11 with case");
   s = await FL.settle(300);
   check("Alt+C: match case on, 'glass' -> 11", s?.matchCase && s.total === 11 && FL.face().querySelector(".vf-case").getAttribute("aria-pressed") === "true", s);
@@ -156,7 +184,7 @@ spike.main(async () => {
   s = await FL.settle(300);
   check("match case: 'Glass' -> N of 2", /^\d of 2$/.test(s?.counter ?? ""), s);
   await capture("core-04-match-case");
-  spike.press("Alt+C");
+  pressCase();
   await FL.until(() => FL.st()?.total === 13, "13 again");
   check("Alt+C again: case off, 13", FL.st()?.total === 13 && !FL.st().matchCase, FL.st());
 
@@ -164,7 +192,9 @@ spike.main(async () => {
   await FL.query("glasszz");
   s = await FL.counter("No matches");
   const cnt = FL.face().querySelector(".vf-count");
-  check("no matches: 'No matches' in #c42b1c", s?.counter === "No matches" && getComputedStyle(cnt).color === "rgb(196, 43, 28)", getComputedStyle(cnt).color);
+  // macOS: the red follows the theme of the page under the row (#ff99a4 on a dark row).
+  if (mac) check(`no matches: 'No matches' in the row's red (${rowDark() ? "#ff99a4, dark" : "#c42b1c, light"} row)`, s?.counter === "No matches" && getComputedStyle(cnt).color === (rowDark() ? "rgb(255, 153, 164)" : "rgb(196, 43, 28)"), getComputedStyle(cnt).color);
+  else check("no matches: 'No matches' in #c42b1c", s?.counter === "No matches" && getComputedStyle(cnt).color === "rgb(196, 43, 28)", getComputedStyle(cnt).color);
   check("no matches: chevrons disabled", FL.face().querySelector(".vf-next").getAttribute("aria-disabled") === "true");
   spike.press("Enter");
   await sleep(200);
@@ -189,14 +219,14 @@ spike.main(async () => {
   check("its link has focus", page.active === "link1", page);
   check("the page has focus", document.activeElement === gBrowser.selectedBrowser);
   await capture("core-06-closed-selected");
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "reopen");
   s = await FL.counter("5 of 13");
   check("Esc then Ctrl+F returns to the same match (5 of 13), query selected", s?.counter === "5 of 13" && s.query === "glass" && FL.input().selectionStart === 0 && FL.input().selectionEnd === 5, s);
 
   // ---- Ctrl+Enter follows the link match ----
   await sleep(300);
-  spike.press("Ctrl+Enter");
+  pressMod("Ctrl+Enter");
   const followed = await FL.until(() => gBrowser.selectedBrowser.currentURI.spec.includes("counter.html"), "followed", 8000);
   check("Ctrl+Enter closes find and clicks the match's link", !!followed && !FL.st()?.open, gBrowser.selectedBrowser.currentURI.spec);
 
@@ -214,7 +244,7 @@ spike.main(async () => {
   const wb = browserBox();
   spike.EU.synthesizeMouseAtPoint(wb.x + word.x, wb.y + word.y, { clickCount: 2 }, window);
   await sleep(300);
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open with selection");
   s = await FL.counter("1 of 1");
   page = await FL.pageState();
@@ -238,21 +268,21 @@ spike.main(async () => {
   await FL.until(() => !FL.st()?.open, "parked closed");
   check("Esc in the page closes parked find (after the page)", !FL.st()?.open);
 
-  // ---- F3 with find closed reopens it parked and steps ----
+  // ---- F3 with find closed reopens it parked and steps (macOS: ⌘G) ----
   await sleep(300);
-  spike.press("F3");
+  pressAgain();
   await FL.until(() => FL.st()?.open, "F3 reopen");
   s = await FL.counter("1 of 1");
-  check("F3 with find closed: reopens parked with the last query", s?.open && !s.focused && s.query === "Pilkington" && s.counter === "1 of 1", s);
+  check(`${againKey} with find closed: reopens parked with the last query`, s?.open && !s.focused && s.query === "Pilkington" && s.counter === "1 of 1", s);
   spike.press("Escape");
   await FL.until(() => !FL.st()?.open, "closed again");
 
   // ---- Ctrl+L leaves find for the address field, keeping the query ----
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open && FL.st()?.focused, "open focused");
   await FL.query("glass");
   await FL.counter("1 of 13");
-  spike.press("Ctrl+L");
+  pressMod("Ctrl+L");
   await FL.until(() => b.omni.open && !FL.st()?.open, "omni");
   check("Ctrl+L in the field: the address field opens, find closes", b.omni.open && !FL.st()?.open);
   await sleep(300);
@@ -263,10 +293,10 @@ spike.main(async () => {
   await sleep(300);
   b.focusPage();
   await sleep(200);
-  spike.press("F3");
+  pressAgain();
   await FL.until(() => FL.st()?.open, "F3 after Ctrl+L");
   s = await FL.settle(400);
-  check("the query survives Ctrl+L for F3", s?.query === "glass" && /of 13$/.test(s.counter), s);
+  check(`the query survives Ctrl+L for ${againKey}`, s?.query === "glass" && /of 13$/.test(s.counter), s);
   spike.press("Escape");
   await FL.until(() => !FL.st()?.open, "closed 3");
 
@@ -276,7 +306,7 @@ spike.main(async () => {
   spike.press("Escape");
   await FL.until(() => !b.omni.open, "home field closed", 3000);
   await sleep(300);
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => b.omni.open, "Ctrl+F on Home");
   check("Ctrl+F on Home opens the address field, not find", b.omni.open && !FL.st()?.open, { omni: b.omni.open, st: FL.st() });
   b.omni.close();
@@ -287,7 +317,7 @@ spike.main(async () => {
   b.activate(tabA);
   await sleep(300);
   b.focusPage();
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open A");
   await FL.settle(400);
   const ordA = FL.st()?.counter;
@@ -314,7 +344,7 @@ spike.main(async () => {
   await FL.load(FL.http("long.html"));
   await sleep(900);
   b.focusPage();
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open long");
   FL.type("glass");
   s = await FL.counter("1 of 1,000+", 6000);
@@ -322,11 +352,13 @@ spike.main(async () => {
   await capture("core-11-limit");
 
   // ---- the scroll guard and the ring: a match under the glass ----
+  // macOS: the row floats over the page as the Windows bar does, so a match under it is moved clear
+  // of its zone (52 + 12) to about y 88 (find controller.ts rowZones, GUARD_AIR).
   spike.press("Escape");
   await FL.until(() => !FL.st()?.open, "closed long");
   await FL.inPage("function (w, d) { w.scrollTo(0, 0); return 0; }");
   await sleep(300);
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open guard");
   await FL.query("ribbon");
   s = await FL.counter("1 of 60");
@@ -343,8 +375,13 @@ spike.main(async () => {
   s = FL.st();
   const after = await FL.inPage("function (w, d) { return { y: d.getElementById('p20').getBoundingClientRect().top, scrollY: w.scrollY }; }");
   log("guard: match 2", s.rect, "p20 after", after);
-  check("a match under the glass is moved clear of it (y >= 68)", s?.rect && s.rect.y >= 68, s?.rect);
-  check("... to about y 92 (the guard), or below the bar by Gecko's own scroll", s?.rect && s.rect.y <= 470, s?.rect);
+  if (mac) {
+    check("macOS: a match under the row is moved clear of it (y >= 64) by scrolling the page", s?.rect && s.rect.y >= ROW_AREA && after.scrollY < before.scrollY, { rect: s?.rect, before, after });
+    check("macOS: ... to about y 88 (the guard), or below the row by Gecko's own scroll", s?.rect && s.rect.y <= 470, s?.rect);
+  } else {
+    check("a match under the glass is moved clear of it (y >= 68)", s?.rect && s.rect.y >= 68, s?.rect);
+    check("... to about y 92 (the guard), or below the bar by Gecko's own scroll", s?.rect && s.rect.y <= 470, s?.rect);
+  }
   check("the ring landed on the match", FL.F().ring.visible && Math.abs(FL.F().ring.last.y - s.rect.y) < 1, FL.F().ring.last);
   await capture("core-12-guard-ring");
   await FL.inPage("function (w, d) { w.scrollBy(0, 40); return w.scrollY; }");
@@ -354,22 +391,25 @@ spike.main(async () => {
   await FL.until(() => FL.st()?.ord === 3, "ord 3");
   await sleep(600);
   s = FL.st();
-  check("an off-screen match: the page jumps, the match lands below the bar", s?.rect && s.rect.y >= 68 && s.rect.y < 860, s?.rect);
+  // macOS: below the row means clear of its zone (ROW_AREA, 64).
+  check("an off-screen match: the page jumps, the match lands below the bar", s?.rect && s.rect.y >= (mac ? ROW_AREA : 68) && s.rect.y < 860, s?.rect);
   await FL.inPage("function (w, d) { w.scrollBy(0, 1500); return w.scrollY; }");
   await sleep(400);
   spike.press("Shift+Enter");
   await FL.until(() => FL.st()?.ord === 2, "back to 2");
   await sleep(600);
   s = FL.st();
-  check("stepping back up to a match above the view: it lands below the bar", s?.rect && s.rect.y >= 68, s?.rect);
+  check("stepping back up to a match above the view: it lands below the bar", s?.rect && s.rect.y >= (mac ? ROW_AREA : 68), s?.rect);
   spike.press("Escape");
   await FL.until(() => !FL.st()?.open, "closed ribbon");
 
   // ---- a match on fixed content under the glass: the pill takes its parked tint ----
+  // macOS: the same: the fixed rail starts at the window's top, under the row (the zone is the row's
+  // whole width), so the marker cannot scroll clear and the face takes its parked tint.
   await FL.load(FL.http("sticky.html"));
   await sleep(900);
   b.focusPage();
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open sticky");
   FL.type("pinned marker");
   await FL.counter("1 of 1");
@@ -380,12 +420,16 @@ spike.main(async () => {
   await FL.until(() => !FL.st()?.open, "closed sticky");
 
   // ---- anchor jumps and scrollIntoView land below the bar (inset's scroll-padding-top) ----
+  // macOS: the strip and its scroll padding are the row's ROW_AREA (64; page inset.ts), so targets
+  // land at window y 64, right below the row's zone.
   const jump = await FL.inPage("function (w, d) { d.querySelector('a[href=\"#second\"]').click(); return true; }");
   await sleep(500);
   const anchor = await FL.inPage("function (w, d) { return { top: d.getElementById('second').getBoundingClientRect().top, pad: w.getComputedStyle(d.documentElement).scrollPaddingTop }; }");
-  check("a #hash link lands its target just below the bar (top ~68)", jump && Math.abs(anchor.top - 68) <= 2, anchor);
+  if (mac) check("macOS: a #hash link lands its target just below the row (top ~64, the strip's scroll padding)", jump && Math.abs(anchor.top - ROW_AREA) <= 2 && anchor.pad === "64px", anchor);
+  else check("a #hash link lands its target just below the bar (top ~68)", jump && Math.abs(anchor.top - 68) <= 2, anchor);
   const siv = await FL.inPage("function (w, d) { d.getElementById('third').scrollIntoView(); return d.getElementById('third').getBoundingClientRect().top; }");
-  check("scrollIntoView() lands below the bar too (top ~68)", Math.abs(siv - 68) <= 2, siv);
+  if (mac) check("macOS: scrollIntoView() lands below the row too (top ~64)", Math.abs(siv - ROW_AREA) <= 2, siv);
+  else check("scrollIntoView() lands below the bar too (top ~68)", Math.abs(siv - 68) <= 2, siv);
 
   // ---- colours pinned per document ----
   const colours = await b.page(b.active()).query("find:colours");
@@ -400,7 +444,7 @@ spike.main(async () => {
   if (!hadMenus) b.provide("menus", { show: (items, at) => (shown = { items, at }), close() {} });
   const realMenus = hadMenus ? "menus module" : "stand-in";
   b.focusPage();
-  spike.press("Ctrl+F");
+  pressMod("Ctrl+F");
   await FL.until(() => FL.st()?.open, "open for menu");
   const inp = FL.input();
   const r = inp.getBoundingClientRect();
@@ -413,11 +457,16 @@ spike.main(async () => {
     shown.items.find((i) => i.label === "Match case").run();
     await sleep(200);
     check("field menu: Match case toggles", FL.st()?.matchCase === true);
-    spike.press("Alt+C");
+    pressCase();
   } else {
     // The real menus module: Shift+F10 in the field opens the glass field menu with Match case.
-    spike.press("Shift+F10");
-    await FL.until(() => window.vitreMenus?.state().open, "menu open", 2000);
+    // macOS has no Shift+F10 or Menu key (keymap.json keys_mac: ⌃-click or right-click): the
+    // contextmenu event below opens it there.
+    if (mac) log("macOS: no Shift+F10 (keymap.json keys_mac), so the field menu is opened by a contextmenu event");
+    else {
+      spike.press("Shift+F10");
+      await FL.until(() => window.vitreMenus?.state().open, "menu open", 2000);
+    }
     let ms = window.vitreMenus?.state();
     if (!ms?.open) {
       inp.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: r.x + 20, clientY: r.y + 20 }));

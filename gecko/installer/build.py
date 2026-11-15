@@ -400,6 +400,9 @@ def copy_engine(engine, dest):
     for folder, _dirs, files in os.walk(OVERLAY):
         for name in files:
             src = os.path.join(folder, name)
+            # defaults/vitre-platform/mac-*.js are loaded on macOS only (config.js): not in a Windows release.
+            if os.path.relpath(src, OVERLAY).replace('\\', '/').lower().startswith('defaults/vitre-platform/'):
+                continue
             dst = os.path.join(dest, os.path.relpath(src, OVERLAY))
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)

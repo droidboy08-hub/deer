@@ -10,7 +10,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "The + circle's tooltip reads 'New tab  Ctrl+T'",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘T",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+W",
@@ -19,7 +21,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "If a panel or peek is open, it closes that instead; in the switcher, it closes the selected card (see those groups). Ctrl+F4 is the Windows tab convention. In split view it closes the focused side (a peek or panel on top closes first); the other side fills the window and takes focus.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘W",
+     "macNote": "Ctrl+F4 has no Mac twin."
     },
     {
      "keys": "Ctrl+Shift+T",
@@ -28,7 +32,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "The + menu row names what will reopen. Ignores key repeat.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘T",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+N",
@@ -37,7 +43,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "Printed in the + menu",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘N",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Shift+N",
@@ -46,7 +54,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "Added 2026-10-04 (user asked for private windows). Printed in the + menu. Ctrl+N in a private window opens another private one. Ignores key repeat.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘N",
+     "macNote": "As in Safari and Chrome (Firefox uses ⇧⌘P)."
     },
     {
      "keys": "Ctrl+Shift+W",
@@ -55,7 +65,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "No prompt. Ctrl+Shift+T reopens the whole window. Alt+F4 still belongs to Windows and also closes it.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘W",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Page Down / Ctrl+Page Up",
@@ -64,7 +76,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "Always positional, whatever 'Order of tabs' is set to. In split view the two sides are two stops, left then right.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘] / ⇧⌘[",
+     "macNote": "Also ⌥⌘→ / ⌥⌘←. Deer first. Window › Show Next Tab / Show Previous Tab."
     },
     {
      "keys": "Ctrl+1 … Ctrl+8",
@@ -73,7 +87,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "Matched by the physical digit key, so AZERTY needs no Shift. Zoom wins only where a digit key is the layout’s only - or + (AZERTY 6). In split view each side counts (count the favicons from the left).",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘1 … ⌘8",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+9",
@@ -82,7 +98,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "In split view the last favicon: the right side of a pair at the end.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘9",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Shift+Page Up / Ctrl+Shift+Page Down",
@@ -91,7 +109,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "The keyboard way to reorder the bar. A split pair moves as one, and a tab steps over a whole pair.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃⇧Page Up / ⌃⇧Page Down",
+     "macNote": "The Control key, not ⌘; ⌃⇧fn↑ / ⌃⇧fn↓ on a laptop."
     },
     {
      "keys": "Ctrl+Shift+U",
@@ -100,7 +120,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "Owner's decision 2026-10-20 (SPLIT-VIEW-SPEC.md). Printed beside 'New tab in split view' (the tab pill's menu) and 'Separate tabs' (a split pill half's menu). Does nothing on a single Home tab or in a popup window; under a 648 px window it does nothing and Narrator says 'Window too narrow for split view'. Ignores key repeat; the AltGr and IME guards apply. F6 then Ctrl+Shift+U, or the pill's menu, is the route a page can't block. Rebindable (Settings › Keyboard shortcuts: Split view). An extension that binds the same chord keeps it.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘U",
+     "macNote": "View › Split View."
     },
     {
      "keys": "F11",
@@ -109,7 +131,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "A page can stop F11 from entering full screen, never from leaving. Tab and window keys stay browser-first in this mode.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃⌘F",
+     "macNote": "Full screen in its own Space; the menu bar and tab bar hide until you point at the top edge. ⌃⌘F again, the green button or View › Exit Full Screen leave; ⎋ never does. F11 still works but is never printed: macOS uses it for Show Desktop."
     }
    ]
   },
@@ -123,7 +147,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "F6 is the key a page can't take",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘L",
+     "macNote": "Also File › Open Location…. Alt+D has no Mac twin: ⌥D types a character."
     },
     {
      "keys": "Enter",
@@ -132,7 +158,9 @@
      "scope": "address field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "↩",
+     "macNote": ""
     },
     {
      "keys": "Alt+Enter",
@@ -141,7 +169,9 @@
      "scope": "address field",
      "priority": "local",
      "note": "As in Chrome and Edge. In Vitre, Alt+Enter always means 'as a tab'.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥↩",
+     "macNote": "Also ⌘↩ in the address field."
     },
     {
      "keys": "Shift+Enter",
@@ -150,7 +180,9 @@
      "scope": "address field",
      "priority": "local",
      "note": "In Chrome this opens a new window. Ctrl+Q is the peek key on every face of the pill.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧↩",
+     "macNote": "Also ⌃Q."
     },
     {
      "keys": "Ctrl+Enter",
@@ -159,7 +191,9 @@
      "scope": "address field",
      "priority": "local",
      "note": "As in Chrome and Edge",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃↩",
+     "macNote": "The Control key."
     },
     {
      "keys": "Shift+Delete",
@@ -168,7 +202,9 @@
      "scope": "address field, suggestion highlighted",
      "priority": "local",
      "note": "With no suggestion highlighted, Shift+Delete stays the Windows cut",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧⌫",
+     "macNote": ""
     },
     {
      "keys": "Esc",
@@ -177,7 +213,9 @@
      "scope": "address field",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+H",
@@ -186,7 +224,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "Docs and Word keep Ctrl+H for Replace. Needs an empty-query state on HomeSearch.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘Y",
+     "macNote": "History is ⌘Y because ⌘H hides Deer. History › Show All History."
     }
    ]
   },
@@ -200,7 +240,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘[",
+     "macNote": "Also ⌘← (page first: in a text field it moves the caret) and the mouse Back button. History › Back."
     },
     {
      "keys": "Alt+Right",
@@ -209,7 +251,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘]",
+     "macNote": "Also ⌘→ and the mouse Forward button. History › Forward."
     },
     {
      "keys": "Ctrl+R",
@@ -218,7 +262,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Reload in the page menu works even when a page takes the keys",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘R",
+     "macNote": "No F5 on a Mac."
     },
     {
      "keys": "Ctrl+Shift+R",
@@ -227,7 +273,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Chrome’s gesture on the reload button is the route a page can’t block",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘R",
+     "macNote": "Never ⌘F5: VoiceOver uses it. ⇧-click the reload button does the same."
     },
     {
      "keys": "Esc",
@@ -236,7 +284,9 @@
      "scope": "page loading, nothing else open",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": "Also ⌘., which steps the same ladder (View › Stop shows ⌘.)."
     },
     {
      "keys": "Esc (in video or element full screen)",
@@ -245,7 +295,9 @@
      "scope": "element full screen, pointer lock",
      "priority": "browser-first",
      "note": "Never counts toward a peek's Esc Esc",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": "Leaves element full screen only: ⎋ never leaves window full screen on a Mac."
     },
     {
      "keys": "Ctrl+Plus",
@@ -254,7 +306,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Matched by the character the active layout types",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘+",
+     "macNote": "Also ⌘=. Pinch zooms the page (APZ)."
     },
     {
      "keys": "Ctrl+Minus",
@@ -263,7 +317,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "On AZERTY this is the 6 key, so Ctrl+6 zooms out",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘−",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+0",
@@ -272,7 +328,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘0",
+     "macNote": "View › Actual Size."
     },
     {
      "keys": "Ctrl+P",
@@ -281,7 +339,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘P",
+     "macNote": "The macOS print dialog."
     },
     {
      "keys": "Ctrl+S",
@@ -290,7 +350,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘S",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+U",
@@ -299,7 +361,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌥⌘U",
+     "macNote": "Option added, as in Safari and Chrome; ⌘U alone is left to pages."
     },
     {
      "keys": "Ctrl+click (link)",
@@ -308,7 +372,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Not printed in the link menu",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘-click (link)",
+     "macNote": "Also middle-click; ⌘↩ on a focused link."
     },
     {
      "keys": "Ctrl+Shift+click (link)",
@@ -317,7 +383,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘-click (link)",
+     "macNote": "Also ⇧⌘↩ on a focused link."
     },
     {
      "alt": "",
@@ -326,7 +394,10 @@
      "keys": "Browser Refresh, Stop, Search and Home keys",
      "action": "Reload, stop loading, edit the address, go to the Home tab",
      "scope": "anywhere in the window",
-     "priority": "browser-first"
+     "priority": "browser-first",
+     "keys_mac": "",
+     "macNote": "Mac keyboards have none; mouse buttons 4 and 5 still go back and forward.",
+     "only": "win"
     }
    ]
   },
@@ -340,7 +411,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Comes only through setWindowOpenHandler, so pages that use Shift+click keep it. A switch in Settings › Keyboard shortcuts brings back Chrome's new window.",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧-click (link)",
+     "macNote": ""
     },
     {
      "keys": "Shift+Enter (focused link)",
@@ -349,7 +422,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧↩ (focused link)",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Q",
@@ -358,7 +433,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Real http/https links only, and never while you're typing in a field. Ctrl+Q never means Quit.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃Q",
+     "macNote": "The Control key: ⌘Q quits."
     },
     {
      "keys": "Shift+click (link on the dimmed page)",
@@ -367,7 +444,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧-click (link on the dimmed page)",
+     "macNote": ""
     },
     {
      "keys": "Alt+Enter",
@@ -376,7 +455,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "If the page in the peek uses Alt+Enter itself (Sheets, Jupyter), use the button instead",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥↩",
+     "macNote": ""
     },
     {
      "keys": "Esc",
@@ -385,7 +466,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "The page gets Esc first",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": "Also ⌘.."
     },
     {
      "keys": "Esc Esc (within 400 ms)",
@@ -394,7 +477,9 @@
      "scope": "peek open",
      "priority": "browser-first",
      "note": "Ignores key repeat, and any Esc already used by the IME, a menu, find or leaving full screen. Once you've typed in the peek, it only bumps the sheet.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋ ⎋ (within 400 ms)",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+W",
@@ -403,7 +488,9 @@
      "scope": "peek open",
      "priority": "browser-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘W",
+     "macNote": ""
     },
     {
      "keys": "Alt+Left",
@@ -412,7 +499,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "Ignores key repeat",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘[",
+     "macNote": "Also ⌘← and the mouse Back button."
     },
     {
      "keys": "Alt+Right",
@@ -421,7 +510,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘]",
+     "macNote": "Also ⌘→ and the mouse Forward button."
     },
     {
      "keys": "Ctrl+R, Ctrl+P, Ctrl+S, Ctrl+U, zoom keys, F12",
@@ -430,7 +521,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "Tab and window keys act on the window. Leaving the tab warm-closes its peek.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘R, ⌘P, ⌘S, ⌥⌘U, zoom keys, ⌥⌘I",
+     "macNote": ""
     }
    ]
   },
@@ -444,7 +537,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "If a page keeps Ctrl+F: press F6, then Ctrl+F, or use Find on page… in the page menu",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘F",
+     "macNote": "Edit › Find…."
     },
     {
      "keys": "Ctrl+F",
@@ -453,7 +548,9 @@
      "scope": "Home",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘F",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+F",
@@ -462,7 +559,9 @@
      "scope": "peek open",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘F",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+F",
@@ -471,7 +570,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘F",
+     "macNote": ""
     },
     {
      "keys": "Enter / Shift+Enter",
@@ -480,7 +581,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "The tooltips print Enter and Shift+Enter",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "↩ / ⇧↩",
+     "macNote": "Also ⌘G / ⇧⌘G."
     },
     {
      "keys": "F3 / Shift+F3",
@@ -489,7 +592,9 @@
      "scope": "page, find closed or parked",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘G / ⇧⌘G",
+     "macNote": "No F3 on a Mac: macOS uses it for Mission Control. Edit › Find Next / Find Previous."
     },
     {
      "keys": "Alt+C",
@@ -498,7 +603,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "Ignored while Ctrl or AltGr is down, so AltGr+C still types ć",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌥⌘C",
+     "macNote": "Only in the find field: ⌥C alone types ç. Outside the field ⌥⌘C is Inspect element."
     },
     {
      "keys": "Ctrl+Enter",
@@ -507,7 +614,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘↩",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Q",
@@ -516,7 +625,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌃Q",
+     "macNote": "The Control key."
     },
     {
      "keys": "Up / Down / Page Up / Page Down",
@@ -525,7 +636,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "↑ / ↓ / Page Up / Page Down",
+     "macNote": "fn↑ / fn↓ on a laptop."
     },
     {
      "keys": "Tab / Shift+Tab",
@@ -534,7 +647,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇥ / ⇧⇥",
+     "macNote": ""
     },
     {
      "keys": "F6",
@@ -543,7 +658,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "F6",
+     "macNote": "fn F6 on a laptop."
     },
     {
      "keys": "Ctrl+L",
@@ -552,7 +669,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘L",
+     "macNote": "The query is kept for ⌘G."
     },
     {
      "keys": "Esc",
@@ -561,7 +680,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⎋",
+     "macNote": "Also ⌘.."
     },
     {
      "keys": "Shift+F10",
@@ -570,7 +691,9 @@
      "scope": "find field",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌃-click (the field)",
+     "macNote": "Also right-click. No Shift+F10 or Menu key on a Mac."
     }
    ]
   },
@@ -584,7 +707,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "Released within 150 ms. A split pair is one entry: the quick tap from one side goes to the previous tab, never to the other side.",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌃⇥ (quick tap)",
+     "macNote": "The Control key: ⌘⇥ is the macOS app switcher."
     },
     {
      "keys": "Ctrl+Tab (hold Ctrl)",
@@ -593,7 +718,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "With 'Order of tabs: Tab bar order' it starts at the tab on the right. Ignored while Alt or AltGr is down (AltGr+Tab is Windows' task switcher). A split pair is one entry (one card), standing for the side that last had focus; landing on it restores that side. Switching sides is not recorded.",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌃⇥ (hold ⌃)",
+     "macNote": ""
     },
     {
      "keys": "Tab (Ctrl held)",
@@ -602,7 +729,9 @@
      "scope": "switcher, Ctrl held",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇥ (⌃ held)",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Shift+Tab",
@@ -611,7 +740,9 @@
      "scope": "anywhere in the window; switcher",
      "priority": "browser-first",
      "note": "Safe, because Tab is pressed in between and Windows' Ctrl+Shift layout switch never fires",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃⇧⇥",
+     "macNote": ""
     },
     {
      "keys": "Release Ctrl",
@@ -620,7 +751,9 @@
      "scope": "switcher, Ctrl held",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "Release ⌃",
+     "macNote": ""
     },
     {
      "keys": "Back to the starting card, then release Ctrl",
@@ -629,7 +762,9 @@
      "scope": "switcher, Ctrl held",
      "priority": "local",
      "note": "Esc can't cancel while Ctrl is held, because Ctrl+Esc opens Windows' Start. One step back from where the deck opens.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃⇧⇥ back to the starting card, then release ⌃",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+W",
@@ -638,7 +773,9 @@
      "scope": "switcher open",
      "priority": "local",
      "note": "Delete is the Alt+Tab convention. While a search is filtering, closes only the highlighted result.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌃W",
+     "macNote": "Also ⌫ while the query is empty."
     },
     {
      "keys": "Type any text",
@@ -647,7 +784,9 @@
      "scope": "switcher open",
      "priority": "local",
      "note": "A held search can’t start with W: use Ctrl+Shift+A. Can be turned off in Settings › Tabs.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "Type any text",
+     "macNote": "⌃ with a letter types too, except W."
     },
     {
      "keys": "Ctrl+Shift+A",
@@ -656,7 +795,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "Ctrl+Tab and then typing is the route a page can't block",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘A",
+     "macNote": "View › Search Tabs."
     },
     {
      "keys": "Left / Right",
@@ -665,7 +806,9 @@
      "scope": "switcher, latched",
      "priority": "local",
      "note": "Latched means opened with Ctrl+Shift+A, by typing, by mouse, or with Sticky Keys on (Sticky Keys skips the quick tap and opens latched).",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "← / →",
+     "macNote": ""
     },
     {
      "keys": "Enter",
@@ -674,7 +817,9 @@
      "scope": "switcher, latched",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "↩",
+     "macNote": ""
     },
     {
      "keys": "Esc",
@@ -683,7 +828,9 @@
      "scope": "switcher, latched",
      "priority": "local",
      "note": "Safe here because Ctrl is up",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": ""
     }
    ]
   },
@@ -697,7 +844,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "Also 'Show downloads' in the + menu and the ring menu",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥⌘L",
+     "macNote": "Also ⇧⌘J. ⌥⌘L as in Safari; Window › Downloads."
     },
     {
      "keys": "Ctrl+Shift+D",
@@ -706,7 +855,9 @@
      "scope": "page with a video",
      "priority": "page-first",
      "note": "Printed beside Download video… in the video menu and in the download mark’s tooltip. Does nothing without a downloadable video.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘D",
+     "macNote": "File › Download This Video."
     },
     {
      "keys": "Shift+click (Download pill)",
@@ -715,7 +866,9 @@
      "scope": "Download this video pill",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧-click (Download pill)",
+     "macNote": ""
     },
     {
      "keys": "Alt+click (link)",
@@ -724,7 +877,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Chrome's convention",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥-click (link)",
+     "macNote": ""
     },
     {
      "alt": "",
@@ -733,7 +888,9 @@
      "keys": "Enter / Space / Delete",
      "action": "In the Downloads panel: open the file / pause or resume / remove the row from the list (never the file)",
      "scope": "Downloads panel, row focused",
-     "priority": "local"
+     "priority": "local",
+     "keys_mac": "↩ / Space / ⌫",
+     "macNote": "⌘⌫ removes the row too."
     }
    ]
   },
@@ -747,7 +904,9 @@
      "scope": "page, tab bar, Vitre fields",
      "priority": "page-first",
      "note": "Pages that show their own menu get the key first; Shift+right-click bypasses them",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌃-click",
+     "macNote": "Also right-click. By keyboard: VoiceOver (VO-⇧M) or Full Keyboard Access; no Shift+F10 or Menu key."
     },
     {
      "keys": "Shift+right-click",
@@ -756,7 +915,9 @@
      "scope": "page",
      "priority": "browser-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⇧-right-click",
+     "macNote": "Also ⌃⇧-click."
     },
     {
      "keys": "Up / Down",
@@ -765,7 +926,9 @@
      "scope": "menu open",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "↑ / ↓",
+     "macNote": "Also ⇥ / ⇧⇥."
     },
     {
      "keys": "Home / End",
@@ -774,7 +937,9 @@
      "scope": "menu open",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "fn← / fn→",
+     "macNote": "Home / End on a full keyboard."
     },
     {
      "keys": "Enter",
@@ -783,7 +948,9 @@
      "scope": "menu open",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "↩",
+     "macNote": "Also Space."
     },
     {
      "keys": "Access-key letter",
@@ -792,7 +959,9 @@
      "scope": "menu open",
      "priority": "local",
      "note": "Global keys are swallowed while a menu is open",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "Type a letter",
+     "macNote": "Menus have no underlined letters: a typed letter moves to the next item that starts with it, and ↩ runs it."
     },
     {
      "keys": "Esc",
@@ -801,7 +970,9 @@
      "scope": "menu open",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⎋",
+     "macNote": "Also ⌘.. ⌥ alone never closes a menu; there is no F10."
     },
     {
      "keys": "F6",
@@ -810,7 +981,9 @@
      "scope": "anywhere in the window",
      "priority": "browser-first",
      "note": "The one key a page can never keep, so focus can’t be trapped. A later per-site list may hand F6 to web IDEs (off by default). In split view 'F6 always leaves the page' still holds: it moves to the other page or to the pill.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "F6",
+     "macNote": "fn F6 on a laptop; ⇧F6 the other way."
     },
     {
      "keys": "Tab (from the address field)",
@@ -819,7 +992,9 @@
      "scope": "address field, tab bar",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇥ (from the address field)",
+     "macNote": "⇧⇥ back."
     },
     {
      "keys": "Left / Right",
@@ -828,7 +1003,9 @@
      "scope": "the split divider (one Tab stop between the tab bar and the focused page)",
      "priority": "local",
      "note": "Double-click (double-tap by touch) is 50/50 too. Esc while dragging the divider cancels the drag.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "← / →",
+     "macNote": "⇧← / ⇧→ move 64 px; fn← / fn→ go to the minimums; ↩ is 50/50."
     }
    ]
   },
@@ -842,7 +1019,9 @@
      "scope": "popover open",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "↑ / ↓",
+     "macNote": ""
     },
     {
      "keys": "Enter",
@@ -851,7 +1030,9 @@
      "scope": "popover open",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "↩",
+     "macNote": "Also Space."
     },
     {
      "keys": "Esc",
@@ -860,7 +1041,9 @@
      "scope": "popover open",
      "priority": "local",
      "note": "A page dialog (alert, confirm, sign-in) takes Esc at the same step",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": ""
     }
    ]
   },
@@ -874,7 +1057,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "The Windows app convention (Terminal, VS Code, Teams). Printed beside Settings in both menus.",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘,",
+     "macNote": "Also Deer › Settings…."
     },
     {
      "keys": "F1",
@@ -883,7 +1068,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "F1 means Help in Windows",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "Help › Keyboard Shortcuts",
+     "macNote": "F1 (fn F1) still works."
     },
     {
      "keys": "Ctrl+Shift+Delete",
@@ -892,7 +1079,9 @@
      "scope": "anywhere in the window",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘⌫",
+     "macNote": "History › Clear Browsing Data…."
     },
     {
      "keys": "Esc",
@@ -901,7 +1090,9 @@
      "scope": "panel open",
      "priority": "local",
      "note": "Topmost first: a panel, then a peek, then the tab",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⎋",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+W",
@@ -910,7 +1101,9 @@
      "scope": "panel open",
      "priority": "local",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘W",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+F",
@@ -919,7 +1112,9 @@
      "scope": "panel open",
      "priority": "local",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘F",
+     "macNote": ""
     },
     {
      "keys": "F12",
@@ -928,7 +1123,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "Inspect, in every page menu, is the route a page can't block",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥⌘I",
+     "macNote": "View › Developer › Developer Tools. No F12 on a Mac."
     },
     {
      "keys": "Ctrl+Shift+J",
@@ -937,7 +1134,9 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥⌘J",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Shift+C",
@@ -946,7 +1145,57 @@
      "scope": "page",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥⌘C",
+     "macNote": "In the find field ⌥⌘C is Match case."
+    },
+    {
+     "keys": "",
+     "alt": "",
+     "action": "Quit Deer. It always asks first, and a page can’t block it (Deer › Quit Deer)",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "",
+     "isNew": true,
+     "keys_mac": "⌘Q",
+     "macNote": "Deer first, even under keyboard lock. Asks every time, because ⌃Q (Peek) is one modifier away (browser.warnOnQuitShortcut). With downloads running and no window open, Deer opens a window to ask.",
+     "only": "mac"
+    },
+    {
+     "keys": "",
+     "alt": "",
+     "action": "Minimize the window into the Dock (Window › Minimize; the yellow window button)",
+     "scope": "anywhere in the window",
+     "priority": "browser-first",
+     "note": "",
+     "isNew": true,
+     "keys_mac": "⌘M",
+     "macNote": "Deer first, even under keyboard lock.",
+     "only": "mac"
+    },
+    {
+     "keys": "",
+     "alt": "",
+     "action": "Hide Deer (Deer › Hide Deer)",
+     "scope": "anywhere in the window",
+     "priority": "menu",
+     "note": "",
+     "isNew": true,
+     "keys_mac": "⌘H",
+     "macNote": "The menu bar runs it: Deer leaves the key to the page first, then to the Deer menu.",
+     "only": "mac"
+    },
+    {
+     "keys": "",
+     "alt": "",
+     "action": "Hide other apps (Deer › Hide Others)",
+     "scope": "anywhere in the window",
+     "priority": "menu",
+     "note": "",
+     "isNew": true,
+     "keys_mac": "⌥⌘H",
+     "macNote": "The menu bar runs it.",
+     "only": "mac"
     }
    ]
   },
@@ -960,7 +1209,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "Never a Vitre accelerator: the focused page or field handles it, and the menus call the same command",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘Z",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Y",
@@ -969,7 +1220,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "Ctrl+Shift+Z also works in Vitre's own fields",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⇧⌘Z",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+X",
@@ -978,7 +1231,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘X",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+C",
@@ -987,7 +1242,9 @@
      "scope": "any text field or selection",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘C",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+V",
@@ -996,7 +1253,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌘V",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Shift+V",
@@ -1005,7 +1264,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "The menu row appears only when the clipboard holds rich text",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌥⇧⌘V",
+     "macNote": "Paste and match style."
     },
     {
      "keys": "Ctrl+A",
@@ -1014,7 +1275,9 @@
      "scope": "any text field or page",
      "priority": "page-first",
      "note": "",
-     "isNew": false
+     "isNew": false,
+     "keys_mac": "⌘A",
+     "macNote": ""
     },
     {
      "keys": "Ctrl+Backspace / Ctrl+Delete",
@@ -1023,7 +1286,9 @@
      "scope": "any text field",
      "priority": "page-first",
      "note": "Works in Vitre's fields too, as do Ctrl+Left Shift / Ctrl+Right Shift for text direction",
-     "isNew": true
+     "isNew": true,
+     "keys_mac": "⌥⌫ / fn⌥⌫",
+     "macNote": "Option, not ⌘: ⌘⌫ deletes to the start of the line."
     }
    ]
   }
@@ -1066,6 +1331,52 @@
    "keys": "Tap Alt for key tips; a Ctrl+K command palette; Ctrl+Shift+O ghost mode; Ctrl+Shift+B to toggle the tab bar; any double-tap of a modifier"
   }
  ],
+ "reservedMac": [
+  {
+   "owner": "App switcher and windows",
+   "keys": "⌘⇥ and ⇧⌘⇥ (the app switcher); ⌘` (the next window of the same app). Deer’s own tab switcher holds ⌃, never ⌘."
+  },
+  {
+   "owner": "Spotlight",
+   "keys": "⌘Space (Spotlight); ⌥⌘Space (a Finder search window)"
+  },
+  {
+   "owner": "Input sources",
+   "keys": "⌃Space and ⌃⌥Space (previous / next input source); ⌃⌘Space (Character Viewer); fn or Globe with any key; every key while an input method is composing"
+  },
+  {
+   "owner": "Spaces and Mission Control",
+   "keys": "⌃← and ⌃→ (move between Spaces); ⌃↑ (Mission Control); ⌃↓ (the app’s windows); ⌃1–⌃9 (go to Desktop 1–9); F3 (Mission Control); F11 (show the desktop). So full screen is ⌃⌘F, not F11."
+  },
+  {
+   "owner": "Screenshots",
+   "keys": "⇧⌘3 (the whole screen); ⇧⌘4 (an area or a window); ⇧⌘5 (the screenshot and recording controls); ⇧⌘6 (the Touch Bar)"
+  },
+  {
+   "owner": "VoiceOver",
+   "keys": "Any chord that holds ⌃ and ⌥ together (the VO keys), such as ⌃⌥→ or ⌃⌥⇧M; ⌘F5 (VoiceOver on or off). So hard reload is ⇧⌘R, never ⌘F5."
+  },
+  {
+   "owner": "Option characters",
+   "keys": "⌥ with any letter, digit or punctuation key, with or without ⇧: it types a character (⌥C types ç, ⌥E starts an accent, ⌥2 types ™). So Match case is ⌥⌘C, not ⌥C. ⌥↩, ⌥-click and ⌥⌘ chords type nothing, so Deer can use them."
+  },
+  {
+   "owner": "Session, Force Quit and the Dock",
+   "keys": "⌃⌘Q (Lock Screen); ⇧⌘Q (Log Out); ⌥⌘⎋ (Force Quit); ⌥⌘D (show or hide the Dock)"
+  },
+  {
+   "owner": "Zoom and keyboard navigation",
+   "keys": "⌥⌘8, ⌥⌘=, ⌥⌘− and ⌥⌘\\ (Zoom); ⌥⌘F5 (Accessibility Shortcuts); ⌃F1–⌃F8 (keyboard navigation, such as ⌃F2 for the menu bar)"
+  },
+  {
+   "owner": "The Deer menu (macOS standard items)",
+   "keys": "⌘H (Hide Deer), ⌥⌘H (Hide Others), ⌘Q (Quit Deer), ⌘M (Minimize). A rebind to one of these, or to any key above, keeps the action’s Mac default."
+  },
+  {
+   "owner": "Services (warn only)",
+   "keys": "Services menu chords such as ⇧⌘A, ⇧⌘L, ⇧⌘Y and ⇧⌘M come from other apps and vary by Mac. Deer keeps ⇧⌘A (Search tabs); Settings may warn about the others."
+  }
+ ],
  "rules": [
   "Every shortcut is local to the Vitre window and works only while Vitre has focus. Never use Electron globalShortcut or RegisterHotKey, and never install a low-level keyboard hook.",
   "Browser-first keys never reach the page. They are Chrome's reserved set: Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+F4, Ctrl+Shift+W, Ctrl+Shift+T, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Page Up and Ctrl+Page Down. Vitre adds three: F6 and Shift+F6; Esc Esc and Ctrl+W while a peek is open; and Esc or F11 to leave full screen or pointer lock. Shift+right-click is the mouse equivalent. Electron doesn't inherit Chrome's reserved list, so catch these keys in before-input-event on every WebContents (tab, peek, PDF guest, chrome view, menu layer) and call preventDefault.",
@@ -1088,6 +1399,22 @@
   "Held switcher: while the switcher is open, held or latched, every Ctrl+letter except Ctrl+W is a search character and never its global command (so Ctrl+T, Ctrl+N, Ctrl+R, Ctrl+Shift+T and Ctrl+Shift+W do nothing there). The first key is translated with the active layout as if Ctrl were up; with an IME on, it only latches and the IME takes the next key.",
   "Address field: Shift+Delete removes a history suggestion only when the user moved onto that row with Up/Down or the pointer is on it; the default top match never counts, and otherwise Shift+Delete cuts.",
   "Hardware keys: Browser Back/Forward/Refresh/Stop/Search/Home and the mouse side buttons arrive through app-command and act like Alt+Left, Alt+Right, Ctrl+R, Esc (stop), Ctrl+L and the Home tab, on the peek first where that applies. In split view the mouse side buttons and hardware Back/Forward act on the pane under the pointer and focus it (not when the pointer is over the tab bar or outside the window); every other hardware key acts on the focused side, as its keyboard chord does."
+ ],
+ "rulesMac": [
+  "One map for both systems (decision D1): a spec in src/shared/shortcuts.ts is [Mod+][Ctrl+][Alt+][Shift+]Key. Mod is Ctrl on Windows and ⌘ on a Mac; Ctrl is always the Control key; rows one system lacks are marked only:win or only:mac (field \"only\" here). keys_mac is the Mac key as printed.",
+  "Display on a Mac: Apple glyphs in ⌃⌥⇧⌘ order, then the key, no “+”: ⇧⌘T, ⌘[, ⌥↩, ⇧⌘⌫, ⌃⇥. Menus, tooltips and Settings › Keyboard shortcuts print the same (shortcuts.ts displaySpec); screen readers hear words (“Shift Command T”, ariaSpec).",
+  "⌘Q asks before quitting, every time, because ⌃Q (Peek) is one modifier away. Quit is Deer first, so a page can’t block it, even under keyboard lock; ⌘M too. With downloads running and no window open, Deer opens a window to ask.",
+  "Peek is ⌃Q (the Control key), because ⌘Q quits. The physical ⌃ stays ⌃ where it means Control: Peek, the tab switcher (hold ⌃, press ⇥), ⌃W on a held card, moving a tab (⌃⇧Page Up / Down).",
+  "History is ⌘Y, because ⌘H hides Deer. ⌘H and ⌥⌘H belong to the Deer menu: Deer leaves them to the page first, then the menu bar runs them.",
+  "⎋ never leaves window full screen; ⌃⌘F, the green button and View › Exit Full Screen do (browser.fullscreen.exit_on_escape is off). ⎋ keeps stepping Deer’s ladder, so a stray press can’t drop the window out of its Space. A video in element full screen still leaves with ⎋.",
+  "⌘. works like ⎋: it stops loading and steps the ⎋ ladder one layer at a time, with ⎋’s rules (a prompt, a native panel or a page’s own layer takes it first). It never closes a page’s own dialog: Gecko closes those on the Escape key only.",
+  "Menus have no underlined letters: type a letter to move to the next item that starts with it; ↩ runs it and ⎋ closes the menu. Right-click menus stay Deer’s own glass menus; only the menu bar is native.",
+  "Guards on a Mac: ⌘ is Mod and must match exactly; Option with a character key never matches (it types a character); any ⌃⌥ chord never matches (VoiceOver); nothing fires while an input method composes. The AltGraph guard is Windows only: Option sets AltGraph on every Mac keydown. fn is not a modifier: fn↑ arrives as Page Up.",
+  "Layouts on a Mac: letters match by virtual key, which Gecko takes from the ⌘ layout while ⌘ is down (Dvorak-QWERTY⌘); digits by physical key; brackets and period by virtual key, so ⇧⌘] is “]” whatever Shift types.",
+  "The menu bar: every Deer chord the router routes is consumed (preventDefault), so it never reaches the menu bar’s key equivalent and never runs twice. Keys Deer does not bind reach the page as before; a ⌘ chord the page leaves alone then reaches the menu bar (⌘H, Edit’s ⌘Z ⌘C ⌘V). A Deer ⌘ chord under a window-modal dialog does nothing, as on Windows.",
+  "Rebinds stored before the Mac port keep working: a saved “Ctrl+K” means ⌘K on a Mac (as a WebExtension’s “Ctrl” does), and the Control key is saved as “MacCtrl”. A saved key that macOS owns (⌥ with a character, ⌃⌥, the list in reservedMac) keeps the action’s Mac default and says so once in the console.",
+  "Every F-key action has a non-F route on a Mac: F6 → ⌘L, F11 → ⌃⌘F, F1 → Help › Keyboard Shortcuts or ⌘,; F3, F5 and F12 are not bound (⌘G, ⌘R, ⌥⌘I).",
+  "Page access keys are ⌃⌥ letter on a Mac (ui.key.contentAccess 6, Firefox’s Mac default), because ⌥ letter types a character there."
  ],
  "changes": [
   "TabMotion 'Esc while switching': in the held deck, cancel is now 'Ctrl+Shift+Tab back to the card you started on, then release Ctrl', a click on the wallpaper, or switching away from Vitre (any loss of focus cancels). Esc cancels only once the switcher is latched. Why: with Ctrl held, Esc is Ctrl+Esc, which Windows takes to open Start.",

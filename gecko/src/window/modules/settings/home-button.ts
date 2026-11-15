@@ -10,6 +10,7 @@ import { HOME_URL } from '../../../shared/home';
 import type { Browser } from '../../browser';
 import { glass, lens } from '../../glass';
 import { setTip } from '../../tips';
+import { isMac } from '../../../shared/os';
 import type { HomeBackground } from './background';
 import { backgroundPicker, type Picker } from './bg-picker';
 import { h, iconBox } from './controls';
@@ -90,7 +91,7 @@ export class HomeButton {
     if (!this.onHome()) return;
     this.picker = backgroundPicker(this.bg, 'popover');
     const close = h('button', { type: 'button', class: 'hb-pop-close', 'aria-label': 'Close' }, iconBox(ico.close, 'hb-pop-close-ico'));
-    setTip(close, 'Close', 'Esc');
+    setTip(close, 'Close', isMac ? '⎋' : 'Esc');
     close.addEventListener('click', () => this.close(true));
     const add = h('button', { type: 'button', class: 'hb-add' }, iconBox(ico.plus, 'hb-add-ico'), 'Add a photo or video');
     add.addEventListener('click', async () => {
@@ -98,7 +99,8 @@ export class HomeButton {
       this.picker?.focus();
     });
     const lensEl = h('div', { class: 'hb-pop-lens' });
-    lensEl.style.backdropFilter = lens(POP_W, POP_H, { radius: 20, scale: 24, blur: 14, saturate: 1.6, opaque: true });
+    // macOS: frost instead of the lens (settings/styles.ts MAC), so no SVG filter is built.
+    if (!isMac) lensEl.style.backdropFilter = lens(POP_W, POP_H, { radius: 20, scale: 24, blur: 14, saturate: 1.6, opaque: true });
     this.pop = h(
       'div',
       { class: 'hb-pop', role: 'dialog', 'aria-label': 'Background', id: 'vitre-home-bg-pop' },

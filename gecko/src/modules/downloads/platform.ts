@@ -7,6 +7,7 @@
 //   markOfTheWeb                           mozIDownloadPlatform.maybeWriteDownloadOriginInformation, the
 //                                          call Firefox's own downloads make (gre/modules/DownloadIntegration.sys.mjs)
 //   pickSavePath / pickFolder              nsIFilePicker on a window's browsing context (recipe: TAKE-OVER)
+import { isMac } from '../../shared/os';
 import { fileFor } from './partfile';
 import { policyConstant, type ReferrerPolicy } from './referrer';
 
@@ -136,13 +137,18 @@ export function pickFolder(win: any, { title = 'Choose a folder', dir = '' } = {
 }
 
 /** The native file picker for one program (ffmpeg.exe). */
-export function pickProgram(win: any, { title = 'Choose ffmpeg.exe', dir = '' } = {}): Promise<string | null> {
+export function pickProgram(win: any, { title = isMac ? 'Choose ffmpeg' : 'Choose ffmpeg.exe', dir = '' } = {}): Promise<string | null> {
   return new Promise((resolve) => {
     try {
       const fp = Cc['@mozilla.org/filepicker;1'].createInstance(Ci.nsIFilePicker);
       fp.init(win.browsingContext, title, Ci.nsIFilePicker.modeOpen);
-      fp.appendFilter('ffmpeg', 'ffmpeg.exe');
-      fp.appendFilters(Ci.nsIFilePicker.filterApps);
+      // macOS: ffmpeg is a plain file without an extension (Homebrew's, or one the person built), and
+      // the open panel's filters go by extension: every file.
+      if (isMac) fp.appendFilters(Ci.nsIFilePicker.filterAll);
+      else {
+        fp.appendFilter('ffmpeg', 'ffmpeg.exe');
+        fp.appendFilters(Ci.nsIFilePicker.filterApps);
+      }
       if (dir) {
         try {
           fp.displayDirectory = fileFor(dir);

@@ -503,3 +503,443 @@
   #vitre-bar .item .close-badge { transform: none; transition: opacity 150ms ease, display 150ms allow-discrete; }
   #vitre-bar .item.active.loading .load-line { animation: none; opacity: 1; transform: scaleX(0.6); }
 }
+
+/* ---- macOS: the traffic lights (winctl.ts lightsCapsule; owner decision D2) and the One row ----
+ * The whole macOS section of this sheet, last so that its one-row rules win over the Windows bar's
+ * (split view's included) at equal specificity.
+ *
+ * The traffic lights: the window's own close, minimise and zoom buttons in a 76x32 glass capsule at
+ * the top LEFT (left 12, top 18), the Private label at the top right. Gecko puts the native buttons
+ * over the first painted element whose appearance is -moz-window-button-box, the close button's
+ * origin on its bottom-left corner (widget/cocoa/nsCocoaWindow.mm, UpdateThemeGeometries ->
+ * placeWindowButtons:). That box's size is the buttons' own (widget/cocoa/nsNativeThemeCocoa.mm,
+ * WindowButtonsSize), so it gets none here and is centred, as Firefox centres its .titlebar-buttonbox
+ * (browser/themes/osx/browser.css): centred in the capsule, the buttons are centred on the bar's
+ * 44 px row (y 34). Around them the capsule moves the window, as a Mac title bar does. In the One
+ * row (below) the same placeholder is centred on the 52 px row in a 76x36 capsule of the row's glass. */
+@media (-moz-platform: macos) {
+  #vitre-root #vitre-winctl {
+    left: 12px;
+    right: auto;
+    width: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -moz-window-dragging: drag;
+  }
+  #vitre-win-lights {
+    appearance: auto;
+    -moz-default-appearance: -moz-window-button-box;
+    flex: none;
+    /* Back with the bar once the capsule's 320 ms slide is over. */
+    transition: visibility 0s linear 320ms;
+  }
+  /* Hidden bar: the lights go at once, then the capsule slides and fades as on Windows. The slide and
+   * the fade run on the compositor, where Gecko does not follow the placeholder (its rectangle comes
+   * from main-thread painting), so the native buttons would stay in place until the slide ended. Not
+   * painted, the placeholder leaves Gecko an empty rectangle and the buttons are moved above the
+   * window, out of sight (nsCocoaWindow.mm, FrameView__closeButtonOrigin). visibility, not opacity: a
+   * transparent capsule that takes pointer events still goes into the display list, placeholder and
+   * all (layout/generic/nsIFrame.cpp, BuildDisplayListForStackingContext). */
+  #vitre-root.bar-hiding:not(.bar-revealed) #vitre-win-lights { visibility: hidden; transition: none; }
+  #vitre-root.bar-snap #vitre-win-lights { transition: none; }
+  #vitre-root #vitre-private { right: 12px; }
+
+  /* ---- One row (src/window/onerow.ts, bar.ts header; boards RowSpec, DirOneRow, DirOneRowBehaviour) ----
+   * #vitre-root.one-row (bar.ts). A 52 px row; capsules 36 tall at top 8, radius 18, 8 apart; tabs
+   * from x 96; the traffic lights at x 20 in their own capsule, centred on the row; Downloads and
+   * Extensions in #vitre-row-end at the right (20 from the edge). onerow.ts holds the same numbers.
+   * The owner, 2026-11-15 ("remove the gray bar like windows"): the page fills the window from y 0
+   * (skin/shell.css section 8) and the row floats over it as the Windows bar does, in a normal window
+   * as in window full screen. Nothing is laid across the row: between the capsules the page takes the
+   * pointer, and only the window's drag strip and the lights' capsule move the window (below). Every
+   * capsule carries Deer's CSS Liquid Glass (RowSpec "Liquid Glass Regular": blur 14, saturate 1.9,
+   * brightness 1.04 under the fill; the full shadow, 0 8 24 at 16 % plus 0 1 2 at 12 %) on its .lens
+   * layer: a blur, not the Windows lens maps. The row's colours follow the PAGE under it, as the
+   * Windows bar's do: #vitre-root's theme-light / theme-dark / theme-clear (browser.ts render(), from
+   * the strip of the page under the row; Home reports its own), never the system's appearance; a
+   * private window is dark glass whatever the page. (Until 2026-11-15 the band was macOS's gray
+   * title-bar material with the page below it, and the colours followed the system's appearance.) */
+
+  /* Colours (RowSpec "Liquid Glass Regular", "Rim and shadow"). theme-light, dark ink on light glass:
+   * ink #1d1d1f, compact titles #3a3a3c, fill white 42 % (58 % under the pointer). The omnibox field
+   * (skin/omnibox.css) and the downloads and extensions capsules in #vitre-row-end read the same
+   * tokens; find's face on the row (find/styles.ts) and the lifted copy of a capsule (splitlift.ts)
+   * key on the same classes. */
+  #vitre-root.one-row :is(#vitre-bar, #vitre-row-end, #vitre-omni-field, #vitre-winctl) {
+    --g-tint: rgba(255,255,255,0.42);
+    --g-shadow: 0 8px 24px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.12);
+    --g-text: #1d1d1f;
+    --g-icon: rgba(29,29,31,0.78);
+    --g-dim: rgba(29,29,31,0.3);
+    --g-hover: rgba(0,0,0,0.06);
+    --g-press: rgba(0,0,0,0.1);
+    --g-placeholder: rgba(29,29,31,0.5);
+    --row-rim: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 0 0 0.5px rgba(255,255,255,0.45), inset 0 -1px 1px rgba(0,0,0,0.06);
+    --row-tint-hover: rgba(255,255,255,0.58);
+    --row-ink-2: #3a3a3c;
+    --row-ink-off: rgba(29,29,31,0.55);
+  }
+  /* theme-dark and theme-clear, light ink on dark or clear glass (RowSpec's dark set: fill white
+   * 14 %, white ink, compact titles 88 % white). Over a photo or the wallpaper (theme-clear) the fill
+   * is the Windows clear glass's lighter white 10 % and the icons a touch brighter, as glass.css's. */
+  #vitre-root.one-row:is(.theme-dark, .theme-clear) :is(#vitre-bar, #vitre-row-end, #vitre-omni-field, #vitre-winctl) {
+    --g-tint: rgba(255,255,255,0.14);
+    --g-text: #ffffff;
+    --g-icon: rgba(255,255,255,0.85);
+    --g-dim: rgba(255,255,255,0.3);
+    --g-hover: rgba(255,255,255,0.1);
+    --g-press: rgba(255,255,255,0.16);
+    --g-placeholder: rgba(255,255,255,0.6);
+    --row-rim: inset 0 1px 0 rgba(255,255,255,0.16), inset 0 0 0 0.5px rgba(255,255,255,0.14);
+    --row-tint-hover: rgba(255,255,255,0.22);
+    --row-ink-2: rgba(255,255,255,0.88);
+    --row-ink-off: rgba(255,255,255,0.55);
+  }
+  #vitre-root.one-row.theme-clear :is(#vitre-bar, #vitre-row-end, #vitre-omni-field, #vitre-winctl) {
+    --g-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.22);
+    --g-icon: rgba(255,255,255,0.9);
+    --g-dim: rgba(255,255,255,0.32);
+    --g-placeholder: rgba(255,255,255,0.62);
+  }
+  /* The glass under every capsule's fill (RowSpec "Liquid Glass Regular"), as a token on the root so
+   * the row, the address field, the lights' capsule, find's face on the row and a lifted copy
+   * (splitlift.ts) all read it. Over a photo or the wallpaper (theme-clear) the glass lifts the
+   * colours under it less and dims them a little, with a 22 % dark fill under the white (above):
+   * Apple's clear glass takes a dimming layer over bright or busy content, and at saturate 1.9 a
+   * vivid picture turned every capsule into a neon plate (the owner's red Home wallpaper painted the
+   * row #ff2020, the red traffic light vanished into its capsule and the placeholder read at about
+   * 2:1). A private window's dark fill needs none of it. */
+  #vitre-root.one-row { --row-glass: blur(14px) saturate(1.9) brightness(1.04); }
+  #vitre-root.one-row.theme-clear:not(.private) { --row-glass: blur(14px) saturate(1.3) brightness(0.96); }
+
+  /* A private window (DirOneRowBehaviour "Private window"): every capsule is dark glass with white
+   * ink, whatever the page, and the "Private" capsule is too. */
+  #vitre-root.one-row.private :is(#vitre-bar, #vitre-row-end, #vitre-omni-field, #vitre-winctl),
+  #vitre-root.one-row #vitre-private {
+    --g-tint: rgba(30,30,32,0.62);
+    --g-shadow: 0 8px 24px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.12);
+    --g-text: #ffffff;
+    --g-icon: rgba(255,255,255,0.85);
+    --g-dim: rgba(255,255,255,0.3);
+    --g-hover: rgba(255,255,255,0.1);
+    --g-press: rgba(255,255,255,0.16);
+    --g-placeholder: rgba(255,255,255,0.6);
+    --row-rim: inset 0 0 0 0.5px rgba(255,255,255,0.14);
+    --row-tint-hover: rgba(44,44,48,0.72);
+    --row-ink-2: rgba(255,255,255,0.88);
+    --row-ink-off: rgba(255,255,255,0.55);
+  }
+
+  /* Moving the window, as on Windows (the owner, 2026-11-15: "remove the gray bar like windows"):
+   * nothing is laid across the row. Only the window's drag strip, #vitre-drag (skin/shell.css section
+   * 4: full width, 18 px tall at the top, pointer-events: auto, -moz-window-dragging: drag; bar.ts
+   * makes it under every layer, on both systems), and the lights' capsule (below) move the window, and
+   * a double-click on them zooms or minimises as the system's settings say, as on a Mac title bar
+   * (-[ChildView mouseUp:] does it outside the non-draggable region when the DOM mouseup was not
+   * prevented; nothing in Deer prevents one there). The capsules painted over the strip (Private
+   * too) are no-drag (the drag region is geometric: layout/painting/nsDisplayList.cpp
+   * AdjustWindowDraggingRegion; nsCocoaWindow.mm UpdateWindowDraggingRegion). The rest of the row,
+   * wherever no capsule is (between two capsules, after +, above and below the bridge between
+   * Downloads and Extensions), is the page's: #vitre-bar and #vitre-row-end are click-through there
+   * (pointer-events: none) and no drag region, so the page under the row gets the pointer, hover,
+   * right-click and the wheel, as between the Windows bar's items. macOS keeps no resize band inside
+   * the client area, so the whole 18 px drag, in a zoomed window too (Windows: 8 px of resize band
+   * and 10 of strip, 8 maximized). A capsule cannot move the window yet (fx.beginWindowMove has no
+   * Mac path: bar.ts header). Window full screen: no strip (skin/shell.css, :root[inFullscreen]).
+   * Until 2026-11-15 a transparent 52 px band across the window (#vitre-row-band) was the drag region
+   * and took the page's input between the capsules. */
+  #vitre-root.one-row > #vitre-drag { height: 18px; }
+
+  /* The right end: the downloads and extensions modules fill it with 36 px capsules. Click-through
+   * and no drag region between them (above); the capsules take the pointer and are no-drag (their
+   * modules' css.ts), and so does the liquid bridge that joins them (extensions/css.ts). */
+  #vitre-root #vitre-row-end {
+    position: absolute;
+    right: 20px;
+    top: 8px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    transition: transform 320ms var(--spring), opacity 220ms ease;
+  }
+  #vitre-root.bar-hiding:not(.bar-revealed) #vitre-row-end { transform: translateY(-60px); opacity: 0; }
+  #vitre-root.bar-hiding:not(.bar-revealed) :is(#vitre-row-end, #vitre-row-end *) { pointer-events: none; }
+
+  /* The traffic lights: the placeholder at x 20, centred on the row (y 26; RowSpec: lights at 20, 20,
+   * 12 tall), in a capsule of the row's glass, 76 x 36 at (12, 8), radius 18, GAP before the first tab
+   * (TABS_LEFT 96), with the capsules' fill, rim, shadow and blur in the page's colours (winctl.ts
+   * gives it the glass layers). The page runs under the row, and with the lights plain over the page
+   * a scrolled page's text ran right through them; Deer's window buttons on Windows have their
+   * capsule too (the owner, 2026-11-15: "like windows"). Like the drag strip it moves the window
+   * (-moz-window-dragging: drag, in the first macOS rules above). Window full screen: not drawn
+   * (below). */
+  #vitre-root.one-row #vitre-winctl {
+    position: absolute;
+    left: 12px;
+    right: auto;
+    top: 8px;
+    width: 76px;
+    height: 36px;
+    border-radius: 18px;
+    box-shadow: var(--g-shadow);
+    justify-content: center;
+  }
+  #vitre-root.one-row #vitre-winctl.glass > .lens { display: block; backdrop-filter: var(--row-glass); }
+  #vitre-root.one-row #vitre-winctl.glass > .tint { background: var(--g-tint); }
+  #vitre-root.one-row:not(.fullscreen) #vitre-winctl.glass > .rim { padding: 0; mask: none; background: none; box-shadow: var(--row-rim); }
+
+  /* The strip. Crowded, it scrolls between x 96 and the right group (bar.ts paintRow): cut off
+   * there (clip-path also stops a hidden capsule from taking clicks), with a 40 px fade at an end
+   * that has more. The wheel moves it without the spring. */
+  #vitre-root.one-row #vitre-bar { height: 52px; }
+  #vitre-root.one-row #vitre-bar.overflow {
+    clip-path: inset(0 calc(100% - var(--strip-r)) 0 var(--strip-l));
+    mask-image: linear-gradient(90deg, transparent var(--strip-l), #000 calc(var(--strip-l) + var(--fade-l)), #000 calc(var(--strip-r) - var(--fade-r)), transparent var(--strip-r));
+  }
+  #vitre-root.one-row #vitre-bar.scrolling .item { transition: none; }
+
+  /* Every capsule: fill, rim, shadow, and the CSS glass on its .lens (the header). An active split
+   * pair's own lens stays off: each half blurs under itself instead. A crowded strip's mask
+   * (#vitre-bar.overflow) isolates its capsules' backdrop, so those show the fill alone. Downloads and
+   * Extensions in #vitre-row-end keep their own fill and rim (their modules' css.ts) and get the same
+   * blur. The !important wins over the Windows lens maps bar.ts and glass.css put on a lens. */
+  #vitre-root.one-row #vitre-bar .item { border-radius: 18px; }
+  #vitre-root.one-row #vitre-bar .item > .lens { display: none; }
+  #vitre-root.one-row :is(#vitre-bar .item:not(.pair.active), #vitre-private) > .lens {
+    display: block;
+    backdrop-filter: var(--row-glass) !important;
+  }
+  #vitre-root.one-row #vitre-bar .item.pair.active .half,
+  #vitre-root.one-row #vitre-row-end > * {
+    backdrop-filter: var(--row-glass);
+  }
+  #vitre-root.one-row #vitre-bar .item > .tint { transition: opacity 200ms ease, background-color 150ms ease; }
+  #vitre-root.one-row #vitre-bar .item > .rim { padding: 0; mask: none; background: none; box-shadow: var(--row-rim); }
+  #vitre-root.one-row #vitre-bar .item > .tint-mix { display: none; }
+  #vitre-root.one-row #vitre-bar .item.mixed > .tint { opacity: 1; }
+  #vitre-root.one-row #vitre-bar .item .circle-face,
+  #vitre-root.one-row #vitre-bar .item.plus .face { border-radius: 18px; }
+  /* Favicons are 16 px in the row. */
+  #vitre-root.one-row #vitre-bar .item .fav,
+  #vitre-root.one-row #vitre-bar .item .fav :is(img, svg) { width: 16px; height: 16px; }
+  #vitre-root.one-row #vitre-bar .item.plus .face svg { width: 17px; height: 17px; }
+
+  /* A compact tab (RowSpec "Compact tab"): favicon 16, 8, a 13 px title in #3a3a3c; padding 10 left
+   * and 14 right; as wide as the title, at most 160 (bar.ts measures it with the same font). */
+  #vitre-root.one-row #vitre-bar .item .circle-face {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0 14px 0 10px;
+    color: var(--row-ink-2);
+    font-size: 13px;
+    letter-spacing: -0.08px;
+    white-space: nowrap;
+  }
+  #vitre-root.one-row #vitre-bar .item .circle-face > .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Crowded: favicons only, centred in 36 px capsules (a grown one shows its title). */
+  #vitre-root.one-row #vitre-bar.icons .item:not(.hovered) .circle-face { justify-content: center; padding: 0; }
+  #vitre-root.one-row #vitre-bar.icons .item:not(.hovered) .circle-face > .title { display: none; }
+  /* Hover: the title darkens, the fill lifts to 58% (no extra plate), and a 20 px close x shows at
+   * the right end (bar.ts grows the capsule to fit both). Favicon-only capsules show it once grown. */
+  #vitre-root.one-row #vitre-bar .item .circle-face:hover { background: transparent; }
+  #vitre-root.one-row #vitre-bar .item.tab:not(.active):hover > .tint { background: var(--row-tint-hover); }
+  #vitre-root.one-row #vitre-bar .item.tab:not(.active):hover .circle-face { color: var(--g-text); }
+  #vitre-root.one-row #vitre-bar:not(.icons) .item.tab:not(.active):hover .circle-face,
+  #vitre-root.one-row #vitre-bar.close-always:not(.icons) .item.tab:not(.active) .circle-face,
+  #vitre-root.one-row #vitre-bar .item.tab.hovered:not(.active) .circle-face { padding-right: 34px; }
+  #vitre-root.one-row #vitre-bar .item .close-badge {
+    right: 8px;
+    top: 8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--g-icon);
+    box-shadow: none;
+  }
+  #vitre-root.one-row #vitre-bar .item .close-badge:hover { background: var(--g-hover); }
+  #vitre-root.one-row #vitre-bar.icons .item.tab:not(.active, .hovered) .close-badge { display: none; }
+
+  /* The active capsule (RowSpec, the capsule at 2x): favicon zone 40, the address 40..360 (favicon
+   * and host centred together, 13.5 px medium), Reload 28 at 4 from the right end. No Back or
+   * Forward: Cmd+[ and Cmd+], and the trackpad. */
+  #vitre-root.one-row #vitre-bar .item :is(.back, .forward) { display: none; }
+  #vitre-root.one-row #vitre-bar .item .address { height: 36px; margin: 0 0 0 40px; font-size: 13.5px; letter-spacing: -0.1px; }
+  #vitre-root.one-row #vitre-bar .item.home .address,
+  #vitre-root.one-row.popup #vitre-bar .item .address { margin: 0; }
+  #vitre-root.one-row #vitre-bar .item .nav svg { width: 16px; height: 16px; }
+  #vitre-root.one-row #vitre-bar .item .reload { margin: 0 4px 0 8px; }
+  #vitre-root.one-row #vitre-bar .item .dl-mark { margin: 0 0 0 4px; }
+  /* No slot is kept for the download mark: the address keeps the whole middle until it shows. */
+  #vitre-root.one-row #vitre-bar .item .dl-mark.empty { display: none; }
+  #vitre-root.one-row #vitre-bar .item .load-line { left: 18px; right: 18px; }
+
+  /* Split view (board DirOneRowBehaviour, "Split view"): two capsules, one per page, joined by a
+   * bridge. While the pair is active its own glass steps back and each half is a capsule; the focused
+   * side's text is full strength. In the background the pair is one capsule with two favicons. */
+  #vitre-root.one-row #vitre-bar .item.pair.active { box-shadow: none; }
+  #vitre-root.one-row #vitre-bar .item.pair.active > :is(.tint, .rim) { opacity: 0; }
+  #vitre-root.one-row #vitre-bar .item.pair .split-face { gap: 16px; }
+  #vitre-root.one-row #vitre-bar .item.pair .split-face :is(.nav, .accessories:empty) { display: none; }
+  #vitre-root.one-row #vitre-bar .item.pair .half {
+    height: 36px;
+    margin: 0;
+    border-radius: 18px;
+    background: var(--g-tint);
+    box-shadow: var(--row-rim), var(--g-shadow);
+  }
+  /* The bridge over the 16 px between them, 2 px into each (the board's path). */
+  #vitre-root.one-row #vitre-bar .item.pair .half.right::before {
+    left: -18px;
+    top: 0;
+    width: 20px;
+    height: 36px;
+    clip-path: path('M0 10 Q10 15 20 10 L20 26 Q10 21 0 26 Z');
+    background: var(--g-tint);
+  }
+  #vitre-root.one-row #vitre-bar .item.pair .half > .plate { display: none; }
+  #vitre-root.one-row #vitre-bar .item.pair .half-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-radius: 18px;
+  }
+  #vitre-root.one-row #vitre-bar .item.pair .half:hover .half-main { padding-right: 34px; }
+  #vitre-root.one-row #vitre-bar .item.pair .half .fav { position: static; flex: none; }
+  #vitre-root.one-row #vitre-bar .item.pair .half .host {
+    position: static;
+    height: auto;
+    min-width: 0;
+    line-height: normal;
+    text-overflow: ellipsis;
+    mask-image: none;
+    color: var(--row-ink-off);
+  }
+  #vitre-root.one-row #vitre-bar .item.pair .half.focused .host { color: var(--g-text); font-weight: 500; }
+  #vitre-root.one-row #vitre-bar .item.pair .half.home .host { color: var(--g-placeholder); }
+  #vitre-root.one-row #vitre-bar .item.pair .half-x { top: 6px; right: 8px; }
+  #vitre-root.one-row #vitre-bar .item.pair .half-load { left: 18px; right: 18px; top: 32px; }
+  #vitre-root.one-row #vitre-bar .item.pair .cap-half .fav { width: 18px; height: 18px; }
+  #vitre-root.one-row #vitre-bar .item.pair .cap-slot.left .cap-half { border-radius: 18px 0 0 18px; }
+  #vitre-root.one-row #vitre-bar .item.pair .cap-slot.right .cap-half { border-radius: 0 18px 18px 0; }
+  /* A side of a background pair closes by middle-click: a badge would sit on its favicon. */
+  #vitre-root.one-row #vitre-bar .item.pair .close-badge.cap-x { display: none; }
+
+  /* The "Private" capsule (DirOneRowBehaviour "Private window"): dark glass, the glasses and "Private"
+   * in 13 px semibold white, just left of #vitre-row-end (bar.ts sets --vitre-row-end-room). A capsule
+   * like the others: it takes the pointer and is no-drag, so its top 10 px, over the drag strip, do
+   * not move or zoom the window, and a press on its glass never reaches a link of the page under it.
+   * (Windows' label lies below its drag strip and lets the pointer through.) Hidden with the row in
+   * full screen, it lets the pointer through. */
+  #vitre-root.one-row #vitre-private {
+    right: calc(20px + var(--vitre-row-end-room, 0px));
+    top: 8px;
+    height: 36px;
+    border-radius: 18px;
+    padding: 0 14px 0 12px;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    pointer-events: auto;
+    -moz-window-dragging: no-drag;
+  }
+  #vitre-root.one-row.bar-hiding:not(.bar-revealed) #vitre-private { pointer-events: none; }
+  #vitre-root.one-row #vitre-private > .rim { padding: 0; mask: none; background: none; box-shadow: var(--row-rim); }
+  #vitre-root.one-row #vitre-private > svg { position: relative; flex: none; }
+
+  /* A favicon that is one flat light (or dark) shape gets its plate by the row's theme, as the Windows
+   * bar's does (16 px here): a light one on light glass, a dark one on dark or clear glass and in a
+   * private window. */
+  #vitre-root.one-row #vitre-bar .fav[data-tone] img { width: 16px; height: 16px; padding: 0; background: none; }
+  #vitre-root.one-row.theme-light:not(.private) #vitre-bar .fav[data-tone="light"] img { padding: 2px; border-radius: 4.5px; background: #1d1f24; }
+  #vitre-root.one-row:is(.theme-dark, .theme-clear, .private) #vitre-bar .fav[data-tone="dark"] img { padding: 2px; border-radius: 4.5px; background: #f4f2ec; }
+
+  /* Split view (bar.ts paintRowSplit): a capsule over the other side's page, when that page's theme
+   * is not the row's (the focused side's), carries over-light, over-dark or over-clear and takes that
+   * page's tokens and favicon plates, so its ink reads over the page under it: a compact tab, +, a
+   * half of the active pair, a row-end capsule, the lights' capsule. Not in a private window. */
+  #vitre-root.one-row:not(.private) :is(#vitre-winctl, #vitre-bar *, #vitre-row-end > *).over-light {
+    --row-glass: blur(14px) saturate(1.9) brightness(1.04);
+    --g-tint: rgba(255,255,255,0.42);
+    --g-text: #1d1d1f;
+    --g-icon: rgba(29,29,31,0.78);
+    --g-dim: rgba(29,29,31,0.3);
+    --g-hover: rgba(0,0,0,0.06);
+    --g-press: rgba(0,0,0,0.1);
+    --g-placeholder: rgba(29,29,31,0.5);
+    --row-rim: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 0 0 0.5px rgba(255,255,255,0.45), inset 0 -1px 1px rgba(0,0,0,0.06);
+    --row-tint-hover: rgba(255,255,255,0.58);
+    --row-ink-2: #3a3a3c;
+    --row-ink-off: rgba(29,29,31,0.55);
+  }
+  #vitre-root.one-row:not(.private) :is(#vitre-winctl, #vitre-bar *, #vitre-row-end > *):is(.over-dark, .over-clear) {
+    --row-glass: blur(14px) saturate(1.9) brightness(1.04);
+    --g-tint: rgba(255,255,255,0.14);
+    --g-text: #ffffff;
+    --g-icon: rgba(255,255,255,0.85);
+    --g-dim: rgba(255,255,255,0.3);
+    --g-hover: rgba(255,255,255,0.1);
+    --g-press: rgba(255,255,255,0.16);
+    --g-placeholder: rgba(255,255,255,0.6);
+    --row-rim: inset 0 1px 0 rgba(255,255,255,0.16), inset 0 0 0 0.5px rgba(255,255,255,0.14);
+    --row-tint-hover: rgba(255,255,255,0.22);
+    --row-ink-2: rgba(255,255,255,0.88);
+    --row-ink-off: rgba(255,255,255,0.55);
+  }
+  #vitre-root.one-row:not(.private) :is(#vitre-winctl, #vitre-bar *, #vitre-row-end > *).over-clear {
+    --row-glass: blur(14px) saturate(1.3) brightness(0.96);
+    --g-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)), rgba(16,16,20,0.22);
+    --g-icon: rgba(255,255,255,0.9);
+    --g-dim: rgba(255,255,255,0.32);
+    --g-placeholder: rgba(255,255,255,0.62);
+  }
+  #vitre-root.one-row:not(.private) #vitre-bar .over-light .fav[data-tone="light"] img { padding: 2px; border-radius: 4.5px; background: #1d1f24; }
+  #vitre-root.one-row:not(.private) #vitre-bar .over-light .fav[data-tone="dark"] img { padding: 0; background: none; }
+  #vitre-root.one-row:not(.private) #vitre-bar :is(.over-dark, .over-clear) .fav[data-tone="dark"] img { padding: 2px; border-radius: 4.5px; background: #f4f2ec; }
+  #vitre-root.one-row:not(.private) #vitre-bar :is(.over-dark, .over-clear) .fav[data-tone="light"] img { padding: 0; background: none; }
+
+  /* ---- Window full screen (onerow.ts header; the owner, 2026-11-15: no bars at the top, as Deer's
+   * F11 full screen on Windows) ----
+   * #vitre-root.fullscreen (browser.ts, from the root's inFullscreen). The page fills the screen, as it
+   * fills a normal window, and the row hides as the Windows bar does in F11 (reveal.ts: slid up and
+   * faded by the bar-hiding rules above); it comes back over the page at top 8 with no traffic lights
+   * (macOS keeps them in its own title-bar strip there: winctl.ts), the first tab at 20 (bar.ts), when
+   * the pointer reaches the top. The capsules look as in a normal window (their glass above).
+   * Nothing is drawn across the top: no strip, frost or fade over the page (the owner: no haze), only
+   * the capsules, as the Windows bar's pill floats over the page in F11, and between them the page
+   * takes the pointer as in a normal window. No drag strip either (skin/shell.css hides #vitre-drag
+   * under :root[inFullscreen]) and no lights' capsule: the window cannot move in full screen, and a
+   * double-click on a drag region would zoom it (nsCocoaWindow.mm -[ChildView mouseUp:]).
+   * The menu bar: while macOS's menu bar and title-bar strip are over the window (reveal.ts: class
+   * row-shifted, --vitre-row-shift), the layers that make the row move down by their height, at once
+   * (the system animates the slide; Gecko reports every frame), and so does the downloads quick view's
+   * layer, which hangs from the Downloads capsule (downloads/ring.ts places it from layout boxes, which
+   * no translate moves, so the shift counts once). */
+  #vitre-root.bar-snap #vitre-row-end { transition: none !important; }
+  #vitre-root.one-row.fullscreen #vitre-winctl { display: none; }
+  #vitre-root.one-row.fullscreen.row-shifted > :is(#layer-bar, #layer-omnibox, #layer-find) {
+    translate: 0 var(--vitre-row-shift, 0px);
+  }
+  #vitre-root.one-row.fullscreen.row-shifted > #layer-downloads-pop {
+    translate: 0 var(--vitre-row-shift, 0px);
+  }
+  @media (forced-colors: active) {
+    #vitre-root.one-row :is(#vitre-bar .item:not(.pair.active), #vitre-private) > .lens,
+    #vitre-root.one-row #vitre-bar .item.pair.active .half,
+    #vitre-root.one-row #vitre-row-end > *,
+    #vitre-root.one-row #vitre-winctl > .lens,
+    #vitre-root.one-row #vitre-omni-field > .lens { backdrop-filter: none !important; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* The capsule only fades in (150 ms, below): the lights follow it. */
+    #vitre-win-lights { transition-delay: 150ms; }
+    #vitre-root #vitre-row-end { transition-property: opacity !important; transition-duration: 150ms !important; }
+  }
+}

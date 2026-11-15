@@ -14,6 +14,8 @@
 //   caretBrowsing() / setCaretBrowsing(on) / onCaretBrowsingChange(fn)
 //                                    Firefox's caret browsing pref (accessibility.browsewithcaret)
 
+import { isMac } from '../../../shared/os';
+
 /** What the Open dialog offers. `extensions` without dots: ['jpg', 'png']. */
 export interface FileFilter {
   name: string;
@@ -120,8 +122,11 @@ export function extOf(path: string): string {
 /**
  * The photos that ship with Windows, one from each theme folder first so the first tiles vary
  * (same rule as app/src/main/modules/settings.ts). %SystemRoot%\Web\Wallpaper\<theme>\*.jpg.
+ * macOS: none. Its own desktop pictures (/System/Library/Desktop Pictures) are HEIC, which Gecko
+ * cannot draw, and a Windows path there only makes PathUtils.join throw.
  */
 export async function builtinWallpapers(): Promise<string[]> {
+  if (isMac) return [];
   const root = PathUtils.join(Services.env.get('SystemRoot') || 'C:\\Windows', 'Web', 'Wallpaper');
   const themes: string[][] = [];
   try {
