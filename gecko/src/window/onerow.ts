@@ -36,7 +36,8 @@
 //     full screen"; skin/shell.css); the first tab is at TABS_LEFT_FULL, since macOS keeps the
 //     traffic lights in its own title-bar strip there;
 //   - the row hides as the Windows bar does in F11 full screen, whatever the barAutoHide setting, and
-//     comes back with the pointer at the top (reveal.ts), so pages get no top strip there;
+//     comes back with the pointer at the top (reveal.ts), so pages get no top strip there (in a
+//     normal window it hides only with the setting on, as the Windows bar does);
 //   - when the pointer reaches the top, macOS slides in its menu bar and a title-bar strip with the
 //     traffic lights over the top of the window. reveal.ts follows the overlap Gecko reports and
 //     sets class `row-shifted` and --vitre-row-shift (CSS px) on #vitre-root while it is not 0;

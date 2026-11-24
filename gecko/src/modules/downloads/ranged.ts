@@ -91,6 +91,18 @@ import type { RenewWhy, Renewed } from './renew';
 
 export { ASK_ABOVE } from './proof';
 
+function deerLog(msg: string): void {
+  try {
+    const file = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
+    file.initWithPath('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log');
+    const stream = Cc['@mozilla.org/network/file-output-stream;1'].createInstance(Ci.nsIFileOutputStream);
+    stream.init(file, 0x02 | 0x08 | 0x10, 0o666, 0);
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    stream.write(line, line.length);
+    stream.close();
+  } catch {}
+}
+
 /** Below this, connection setup costs more than parallel pieces return. */
 const MIN_SPLIT = 8 * 1024 * 1024;
 /** A running segment is only split when both halves would be at least this big. */
@@ -890,9 +902,20 @@ export class FileTransfer {
     if (s.segments.length) return;
     if (s.ranges && s.total > 0) {
       // Cut at multiples of the block size, so each block sits inside one segment (RESUME-DESIGN.md 4.1).
+      // Distribute blocks evenly across all connections so all workers start immediately without stealing or socket churn.
       const bs = blockSize(s.total);
-      const size = Math.ceil(Math.ceil(s.total / this.connections()) / bs) * bs;
-      for (let start = 0; start < s.total; start += size) s.segments.push({ start, end: Math.min(s.total, start + size), received: 0 });
+      const conns = this.connections();
+      const totalBlocks = Math.floor(s.total / bs);
+      const numSegs = Math.max(1, Math.min(conns, totalBlocks));
+      const baseBlocks = Math.floor(totalBlocks / numSegs);
+      const extraBlocks = totalBlocks % numSegs;
+      let start = 0;
+      for (let i = 0; i < numSegs; i++) {
+        const blocks = baseBlocks + (i < extraBlocks ? 1 : 0);
+        const end = i === numSegs - 1 ? s.total : start + blocks * bs;
+        s.segments.push({ start, end, received: 0 });
+        start = end;
+      }
     } else {
       s.segments = [{ start: 0, end: s.total >= 0 ? s.total : -1, received: 0 }];
     }
@@ -1546,6 +1569,7 @@ export class FileTransfer {
     stat.headMs = res.headMs;
     stat.protocol = res.protocol;
     this.sockets.add(res.socket);
+    deerLog(`pull: lane=${lane} socket=${res.socket} protocol=${res.protocol} totalSockets=${this.sockets.size} range=bytes=${from}-${to}`);
     // R1: a whole answer that is a page (or JSON, XML, text) where the file was: the address expired.
     if (res.status === 200 && notFile(this.k, res.header('content-type'))) {
       res.destroy();

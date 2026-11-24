@@ -27,9 +27,9 @@
 // offered"), and picking another quality turns the row into File changed (the panel then shows its choice).
 //
 // macOS, One row (window/onerow.ts): the pill keeps 8 px clear of the row, as it keeps 8 px under the
-// Windows bar. The row floats over the top ROW_H px of the page; outside full screen it never hides,
-// and in window full screen it hides and comes back (reveal.ts), so the pill's least top is ROW_H + 8
-// (8, as on Windows, only for a hidden row in full screen).
+// Windows bar. The row floats over the top ROW_H px of the page and hides in window full screen or
+// with the auto-hide setting (reveal.ts), so the pill's least top is ROW_H + 8, or 8, as on Windows,
+// while the row is hidden.
 // While macOS's menu bar is down in full screen the row moves down by --vitre-row-shift: a pill
 // near that line moves down with it by what the row would cover (css.ts, macOS block; place() hands
 // it how far below the line it sits as --vd-pill-room), except while its picker hangs from it.
@@ -39,7 +39,7 @@ import * as fx from '../../firefox';
 import { scrollThumb } from '../../scrollthumb';
 import { glass, lens } from '../../glass';
 import type { Tab } from '../../model';
-import { ROW_H, oneRow, rowFullScreen } from '../../onerow';
+import { ROW_H, oneRow } from '../../onerow';
 import { setTip } from '../../tips';
 import { isMac } from '../../../shared/os';
 import type { DownloadView, PageVideo, StartOptions, VideoOffer, VideoOption } from '../../../modules/downloads/types';
@@ -51,7 +51,18 @@ import type { Ring } from './ring';
 import type { DownloadStore } from './store';
 import { leaveElementFullscreen } from './system';
 import { ytdlpFirst } from '../../../modules/downloads/sites';
+import { pageIdentity } from './principals';
 import { streamKeyOf } from '../../../modules/downloads/streamkey';
+import { isReanime } from '../../../modules/downloads/webdownfix';
+
+function deerLog(msg: string): void {
+  try {
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    dump(line);
+    console.warn(msg);
+    IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+  } catch {}
+}
 
 type PillMode = 'found' | 'downloading' | 'paused' | 'saved' | 'protected' | 'live' | 'continue';
 
@@ -555,9 +566,9 @@ export class VideoUI {
     const r = this.toWindow(t.tabId, t.video.rect);
     const w = this.pill.offsetWidth || 168;
     // Clear of the bar: 8 px under it, or 8 from the window's top while it is hidden. One row (header):
-    // 8 px under the row, which floats ROW_H tall over the page in a normal window too (as the Windows
-    // bar's band does), or 8 from the top while it is hidden in window full screen.
-    const minTop = oneRow() ? (rowFullScreen(this.b.root) && this.b.bar.hidden ? 8 : ROW_H + 8) : this.b.root.classList.contains('fullscreen') || this.b.bar.hidden ? 8 : 64;
+    // 8 px under the row, which floats ROW_H tall over the page (as the Windows bar's band does), or 8
+    // from the top while it is hidden (window full screen, the auto-hide setting).
+    const minTop = oneRow() ? (this.b.bar.hidden ? 8 : ROW_H + 8) : this.b.root.classList.contains('fullscreen') || this.b.bar.hidden ? 8 : 64;
     // 12 px inside the part of the video the page shows: a video wider than the page (zoomed in)
     // must not put the pill over the page's own scrollbar.
     const view = t.video.view && t.video.view.w > 0 ? this.toWindow(t.tabId, { x: 0, y: 0, w: t.video.view.w, h: t.video.view.h }) : null;
@@ -643,7 +654,33 @@ export class VideoUI {
 
   // ---- downloading ----
 
+  /**
+   * How a chosen quality is fetched. The tab's page stays the download's source. When the offer had to
+   * ask as an embedded player (`requestPage`), the download sends that player's full address as Referer
+   * and uses the tab's own cookie jar: the player's cookies are stored under the watch page.
+   */
+  private playerIdentity(tab: Tab | undefined, requestPage: string | undefined): NonNullable<StartOptions['identity']> {
+    const base = {
+      pageUrl: tab?.url ?? '',
+      userContextId: tab?.node.userContextId ?? 0,
+      isPrivate: this.b.isPrivate,
+      withOrigin: true,
+      firstParty: false,
+    };
+    if (!requestPage || !/^https?:/i.test(requestPage)) return base;
+    const played = { ...base, requestPage, referrerPolicy: 'unsafe-url' };
+    let frame: ReturnType<typeof fx.frameLoadData> = null;
+    try {
+      frame = tab ? fx.frameLoadData(tab.browser.browsingContext) : null;
+    } catch {
+      frame = null;
+    }
+    const id = frame ? pageIdentity(requestPage, frame.principal, null, frame.cookieJarSettings, base.pageUrl) : null;
+    return { ...played, ...(id?.cookieJarSettings ? { cookieJarSettings: id.cookieJarSettings } : {}) };
+  }
+
   download(t: Target, offer: VideoOffer, opt: VideoOption, origin: { x: number; y: number }, dir?: string): void {
+    deerLog(`video.ui.download: url=${opt.url} mode=${opt.mode} quality=${opt.label} variantUrl=${opt.variantUrl} audioUrl=${opt.audioUrl} requestPage=${offer.requestPage}`);
     const tab = this.b.tab(t.tabId);
     const opts: StartOptions = {
       mode: opt.mode,
@@ -668,7 +705,7 @@ export class VideoUI {
       // The media a page's player fetched: the page is the loading principal, Origin is sent. An
       // embedded player's media its server only gives to that player goes out as the player's frame
       // (offer.requestPage); pageUrl stays the tab's page (the download's source).
-      identity: { userContextId: tab?.node.userContextId ?? 0, withOrigin: true, firstParty: false, ...(offer.requestPage ? { requestPage: offer.requestPage } : {}) },
+      identity: this.playerIdentity(tab, offer.requestPage),
       origin,
       dir,
     };
@@ -713,7 +750,7 @@ export class VideoUI {
    */
   renewWith(t: Target, offer: VideoOffer, dl: DownloadView, opt: VideoOption): void {
     const tab = this.b.tab(t.tabId);
-    const r = this.store.engine.renewWith(dl.id, opt, { videoKey: offer.key, identity: { userContextId: tab?.node.userContextId ?? 0, isPrivate: this.b.isPrivate, ...(offer.requestPage ? { requestPage: offer.requestPage } : {}) } });
+    const r = this.store.engine.renewWith(dl.id, opt, { videoKey: offer.key, identity: this.playerIdentity(tab, offer.requestPage) });
     if (r === 'continued') {
       if (t.video.id >= 0) this.pin(t, offer.key, 'download');
       const words = `Continuing ${dl.filename} from ${f.percent(dl)}%`;
@@ -841,7 +878,7 @@ export class VideoUI {
       const t: Target = { tabId: tab.id, browserId, video };
       const offer = await this.resolve(t, true);
       busy?.();
-      if (!offer || offer.state === 'none') {
+      if (!offer || offer.state === 'none' || (offer.state === 'live' && isReanime(tab.url))) {
         // The element itself gave nothing (a player's blob: source, or media its frame did not load):
         // offer what the page loaded instead, the same streams that lit the mark.
         await this.offerPageMedia(tab, browserId, keyboard, offer);
@@ -870,16 +907,19 @@ export class VideoUI {
    */
   private async offerPageMedia(tab: Tab, browserId: number, keyboard: boolean, elementOffer: VideoOffer | null): Promise<void> {
     const state = this.mediaState(tab);
+    deerLog(`offerPageMedia: tabUrl=${tab.url} count=${state.count} protected=${state.protected} isReanime=${isReanime(tab.url)}`);
     let offer: VideoOffer | null = null;
-    if (state.count || state.protected || ytdlpFirst(tab.url) || elementOffer?.needsTools) {
+    if (state.count || state.protected || ytdlpFirst(tab.url) || elementOffer?.needsTools || isReanime(tab.url)) {
       const frame: PageVideo = { id: -1, kind: 'video', rect: { x: 0, y: 0, w: 0, h: 0 }, src: '', duration: NaN, width: 0, height: 0, protected: state.protected, live: false, title: tab.title, frameSrc: '' };
       offer = elementOffer?.key.startsWith('ytdlp|') || elementOffer?.needsTools ? elementOffer : await this.resolve({ tabId: tab.id, browserId, video: frame }, true);
+      deerLog(`offerPageMedia: resolve result=${offer?.state} options=${offer?.options.length ?? 0}`);
       if (offer?.state === 'ok') {
         this.picker.open({ tabId: tab.id, browserId, video: frame }, offer, keyboard, this.b.bar.layout.pillRect);
         return;
       }
     }
     const why = offer?.state === 'protected' || elementOffer?.state === 'protected' ? 'protected' : offer?.state === 'live' || elementOffer?.state === 'live' ? 'live' : 'none';
+    deerLog(`offerPageMedia: nothing to offer, why=${why} reason=${offer?.reason || elementOffer?.reason || ''}`);
     console.warn('Deer downloads: nothing to offer on this page', JSON.stringify({ url: tab.url, media: state, element: elementOffer?.state ?? null, page: offer?.state ?? null, reason: offer?.reason ?? elementOffer?.reason ?? '' }));
     if (offer?.needsTools || elementOffer?.needsTools) {
       this.note('Saving videos from this site needs yt-dlp', 'Get it once in Settings › Video downloads.', 8000, { label: 'Open settings', run: () => this.openToolsSettings() });

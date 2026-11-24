@@ -9,6 +9,8 @@ export interface Settings {
   /** The icon on the taskbar, window and Deer's shortcuts (src/modules/VitreAppIcon.sys.ts). */
   appIcon: 'gold' | 'orange';
   barAutoHide: boolean;
+  /** When true, tab capsules are always shown on the Home tab even if barAutoHide is on. */
+  showCapsulesOnHome: boolean;
   /** Pages start below the bar: a strip of the bar area's height, in the page's own colour, that
    *  scrolls away with the page (src/actors/page/inset.ts). */
   pageInset: boolean;
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appIcon: 'gold',
   // Owner's choice (2026-10-06): the bar (and the window controls) show when the pointer is at the top.
   barAutoHide: true,
+  showCapsulesOnHome: false,
   pageInset: true,
   homeBackground: { kind: 'windows', path: '' },
   switcherStyle: 'deck',

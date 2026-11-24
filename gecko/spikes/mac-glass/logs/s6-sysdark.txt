@@ -1,0 +1,40 @@
+[config] security.sandbox.content.mac.testing_read_path1 = /Users/droid/Documents/Projects/Deer browser/gecko/build
+@@pid 76587
+@@capture glass-look-motion-before-rec-sysdark 0x15eaa6b00 screen 40 40 1400 880
+MOTION-REC rec-sysdark 140 190 1200 420 12
+recording rec: started
+T+0 open A v1
+OPEN A v1 d=240 shown->class 9 ms; transition 0.24s; computed {"t":"","o":""}
+T+947 close A v1
+CLOSE A after 246 ms (transitionend -moz-window-opacity)
+T+1951 open B v1
+OPEN B v1 d=240 shown->class 19 ms; transition 0.24s; computed {"t":"","o":""}
+T+2897 close B v1
+CLOSE B after 248 ms (transitionend -moz-window-opacity)
+T+3880 open A v2
+OPEN A v2 d=240 shown->class 20 ms; transition 0.24s; computed {"t":"","o":""}
+T+4929 close A v2
+CLOSE A after 249 ms (transitionend -moz-window-transform)
+T+5882 open A v3
+OPEN A v3 d=240 shown->class 20 ms; transition 0.24s; computed {"t":"","o":""}
+T+6819 close A v3
+CLOSE A after 251 ms (transitionend -moz-window-opacity)
+T+7772 end
+OPEN A v1 d=3000 shown->class 10 ms; transition 3s; computed {"t":"","o":""}
+@@capture glass-look-motion-slow-open-1-sysdark 0x15eaa6b00 screen 40 40 1400 880
+@@capture glass-look-motion-slow-open-2-sysdark 0x15eaa6b00 screen 40 40 1400 880
+@@capture glass-look-motion-slow-open-3-sysdark 0x15eaa6b00 screen 40 40 1400 880
+computed at rest {"t":"","o":""}
+@@capture glass-look-motion-slow-open-4-sysdark 0x15eaa6b00 screen 40 40 1400 880
+@@capture glass-look-motion-slow-close-1-sysdark 0x15eaa6b00 screen 40 40 1400 880
+CLOSE A after 3011 ms (transitionend -moz-window-opacity)
+@@capture glass-look-motion-slow-close-2-sysdark 0x15eaa6b00 screen 40 40 1400 880
+@@capture glass-look-motion-slow-close-3-sysdark 0x15eaa6b00 screen 40 40 1400 880
+SLOW capture times (ms after the transition started; each capture also takes ~0.4 s to raise the window first) [["open-1",153],["open-2",8771],["open-3",16789],["open-4",23140],["close-1",156],["close-2",6828],["close-3",14428]]
+OPEN A v1 d=240 shown->class 15 ms; transition 0.24s; computed {"t":"","o":""}
+LAYOUT {"tag":"glass-look-motion-shadow-sysdark","scale":2,"win":[40,40,1400,880],"inner":[40,40],"pieces":[{"name":"C","scheme":"dark","state":"open","px":[1800,400,600,600],"real":[1800,400,600,600],"ink":"rgb(255, 255, 255)"},{"name":"A","scheme":"dark","state":"open","px":[280,400,600,600],"real":[280,400,600,600],"ink":"rgb(255, 255, 255)"}]}
+@@capture glass-look-motion-shadow-sysdark 0x15eaa6b00 screen 40 40 1400 880
+CLOSE A after 251 ms (transitionend -moz-window-opacity)
+PASS motion captures: 8  ["glass-look-motion-slow-open-1","glass-look-motion-slow-open-2","glass-look-motion-slow-open-3","glass-look-motion-slow-open-4","glass-look-motion-slow-close-1","glass-look-motion-slow-close-2","glass-look-motion-slow-close-3","glass-look-motion-shadow"]
+RESULT pass=1 fail=0
+@@quit

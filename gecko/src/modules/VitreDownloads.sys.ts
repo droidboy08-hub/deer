@@ -50,7 +50,8 @@
 //   installFfmpeg(), ffmpegInstall(), onFfmpegInstall(fn), cancelFfmpegInstall()
 //                                  get ffmpeg for the person when they ask (downloads/ffmpeg-install.ts)
 //   toolFolders()                  where ffmpeg, yt-dlp and Deno are downloaded to (%LOCALAPPDATA%\Deer)
-//                                  and read from (also %LOCALAPPDATA%\Vitre, from before the rename)
+//                                  and read from (also %LOCALAPPDATA%\Vitre, from before the rename);
+//                                  macOS: ~/Library/Application Support/Deer, no old folders
 //   setQuitPrompt(win, fn)         fn(kind, count, privateCount) shows the window's own "downloads are
 //                                  running" prompt; confirmQuit() lets the next quit through (then quit
 //                                  again). kind 'private': the last private window is closing
@@ -218,6 +219,7 @@ import { VitreSettings } from 'chrome://vitre/content/modules/VitreSettings.sys.
 import { AsyncShutdown } from 'resource://gre/modules/AsyncShutdown.sys.mjs';
 import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { clearInterval, clearTimeout, setInterval, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
+import { isMac } from '../shared/os';
 import { findFfmpeg, forgetFfmpeg } from './downloads/ffmpeg';
 import { cancelFfmpegInstall, ffmpegInstallDir, ffmpegInstallState, installFfmpeg, oldFolder, onFfmpegInstall, type FfmpegInstallState } from './downloads/ffmpeg-install';
 import { DRM_MESSAGE, StreamTransfer, allWritten, keptSecs, streamEstimate, streamFills, trackPart, type StreamEnv, type StreamState } from './downloads/hls';
@@ -228,6 +230,15 @@ import { PRE_MATCH, partialName, realFile, score, unbroken, type Named } from '.
 import { categoryOf, chooseName, extOf, nameFromDisposition, nameFromUrl, sanitize, streamTitle, uniquePath } from './downloads/naming';
 import { Budget, COLLECT_MS, LOAD_MS, PER_ROW, SIGN_IN, STREAM_SETTLE, STRONG, linkNames, pickLinks, sameSizeMedia, scoreLink, siteKey, streamNear } from './downloads/pagestep';
 import { streamKeyOf } from './downloads/streamkey';
+
+function deerLog(msg: string): void {
+  try {
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    dump(line);
+    console.warn(msg);
+    IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+  } catch {}
+}
 import { DURATION_SLACK, StreamTable, rungFromQuality } from './downloads/table';
 import { checkFinished, damagedFills, editedSince, mediaCheck, repairFinished, restoreFinished, siteCompare, statOf, type RepairOutcome } from './downloads/finished';
 import { Ledger, MTIME_SLACK, SEAL_BYTES, SEAL_EVERY, SEAL_MIN_GAP, UNFLUSHED_MARGIN, blockSize, flushPart, unsparsePart, type Header } from './downloads/ledger';
@@ -1067,6 +1078,7 @@ class Manager {
    * of the row it continues when it is that row's file started again (RESUME-DESIGN.md G1, Phase 3).
    */
   start(url: string, opts: StartOptions = {}): string {
+    deerLog(`VitreDownloads.start: url=${url} mode=${opts.mode} variantUrl=${opts.variantUrl} quality=${opts.quality} requestPage=${opts.identity?.requestPage}`);
     if (!/^https?:\/\//i.test(url)) throw new DownloadError('Only web addresses can be downloaded.');
     const mode: StartMode = opts.mode === 'hls' || opts.mode === 'dash' || opts.mode === 'ytdlp' ? opts.mode : opts.mode === 'file' ? 'file' : /\.m3u8(\?|#|$)/i.test(url) ? 'hls' : /\.mpd(\?|#|$)/i.test(url) ? 'dash' : 'file';
     // DRM, whoever asks: the page may have started its key session after its picker opened.
@@ -1809,6 +1821,7 @@ class Manager {
   }
 
   private async runStream(rec: Rec, run: Run): Promise<void> {
+    deerLog(`VitreDownloads.runStream: START rec=${rec.id} url=${rec.url} mode=${rec.mode}`);
     const state = rec.stream ?? StreamTransfer.fresh(rec.url);
     rec.stream = state;
     // RESUME-DESIGN.md 5.8: an older row's quality ("1080p") stands in for the rung a master read again picks by.
@@ -1842,9 +1855,11 @@ class Manager {
       // A wait's try ends its check at the first 429 or 5xx (review of Phase 4; see runFile()).
       transfer.waitTry = !!rec.trying;
       try {
+        deerLog(`VitreDownloads.runStream: calling transfer.prepare for ${rec.id}`);
         // Phase 6: a resume checks its saved parts against the table and proves its written segments
         // against the playlists read now (RESUME-DESIGN.md 2.6), renewing them when they refuse (G2).
         await transfer.prepare(run.ac.signal, rec.path ? stem(rec.path) : '');
+        deerLog(`VitreDownloads.runStream: transfer.prepare SUCCEEDED for ${rec.id}, tracks=${state.tracks.length}`);
       } finally {
         transfer.waitTry = false;
         this.takeEvents(rec, transfer);
@@ -1868,7 +1883,9 @@ class Manager {
       }
       this.save(true);
       base = stem(rec.path);
+      deerLog(`VitreDownloads.runStream: calling transfer.download for ${rec.id} base=${base}`);
       await transfer.download(base, run.ac.signal);
+      deerLog(`VitreDownloads.runStream: transfer.download FINISHED for ${rec.id}`);
     }
     run.phase = 'merging';
     this.touch(rec);
@@ -2310,6 +2327,7 @@ class Manager {
   }
 
   private async complete(rec: Rec): Promise<void> {
+    deerLog(`VitreDownloads.complete: START rec=${rec.id} path=${rec.path} received=${rec.received}`);
     // The new file is complete: the partial Start over kept goes now (owner's decision 2).
     this.dropOldParts(rec);
     // Safe Browsing, for what the engine fetched itself (Firefox checked its own mirrored ones).
@@ -2506,6 +2524,7 @@ class Manager {
   }
 
   private stopped(rec: Rec, run: Run, err: unknown): void {
+    deerLog(`VitreDownloads.stopped: rec=${rec.id} url=${rec.url} error=${String(err)} msg=${(err as any)?.message} stack=${(err as any)?.stack}`);
     // A run that kept asking with nothing coming in (retryingOf()) was a wait: a quit leaves it one, which continues
     // after the next start as every wait does (G4). As it was when the stop was asked (noteStop(); review: read here,
     // after every connection had left, it was never a wait).
@@ -3163,7 +3182,7 @@ class Manager {
 
   /**
    * Download, check and unpack ffmpeg for the person (Settings › Video downloads), then use it:
-   * vitre.ffmpegPath points at the new ffmpeg.exe. Resolves with its path; see downloads/ffmpeg-install.ts.
+   * vitre.ffmpegPath points at the new ffmpeg.exe (ffmpeg on a Mac). Resolves with its path; see downloads/ffmpeg-install.ts.
    */
   async installFfmpeg(): Promise<string> {
     const exe = await installFfmpeg();
@@ -3195,10 +3214,13 @@ class Manager {
    * Where Deer downloads ffmpeg and yt-dlp + Deno to (ffmpeg, tools: %LOCALAPPDATA%\Deer\...), the
    * folders it still reads from before the rename (oldFfmpeg, oldTools: %LOCALAPPDATA%\Vitre\...,
    * never written) and the folder the yt-dlp in use was found in ('' when none, or a stand-in command).
+   * macOS: ffmpeg and tools under ~/Library/Application Support/Deer, no old folders (''), and ytdlpFrom
+   * the tools folder (yt-dlp is <tools>/yt-dlp/yt-dlp_macos there).
    */
   toolFolders(): { ffmpeg: string; tools: string; oldFfmpeg: string; oldTools: string; ytdlpFrom: string } {
     const tools = ytdlpTools();
     const exe = tools?.deno ? tools.command[0] : ''; // a stand-in command has no Deno
+    if (isMac) return { ffmpeg: ffmpegInstallDir(), tools: toolsDir(), oldFfmpeg: '', oldTools: '', ytdlpFrom: exe ? (PathUtils.parent(PathUtils.parent(exe) ?? '') ?? '') : '' };
     return { ffmpeg: ffmpegInstallDir(), tools: toolsDir(), oldFfmpeg: oldFolder('ffmpeg'), oldTools: oldToolsDir(), ytdlpFrom: exe ? (PathUtils.parent(exe) ?? '') : '' };
   }
 
@@ -4506,10 +4528,13 @@ class Manager {
         rec.received = run.transfer.received;
         rec.total = run.transfer instanceof StreamTransfer || run.transfer instanceof YtdlpTransfer ? run.transfer.estimate : run.transfer.state.total;
         run.samples.push({ t: now, bytes: rec.netBytes });
-        while (run.samples.length > 2 && now - run.samples[0].t > 3000) run.samples.shift();
+        while (run.samples.length > 2 && now - run.samples[0].t > 1500) run.samples.shift();
+        if (rec.netBytes > run.samples[0].bytes) {
+          while (run.samples.length > 2 && run.samples[0].bytes === run.samples[1].bytes) run.samples.shift();
+        }
         const first = run.samples[0];
         const span = (now - first.t) / 1000;
-        run.speed = span >= 0.5 ? (rec.netBytes - first.bytes) / span : run.speed;
+        run.speed = span >= 0.25 ? Math.max(0, (rec.netBytes - first.bytes) / span) : run.speed;
       }
       if (rec.state === 'downloading' && !run.phase) {
         rec.activeMs += dt;

@@ -42,7 +42,7 @@
 //   hunt-15-private        a private window over a light page (opened by this run; not in a private run)
 // Each capture comes with checks of what it shows (the row's theme class and ink, where the page's
 // content and headers are, the drag strip, the traffic lights), so a failing look is also a failing line.
-/* global spike, M, Services, Ci, ChromeUtils, gBrowser, InspectorUtils */
+/* global spike, M, Services, Ci, ChromeUtils, gBrowser, InspectorUtils, IOUtils, PathUtils */
 Services.scriptloader.loadSubScript("resource://vitre-boot/lib.js", window);
 spike.main(async () => {
   const { b } = M;
@@ -370,7 +370,7 @@ spike.main(async () => {
       await waitFor(() => !!main?.querySelector(".vs-path")?.textContent, { timeout: 3000, what: "the ffmpeg status" }).catch(() => {});
       video = {
         downloadRows: [...(main?.querySelectorAll("#vd-ff-get-row, #vd-ff-get, #vd-yt-row, #vd-yt-get") ?? [])].map((e) => e.id),
-        notYet: (main?.textContent.match(/Deer cannot (?:download ffmpeg|install)[^.]*on a Mac yet/g) || []).length,
+        notYet: (main?.textContent.match(/(?:on a Mac|on macOS) yet|not available on (?:a Mac|macOS)/gi) || []).length,
         status: main?.querySelector(".vs-path")?.textContent ?? null,
       };
     }
@@ -379,11 +379,16 @@ spike.main(async () => {
   check("Settings, every page (" + pageIds.length + "): nothing names Windows, Ctrl, Alt, Explorer, Program Files, .exe or this PC on a Mac", pageIds.length >= 9 && said.length === 0, said);
   M.key("KEY_Escape");
   await sleep(700);
-  // Settings › Video downloads: Deer cannot get the video tools on a Mac yet (their builds are Windows
-  // ones), so no Download rows and no promise; the ffmpeg status still answers.
-  check("Settings › Video downloads on a Mac: no Download rows, it says the tools are not there yet, and the ffmpeg status answers", !!video && video.downloadRows.length === 0 && video.notYet === 2 && !!video.status, video);
-  // And the engine refuses to install them there (the sources point nowhere, in case it did not).
+  // Settings › Video downloads: Deer gets the video tools on a Mac as on Windows (their macOS builds,
+  // downloads/mac-tools.ts), so the Download ffmpeg and yt-dlp rows are there, no "not on a Mac yet",
+  // and the ffmpeg status answers. (tests/downloads/mac-tools.py installs them from stand-ins.)
+  check("Settings › Video downloads on a Mac: the Download ffmpeg and yt-dlp rows, nothing says they are not there yet, and the ffmpeg status answers", !!video && video.downloadRows.length === 4 && video.notYet === 0 && !!video.status, video);
+  // And the engine tries to install them there: with the sources pointing nowhere each install fails on the
+  // network ("the release could not be reached", what a Mac install says when its source cannot be reached;
+  // nothing naming a Mac), receives nothing and installs or leaves nothing (no temporary file, no lock).
   const engine = b.sys("VitreDownloads");
+  const folders = engine.toolFolders();
+  const hadYtdlp = engine.hasYtdlp();
   const dead = "http://127.0.0.1:9/";
   const srcPrefs = ["vitre.ffmpeg.source", "vitre.tools.source.ytdlp", "vitre.tools.source.deno"];
   for (const p of srcPrefs) Services.prefs.setStringPref(p, dead);
@@ -399,7 +404,20 @@ spike.main(async () => {
     const ff = await refused(engine.installFfmpeg());
     const yt = await refused(engine.installYtdlp(false));
     const st = { ff, yt, ffState: engine.ffmpegInstall(), ytState: engine.ytdlpInstall(), hasYtdlp: engine.hasYtdlp() };
-    check("on a Mac the engine refuses to install ffmpeg and yt-dlp at once (Windows builds), and finds no yt-dlp", /Mac/.test(ff) && /Mac/.test(yt) && st.ffState.phase === "failed" && st.ytState.phase === "failed" && st.ffState.received === 0 && st.ytState.received === 0 && !st.hasYtdlp, st);
+    const leftovers = [];
+    const installed = [PathUtils.join(folders.ffmpeg, "ffmpeg"), PathUtils.join(folders.tools, "yt-dlp"), PathUtils.join(folders.tools, "deno")];
+    for (const p of installed) if (await IOUtils.exists(p)) leftovers.push(p);
+    // Temporary names are each install's own (ffmpeg.new-<id>, yt-dlp-download-<id>.zip...), and the locks.
+    for (const dir of [PathUtils.parent(folders.ffmpeg), folders.tools]) {
+      for (const p of await IOUtils.getChildren(dir).catch(() => [])) {
+        if (/^(?:ffmpeg\.new|ffmpeg-download|yt-dlp\.new|yt-dlp-download|deno-download|deno\.download)|install-lock$|^\.yt-dlp-running-/.test(PathUtils.filename(p))) leftovers.push(p);
+      }
+    }
+    check(
+      "on a Mac the engine tries to install ffmpeg and yt-dlp (no refusal for being a Mac), fails on the unreachable sources, receives and installs nothing",
+      /could not be reached/.test(ff) && /could not be reached/.test(yt) && !/mac/i.test(ff + yt) && st.ffState.phase === "failed" && st.ytState.phase === "failed" && st.ffState.received === 0 && st.ytState.received === 0 && st.hasYtdlp === hadYtdlp && !hadYtdlp && leftovers.length === 0 && folders.oldFfmpeg === "" && folders.oldTools === "",
+      { ...st, folders, leftovers }
+    );
   } finally {
     for (const p of srcPrefs) Services.prefs.clearUserPref(p);
   }

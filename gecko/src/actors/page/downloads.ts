@@ -390,6 +390,15 @@ export function onMessage(ctx: PageContext, name: string, data: unknown): unknow
     }
     return { links, password: !!doc.querySelector('input[type="password" i]') };
   }
+  if (name === 'downloads:flix-pk') {
+    try {
+      const win = (ctx.window as any)?.wrappedJSObject || ctx.window;
+      const pk = win?.__pk;
+      return typeof pk === 'string' ? pk : pk ? JSON.stringify(pk) : null;
+    } catch {
+      return null;
+    }
+  }
   return undefined;
 }
 

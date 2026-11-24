@@ -16,9 +16,14 @@ const search = '<circle cx="8.8" cy="8.8" r="5.3"/><path d="m12.8 12.8 3.6 3.6"/
 const keyboard = '<rect x="2.5" y="5.5" width="15" height="9" rx="2"/><path d="M5.5 8.5h1M9.5 8.5h1M13.5 8.5h1M6.5 11.5h7"/>';
 const info = '<circle cx="10" cy="10" r="6.5"/><path d="M10 9.2v4M10 6.7v.1"/>';
 const puzzle = '<path d="M8 3.5h2.2a1.6 1.6 0 1 1 3.2 0H15a1 1 0 0 1 1 1V7a1.6 1.6 0 1 0 0 3.2v2.3a1 1 0 0 1-1 1h-2.3a1.6 1.6 0 1 0-3.2 0H7a1 1 0 0 1-1-1v-2.3a1.6 1.6 0 1 1 0-3.2V4.5a1 1 0 0 1 1-1z"/>';
+const user = '<circle cx="10" cy="7" r="3.5"/><path d="M4 17a6 6 0 0 1 12 0"/>';
+const syncArrows = '<path d="M16 8A6 6 0 0 0 5 6.2M4 12a6 6 0 0 0 11 1.8"/><path d="M16 4v4.5h-4.5M4 16v-4.5h4.5"/>';
+const keyLock = '<circle cx="7.5" cy="12.5" r="3.5"/><path d="m10 10 6-6M13.5 6.5l2 2M15 5l2 2"/>';
+const bookmarkRibbon = '<path d="M5.5 3.5h9a1 1 0 0 1 1 1v12l-5.5-3.5-5.5 3.5v-12a1 1 0 0 1 1-1z"/>';
 
 /** Sidebar icons (18 px). */
 export const nav = {
+  account: svg(18, user),
   general: svg(18, sliders),
   appearance: svg(18, contrast),
   home: svg(18, picture),
@@ -66,6 +71,10 @@ export const ico = {
   data: svg(20,'<ellipse cx="10" cy="5.5" rx="5.5" ry="2"/><path d="M4.5 5.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M4.5 10c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/>'),
   open: svg(20, '<path d="M8.5 4.5h-3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-3"/><path d="M11.5 3.5h5v5M16.5 3.5l-7 7"/>'),
   link: svg(20, '<path d="M8.6 11.4a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M11.4 8.6a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1"/>', 'stroke-linecap="round"'),
+  account: svg(20, user),
+  sync: svg(20, syncArrows),
+  key: svg(20, keyLock),
+  bookmark: svg(20, bookmarkRibbon),
 };
 
 /** A fresh <svg> element from one of the markups above. */

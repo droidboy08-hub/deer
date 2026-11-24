@@ -1,0 +1,195 @@
+=== s1-syslight.txt
+PIECE glass-look-white-small-syslight      row36-light            light       h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      row36-dark             dark        h=36  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-white-small-syslight      row36-light dark       light dark  h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      row24-auto             light dark  h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light-24           light       h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light-36           light       h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light-64           light       h=64  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light-66           light       h=66  glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-white-small-syslight      col-light-300          light       h=300 glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-white-small-syslight      col-dark-24            dark        h=24  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-white-small-syslight      col-dark-36            dark        h=36  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-white-small-syslight      col-dark-64            dark        h=64  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-white-small-syslight      col-dark-66            dark        h=66  glassL=0.125 rgb=[99, 99, 99] contrast=6.01
+PIECE glass-look-white-small-syslight      col-dark-300           dark        h=300 glassL=0.125 rgb=[99, 99, 99] contrast=6.01
+PIECE glass-look-white-small-syslight      col-light dark-24      light dark  h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light dark-36      light dark  h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light dark-64      light dark  h=64  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-white-small-syslight      col-light dark-66      light dark  h=66  glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-white-small-syslight      col-light dark-300     light dark  h=300 glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-stale-a-syslight          row36-light            light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          row36-dark             dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-a-syslight          row36-light dark       light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          row24-auto             light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light-24           light       h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light-36           light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light-64           light       h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light-66           light       h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-a-syslight          col-light-300          light       h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-a-syslight          col-dark-24            dark        h=24  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-a-syslight          col-dark-36            dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-a-syslight          col-dark-64            dark        h=64  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-a-syslight          col-dark-66            dark        h=66  glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-stale-a-syslight          col-dark-300           dark        h=300 glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-stale-a-syslight          col-light dark-24      light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light dark-36      light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light dark-64      light dark  h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-a-syslight          col-light dark-66      light dark  h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-a-syslight          col-light dark-300     light dark  h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-b-syslight          row36-light            light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          row36-dark             dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-b-syslight          row36-light dark       light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          row24-auto             light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light-24           light       h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light-36           light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light-64           light       h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light-66           light       h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-b-syslight          col-light-300          light       h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-b-syslight          col-dark-24            dark        h=24  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-b-syslight          col-dark-36            dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-b-syslight          col-dark-64            dark        h=64  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-stale-b-syslight          col-dark-66            dark        h=66  glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-stale-b-syslight          col-dark-300           dark        h=300 glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-stale-b-syslight          col-light dark-24      light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light dark-36      light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light dark-64      light dark  h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-stale-b-syslight          col-light dark-66      light dark  h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-stale-b-syslight          col-light dark-300     light dark  h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-white-big-syslight        big-light              light       h=688 glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-white-big-syslight        big-dark               dark        h=688 glassL=0.125 rgb=[99, 99, 99] contrast=6.01
+PIECE glass-look-white-big-syslight        big-light dark         light dark  h=688 glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-black-small-syslight      row36-light            light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      row36-dark             dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-black-small-syslight      row36-light dark       light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      row24-auto             light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light-24           light       h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light-36           light       h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light-64           light       h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light-66           light       h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-black-small-syslight      col-light-300          light       h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-black-small-syslight      col-dark-24            dark        h=24  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-black-small-syslight      col-dark-36            dark        h=36  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-black-small-syslight      col-dark-64            dark        h=64  glassL=0.007 rgb=[19, 19, 19] contrast=18.58
+PIECE glass-look-black-small-syslight      col-dark-66            dark        h=66  glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-black-small-syslight      col-dark-300           dark        h=300 glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-black-small-syslight      col-light dark-24      light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light dark-36      light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light dark-64      light dark  h=64  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-black-small-syslight      col-light dark-66      light dark  h=66  glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-black-small-syslight      col-light dark-300     light dark  h=300 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-black-big-syslight        big-light              light       h=688 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-black-big-syslight        big-dark               dark        h=688 glassL=0.015 rgb=[33, 33, 33] contrast=16.10
+PIECE glass-look-black-big-syslight        big-light dark         light dark  h=688 glassL=0.413 rgb=[172, 172, 172] contrast=8.31
+PIECE glass-look-text-small-syslight       row36-light            light       h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       row36-dark             dark        h=36  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-text-small-syslight       row36-light dark       light dark  h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       row24-auto             light dark  h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       col-light-24           light       h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       col-light-36           light       h=36  glassL=0.956 rgb=[250, 250, 250] contrast=16.84
+PIECE glass-look-text-small-syslight       col-light-64           light       h=64  glassL=0.939 rgb=[248, 248, 248] contrast=16.59
+PIECE glass-look-text-small-syslight       col-light-66           light       h=66  glassL=0.890 rgb=[243, 242, 242] contrast=15.86
+PIECE glass-look-text-small-syslight       col-light-300          light       h=300 glassL=0.855 rgb=[238, 238, 238] contrast=15.33
+PIECE glass-look-text-small-syslight       col-dark-24            dark        h=24  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-text-small-syslight       col-dark-36            dark        h=36  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-text-small-syslight       col-dark-64            dark        h=64  glassL=0.947 rgb=[249, 249, 249] contrast=1.05
+PIECE glass-look-text-small-syslight       col-dark-66            dark        h=66  glassL=0.125 rgb=[99, 99, 99] contrast=6.01
+PIECE glass-look-text-small-syslight       col-dark-300           dark        h=300 glassL=0.120 rgb=[97, 97, 97] contrast=6.19
+PIECE glass-look-text-small-syslight       col-light dark-24      light dark  h=24  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       col-light dark-36      light dark  h=36  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       col-light dark-64      light dark  h=64  glassL=0.947 rgb=[249, 249, 249] contrast=16.72
+PIECE glass-look-text-small-syslight       col-light dark-66      light dark  h=66  glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-text-small-syslight       col-light dark-300     light dark  h=300 glassL=0.903 rgb=[242, 244, 247] contrast=16.06
+PIECE glass-look-text-big-syslight         big-light              light       h=688 glassL=0.863 rgb=[239, 239, 239] contrast=15.46
+PIECE glass-look-text-big-syslight         big-dark               dark        h=688 glassL=0.122 rgb=[98, 98, 98] contrast=6.10
+PIECE glass-look-text-big-syslight         big-light dark         light dark  h=688 glassL=0.922 rgb=[246, 246, 247] contrast=16.34
+PIECE glass-look-scroll-small-moving-syslight row36-light            light       h=36  glassL=0.679 rgb=[252, 209, 131] contrast=12.64
+PIECE glass-look-scroll-small-moving-syslight row36-dark             dark        h=36  glassL=0.184 rgb=[155, 111, 19] contrast=4.49
+PIECE glass-look-scroll-small-moving-syslight row36-light dark       light dark  h=36  glassL=0.699 rgb=[255, 212, 129] contrast=12.95
+PIECE glass-look-scroll-small-moving-syslight row24-auto             light dark  h=24  glassL=0.699 rgb=[255, 212, 129] contrast=12.95
+PIECE glass-look-scroll-small-moving-syslight col-light-24           light       h=24  glassL=0.722 rgb=[242, 221, 131] contrast=13.31
+PIECE glass-look-scroll-small-moving-syslight col-light-36           light       h=36  glassL=0.709 rgb=[161, 236, 180] contrast=13.10
+PIECE glass-look-scroll-small-moving-syslight col-light-64           light       h=64  glassL=0.574 rgb=[158, 212, 174] contrast=10.96
+PIECE glass-look-scroll-small-moving-syslight col-light-66           light       h=66  glassL=0.621 rgb=[148, 215, 255] contrast=11.72
+PIECE glass-look-scroll-small-moving-syslight col-light-300          light       h=300 glassL=0.572 rgb=[223, 190, 210] contrast=10.92
+PIECE glass-look-scroll-small-moving-syslight col-dark-24            dark        h=24  glassL=0.170 rgb=[138, 112, 5] contrast=4.77
+PIECE glass-look-scroll-small-moving-syslight col-dark-36            dark        h=36  glassL=0.156 rgb=[44, 125, 64] contrast=5.10
+PIECE glass-look-scroll-small-moving-syslight col-dark-64            dark        h=64  glassL=0.163 rgb=[39, 128, 65] contrast=4.94
+PIECE glass-look-scroll-small-moving-syslight col-dark-66            dark        h=66  glassL=0.072 rgb=[0, 74, 154] contrast=8.58
+PIECE glass-look-scroll-small-moving-syslight col-dark-300           dark        h=300 glassL=0.064 rgb=[99, 59, 80] contrast=9.24
+PIECE glass-look-scroll-small-moving-syslight col-light dark-24      light dark  h=24  glassL=0.826 rgb=[255, 236, 120] contrast=14.91
+PIECE glass-look-scroll-small-moving-syslight col-light dark-36      light dark  h=36  glassL=0.594 rgb=[141, 220, 161] contrast=11.29
+PIECE glass-look-scroll-small-moving-syslight col-light dark-64      light dark  h=64  glassL=0.648 rgb=[158, 226, 176] contrast=12.14
+PIECE glass-look-scroll-small-moving-syslight col-light dark-66      light dark  h=66  glassL=0.622 rgb=[137, 217, 255] contrast=11.73
+PIECE glass-look-scroll-small-moving-syslight col-light dark-300     light dark  h=300 glassL=0.594 rgb=[246, 186, 210] contrast=11.28
+PIECE glass-look-scroll-small-stopped-syslight row36-light            light       h=36  glassL=0.777 rgb=[158, 248, 179] contrast=14.16
+PIECE glass-look-scroll-small-stopped-syslight row36-dark             dark        h=36  glassL=0.147 rgb=[50, 121, 66] contrast=5.32
+PIECE glass-look-scroll-small-stopped-syslight row36-light dark       light dark  h=36  glassL=0.777 rgb=[158, 248, 179] contrast=14.16
+PIECE glass-look-scroll-small-stopped-syslight row24-auto             light dark  h=24  glassL=0.771 rgb=[159, 247, 177] contrast=14.07
+PIECE glass-look-scroll-small-stopped-syslight col-light-24           light       h=24  glassL=0.691 rgb=[161, 233, 179] contrast=12.82
+PIECE glass-look-scroll-small-stopped-syslight col-light-36           light       h=36  glassL=0.566 rgb=[147, 204, 255] contrast=10.84
+PIECE glass-look-scroll-small-stopped-syslight col-light-64           light       h=64  glassL=0.667 rgb=[158, 222, 255] contrast=12.45
+PIECE glass-look-scroll-small-stopped-syslight col-light-66           light       h=66  glassL=0.738 rgb=[223, 223, 223] contrast=13.54
+PIECE glass-look-scroll-small-stopped-syslight col-light-300          light       h=300 glassL=0.567 rgb=[243, 185, 170] contrast=10.84
+PIECE glass-look-scroll-small-stopped-syslight col-dark-24            dark        h=24  glassL=0.151 rgb=[45, 123, 65] contrast=5.22
+PIECE glass-look-scroll-small-stopped-syslight col-dark-36            dark        h=36  glassL=0.124 rgb=[29, 100, 172] contrast=6.05
+PIECE glass-look-scroll-small-stopped-syslight col-dark-64            dark        h=64  glassL=0.141 rgb=[62, 107, 160] contrast=5.50
+PIECE glass-look-scroll-small-stopped-syslight col-dark-66            dark        h=66  glassL=0.125 rgb=[99, 99, 99] contrast=6.01
+PIECE glass-look-scroll-small-stopped-syslight col-dark-300           dark        h=300 glassL=0.063 rgb=[121, 47, 42] contrast=9.32
+PIECE glass-look-scroll-small-stopped-syslight col-light dark-24      light dark  h=24  glassL=0.761 rgb=[160, 245, 181] contrast=13.92
+PIECE glass-look-scroll-small-stopped-syslight col-light dark-36      light dark  h=36  glassL=0.591 rgb=[148, 209, 255] contrast=11.24
+PIECE glass-look-scroll-small-stopped-syslight col-light dark-64      light dark  h=64  glassL=0.673 rgb=[158, 223, 255] contrast=12.53
+PIECE glass-look-scroll-small-stopped-syslight col-light dark-66      light dark  h=66  glassL=0.930 rgb=[247, 247, 247] contrast=16.46
+PIECE glass-look-scroll-small-stopped-syslight col-light dark-300     light dark  h=300 glassL=0.584 rgb=[255, 184, 168] contrast=11.12
+PIECE glass-look-scroll-big-moving-syslight big-light              light       h=688 glassL=0.643 rgb=[222, 208, 188] contrast=12.05
+PIECE glass-look-scroll-big-moving-syslight big-dark               dark        h=688 glassL=0.076 rgb=[97, 74, 45] contrast=8.31
+PIECE glass-look-scroll-big-moving-syslight big-light dark         light dark  h=688 glassL=0.690 rgb=[243, 211, 182] contrast=12.80
+PIECE glass-look-scroll-big-stopped-syslight big-light              light       h=688 glassL=0.630 rgb=[223, 205, 188] contrast=11.85
+PIECE glass-look-scroll-big-stopped-syslight big-dark               dark        h=688 glassL=0.068 rgb=[98, 67, 46] contrast=8.89
+PIECE glass-look-scroll-big-stopped-syslight big-light dark         light dark  h=688 glassL=0.690 rgb=[243, 211, 182] contrast=12.80
+PIECE glass-look-photo-small-syslight      row36-light            light       h=36  glassL=0.451 rgb=[219, 166, 167] contrast=8.95
+PIECE glass-look-photo-small-syslight      row36-dark             dark        h=36  glassL=0.029 rgb=[94, 20, 22] contrast=13.23
+PIECE glass-look-photo-small-syslight      row36-light dark       light dark  h=36  glassL=0.008 rgb=[22, 21, 21] contrast=1.14
+PIECE glass-look-photo-small-syslight      row24-auto             light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-photo-small-syslight      col-light-24           light       h=24  glassL=0.418 rgb=[193, 167, 167] contrast=8.39
+PIECE glass-look-photo-small-syslight      col-light-36           light       h=36  glassL=0.011 rgb=[39, 23, 23] contrast=1.20
+PIECE glass-look-photo-small-syslight      col-light-64           light       h=64  glassL=0.011 rgb=[39, 22, 23] contrast=1.19
+PIECE glass-look-photo-small-syslight      col-light-66           light       h=66  glassL=0.455 rgb=[196, 175, 175] contrast=9.01
+PIECE glass-look-photo-small-syslight      col-light-300          light       h=300 glassL=0.489 rgb=[227, 172, 173] contrast=9.57
+PIECE glass-look-photo-small-syslight      col-dark-24            dark        h=24  glassL=0.049 rgb=[117, 32, 33] contrast=10.58
+PIECE glass-look-photo-small-syslight      col-dark-36            dark        h=36  glassL=0.040 rgb=[107, 27, 27] contrast=11.68
+PIECE glass-look-photo-small-syslight      col-dark-64            dark        h=64  glassL=0.042 rgb=[110, 28, 29] contrast=11.37
+PIECE glass-look-photo-small-syslight      col-dark-66            dark        h=66  glassL=0.030 rgb=[68, 41, 41] contrast=13.17
+PIECE glass-look-photo-small-syslight      col-dark-300           dark        h=300 glassL=0.019 rgb=[42, 37, 37] contrast=15.11
+PIECE glass-look-photo-small-syslight      col-light dark-24      light dark  h=24  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-photo-small-syslight      col-light dark-36      light dark  h=36  glassL=0.007 rgb=[19, 19, 19] contrast=1.12
+PIECE glass-look-photo-small-syslight      col-light dark-64      light dark  h=64  glassL=0.007 rgb=[20, 19, 19] contrast=1.12
+PIECE glass-look-photo-small-syslight      col-light dark-66      light dark  h=66  glassL=0.414 rgb=[173, 172, 173] contrast=8.33
+PIECE glass-look-photo-small-syslight      col-light dark-300     light dark  h=300 glassL=0.488 rgb=[229, 171, 172] contrast=9.56
+PIECE glass-look-photo-big-syslight        big-light              light       h=688 glassL=0.490 rgb=[225, 173, 174] contrast=9.59
+PIECE glass-look-photo-big-syslight        big-dark               dark        h=688 glassL=0.020 rgb=[46, 36, 36] contrast=15.06
+PIECE glass-look-photo-big-syslight        big-light dark         light dark  h=688 glassL=0.457 rgb=[207, 172, 172] contrast=9.06
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape1", "h_css": 160, "edge_px": [120, 220], "asked_px": [120, 220], "radius_px": 25.75, "radius_css": 12.875, "rms": 1.01}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape2", "h_css": 160, "edge_px": [520, 220], "asked_px": [520, 220], "radius_px": 25.75, "radius_css": 12.875, "rms": 1.01}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape3", "h_css": 160, "edge_px": [920, 220], "asked_px": [920, 220], "radius_px": 25.25, "radius_css": 12.625, "rms": 0.7}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape4", "note": "too little contrast to measure", "bg_L": 0.0, "glass_L": 0.007}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape5", "h_css": 36, "edge_px": [1400, 340], "asked_px": [1400, 340], "radius_px": 36.75, "radius_css": 18.375, "rms": 0.35}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape6", "h_css": 24, "edge_px": [1840, 220], "asked_px": [1840, 220], "radius_px": 40.0, "radius_css": 20.0, "rms": 21.62}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape7", "note": "too little contrast to measure", "bg_L": 0.0, "glass_L": 0.007}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape8", "h_css": 300, "edge_px": [120, 720], "asked_px": [120, 720], "radius_px": 25.75, "radius_css": 12.875, "rms": 1.01}
+CORNER {"capture": "glass-look-shape-black-syslight", "piece": "shape9", "note": "too little contrast to measure", "bg_L": 0.0, "glass_L": 0.015}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape1", "h_css": 160, "edge_px": [120, 220], "asked_px": [120, 220], "radius_px": 24.25, "radius_css": 12.125, "rms": 0.52}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape2", "h_css": 160, "edge_px": [520, 220], "asked_px": [520, 220], "radius_px": 24.25, "radius_css": 12.125, "rms": 0.52}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape3", "h_css": 160, "edge_px": [920, 220], "asked_px": [920, 220], "radius_px": 35.5, "radius_css": 17.75, "rms": 0.33}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape4", "h_css": 24, "edge_px": [1400, 220], "asked_px": [1400, 220], "radius_px": 24.25, "radius_css": 12.125, "rms": 0.66}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape5", "h_css": 36, "edge_px": [1400, 340], "asked_px": [1400, 340], "radius_px": 35.75, "radius_css": 17.875, "rms": 0.33}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape6", "note": "too little contrast to measure", "bg_L": 1.0, "glass_L": 0.965}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape7", "h_css": 36, "edge_px": [1840, 340], "asked_px": [1840, 340], "radius_px": 24.25, "radius_css": 12.125, "rms": 0.67}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape8", "h_css": 300, "edge_px": [120, 720], "asked_px": [120, 720], "radius_px": 24.25, "radius_css": 12.125, "rms": 0.52}
+CORNER {"capture": "glass-look-shape-white-syslight", "piece": "shape9", "h_css": 300, "edge_px": [800, 720], "asked_px": [800, 720], "radius_px": 24.0, "radius_css": 12.0, "rms": 0.56}
+BLUR {"capture": "glass-look-scroll-small-stopped-syslight", "piece": "col-light-300", "edges": 3, "w10_90_css": [23.0, 5.5]}
+BLUR {"capture": "glass-look-scroll-small-stopped-syslight", "piece": "col-dark-300", "edges": 3, "w10_90_css": [20.5]}
+BLUR {"capture": "glass-look-scroll-small-stopped-syslight", "piece": "col-light dark-300", "edges": 3, "w10_90_css": [20.0, 20.5, 19.5]}
+BLUR {"capture": "glass-look-scroll-big-stopped-syslight", "piece": "big-light", "edges": 8, "w10_90_css": [28.0, 33.0, 0.0, 28.0, 16.0, 21.0]}
+BLUR {"capture": "glass-look-scroll-big-stopped-syslight", "piece": "big-dark", "edges": 8, "w10_90_css": [38.0, 21.5]}
+BLUR {"capture": "glass-look-scroll-big-stopped-syslight", "piece": "big-light dark", "edges": 8, "w10_90_css": [24.0, 22.0, 36.0, 41.5, 27.5, 20.5, 23.0]}

@@ -34,6 +34,7 @@ const SCHEMA: Record<string, Spec> = {
   theme: { kind: 'string', def: DEFAULT_SETTINGS.theme, allowed: ['system', 'light', 'dark'] },
   appIcon: { kind: 'string', def: DEFAULT_SETTINGS.appIcon, allowed: ['gold', 'orange'] },
   barAutoHide: { kind: 'bool', def: DEFAULT_SETTINGS.barAutoHide },
+  showCapsulesOnHome: { kind: 'bool', def: DEFAULT_SETTINGS.showCapsulesOnHome },
   pageInset: { kind: 'bool', def: DEFAULT_SETTINGS.pageInset },
   'homeBackground.kind': { kind: 'string', def: DEFAULT_SETTINGS.homeBackground.kind, allowed: ['windows', 'image', 'video', 'none'] },
   'homeBackground.path': { kind: 'string', def: DEFAULT_SETTINGS.homeBackground.path },

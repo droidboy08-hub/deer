@@ -245,14 +245,18 @@ Every Python tool here keeps to Python 3.9 and the standard library (`/usr/bin/p
   (`nativeHandle`, `windowId`: the HWND or `[NSWindow windowNumber]`; the window move started from the
   bar; Windows' system menu, nothing on a Mac),
   `progress.ts` (taskbar progress per window, or the one Dock tile: `progressIsGlobal`), `a11y.ts`
-  (Sticky Keys; false on a Mac for now), `tools.ts` (`toolName`, `trustInstalledTool`: 0755 and no
-  quarantine on a Mac) and `wallpaper.ts` (the Mac desktop picture for Home: the file `NSWorkspace`
+  (Sticky Keys; false on a Mac for now), `tools.ts` (`toolName`; `trustInstalledTool` /
+  `trustInstalledTree`: on a Mac mode 0755 on the programs and no `com.apple.quarantine` on anything
+  Deer unpacked, taken off by `/usr/bin/xattr -dr` started through Subprocess (no shell) and read back
+  on every file, `quarantined()`; Windows clears the read-only attribute) and `wallpaper.ts` (the Mac desktop picture for Home: the file `NSWorkspace`
   names, else `DefaultDesktop.heic`; HEIC and other formats Gecko 157 cannot decode are converted
   once with `/usr/bin/sips` into `<profile>/vitre-home`). Windows behaviour there is the code that
   lived in `firefox.ts`, `VitreStartup` and `VitreSwitcher`, moved or copied unchanged. Today the window
-  core (`firefox.ts` nativeHandle / canMoveWindow / beginWindowMove) and `VitreHome` use the layer;
-  the downloads engine (`downloads/system.ts`, `ffmpeg-install.ts`), the updater and the switcher
-  still read their Windows services and folders themselves.
+  core (`firefox.ts` nativeHandle / canMoveWindow / beginWindowMove), `VitreHome` and the video tools'
+  installers (`downloads/ffmpeg-install.ts`, `ytdlp.ts`, `ffmpeg.ts`: `dirs.ts` `dataRoot()` on a Mac,
+  `tools.ts`) use the layer; the rest of the downloads engine (`downloads/platform.ts`, the window's
+  `downloads/system.ts`), the updater and the switcher still read their Windows services and folders
+  themselves.
 
 ## Window architecture (`src/window/`)
 
@@ -675,8 +679,8 @@ and `pagearea.ts` (and `splitlift.ts`, find's `controller.ts` for their row geom
   `window-native.ts` showSystemMenu false). Minimise is also ⌘M (`window.minimize()`).
 - Pages under the row (`pagearea.ts`, `skin/shell.css` section 8): the page area fills the window from
   y 0 as on Windows, in a normal window and in window full screen alike, and the page list follows the
-  row's hiding mode exactly as it follows the Windows bar's. In a normal window the row never hides
-  (`reveal.ts`), no page is on `INSET_BAR_HIDDEN_KEY`, and every web page gets the top strip
+  row's hiding mode exactly as it follows the Windows bar's. In a normal window with the row always
+  shown (`reveal.ts`), no page is on `INSET_BAR_HIDDEN_KEY`, and every web page gets the top strip
   (`ROW_AREA`, 64) and the PDF viewer its offset: content starts below the row at scroll top and
   scrolls under the capsules; boxes pinned to the top move below the strip. In window full screen the
   row hides as the Windows bar does in F11 (whatever the auto-hide setting) and comes back with the
@@ -701,19 +705,34 @@ and `pagearea.ts` (and `splitlift.ts`, find's `controller.ts` for their row geom
   and close motion is left out. `PANEL_ATTRS` lists the popup manager's attributes: presses and the
   wheel outside are Gecko's rollup (a left or middle press is swallowed, a right press reaches the
   page), `noautofocus` keeps the page's focus and selection, `ignorekeys` sends every key through
-  Deer's router; the panel never becomes the key window. A panel the system closes is reported to the
-  view; one that cannot open falls back to the layer. Tab bar menus hang at y 52.
+  Deer's router; the panel never becomes the key window. With assistive technology on, the open menu
+  takes focus (`view.ts` takeFocus) and the Settings and History panels' focus traps leave it there
+  (their `isBeneath`: a menu's panel is outside every module layer, never under them). A panel the
+  system closes is reported to the view; one that cannot open falls back to the layer. Tab bar menus
+  hang at y 52.
 - Settings (`settings/styles.ts` MAC, `panel.ts`, `home-button.ts`): no lens. The sheet carries a plain
   `backdrop-filter: blur(30px) saturate(1.6)` and Home's Background popover `blur(24px)
   saturate(1.6)` under the same tint and rim; no SVG lens filter is built. Settings › Appearance has
-  no App icon group, and its Tab bar group only "Start pages below the tab bar" (`pageInset`: the 64 px
-  strip under the row; no "Show the tab bar", the row never auto-hides in a normal window), the
+  no App icon group; its Tab bar group has "Show the tab bar" (`barAutoHide`: the row hides in a normal
+  window and comes back with the pointer at the top, as the Windows bar does) and "Start pages below
+  the tab bar" (`pageInset`: the 64 px strip under the row while it is always shown), the
   Keyboard shortcuts page shows the Mac map (`keymap.ts`
   KEY_GROUPS_MAC, DIFFERENT_FROM_CHROME_MAC) and its capture refuses what `macRefusal` refuses
   (`capture.ts`), and the Home background calls the desktop picture "Your Mac wallpaper". Settings ›
-  Video downloads (`downloads/settings-page.ts`) has no Download rows on a Mac and says Deer cannot
-  get ffmpeg or yt-dlp there yet (the installers take Windows builds and refuse on a Mac: see
-  Downloads below); ffmpeg is the file chosen there or one on PATH.
+  Video downloads (`downloads/settings-page.ts`) has Windows' Download ffmpeg and Download yt-dlp rows
+  (status, progress, errors, Cancel, Try again, Update) in Mac words: Martin Riedl's macOS build of
+  ffmpeg (about 30 MB), yt-dlp and Deno (about 95 MB), no copy beside Deer (see Downloads below).
+- History (`history/css.ts` MAC, `panel.ts`): Settings' sheet rules: no lens, the sheet's own
+  `backdrop-filter: blur(30px) saturate(1.6)` under the same tint and rim, centred in the window
+  (nothing of it hangs from the row). ⌘Y opens and closes it (⌘H hides Deer; in the address field
+  too, carrying what was typed), and History › Show All History in the menu bar opens it, never
+  closing it, as the + menu's History row does. In the panel ⌘ does what Ctrl does on Windows (⌘↑ ⌘↓
+  between day headings, ⌘↩ and ⌘-click a background tab, ⇧⌘-click a new tab, ⌘A, ⌘C, ⌘Z), ⌃Q still
+  peeks, ⌫ deletes (⌘⌫, ⇧⌫ and fn⌫ too; ⇧⌘⌫ stays Clear browsing data), ⌘. is ⎋ in its search field,
+  and a ⌃-click opens a row's menu at the pointer. Its tooltips, menus and announcements print and
+  say the Mac keys (⎋, ⌫, ⌘Z, ⇧⌘T, ⌃Q, "Undo with Command Z."). Settings' Keyboard shortcuts page
+  lists "Open or close History ⌘Y" (`keymap.ts` KEY_GROUPS_MAC); `../design/keymap.json` has the
+  panel's keys_mac. Tests: `tests/history` (`hlib.js` plays each Windows key the Mac way).
 - The other modules each keep a macOS block named in their headers (downloads `ring.ts` and
   `panel.ts`, extensions `bar.ts`, find, peek, switcher): search for `oneRow()` and `isMac`. A module
   that hangs something from a row capsule hangs it 8 px below it (boards RowDownloads, RowExtensions).
@@ -736,7 +755,9 @@ into the attributes of a XUL `<key>`.
   All | Quit Deer), File, Edit, View (with Developer ›), History (Recently Closed ›), Window (the open
   windows, which macOS adds) and Help (Keyboard Shortcuts, Deer on GitHub). No access keys. A click
   runs the Deer action the item's key runs (`b.run`) or its verb (`runVerb`: About and Check for
-  Updates open Settings › About, the latter also checking; Zoom; Bring All to Front; GitHub). Edit's
+  Updates open Settings › About, the latter also checking; Zoom; Bring All to Front; GitHub); Show
+  All History (⌘Y) opens the History panel and never closes it (the service's `open()`, as the + menu's
+  History row; the key toggles through the router). Edit's
   standard items keep Firefox's ids and commands (`menu_undo` ... `menu_selectAll`), so they go
   through the responder chain to native fields as well. Items are dimmed, never removed: Back and
   Forward with nothing behind or ahead, Stop while nothing loads, an empty Recently Closed; View says
@@ -769,7 +790,7 @@ into the attributes of a XUL `<key>`.
 
 ## Feature modules and their services
 
-Seven feature modules sit on the core. Each lives in `src/window/modules/<key>/` (contract in its
+Eight feature modules sit on the core. Each lives in `src/window/modules/<key>/` (contract in its
 `index.ts` header), keeps every Firefox internal it uses in its own `gecko.ts` / `fx.ts` with the
 source file named, and is tested by `tests/<key>/` (the builder's suites) and `tests/<key>-verify/`
 (the verifier's attack suites, which also rerun the builder's). `tests/integrate/` runs them together.
@@ -781,13 +802,14 @@ are optional for callers and were added during the build, the rest is the agreed
 
 | Service | Provider | Members | Additions | Used by |
 |---|---|---|---|---|
-| `peek` | peek | `open(urlOrRequest, opts?)` (opts: `origin` rect, `browser`, principals), `isOpen()`, `browser()`, `close()`, `promote()`, `headerRect()`, `canReopen()`, `reopen()` | `headerSlot(on)` (find's capsule slot; hides the header's domain and path), `search(text, opts?)`; window event `vitre:peek` (`detail.phase`: open, closing, promoting, closed); `window.vitrePeek` `{ browser(), close(), open(url) }` for the core | menus, find, downloads |
+| `peek` | peek | `open(urlOrRequest, opts?)` (opts: `origin` rect, `browser`, principals), `isOpen()`, `browser()`, `close()`, `promote()`, `headerRect()`, `canReopen()`, `reopen()` | `headerSlot(on)` (find's capsule slot; hides the header's domain and path), `search(text, opts?)`; open opts `noWash` (History draws its row's wash itself); window event `vitre:peek` (`detail.phase`: open, closing, promoting, closed); `window.vitrePeek` `{ browser(), close(), open(url) }` for the core | menus, find, downloads |
 | `find` | find | `open({ query?, browser? }?)`, `close()`, `isOpen()` | | menus |
 | `menus` | menus | `show(items, at, { align?, onClose? })`, `close()` | `isOpen()`, `editItems(field)`; `MenuItem.access`, `.bold`; show options `keyboard`, `label`, `owner`, `gap`, `touch`; `onClose` also runs when nothing could be shown | find, peek, downloads, extensions |
 | `downloads` | downloads | `download(urlOrRequest, { browser?, filename?, saveAs?, referrerInfo?, triggeringPrincipal? })`, `openPanel()`, `videoPicker()` | options `origin` (where the file flies from), `isPrivate`, `cookieJarSettings` (the page's); `openPanel(focusId?)`; `mediaState(browser?)`, `isPanelOpen()` | menus |
 | `settings` | settings | `open(pageId?, query?)`, `registerPage({ id, title, icon?, order, render })` | page `keywords`; `isOpen()`, `close()`, `changeBackground()` (Home's popover on Home, else Settings › Home and background) | menus, downloads (Video downloads, 51), extensions (Extensions, 65) |
 | `extensions` | extensions | `openPanel()`, `count()` | | |
 | `switcher` | switcher | `open('cycle' \| 'latched' \| 'search')`, `isOpen()` | `close()` (cancel as Esc does) | downloads (the quit prompt) |
+| `history` | history | `open(opts?)` (opts: `query`, `view` 'all' \| 'closed'), `toggle()`, `close()`, `isOpen()` | | menus (the + circle's History row) |
 
 `tests/integrate/services.js` checks every provider against this table. Consumers read a service
 typed by its provider's declaration (`b.service('menus')` is `MenusApi | undefined`), never through a
@@ -829,10 +851,39 @@ local look-alike type, so a contract change fails `tsc`.
   wired to `VitreSettings`, rebinding of the four rebindable verbs, Clear browsing data (Sanitizer),
   Home's background popover; other modules add pages with `registerPage`. Panel state `panel-open`
   and `settings-open` on `b.root`; Esc and close layers 60. macOS: frost without the lens, the Mac
-  keymap, no App icon or "Show the tab bar" rows, Mac words where a page named Windows or Ctrl (One
+  keymap, no App icon row, Mac words where a page named Windows or Ctrl (One
   row, above). Tests: `tests/settings` (pages, rebind,
   clear, picker, appicon, wallpapers), `tests/settings-verify` (ladder, keyboard, windows, scale, restart,
   hung, a11y, integration).
+- **History** (`modules/history/`, singleton `modules/VitreHistory.sys.ts`; spec
+  `../design/HISTORY-SPEC.md`, approved by the owner 2026-10-24, boards on the canvas page "History"):
+  the third floating panel (Ctrl+H, page-first, toggles; History in the + circle's menu; Ctrl+H in the
+  address field searches for what was typed). The 960x688 Settings sheet with a 216 px sidebar (search,
+  All history / Recently closed, Clear browsing data…), a 32 px toolbar line (summary, match count,
+  selection, undo line) and the list: one row per page per day (that day's latest counted visit;
+  reloads, embeds, downloads, framed links, redirect sources and non-web pages left out), days newest
+  first, read from Places one day per query (`store.ts`, read-only connections; at least 60 rows at a
+  time, a large day built 200 rows per frame). Search: `AUTOCOMPLETE_MATCH` over moz_places by a scan
+  and sort, 150 a page, never interrupted (a newer search wins by serial). Rows open like links (click
+  here, Ctrl/middle background, Ctrl+Shift switched, Shift+click a peek with History stepping aside and
+  coming back warm); a checkbox selects; deletes are instant with a 10 s undo line and change Places
+  only when they commit (`removeVisitsByFilter` per row and day, never `history.remove`: a row takes that
+  page's visits on that day only; a day's range ends at the next midnight less 0.001 ms, Today's at the
+  moment of the delete). The commit runs in `VitreHistory` (it outlives the window and blocks Places'
+  shutdown), on timeout, close, a new delete, opening a page, the window closing, Clear browsing data in
+  any window (`settings/gecko.ts sanitize` calls `flushAll()` first) and quit. The rows a delete hides
+  stay in the store (`hides()` keeps them off screen), so Undo is exact after the list was read again
+  (the Peek hand-off, a bulk change); a committed delete's rows stay hidden until `VitreHistory` has
+  removed them (a reopen meanwhile never shows them). Rows read again keep their ids, so the drawn rows,
+  keyboard focus and the selection survive a reload. Delete day on a search-results heading takes the
+  whole day, and its line counts the day's pages (counted in Places when that day isn't loaded). Every
+  loaded row is drawn: a change repaints only rows whose fields changed and skips unchanged days, and
+  `aria-rowindex` is renumbered 3,000 rows a frame (about 10 ms a change with 20,000 rows). Live updates through
+  `PlacesObservers` while open; Recently closed from SessionStore (`closed.ts`). Warm state 60 s
+  (view, query, scroll, focused row; never the selection). A private window's panel shows only "History
+  isn’t shown in private windows." and reads nothing. Esc and close layers 60; `panel-open` and
+  `history-open` on `b.root`. Tests: `tests/history` (look, open, list, search, gestures, select,
+  delete, closed, live, keys, a11y). macOS: ⌘Y, Settings' frost and the Mac keys (One row, "History").
 - **Downloads** (`modules/downloads/`, engine `modules/VitreDownloads.sys.ts` + `modules/downloads/*`,
   page module `actors/page/downloads.ts`): IDM-style segmented engine (one network partition per
   connection), take-over of Firefox's downloads, HLS / DASH joined by ffmpeg (`-c copy`), yt-dlp with
@@ -849,9 +900,42 @@ local look-alike type, so a contract change fails `tsc`.
   or downloaded again (ffmpeg is looked for in the settings path, beside the program, Deer's folder,
   the old folder, then PATH). The pref `vitre.localAppData` stands in for `%LOCALAPPDATA%`:
   `tools/run.py` points it into each throwaway profile, so tests never read the person's real copies.
-  macOS (not ported yet): `installFfmpeg` and `installTools` refuse there and fetch nothing (their
-  downloads are Windows builds), no folder under `%LOCALAPPDATA%` is looked in (a Mac has none), and
-  the ffmpeg picker takes any file (`platform.ts` pickProgram: no `.exe` filter).
+  macOS (`downloads/mac-tools.ts`; the owner, 2026-11-15: "just like the windows"): the same rows and
+  the same rule (nothing is installed unless the SHA-256 its source publishes matches) with the macOS
+  builds for the engine's processor (`Services.appinfo.XPCOMABI`, so they run wherever Deer runs):
+  ffmpeg from Martin Riedl's build server (`.../redirect/latest/macos/<arm64|amd64>/release/ffmpeg.zip`
+  redirects to the versioned file, whose `.sha256` is read from that same address and which is then
+  downloaded; GET only, its HEAD answers are unreliable; one static `ffmpeg`, Developer ID signed and
+  notarized, GPL v3, as no macOS source builds LGPL), yt-dlp's onedir `yt-dlp_macos.zip` from its
+  `SHA2-256SUMS` (universal; never the one-file `yt-dlp_macos`, which unpacks its Python on every run
+  where a quarantined process may not load it) and `deno-<aarch64|x86_64>-apple-darwin.zip` with its
+  `.sha256sum`. They go to `~/Library/Application Support/Deer/ffmpeg/ffmpeg` and
+  `.../Deer/tools/yt-dlp/yt-dlp_macos` (beside its `_internal`) and `.../Deer/tools/deno`
+  (`platform/dirs.ts` `dataRoot()`, which `vitre.localAppData` stands in for; shared by Deer and Deer
+  Dev as `%LOCALAPPDATA%\Deer` is on Windows; no old folder is read). Two Deers at once (each its own
+  process; macOS, unlike Windows, lets the folder of a running program be replaced): an install holds a
+  lock file in the folder it installs into (`tools/.install-lock`, `Deer/.ffmpeg-install-lock`, holding
+  its pid and program) and fails at once with "another Deer is installing ..." while a live Deer holds
+  it (one whose process has ended, runs another program now or is 6 h old is taken over), its temporary
+  names are its own (`yt-dlp.new-<id>`, `ffmpeg-download-<id>.zip`; what a stopped install left is
+  removed under the lock), and every yt-dlp Deer's runner starts is marked in the tools folder
+  (`.yt-dlp-running-<pid>` until it ends), so an update in either Deer waits for the other's too
+  (`/bin/ps -p <pid> -o comm=` says whether it still runs). Deer.app sets
+  `LSFileQuarantineEnabled`, so everything Deer unpacks and every process it starts is quarantined, and
+  yt-dlp (not notarized) started while quarantined hangs in dyld behind an alert, for good: after the
+  checksum and before any start the programs get mode 0755 and the quarantine comes off everything
+  unpacked (`platform/tools.ts` `trustInstalledTree`; the install fails if any is left), then each tool is
+  started once (`--version`, ffmpeg `-version`; at most 1 min for ffmpeg, 2 for yt-dlp and Deno; the row
+  says Checking and Cancel stops it) before it replaces the one in place: a tool macOS would not start is never installed, and macOS's first-run check of new code
+  (about 25 s for yt-dlp) happens during the install, not the person's first download. An update waits
+  up to 20 s for a yt-dlp that runs, this Deer's or one another Deer marked (it reads its folder's
+  modules as it goes; Windows refuses to move a running yt-dlp.exe), then says it is in use by a
+  download, as on Windows. A network failure reads "the release could not be reached"; a folder Deer
+  cannot create fails the install and says so. Deer then uses
+  them as on Windows (yt-dlp with `--js-runtimes deno:<path>` and `--ffmpeg-location`). ffmpeg is looked
+  for in the settings path, Deer's folder, then Deer's own PATH (a Deer started from the Dock or Finder
+  has only `/usr/bin:/bin:/usr/sbin:/sbin`, so not Homebrew's); the ffmpeg picker takes any file
+  (`platform.ts` pickProgram: no `.exe` filter).
   Safety as Firefox's own downloads: names through Firefox's validator
   (`naming.ts`), Safe Browsing on every file the engine fetched (`reputation.ts`), Firefox's prompt
   before opening an executable that is not an .exe, page-derived addresses fetched with the page's
@@ -1142,7 +1226,14 @@ local look-alike type, so a contract change fails `tsc`.
   the attempt at the failure (one -J, then the schedule).
   Tests: `tests/downloads` (engine, restart, takeover, crosssite, mark, spa,
   ytdlp, streams, noffmpeg, faults, drm, ui, safety, folders, integrity, expiry, attach, network, repair, stream-expiry, resolve; perf and ytdlp-real on demand; the
-  ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`),
+  ffmpeg download against a local stand-in release: `tests/downloads/ffmpeg-install.py`; on macOS
+  `tests/downloads/mac-tools.py` runs `mac-tools.js`, Download ffmpeg and Download yt-dlp against local
+  stand-ins of the macOS sources (the redirect, fingerprints, files, modes, no quarantine, each
+  processor's Deno, the page, Cancel during ffmpeg's first start, mismatches, an update that waits for
+  a running yt-dlp, another Deer's install lock and running yt-dlp stood in for by /bin/sleep, a zip
+  entry outside its folder, a Deno that does not start, unreachable sources), and `mac-tools-real.js` on
+  demand gets the real tools (ffmpeg's and Deno's processor checked) and downloads a real YouTube video
+  joined by the installed ffmpeg, the running yt-dlp marked in the tools folder),
   `tests/downloads-verify` (+ v-keys, v-windows, v-core, v-scale, v-pages, v-rapid, v-restore,
   v-measure).
 - **Extensions** (`modules/extensions/`, singleton `modules/VitreExtensions.sys.ts`): pinned
@@ -1158,8 +1249,9 @@ Cross-module behaviour worth knowing: the menus' Peek link / Download linked fil
 Find selection / Settings rows go through the services above; find in a peek uses `headerSlot` and
 closes with the sheet (`vitre:peek` closed); a promoted peek is an ordinary tab for the switcher; the
 download mark and the extension buttons share the pill's right end (mark slot 410..438 always kept,
-cluster before it); Downloads and Settings are panels (one at a time: `downloads-open` /
-`settings-open`); any menu whose owner is in the bar, an extension popup and a peek hold an
+cluster before it); Downloads, Settings and History are panels (one at a time: `downloads-open` /
+`settings-open` / `history-open`; History steps aside when another appears and closes them when it
+opens); any menu whose owner is in the bar, an extension popup and a peek hold an
 auto-hidden bar on screen.
 
 ## Settings, data, pages
@@ -1235,7 +1327,9 @@ auto-hidden bar on screen.
   search box hands every key to Firefox's hidden address bar (`gURLBar.handoff`), so nothing could
   be typed there (test `input/private.js`).
 - Address field history: Places SQL in `src/window/places.ts` (hosts first, then a frecency-ordered
-  scan; a newer search interrupts the running one). Search engines: Deer's own list in
+  scan; a newer search interrupts the running one). While the History panel holds a delete under its
+  undo line, the pages it would take out of history entirely are left out of this window's
+  suggestions (`setPendingRemoval`) until the commit has finished. Search engines: Deer's own list in
   `src/shared/settings.ts`; private windows search with their own engine (`privateSearchEngine`,
   DuckDuckGo by default, the owner's choice of 2026-10-10; Settings › Search engine › Private
   windows), picked by the window's `Browser.applySettings` for its address field, selected text and
@@ -1531,6 +1625,17 @@ the code as described; the user may want it otherwise.
   items may push a menu past the 10-row limit (more so now that an extension's nested items are listed
   in place under captions instead of a submenu); the overlay scrollbar is Gecko's thin one, not 2 px; in
   element full screen menus use the solid material.
+- **History**: its menus keep the menus module's width rule (MenuSpec: fitted to the measured text in
+  8 px steps, as every Deer menu): the + circle 288 px (as before History; HistoryMenus draws 296), the
+  selection menu 304 (spec 328) and the day menu 280 (spec 312). The canvas sizes menus from character
+  counts (CtxMenu.dc.html: length x size x 0.51), and its `plus` kind is 296 where Deer has drawn 288
+  since before History; the heights match. A row's three-line tooltip is tips.ts's tip grown to three lines
+  (`.lines`); rows are plain fixed-height DOM, without `content-visibility` (the spec's optional hint:
+  measured with 37,000 rows drawn, `content-visibility: auto` on rows made each frame slower, 32 ms
+  against 6, and a change no faster);
+  the summary counts pages with at least one counted visit; the closed-tab row that Ctrl+Shift+T would
+  bring back (its key printed in the menu) is the newest close of any normal window or a window, as
+  SessionStore's last close action is; "Open N pages in new tabs" opens them in the background.
 - **Extensions** (no board exists): the cluster is not drawn on Home or in popup windows (there
   `openPanel()` opens Settings or nothing); pinned buttons give way below a 140 px address and the
   cluster below 100 px; page actions come before pinned buttons; Firefox's wording is replaced by "Pin
@@ -1588,14 +1693,23 @@ macOS (the Mac port; where an entry says "owner's" the owner decided it, the res
   at run time, and only when Deer's items made the app menu: after a late start Firefox's items made
   it, the slot would read "Share Deer", and the pref stays off. The pref's other readers in Firefox are
   interface Deer does not show (its main menu panel, its menu bar, its About dialog).
-- **Settings hides App icon and "Show the tab bar" on a Mac** (`settings/pages.ts` appearance): the
-  Dock shows the app bundle's icon, and the One row stays shown in a normal window, so "Show the tab
-  bar" would do nothing there; window full screen always hides it as F11 does on Windows
-  (`reveal.ts`). "Start pages below the tab bar" (`pageInset`) is shown on a Mac too, alone in the Tab
-  bar group: the page runs under the row and the setting turns its 64 px top strip off and on. Windows
-  keeps both rows in the same order. Home's right-click menu has no "Show tab bar" on a Mac
-  (`menus/page-items.ts`). A Mac auto-hide while reading is not designed yet; the hiding mode in
-  `reveal.ts` is ready for it.
+- **Settings hides App icon on a Mac** (`settings/pages.ts` appearance): the Dock shows the app
+  bundle's icon. "Show the tab bar" (`barAutoHide`) is there as on Windows (the owner, 2026-11-15:
+  "where is the option to hide the capsule tabs ... like in windows"): with "When I point at the top"
+  the One row (capsules, the traffic lights and their capsule, Downloads and Extensions) slides away in
+  a normal window and comes back with the pointer at the top, on the row, with focus or a hold, by
+  `reveal.ts`'s rules; the 18 px drag strip stays. Its default is Windows' (on). Window full screen
+  hides the row whatever the setting, as F11 does on Windows. "Start pages below the tab bar"
+  (`pageInset`) follows, as on Windows. Home's right-click menu has "Show tab bar" too
+  (`menus/page-items.ts`). Test: `tests/menus/mac-row-autohide.js`.
+- **The video tools on a Mac** (the owner, 2026-11-15: "why is the ytdlp missing, add that too. like
+  ffmpeg ... just like the windows"): Settings › Video downloads downloads ffmpeg, yt-dlp and Deno on a
+  Mac as on Windows, from their macOS builds for the engine's processor: Martin Riedl's notarized ffmpeg
+  (GPL v3; the Windows build is BtbN's LGPL one), yt-dlp's onedir zip, Deno's darwin zip; each checked
+  against its published SHA-256, made runnable (0755, no quarantine) and started once before it is put
+  in `~/Library/Application Support/Deer` (shared by Deer and Deer Dev, as on Windows: an install lock,
+  temporary names of each install's own and running-yt-dlp marks keep the two apart). Downloads above,
+  `downloads/mac-tools.ts`.
 - **No window icon on a Mac**: `VitreStartup.brandWindow` does nothing there (no icon attribute, no
   taskbar group): macOS windows carry no icon of their own; the `.ico` files are copied into the
   bundle unused.

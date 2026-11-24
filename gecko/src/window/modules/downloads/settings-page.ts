@@ -66,26 +66,25 @@ function render(b: Browser, host: HTMLElement): () => void {
     ytStop,
     ytGet
   );
-  // macOS: Deer cannot get the video tools there yet (ffmpeg-install.ts and ytdlp.ts take the Windows
-  // builds, and refuse to on a Mac), so the page has no Download rows and promises nothing: ffmpeg is
-  // the file chosen here or one on PATH, and the yt-dlp section only says it is not there yet.
+  // macOS: the same rows; ffmpeg-install.ts and ytdlp.ts get the macOS builds there (mac-tools.ts), and
+  // the words name what a Mac gets (no copy beside Deer, Martin Riedl's build, the sizes).
   host.append(
     el('h2', { class: 'vs-h2' }, 'Joining video and sound'),
-    el('div', { class: 'vs-card' }, row, isMac ? null : getRow),
+    el('div', { class: 'vs-card' }, row, getRow),
     el(
       'p',
       { class: 'vs-intro' },
       isMac
-        ? 'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise one on your PATH. Deer cannot download ffmpeg for you on a Mac yet. Without it, the two parts are saved as separate files.'
+        ? 'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise one Deer downloaded, otherwise one on your PATH. If you have none, Deer can download it for you. Without it, the two parts are saved as separate files.'
         : 'Streams often keep the picture and the sound apart. Deer joins them with ffmpeg without re-encoding anything. It uses the file you choose here, otherwise a copy beside Deer or one Deer downloaded, otherwise one on your PATH. If you have none, Deer can download it for you. Without it, the two parts are saved as separate files.'
     ),
     el('h2', { class: 'vs-h2' }, 'YouTube and other video sites'),
-    ...(isMac ? [] : [el('div', { class: 'vs-card' }, ytRow)]),
+    el('div', { class: 'vs-card' }, ytRow),
     el(
       'p',
       { class: 'vs-intro' },
       isMac
-        ? 'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. Saving from those sites takes yt-dlp, which Deer cannot install on a Mac yet.'
+        ? 'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. yt-dlp asks those sites for the video itself; it needs Deno, a JavaScript engine, for YouTube. Deer gets both from their GitHub releases (about 95 MB), checks them against their published fingerprints, keeps them in its own folder and makes sure your Mac lets them run. Sites change often: update yt-dlp when a site stops working.'
         : 'Some sites, YouTube first, never play from a file address, so there is nothing in the page Deer could save. yt-dlp asks those sites for the video itself; it needs Deno, a JavaScript engine, for YouTube. Deer gets both from their GitHub releases (about 60 MB), checks them against their published fingerprints and keeps them in its own folder. Sites change often: update yt-dlp when a site stops working.'
     ),
     el('h2', { class: 'vs-h2' }, 'Protected video'),
@@ -134,7 +133,9 @@ function render(b: Browser, host: HTMLElement): () => void {
     const busy = s.phase === 'checking' || s.phase === 'downloading' || s.phase === 'verifying' || s.phase === 'unpacking';
     getRow.hidden = found && !busy && s.phase !== 'failed';
     const name = s.version ? `FFmpeg ${s.version}` : 'FFmpeg';
-    let text = 'The free LGPL build from BtbN’s FFmpeg Builds on GitHub, the Windows build ffmpeg.org points to. About 75 MB, checked against its published fingerprint and kept in Deer’s folder.';
+    let text = isMac
+      ? 'The free macOS build from Martin Riedl’s FFmpeg build server, signed and notarized by its author. About 30 MB, checked against its published fingerprint and kept in Deer’s folder.'
+      : 'The free LGPL build from BtbN’s FFmpeg Builds on GitHub, the Windows build ffmpeg.org points to. About 75 MB, checked against its published fingerprint and kept in Deer’s folder.';
     if (s.phase === 'checking') text = 'Looking for the newest release…';
     else if (s.phase === 'downloading') text = s.total > 0 ? `Downloading ${name}… ${mb(s.received)} of ${mb(s.total)} MB` : `Downloading ${name}…`;
     else if (s.phase === 'verifying') text = `Checking ${name}…`;

@@ -1,0 +1,37 @@
+[config] security.sandbox.content.mac.testing_read_path1 = /Users/droid/Documents/Projects/Deer browser/gecko/build
+@@pid 9448
+WINLIST s5-alert-3
+ORDER alert {"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"dialog":true,"dialogBox":{"x":0,"y":0,"w":0,"h":0},"panelA":{"x":300,"y":56,"w":600,"h":300}}
+@@capture glass-behave-s5-alert 0x15923a200 screen 40 40 1200 760
+ORDER alert-esc {"dialogAfterEsc":false,"A":"open","router":[],"focus":"input#gb-in"}
+PASS S5 alert: the prompt opened with the panel open  {"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"dialog":true,"dialogBox":{"x":0,"y":0,"w":0,"h":0},"panelA":{"x":300,"y":56,"w":600,"h":300}}
+beforeunload: closeTab returned before the prompt was answered: false
+WINLIST s5-beforeunload-5
+ORDER beforeunload {"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":14,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"dialog":true,"tabs":[2,2]}
+@@capture glass-behave-s5-beforeunload 0x15923a200 screen 40 40 1200 760
+ORDER beforeunload-after {"tabs":2,"A":"open"}
+WINLIST s5-windowmodal-7
+ORDER windowmodal {"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":14,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"open":true,"box":{"x":412,"y":0,"w":377,"h":208}}
+@@capture glass-behave-s5-windowmodal 0x15923a200 screen 40 40 1200 760
+WINLIST s5-domfullscreen-10
+ORDER domfullscreen {"A":"open","C":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"fullscreen":false,"win":[40,40,1200,760],"anchorBox":1}
+@@capture glass-behave-s5-domfullscreen 0x15923a200 screen 40 40 1200 760
+WINLIST s5-domfullscreen-left-11
+ORDER domfullscreen-left {"A":"open","C":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}]}
+@@capture glass-behave-s5-domfullscreen-left 0x15923a200 screen 40 40 1200 760
+FAIL S5 DOM full screen entered  {"A":"open","C":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"fullscreen":false,"win":[40,40,1200,760],"anchorBox":1}
+plus capsule {"x":596,"y":8,"w":36,"h":36}
+WINLIST s5-tooltip-13
+ORDER tooltip {"focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"tip":{"x":568,"y":52,"w":93,"h":26},"tipText":"New tab⌘T","panel":{"x":0,"y":0,"w":10,"h":10}}
+@@capture glass-behave-s5-tooltip 0x15923a200 screen 40 40 1200 760
+PASS S5 tooltip shown while the glass panel covers its place  {"x":568,"y":52,"w":93,"h":26}
+WINLIST s5-menu-over-panel-15
+ORDER menu-over-panel {"A":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"menuOpen":false}
+@@capture glass-behave-s5-menu-over-panel 0x15923a200 screen 40 40 1200 760
+ORDER menu-esc {"menuOpen":false,"A":"open"}
+WINLIST s5-panel-after-menu-17
+ORDER panel-after-menu {"A":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"menuOpen":false,"P2":"showing"}
+@@capture glass-behave-s5-panel-after-menu 0x15923a200 screen 40 40 1200 760
+S5 RESULTS {"alert":{"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"dialog":true,"dialogBox":{"x":0,"y":0,"w":0,"h":0},"panelA":{"x":300,"y":56,"w":600,"h":300}},"alertEsc":{"dialogAfterEsc":false,"A":"open","router":[],"focus":"input#gb-in"},"beforeunload":{"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":14,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"dialog":true,"tabs":[2,2]},"beforeunloadAfter":{"tabs":2,"A":"open"},"windowmodal":{"A":"open","C":"open","focus":"browser.dialogFrame","windowsFrontToBack":[{"order":13,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":14,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"open":true,"box":{"x":412,"y":0,"w":377,"h":208}},"domfullscreen":{"A":"open","C":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"fullscreen":false,"win":[40,40,1200,760],"anchorBox":1},"domfullscreen-left":{"A":"open","C":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[271,127],"pos":[863,512],"title":""},{"order":14,"layer":0,"size":[541,271],"pos":[412,170],"title":""},{"order":15,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}]},"tooltip":{"focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"tip":{"x":568,"y":52,"w":93,"h":26},"tipText":"New tab⌘T","panel":{"x":0,"y":0,"w":10,"h":10}},"menu-over-panel":{"A":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"menuOpen":false},"menuEsc":{"menuOpen":false,"A":"open"},"panel-after-menu":{"A":"open","focus":"browser","windowsFrontToBack":[{"order":13,"layer":0,"size":[1081,685],"pos":[122,91],"title":"Ordering – Deer"}],"menuOpen":false,"P2":"showing"}}
+RESULT pass=2 fail=1
+@@quit

@@ -10,8 +10,17 @@
 //               .zip.sha256sum (PowerShell Get-FileHash text); yt-dlp needs a JavaScript runtime for
 //               YouTube since 2025.11 (--js-runtimes deno:<path>).
 // Nothing is installed when a fingerprint does not match.
-// macOS: not ported. Both downloads above are Windows builds, so installTools refuses there and fetches
-// nothing, and ytdlpTools looks in no folder of Deer's there (only the test pref's stand-in command).
+// macOS (installAllMac; sources and steps in mac-tools.ts): installed in ~/Library/Application
+// Support/Deer/tools (the same pref; shared by Deer and Deer Dev as on Windows; no old folder):
+//   yt-dlp/     yt-dlp_macos.zip from the same release (SHA2-256SUMS lists "<sha256>  yt-dlp_macos.zip"),
+//               the "onedir" build unpacked whole: yt-dlp/yt-dlp_macos beside yt-dlp/_internal
+//   deno        deno-<aarch64|x86_64>-apple-darwin.zip (this Mac's processor) and its .zip.sha256sum
+// After the checksums pass: mode 0755 and no quarantine anywhere (platform/tools.ts trustInstalledTree),
+// then each is started once (--version) before it replaces the one in place, so a tool macOS would
+// not start is never installed and its first-run check happens here, not in the person's download.
+// Deer and Deer Dev share the folder (mac-tools.ts, two Deers at once): an install holds
+// <tools>/.install-lock, its temporary names are its own (yt-dlp.new-<id>...), and every yt-dlp run()
+// starts is marked there (.yt-dlp-running-<pid>) until it ends, so an update in either Deer waits for it.
 //
 // Use:
 //   probe(pageUrl)  yt-dlp -J: title, duration, live, DRM and formats -> a VideoOffer (mode 'ytdlp');
@@ -39,9 +48,9 @@
 // No cookies are given to yt-dlp: it downloads what anyone can watch without signing in.
 //
 // For tests (prefs): vitre.tools.installDir; vitre.localAppData (stands in for %LOCALAPPDATA%, both
-// folders; ffmpeg-install.ts); vitre.tools.source.ytdlp / vitre.tools.source.deno (base URLs
-// of a release, ending with "/"); vitre.tools.ytdlpCommand = JSON array [program, ...first arguments]
-// replacing yt-dlp.exe (a stand-in script).
+// folders, or for ~/Library/Application Support on a Mac; ffmpeg-install.ts); vitre.tools.source.ytdlp /
+// vitre.tools.source.deno (base URLs of a release, ending with "/"); vitre.tools.ytdlpCommand = JSON
+// array [program, ...first arguments] replacing yt-dlp.exe (a stand-in script).
 //
 // Firefox internals: resource://gre/modules/Subprocess.sys.mjs, Downloads.sys.mjs (createDownload),
 // nsIZipReader.
@@ -49,7 +58,9 @@ import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { Subprocess } from 'resource://gre/modules/Subprocess.sys.mjs';
 import { clearTimeout, setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { isMac } from '../../shared/os';
+import { toolName, trustInstalledTree } from '../platform/tools';
 import { deerFolder, fetchText, oldFolder, sha256 } from './ffmpeg-install';
+import { YTDLP_MAC_DIR, YTDLP_MAC_EXE, YTDLP_MAC_ZIP, denoMacZip, markRunning, releaseText, runningMarked, sweep, takeInstallLock, tempId, tryRun, unmarkRunning, unzipAll, unzipOne } from './mac-tools';
 import { AbortedError, AddressRefusedError, DownloadError, REFUSED_STATUS } from './net';
 import { fileFor } from './partfile';
 import { sizeText } from './proof';
@@ -76,12 +87,12 @@ function exists(path: string): boolean {
   }
 }
 
-/** Where yt-dlp and Deno are installed: %LOCALAPPDATA%\Deer\tools (a test can move it). */
+/** Where yt-dlp and Deno are installed: %LOCALAPPDATA%\Deer\tools, on a Mac ~/Library/Application Support/Deer/tools (a test can move it). */
 export function toolsDir(): string {
   return pref('vitre.tools.installDir') || deerFolder('tools');
 }
 
-/** The folder installed before the rename, %LOCALAPPDATA%\Vitre\tools: read, never written. */
+/** The folder installed before the rename, %LOCALAPPDATA%\Vitre\tools: read, never written (never read on a Mac). */
 export function oldToolsDir(): string {
   return oldFolder('tools');
 }
@@ -97,9 +108,14 @@ export function ytdlpTools(): { command: string[]; deno: string } | null {
       /* fall through */
     }
   }
+  // macOS: Deer's folder only (installAllMac's layout).
+  if (isMac) {
+    const ytdlp = PathUtils.join(toolsDir(), YTDLP_MAC_DIR, YTDLP_MAC_EXE);
+    const deno = PathUtils.join(toolsDir(), toolName('deno'));
+    return exists(ytdlp) && exists(deno) ? { command: [ytdlp], deno } : null;
+  }
   // Deer's folder first: once an update has put a pair there, the old folder is no longer used.
-  // macOS: Deer installs no pair there (installTools), and %LOCALAPPDATA% does not exist on a Mac.
-  for (const dir of isMac ? [] : [toolsDir(), oldToolsDir()]) {
+  for (const dir of [toolsDir(), oldToolsDir()]) {
     const ytdlp = PathUtils.join(dir, 'yt-dlp.exe');
     const deno = PathUtils.join(dir, 'deno.exe');
     if (exists(ytdlp) && exists(deno)) return { command: [ytdlp], deno };
@@ -139,6 +155,14 @@ async function readAll(pipe: any, onChunk?: (s: string) => void): Promise<string
   }
 }
 
+/**
+ * macOS: the yt-dlp processes run() started that have not ended. An update there replaces yt-dlp's folder,
+ * which a running yt-dlp still reads its Python modules from (Windows refuses the move of a running
+ * yt-dlp.exe instead), so installAllMac waits for them, then refuses as Windows does. Each is also marked
+ * in the tools folder (markRunning), which another Deer sharing it (Deer Dev) waits for in the same way.
+ */
+const macRunning = new Set<any>();
+
 async function run(args: string[], opts: { signal?: AbortSignal | null; onLine?: (line: string) => void; timeoutMs?: number } = {}): Promise<Ran> {
   const tools = ytdlpTools();
   if (!tools) throw new DownloadError('yt-dlp is not installed (Settings › Video downloads).');
@@ -153,6 +177,16 @@ async function run(args: string[], opts: { signal?: AbortSignal | null; onLine?:
     environmentAppend: true,
     stderr: 'pipe',
   });
+  let unmarked: Promise<void> | null = null;
+  if (isMac) {
+    macRunning.add(proc);
+    const mark = markRunning(toolsDir(), Number(proc.pid), command);
+    const done = (): Promise<void> => {
+      macRunning.delete(proc);
+      return mark.then(unmarkRunning);
+    };
+    unmarked = proc.wait().then(done, done);
+  }
   let killed = false;
   const kill = (): void => {
     killed = true;
@@ -175,6 +209,8 @@ async function run(args: string[], opts: { signal?: AbortSignal | null; onLine?:
   const errP = readAll(proc.stderr);
   const [stdout, stderr] = await Promise.all([outP, errP]);
   const { exitCode } = await proc.wait();
+  // macOS: its mark is gone before run() answers.
+  if (unmarked) await unmarked;
   opts.signal?.removeEventListener('abort', kill);
   if (timer) clearTimeout(timer);
   if (opts.signal?.aborted) throw new AbortedError();
@@ -1137,16 +1173,113 @@ async function installAll(force: boolean): Promise<void> {
   }
 }
 
+/** macOS: start a freshly unpacked tool once (`args`: its version), Cancel able to stop it; throws when it did not run. */
+async function firstRun(program: string, args: string[], tool: string, ok: RegExp): Promise<void> {
+  setState({ phase: 'verifying', tool });
+  // yt-dlp's first start takes macOS's check of new code (12 to 30 s measured); a slow Mac gets two minutes.
+  const ran = await tryRun(program, args, 120000, (stop) => {
+    active = { cancel: async () => stop() };
+  });
+  active = null;
+  stopIfCancelled();
+  if (ran.error || !ok.test(ran.out)) throw new Error(`the downloaded ${tool} did not start on this Mac (${ran.error || 'no version'})`);
+}
+
+/** macOS: installAll()'s steps with the macOS builds (header; mac-tools.ts). */
+async function installAllMac(force: boolean): Promise<void> {
+  const dir = toolsDir();
+  const ytSource = pref('vitre.tools.source.ytdlp') || YTDLP_RELEASE;
+  const denoSource = pref('vitre.tools.source.deno') || DENO_RELEASE;
+  const ytHome = PathUtils.join(dir, YTDLP_MAC_DIR);
+  const deno = PathUtils.join(dir, toolName('deno'));
+  const denoZipName = denoMacZip();
+  // This install's own names (another Deer may install into the same folder; mac-tools.ts).
+  const id = tempId();
+  const ytFresh = `${ytHome}.new-${id}`;
+  const temp: string[] = [];
+  let release: (() => Promise<void>) | null = null;
+  setState({ phase: 'checking', tool: '', received: 0, total: 0, error: '' });
+  try {
+    try {
+      await IOUtils.makeDirectory(dir, { createAncestors: true, ignoreExisting: true });
+    } catch {
+      throw new Error('Deer’s folder could not be created');
+    }
+    release = await takeInstallLock(PathUtils.join(dir, '.install-lock'));
+    if (!release) throw new Error('another Deer is installing yt-dlp right now; try again when it has finished');
+    await sweep(dir, (n) => /^(yt-dlp-download|deno-download)(-\w+)?\.zip$|^(yt-dlp\.new|deno\.download)(-\w+)?$/.test(n));
+
+    // yt-dlp: the onedir zip, unpacked whole into a fresh folder.
+    const ytHash = listedHash(await releaseText(ytSource + 'SHA2-256SUMS'), YTDLP_MAC_ZIP);
+    stopIfCancelled();
+    const ytZip = PathUtils.join(dir, `yt-dlp-download-${id}.zip`);
+    temp.push(ytZip, ytFresh);
+    await fetchTo(ytSource + YTDLP_MAC_ZIP, ytZip, 'yt-dlp');
+    await verified(ytZip, ytHash, 'yt-dlp');
+    setState({ phase: 'unpacking', tool: 'yt-dlp' });
+    await new Promise((r) => setTimeout(r, 0));
+    await IOUtils.remove(ytFresh, { recursive: true, ignoreAbsent: true });
+    await IOUtils.makeDirectory(ytFresh, { createAncestors: true, ignoreExisting: true });
+    await unzipAll(ytZip, ytFresh);
+    await IOUtils.remove(ytZip, { ignoreAbsent: true });
+    const ytExe = PathUtils.join(ytFresh, YTDLP_MAC_EXE);
+    if (!exists(ytExe)) throw new Error(`the yt-dlp download has no ${YTDLP_MAC_EXE} in it`);
+    if (!(await trustInstalledTree(ytFresh, [ytExe]))) throw new Error('macOS did not let Deer mark yt-dlp as safe to run');
+    stopIfCancelled();
+
+    // Deno: a zip with deno (kept when it is there already, unless updating).
+    let denoTmp = '';
+    if (force || !exists(deno)) {
+      const denoHash = listedHash(await releaseText(denoSource + denoZipName + '.sha256sum'), denoZipName);
+      stopIfCancelled();
+      const zip = PathUtils.join(dir, `deno-download-${id}.zip`);
+      temp.push(zip);
+      await fetchTo(denoSource + denoZipName, zip, 'Deno');
+      await verified(zip, denoHash, 'Deno');
+      setState({ phase: 'unpacking', tool: 'Deno' });
+      await new Promise((r) => setTimeout(r, 0));
+      denoTmp = `${deno}.download-${id}`;
+      temp.push(denoTmp);
+      if (!(await unzipOne(zip, /(^|\/)deno$/, denoTmp))) throw new Error('the Deno download has no deno in it');
+      if (!(await trustInstalledTree(denoTmp, [denoTmp]))) throw new Error('macOS did not let Deer mark Deno as safe to run');
+    }
+    stopIfCancelled();
+
+    // Each starts once before it replaces the one in place.
+    await firstRun(ytExe, ['--no-config', '--version'], 'yt-dlp', /^\s*\d{4}\.\d{2}\.\d{2}/m);
+    if (denoTmp) await firstRun(denoTmp, ['--version'], 'Deno', /deno\s+\d/i);
+    // A yt-dlp that runs reads its folder: a page's question (-J) ends within seconds, a download does not.
+    // This Deer's own (macRunning) and any Deer's marked in the folder (another Deer's: Deer Dev).
+    const inUse = async (): Promise<boolean> => macRunning.size > 0 || (await runningMarked(dir)) > 0;
+    for (const until = Date.now() + 20000; (await inUse()) && Date.now() < until; ) {
+      await new Promise((r) => setTimeout(r, 500));
+      stopIfCancelled();
+    }
+    if (await inUse()) throw new Error('yt-dlp is in use by a download; let it finish and try again');
+    try {
+      await IOUtils.remove(ytHome, { recursive: true, ignoreAbsent: true });
+      await IOUtils.move(ytFresh, ytHome);
+      if (denoTmp) await IOUtils.move(denoTmp, deno);
+    } catch {
+      throw new Error('yt-dlp or Deno could not be put in place in Deer’s folder');
+    }
+    setState({ phase: 'done', tool: '' });
+  } catch (e) {
+    if (e instanceof Cancelled || cancelled) setState({ phase: 'cancelled' });
+    else setState({ phase: 'failed', error: e instanceof Error ? e.message : String(e) });
+    throw e;
+  } finally {
+    active = null;
+    for (const t of temp) await IOUtils.remove(t, { recursive: true, ignoreAbsent: true }).catch(() => undefined);
+    await release?.();
+  }
+}
+
 /** Download, check and put in place yt-dlp (always) and Deno (when missing, or always with `force`). */
 export function installTools(force = false): Promise<void> {
   if (installing) return installing;
-  if (isMac) {
-    // yt-dlp.exe and Deno's Windows zip (DENO_ZIP): nothing that would run on a Mac.
-    setState({ phase: 'failed', tool: '', received: 0, total: 0, error: 'it is not available on a Mac yet' });
-    return Promise.reject(new Error('yt-dlp is not available on a Mac yet'));
-  }
   cancelled = false;
-  installing = installAll(force).finally(() => {
+  installing = (isMac ? installAllMac(force) : installAll(force)).finally(() => {
     installing = null;
   });
   return installing;

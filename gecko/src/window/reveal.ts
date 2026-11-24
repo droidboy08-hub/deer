@@ -18,14 +18,17 @@
 // `bar-revealed` (it is showing anyway). The window controls (and a private window's label) hide and
 // come back with the bar.
 //
-// macOS, One row (./onerow.ts). In a normal window the row never hides, whatever the setting: it
-// floats over the page there as the Windows bar does with the setting off, and pages get the top
-// strip (pagearea.ts; Mac auto-hide while reading is not designed yet). In window
-// full screen (native Spaces) it hides as the Windows bar does in F11 full screen, whatever the
-// setting (the owner, 2026-11-15: "full screen browser with no bars at the top ... just like the
-// Windows browser Deer"): the page fills the screen and the row comes back by the rules above
-// (pointer at the top, on the row, focus, a hold). Settings shows no "Show the tab bar" row on a Mac
-// (settings/pages.ts) and Home's menu no "Show tab bar" (menus/page-items.ts). The row's own end,
+// macOS, One row (./onerow.ts). In a normal window the row follows the setting as the Windows bar
+// does (the owner, 2026-11-15: "where is the option to hide the capsule tabs ... like in windows"):
+// "Show the tab bar" in Settings (settings/pages.ts) and Home's menu (menus/page-items.ts). Hidden,
+// the capsules, the traffic lights' capsule and the native lights in it (skin/bar.css, macOS: the
+// lights go at once, by visibility) and #vitre-row-end slide away; the 18 px drag strip at the top
+// stays, so the window still moves by its top edge (and pointing there brings the row). Shown, it
+// floats over the page and pages get the top strip (pagearea.ts). In window full screen (native
+// Spaces) it hides as the Windows bar does in F11 full screen, whatever the setting (the owner,
+// 2026-11-15: "full screen browser with no bars at the top ... just like the Windows browser Deer"):
+// the page fills the screen. Either way it comes back by the rules above (pointer at the top, on the
+// row, focus, a hold). The row's own end,
 // #vitre-row-end, counts as the bar for focus and for a popover open from one of its capsules
 // (wanted()).
 // In window full screen, when the pointer reaches the top of the screen macOS slides in its menu bar and, under
@@ -111,8 +114,8 @@ export class Reveal {
   update(): void {
     const fullscreen = this.b.root.classList.contains('fullscreen');
     // Windows: F11 full screen or the setting. macOS: window full screen, as F11 on Windows (header;
-    // not for a page element in full screen, which hides Deer's layer anyway).
-    const hiding = oneRow() ? rowFullScreen(this.b.root) : fullscreen || !!this.b.settings.barAutoHide;
+    // not for a page element in full screen, which hides Deer's layer anyway), or the setting.
+    const hiding = (oneRow() ? rowFullScreen(this.b.root) : fullscreen) || !!this.b.settings.barAutoHide;
     // Out of full screen macOS reports no more overlap: the row goes back up (Firefox does the same
     // when it leaves full screen, FullScreen.toggle -> shiftMacToolbarDown(0)).
     if (!fullscreen && this.shift) this.menuBar(0);
@@ -123,6 +126,12 @@ export class Reveal {
       this.stopWatch();
       if (hiding && this.wanted()) {
         this.revealed = true;
+        this.startWatch();
+      }
+    } else if (hiding) {
+      if (this.wanted() && !this.revealed) {
+        this.show();
+      } else if (this.revealed && !this.wanted() && !this.watch) {
         this.startWatch();
       }
     }
@@ -177,6 +186,8 @@ export class Reveal {
 
   /** Is there a reason for the bar to be on screen right now? */
   private wanted(): boolean {
+    const isFullscreen = oneRow() ? rowFullScreen(this.b.root) : this.b.root.classList.contains('fullscreen');
+    if (!isFullscreen && this.b.settings.showCapsulesOnHome && this.b.active()?.kind === 'home') return true;
     if (this.lastY <= KEEP_ABOVE + this.reach) return true;
     // macOS full screen: the menu bar is down (the pointer is up there, or on its way back).
     if (this.shift > 0) return true;

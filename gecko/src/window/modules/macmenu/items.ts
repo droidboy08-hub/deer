@@ -54,7 +54,7 @@ import { bindingsFor, specOf, type Binding } from '../../../shared/shortcuts';
 import { keyAttrs } from './keyattr';
 
 /** Things an item does that are not Deer actions. */
-export type Verb = 'about' | 'updates' | 'zoom' | 'front' | 'github';
+export type Verb = 'about' | 'updates' | 'zoom' | 'front' | 'github' | 'bookmark' | 'bookmarksLibrary' | 'savedLogins';
 
 export interface Item {
   /** The element id: Deer's own ("vitre-mb-..."), or the id Firefox's menu code looks for. */
@@ -187,6 +187,16 @@ export const MENUS: Menu[] = [
       { id: RECENT_ID, label: 'Recently Closed', items: [] },
       null,
       act('clearData', 'Clear Browsing Data…', { hidden: 'app' }),
+    ],
+  },
+  {
+    id: 'vitre-menu-bookmarks',
+    label: 'Bookmarks',
+    items: [
+      { id: 'vitre-mb-bookmark-tab', label: 'Bookmark Current Tab…', verb: 'bookmark' },
+      { id: 'vitre-mb-manage-bookmarks', label: 'Manage Bookmarks…', verb: 'bookmarksLibrary', hidden: 'app' },
+      null,
+      { id: 'vitre-mb-saved-logins', label: 'Saved Logins and Passwords…', verb: 'savedLogins', hidden: 'app' },
     ],
   },
   {
@@ -461,6 +471,23 @@ export function runVerb(verb: Verb, win: any): void {
     case 'github':
       b?.newTab(GITHUB_URL);
       break;
+    case 'bookmark':
+      try {
+        win?.PlacesCommandHook?.bookmarkPage?.();
+      } catch (e) {
+        console.warn('Deer menu: bookmark failed', e);
+      }
+      break;
+    case 'bookmarksLibrary':
+      try {
+        win?.PlacesCommandHook?.showPlacesOrganizer?.('AllBookmarks');
+      } catch (e) {
+        console.warn('Deer menu: bookmarksLibrary failed', e);
+      }
+      break;
+    case 'savedLogins':
+      b?.newTab('about:logins');
+      break;
   }
 }
 
@@ -522,7 +549,10 @@ async function runFromHidden(item: Item, hiddenWin: any, event: any): Promise<vo
   }
   if (!item.hidden) return;
   const win = await frontWindow();
+  // Show All History opens the panel, never closes it (as in a window's menu bar: index.ts header).
+  const history = item.action === 'history' ? win?.vitre?.service('history') : undefined;
   if (item.verb) runVerb(item.verb, win);
+  else if (history) history.open();
   else if (item.action) win?.vitre?.run(item.action, item.arg);
 }
 

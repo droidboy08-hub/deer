@@ -1,0 +1,444 @@
+ffmpeg failed: -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion.mkv -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-motion.mp4 [in#0 @ 0xa7cc20000] EBML header parsing failed
+[in#0 @ 0xa7cc1c000] Error opening input: Invalid data found when processing input
+Error opening input file /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion.mkv.
+Error opening input files: Invalid data found when processing input
+
+ffmpeg failed: -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-css.mkv -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-motion-css.mp4 [in#0 @ 0xc2ac1c000] EBML header parsing failed
+[in#0 @ 0xc2b010000] Error opening input: Invalid data found when processing input
+Error opening input file /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-css.mkv.
+Error opening input files: Invalid data found when processing input
+
+ffmpeg failed: -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-24.mkv -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-motion-24.mp4 [in#0 @ 0x956c20000] EBML header parsing failed
+[in#0 @ 0x956c1c000] Error opening input: Invalid data found when processing input
+Error opening input file /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-24.mkv.
+Error opening input files: Invalid data found when processing input
+
+ffmpeg failed: -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-css.mkv -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion.mkv -i /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-24.mkv -filter_com [in#0 @ 0xc8881c000] EBML header parsing failed
+[in#0 @ 0xc88814000] Error opening input: Invalid data found when processing input
+Error opening input file /var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-css.mkv.
+Error opening input files: Invalid data found when processing input
+
+ffmpeg failed: -i /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-article-css.png -i /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-article-36.png -i /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-article-24.png -i /Users/d [Parsed_vstack_81 @ 0x902873b40] Input 21 width 480 does not match input 0 width 640.
+[Parsed_vstack_81 @ 0x902873b40] Failed to configure output pad on Parsed_vstack_81
+[fc#0 @ 0x90280c000] Error reinitializing filters!
+[fc#0 @ 0x90280c000] Task finished with error code: -22 (Invalid argument)
+[fc#0 @ 0x90280c000] Terminating thread with return code -22 (Invalid argument)
+[vost#0:0/png @ 0x903428000] [enc:png @ 0x903030230] Could not open encoder before EOF
+[vost#0:0/png @ 0x903428000] Task fin
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-article.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-scrolled.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-dark.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-home.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-photo.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-hover.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-typing.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-resized.png
+summary: /Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/glass-demo-summary-menu.png
+
+== Ink contrast on each capsule (WCAG; under 3:1 hard to read, under 4.5:1 below the text rule) ==
+tone = median sRGB grey of the capsule (inset 3 CSS px), ink = Deer's colour blended on it
+glass-demo-article-css         theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 255  contrast 16.8
+    plus                   plus              tone 255  contrast 16.8
+    Night Shift            tab               tone 255  contrast 11.3
+    Home                   tab               tone 255  contrast 11.3
+    Wildlife - Long Exposu tab               tone 255  contrast 11.3
+    Tideline               tab               tone 255  contrast 11.3
+    Refract                tab               tone 255  contrast 11.3
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-article-36          theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 249  contrast 16.0
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 249  contrast 10.8
+    Home                   tab         light tone 249  contrast 10.8
+    Wildlife - Long Exposu tab         light tone 249  contrast 10.8
+    Tideline               tab         light tone 249  contrast 10.8
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-article-24          theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 249  contrast 16.0
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 249  contrast 10.8
+    Home                   tab         light tone 249  contrast 10.8
+    Wildlife - Long Exposu tab         light tone 249  contrast 10.8
+    Tideline               tab         light tone 249  contrast 10.8
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-scrolled-css        theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 255  contrast 16.8
+    plus                   plus              tone 255  contrast 16.8
+    Night Shift            tab               tone 255  contrast 11.3
+    Home                   tab               tone 255  contrast 11.3
+    Wildlife - Long Exposu tab               tone 255  contrast 11.3
+    Tideline               tab               tone 255  contrast 11.3
+    Refract                tab               tone 255  contrast 11.3
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-scrolled-36         theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 249  contrast 16.0
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 249  contrast 10.8
+    Home                   tab         light tone 249  contrast 10.8
+    Wildlife - Long Exposu tab         light tone 249  contrast 10.8
+    Tideline               tab         light tone 249  contrast 10.8
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-scrolled-24         theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 249  contrast 16.0
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 249  contrast 10.8
+    Home                   tab         light tone 249  contrast 10.8
+    Wildlife - Long Exposu tab         light tone 249  contrast 10.8
+    Tideline               tab         light tone 249  contrast 10.8
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-dark-css            theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab               tone  59  contrast 9.5
+    plus                   plus              tone  59  contrast 11.7
+    Night Shift            active            tone  59  contrast 11.7
+    Home                   tab               tone  59  contrast 9.5
+    Wildlife - Long Exposu tab               tone  59  contrast 9.5
+    Tideline               tab               tone  59  contrast 9.5
+    Refract                tab               tone  59  contrast 9.5
+    vd-ring                vd-ring           tone  59  contrast 11.7
+    vx-rowcap              vx-rowcap         tone  59  contrast 11.7
+glass-demo-dark-36             theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  32  contrast 13.6
+    plus                   plus        dark  tone  32  contrast 17.4
+    Night Shift            active      dark  tone  32  contrast 17.4
+    Home                   tab         dark  tone  32  contrast 13.6
+    Wildlife - Long Exposu tab         dark  tone  32  contrast 13.6
+    Tideline               tab         dark  tone  32  contrast 13.6
+    Refract                tab         dark  tone  32  contrast 13.6
+    downloads              downloads   dark  tone  32  contrast 17.4
+    extensions             extensions  dark  tone  32  contrast 17.4
+glass-demo-dark-24             theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  32  contrast 13.6
+    plus                   plus        dark  tone  32  contrast 17.4
+    Night Shift            active      dark  tone  32  contrast 17.4
+    Home                   tab         dark  tone  32  contrast 13.6
+    Wildlife - Long Exposu tab         dark  tone  32  contrast 13.6
+    Tideline               tab         dark  tone  32  contrast 13.6
+    Refract                tab         dark  tone  32  contrast 13.6
+    downloads              downloads   dark  tone  32  contrast 17.4
+    extensions             extensions  dark  tone  32  contrast 17.4
+glass-demo-home-css            theme-clear 9 capsules, under 3:1: 0, under 4.5:1: 1
+    Float glass - Field No tab               tone  90  contrast 5.7
+    plus                   plus              tone  32  contrast 17.4
+    Night Shift            tab               tone  70  contrast 7.9
+    Home                   active            tone  85  contrast 3.8
+    Wildlife - Long Exposu tab               tone  44  contrast 11.8
+    Tideline               tab               tone  36  contrast 13.1
+    Refract                tab               tone  34  contrast 13.4
+    vd-ring                vd-ring           tone  35  contrast 16.7
+    vx-rowcap              vx-rowcap         tone  53  contrast 12.9
+glass-demo-home-36             theme-clear 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  66  contrast 8.3
+    plus                   plus        dark  tone  26  contrast 18.5
+    Night Shift            tab         dark  tone  53  contrast 10.2
+    Home                   active      dark  tone  62  contrast 5.1
+    Wildlife - Long Exposu tab         dark  tone  32  contrast 13.5
+    Tideline               tab         dark  tone  27  contrast 14.3
+    Refract                tab         dark  tone  26  contrast 14.4
+    downloads              downloads   dark  tone  27  contrast 18.3
+    extensions             extensions  dark  tone  37  contrast 16.3
+glass-demo-home-24             theme-clear 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  73  contrast 7.4
+    plus                   plus        dark  tone   0  contrast 21.0
+    Night Shift            tab         dark  tone  39  contrast 12.6
+    Home                   active      dark  tone  60  contrast 5.2
+    Wildlife - Long Exposu tab         dark  tone  49  contrast 10.7
+    Tideline               tab         dark  tone  26  contrast 14.4
+    Refract                tab         dark  tone   6  contrast 15.9
+    downloads              downloads   dark  tone  28  contrast 18.3
+    extensions             extensions  dark  tone  37  contrast 16.4
+glass-demo-photo-css           theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab               tone  54  contrast 10.1
+    plus                   plus              tone  54  contrast 12.6
+    Night Shift            tab               tone  54  contrast 10.1
+    Home                   tab               tone  54  contrast 10.1
+    Wildlife - Long Exposu active            tone  54  contrast 12.6
+    Tideline               tab               tone  54  contrast 10.1
+    Refract                tab               tone  54  contrast 10.1
+    vd-ring                vd-ring           tone  54  contrast 12.6
+    vx-rowcap              vx-rowcap         tone  54  contrast 12.6
+glass-demo-photo-36            theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  30  contrast 13.9
+    plus                   plus        dark  tone  30  contrast 17.7
+    Night Shift            tab         dark  tone  30  contrast 13.9
+    Home                   tab         dark  tone  30  contrast 13.9
+    Wildlife - Long Exposu active      dark  tone  30  contrast 17.7
+    Tideline               tab         dark  tone  30  contrast 13.9
+    Refract                tab         dark  tone  30  contrast 13.9
+    downloads              downloads   dark  tone  30  contrast 17.7
+    extensions             extensions  dark  tone  30  contrast 17.7
+glass-demo-photo-24            theme-dark  9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No tab         dark  tone  30  contrast 13.9
+    plus                   plus        dark  tone  30  contrast 17.7
+    Night Shift            tab         dark  tone  30  contrast 13.9
+    Home                   tab         dark  tone  30  contrast 13.9
+    Wildlife - Long Exposu active      dark  tone  30  contrast 17.7
+    Tideline               tab         dark  tone  30  contrast 13.9
+    Refract                tab         dark  tone  30  contrast 13.9
+    downloads              downloads   dark  tone  30  contrast 17.7
+    extensions             extensions  dark  tone  30  contrast 17.7
+glass-demo-hover-css           theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 238  contrast 14.6
+    plus                   plus              tone 255  contrast 16.8
+    Night Shift            tab               tone 234  contrast 9.5
+    Home                   tab               tone 235  contrast 9.6
+    Wildlife - Long Exposu tab               tone 236  contrast 9.6
+    Tideline               tab               tone 241  contrast 15.0
+    Refract                tab               tone 255  contrast 11.3
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-hover-36            theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 246  contrast 15.6
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 240  contrast 10.0
+    Home                   tab         light tone 242  contrast 10.2
+    Wildlife - Long Exposu tab         light tone 241  contrast 10.1
+    Tideline               tab         light tone 242  contrast 15.1
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-hover-24            theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 247  contrast 15.7
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 240  contrast 10.0
+    Home                   tab         light tone 243  contrast 10.2
+    Wildlife - Long Exposu tab         light tone 242  contrast 10.2
+    Tideline               tab         light tone 243  contrast 15.2
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-typing-css          theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 235  contrast 14.2
+    plus                   plus              tone 237  contrast 14.4
+    Night Shift            tab               tone 231  contrast 9.3
+    Home                   tab               tone 232  contrast 9.4
+    Wildlife - Long Exposu tab               tone 232  contrast 9.3
+    Tideline               tab               tone 234  contrast 9.5
+    Refract                tab               tone 232  contrast 9.3
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-typing-36           theme-light 10 capsules, under 3:1: 0, under 4.5:1: 1
+    field                  field       light tone 246  contrast 15.6
+    plus                   plus        light tone 246  contrast 15.6
+    Night Shift            tab         light tone 231  contrast 9.3
+    Home                   tab         light tone 242  contrast 10.2
+    Wildlife - Long Exposu tab         light tone 233  contrast 9.4
+    Tideline               tab         light tone 233  contrast 9.4
+    Refract                tab         light tone 233  contrast 9.4
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+    suggestions            suggestions light tone 106  contrast 3.1
+glass-demo-typing-24           theme-light 10 capsules, under 3:1: 0, under 4.5:1: 3
+    field                  field       light tone 247  contrast 15.7
+    plus                   plus        light tone 247  contrast 15.7
+    Night Shift            tab         light tone 136  contrast 3.2
+    Home                   tab         light tone 244  contrast 10.3
+    Wildlife - Long Exposu tab         light tone 164  contrast 4.7
+    Tideline               tab         light tone 133  contrast 3.1
+    Refract                tab         light tone 218  contrast 8.2
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+    suggestions            suggestions light tone 106  contrast 3.1
+glass-demo-resized-css         theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 236  contrast 14.4
+    plus                   plus              tone 233  contrast 14.0
+    Night Shift            tab               tone 229  contrast 9.0
+    Home                   tab               tone 236  contrast 9.7
+    Wildlife - Long Exposu tab               tone 233  contrast 9.4
+    Tideline               tab               tone 231  contrast 9.3
+    Refract                tab               tone 230  contrast 9.2
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-resized-36          theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 243  contrast 15.2
+    plus                   plus        light tone 245  contrast 15.4
+    Night Shift            tab         light tone 231  contrast 9.2
+    Home                   tab         light tone 243  contrast 10.3
+    Wildlife - Long Exposu tab         light tone 236  contrast 9.6
+    Tideline               tab         light tone 231  contrast 9.3
+    Refract                tab         light tone 232  contrast 9.3
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-resized-24          theme-light 9 capsules, under 3:1: 0, under 4.5:1: 2
+    Float glass - Field No active      light tone 245  contrast 15.4
+    plus                   plus        light tone 246  contrast 15.6
+    Night Shift            tab         light tone 135  contrast 3.2
+    Home                   tab         light tone 245  contrast 10.4
+    Wildlife - Long Exposu tab         light tone 164  contrast 4.7
+    Tideline               tab         light tone 133  contrast 3.1
+    Refract                tab         light tone 218  contrast 8.2
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-menu-css            theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active            tone 238  contrast 14.6
+    plus                   plus              tone 255  contrast 16.8
+    Night Shift            tab               tone 234  contrast 9.5
+    Home                   tab               tone 235  contrast 9.6
+    Wildlife - Long Exposu tab               tone 236  contrast 9.6
+    Tideline               tab               tone 235  contrast 9.6
+    Refract                tab               tone 239  contrast 9.9
+    vd-ring                vd-ring           tone 254  contrast 16.7
+    vx-rowcap              vx-rowcap         tone 255  contrast 16.8
+glass-demo-menu-36             theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 246  contrast 15.6
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 240  contrast 10.0
+    Home                   tab         light tone 242  contrast 10.2
+    Wildlife - Long Exposu tab         light tone 241  contrast 10.1
+    Tideline               tab         light tone 240  contrast 10.0
+    Refract                tab         light tone 249  contrast 10.8
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+glass-demo-menu-24             theme-light 9 capsules, under 3:1: 0, under 4.5:1: 0
+    Float glass - Field No active      light tone 247  contrast 15.7
+    plus                   plus        light tone 249  contrast 16.0
+    Night Shift            tab         light tone 240  contrast 10.0
+    Home                   tab         light tone 243  contrast 10.2
+    Wildlife - Long Exposu tab         light tone 242  contrast 10.2
+    Tideline               tab         light tone 240  contrast 10.0
+    Refract                tab         light tone 248  contrast 10.7
+    downloads              downloads   light tone 249  contrast 16.0
+    extensions             extensions  light tone 249  contrast 16.0
+
+== Lag, variant 36: 12 glass windows matched to capsules, 887 frames of Deer's row, 228 window-server samples ==
+(off = glass window against where Deer's row had its capsule, both relative to Deer's window; delay = the shift of the row's timeline that fits the glass best)
+bg-tab-open     1030 ms  windows: 7, max off 38 pt, mean off 2.1 pt, best-fit delay median 36 ms (36..36)
+      c3   tab         max off  37.6 pt, mean  3.5 pt, best delay 36 ms, then off 0.8 pt
+      c5   tab         max off  34.9 pt, mean  3.3 pt, best delay 36 ms, then off 1.1 pt
+      c4   tab         max off  34.9 pt, mean  3.3 pt, best delay 36 ms, then off 0.7 pt
+bg-tab-close     908 ms  windows: 6, max off 36 pt, mean off 2.1 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  36.4 pt, mean  3.1 pt, best delay 24 ms, then off 0.4 pt
+      c5   tab         max off  33.1 pt, mean  2.8 pt, best delay 24 ms, then off 0.4 pt
+      c4   tab         max off  33.1 pt, mean  2.8 pt, best delay 24 ms, then off 0.2 pt
+fg-tab-open     1111 ms  windows: 8, max off 171 pt, mean off 4.2 pt, best-fit delay median 36 ms (36..40)
+      c3   tab         max off 171.4 pt, mean 10.6 pt, best delay 36 ms, then off 4.0 pt
+      c1   active      max off 171.4 pt, mean 10.6 pt, best delay 36 ms, then off 3.9 pt
+      c5   tab         max off  58.3 pt, mean  3.6 pt, best delay 36 ms, then off 2.1 pt
+fg-tab-close    1044 ms  windows: 7, max off 138 pt, mean off 3.8 pt, best-fit delay median 32 ms (32..36)
+      c1   tab         max off 137.6 pt, mean  8.6 pt, best delay 32 ms, then off 1.9 pt
+      c3   tab         max off 137.6 pt, mean  8.6 pt, best delay 32 ms, then off 2.0 pt
+      c5   tab         max off  46.8 pt, mean  2.9 pt, best delay 32 ms, then off 1.1 pt
+hover-in        1238 ms  windows: 3, max off 7 pt, mean off 0.4 pt, best-fit delay median 24 ms (24..24)
+      c6   tab         max off   6.5 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+      c7   tab         max off   6.5 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+      c2   plus        max off   6.5 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+hover-out        511 ms  windows: 3, max off 7 pt, mean off 0.9 pt, best-fit delay median 20 ms (20..20)
+      c7   tab         max off   6.6 pt, mean  0.9 pt, best delay 20 ms, then off 0.2 pt
+      c6   tab         max off   6.6 pt, mean  0.9 pt, best delay 20 ms, then off 0.2 pt
+      c2   plus        max off   6.6 pt, mean  0.9 pt, best delay 20 ms, then off 0.2 pt
+typing-open      411 ms  windows: 7, max off 157 pt, mean off 13.3 pt, best-fit delay median 40 ms (40..40)
+      c1   active      max off 157.1 pt, mean 20.6 pt, best delay 40 ms, then off 4.1 pt
+      c3   tab         max off 138.5 pt, mean 22.1 pt, best delay 40 ms, then off 5.5 pt
+      c4   tab         max off  94.1 pt, mean 15.1 pt, best delay 40 ms, then off 3.8 pt
+typing          1768 ms  windows: 4, max off 0 pt, mean off 0.0 pt, best-fit delay median - ms (-..-)
+      c5   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+      c4   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+      c3   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+typing-close     708 ms  windows: 7, max off 79 pt, mean off 4.9 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  78.8 pt, mean  8.1 pt, best delay 24 ms, then off 1.3 pt
+      c1   field       max off  78.8 pt, mean  8.1 pt, best delay 24 ms, then off 0.9 pt
+      c4   tab         max off  53.5 pt, mean  5.5 pt, best delay 24 ms, then off 1.0 pt
+resize-narrow    816 ms  windows: 8, max off 107 pt, mean off 9.1 pt, best-fit delay median 32 ms (32..32)
+      c2   plus        max off 107.1 pt, mean 14.8 pt, best delay 32 ms, then off 0.6 pt
+      c7   tab         max off  88.5 pt, mean 12.4 pt, best delay 32 ms, then off 0.7 pt
+      c6   tab         max off  68.8 pt, mean 10.0 pt, best delay 32 ms, then off 0.6 pt
+resize-wide      913 ms  windows: 8, max off 124 pt, mean off 7.6 pt, best-fit delay median 32 ms (28..32)
+      c2   plus        max off 124.1 pt, mean 13.0 pt, best delay 32 ms, then off 0.9 pt
+      c7   tab         max off 100.6 pt, mean 11.0 pt, best delay 32 ms, then off 0.9 pt
+      c6   tab         max off  75.5 pt, mean  8.8 pt, best delay 32 ms, then off 0.8 pt
+snaps (window jumped > 20 pt against Deer's window while its capsule stood): 7
+      at +2606 ms (fg-tab-open): c5 window x 765 -> 786 against Deer's window, capsule at 793
+      at +6491 ms (typing-open): c5 window x 755 -> 784 against Deer's window, capsule at 794
+      at +2606 ms (fg-tab-open): c4 window x 672 -> 693 against Deer's window, capsule at 700
+      at +6491 ms (typing-open): c4 window x 679 -> 719 against Deer's window, capsule at 734
+      at +3675 ms (fg-tab-close): c3 window x 304 -> 345 against Deer's window, capsule at 378
+      at +6491 ms (typing-open): c3 window x 583 -> 643 against Deer's window, capsule at 665
+      at +6491 ms (typing-open): c2 window x 1049 -> 1018 against Deer's window, capsule at 1006
+window-move: Deer's window x [(22, 240)]
+   glass c9 x [(22, 1464)]
+   glass c8 x [(22, 1420)]
+window-back: Deer's window x [(23, 40)]
+   glass c9 x [(23, 1264)]
+   glass c8 x [(23, 1220)]
+
+== Lag, variant 24: 12 glass windows matched to capsules, 877 frames of Deer's row, 223 window-server samples ==
+(off = glass window against where Deer's row had its capsule, both relative to Deer's window; delay = the shift of the row's timeline that fits the glass best)
+bg-tab-open     1031 ms  windows: 7, max off 36 pt, mean off 1.6 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  35.7 pt, mean  2.8 pt, best delay 24 ms, then off 0.4 pt
+      c5   tab         max off  32.5 pt, mean  2.5 pt, best delay 24 ms, then off 0.5 pt
+      c4   tab         max off  32.5 pt, mean  2.5 pt, best delay 24 ms, then off 0.3 pt
+bg-tab-close     906 ms  windows: 6, max off 37 pt, mean off 1.9 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  36.9 pt, mean  2.9 pt, best delay 24 ms, then off 0.4 pt
+      c5   tab         max off  33.5 pt, mean  2.7 pt, best delay 24 ms, then off 0.5 pt
+      c4   tab         max off  33.5 pt, mean  2.7 pt, best delay 24 ms, then off 0.3 pt
+fg-tab-open     1129 ms  windows: 8, max off 199 pt, mean off 4.2 pt, best-fit delay median 36 ms (36..36)
+      c3   tab         max off 199.2 pt, mean 10.5 pt, best delay 36 ms, then off 3.0 pt
+      c1   active      max off 199.2 pt, mean 10.5 pt, best delay 36 ms, then off 2.9 pt
+      c5   tab         max off  67.7 pt, mean  3.6 pt, best delay 36 ms, then off 1.6 pt
+fg-tab-close    1042 ms  windows: 7, max off 140 pt, mean off 5.0 pt, best-fit delay median 40 ms (40..40)
+      c3   tab         max off 139.7 pt, mean 11.1 pt, best delay 40 ms, then off 0.8 pt
+      c1   tab         max off 139.7 pt, mean 11.1 pt, best delay 40 ms, then off 0.7 pt
+      c5   tab         max off  47.5 pt, mean  3.8 pt, best delay 40 ms, then off 0.5 pt
+hover-in        1229 ms  windows: 3, max off 7 pt, mean off 0.4 pt, best-fit delay median 24 ms (24..24)
+      c7   tab         max off   6.6 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+      c6   tab         max off   6.6 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+      c2   plus        max off   6.6 pt, mean  0.4 pt, best delay 24 ms, then off 0.1 pt
+hover-out        521 ms  windows: 3, max off 7 pt, mean off 0.9 pt, best-fit delay median 24 ms (24..24)
+      c7   tab         max off   6.6 pt, mean  0.9 pt, best delay 24 ms, then off 0.2 pt
+      c6   tab         max off   6.6 pt, mean  0.9 pt, best delay 24 ms, then off 0.2 pt
+      c2   plus        max off   6.6 pt, mean  0.9 pt, best delay 24 ms, then off 0.2 pt
+typing-open      409 ms  windows: 7, max off 122 pt, mean off 14.3 pt, best-fit delay median 40 ms (40..40)
+      c1   active      max off 122.1 pt, mean 22.7 pt, best delay 40 ms, then off 1.8 pt
+      c3   tab         max off  99.9 pt, mean 23.7 pt, best delay 40 ms, then off 2.8 pt
+      c4   tab         max off  68.5 pt, mean 16.2 pt, best delay 40 ms, then off 2.0 pt
+typing          1685 ms  windows: 4, max off 0 pt, mean off 0.0 pt, best-fit delay median - ms (-..-)
+      c5   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+      c4   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+      c3   tab         max off   0.0 pt, mean  0.0 pt, best delay None ms, then off - pt
+typing-close     718 ms  windows: 7, max off 79 pt, mean off 4.8 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  78.8 pt, mean  7.9 pt, best delay 24 ms, then off 1.2 pt
+      c1   field       max off  78.8 pt, mean  7.9 pt, best delay 24 ms, then off 0.9 pt
+      c4   tab         max off  53.5 pt, mean  5.4 pt, best delay 24 ms, then off 0.9 pt
+resize-narrow    809 ms  windows: 8, max off 155 pt, mean off 9.7 pt, best-fit delay median 36 ms (32..36)
+      c2   plus        max off 155.4 pt, mean 16.1 pt, best delay 36 ms, then off 1.2 pt
+      c7   tab         max off 129.0 pt, mean 13.6 pt, best delay 36 ms, then off 1.3 pt
+      c6   tab         max off 101.2 pt, mean 10.9 pt, best delay 36 ms, then off 1.2 pt
+resize-wide      911 ms  windows: 8, max off 147 pt, mean off 8.6 pt, best-fit delay median 36 ms (36..36)
+      c2   plus        max off 146.9 pt, mean 14.1 pt, best delay 36 ms, then off 1.4 pt
+      c7   tab         max off 123.3 pt, mean 11.9 pt, best delay 36 ms, then off 1.5 pt
+      c6   tab         max off  97.5 pt, mean  9.6 pt, best delay 36 ms, then off 1.2 pt
+snaps (window jumped > 20 pt against Deer's window while its capsule stood): 9
+      at +10452 ms (resize-wide): c9 window x 1150 -> 1178 against Deer's window, capsule at 1184
+      at +10452 ms (resize-wide): c8 window x 1106 -> 1134 against Deer's window, capsule at 1140
+      at +2613 ms (fg-tab-open): c7 window x 990 -> 1015 against Deer's window, capsule at 1020
+      at +9552 ms (resize-narrow): c7 window x 910 -> 867 against Deer's window, capsule at 829
+      at +2613 ms (fg-tab-open): c6 window x 886 -> 911 against Deer's window, capsule at 916
+      at +9552 ms (resize-narrow): c6 window x 816 -> 782 against Deer's window, capsule at 753
+      at +2636 ms (fg-tab-open): c3 window x 305 -> 283 against Deer's window, capsule at 265
+      at +2613 ms (fg-tab-open): c2 window x 1091 -> 1116 against Deer's window, capsule at 1120
+window-move: Deer's window x [(15, 240)]
+   glass c9 x [(15, 1464)]
+   glass c8 x [(15, 1420)]
+window-back: Deer's window x [(19, 40)]
+   glass c9 x [(19, 1264)]
+   glass c8 x [(19, 1220)]
+CD-RECORDING glass-demo-motion {"video":"/var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion.mkv","started":true} rect [40,40,1280,800]
+MOTION glass-demo-motion {"t0":1794839874859.7,"ev":[[1794839875362,"bg-tab-open"],[1794839876391.3,"bg-tab-close"],[1794839877326.2,"fg-tab-open"],[1794839878439.5,"fg-tab-close"],[1794839879454.3,"hover-in"],[1794839880660.9,"hover-out"],[1794839881168.4,"typing-open"],[1794839881585.8,"typing"],[1794839883269.5,"typing-close"],[1794839883982,"resize-narrow"],[1794839884787.6,"resize-wide"],[1794839885692.6,"menu-open"],[1794839887001.7,"menu-close"],[1794839887508.7,"end"]],"sync":{"frames":761,"secs":12.62,"dtP50":16.67,"dtP95":19.17,"dtMax":37.23,"costP50":0.33,"costP95":1.7,"costMax":17.56,"windowsMax":10}}
+CD-RECORDING glass-demo-motion-css {"video":"/var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-css.mkv","started":true} rect [40,40,1280,800]
+MOTION glass-demo-motion-css {"t0":1794839893278,"ev":[[1794839893783.3,"bg-tab-open"],[1794839894843.8,"bg-tab-close"],[1794839895748.1,"fg-tab-open"],[1794839896864.2,"fg-tab-close"],[1794839897872.9,"hover-in"],[1794839899106.1,"hover-out"],[1794839899617,"typing-open"],[1794839900025.4,"typing"],[1794839901708.9,"typing-close"],[1794839902416.9,"resize-narrow"],[1794839903233.2,"resize-wide"],[1794839904151.7,"menu-open"],[1794839905541.9,"menu-close"],[1794839906050.6,"end"]],"sync":null}
+CD-RECORDING glass-demo-motion-24 {"video":"/var/folders/t_/m6qqt8m962qgd70l9tcq5c780000gn/T//mac-glass-s10/vids/glass-demo-motion-24.mkv","started":true} rect [40,40,1280,800]
+MOTION glass-demo-motion-24 {"t0":1794839914389.4,"ev":[[1794839914902.5,"bg-tab-open"],[1794839915935.4,"bg-tab-close"],[1794839916843.4,"fg-tab-open"],[1794839917958,"fg-tab-close"],[1794839919001.8,"hover-in"],[1794839920205.4,"hover-out"],[1794839920711.8,"typing-open"],[1794839921116.4,"typing"],[1794839922803.6,"typing-close"],[1794839923512.8,"resize-narrow"],[1794839924320.1,"resize-wide"],[1794839925238.9,"menu-open"],[1794839926544.2,"menu-close"],[1794839927048.1,"end"]],"sync":{"frames":760,"secs":12.65,"dtP50":16.67,"dtP95":19.37,"dtMax":35.47,"costP50":0.32,"costP95":1.77,"costMax":15.39,"windowsMax":10}}
+MEASURE 36 {"tag":"track-36-1","stats":{"frames":887,"secs":14.68,"dtP50":16.67,"dtP95":18.01,"dtMax":28.74,"costP50":0.23,"costP95":1.57,"costMax":17.87,"windowsMax":10},"recPath":"/Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/cd-rec-36.json"}
+MEASURE 24 {"tag":"track-24-2","stats":{"frames":877,"secs":14.52,"dtP50":16.67,"dtP95":18.21,"dtMax":32.96,"costP50":0.21,"costP95":1.59,"costMax":17.91,"windowsMax":10},"recPath":"/Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/cd-rec-24.json"}
+CD-CPU css {"idle":{"engine":1.7,"ws":20.6,"gpu":26.5,"gpuMax":43},"motion":{"engine":29.4,"ws":30.5,"gpu":41.5,"gpuMax":60}}
+CD-CPU 36 {"idle":{"engine":3.2,"ws":18.3,"gpu":35.2,"gpuMax":39},"motion":{"engine":29.3,"ws":36.2,"gpu":45.7,"gpuMax":56}}

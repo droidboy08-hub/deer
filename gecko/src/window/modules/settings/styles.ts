@@ -280,6 +280,7 @@ ${R} .vs-btn.accent { background: var(--vs-accent); box-shadow: none; color: var
 ${R} .vs-btn.accent:hover { background: var(--vs-accent-hover); }
 ${R} .vs-btn.subtle { height: 30px; margin-right: 6px; padding: 0 10px; background: transparent; box-shadow: none; color: var(--vs-subtle); }
 ${R} .vs-btn.subtle:hover { background: var(--vs-hover); }
+${R} .vs-row-btns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 ${R} .vs-link { padding: 4px 6px; border-radius: 4px; font-size: 13px; color: var(--vs-value); white-space: nowrap; flex-shrink: 0; }
 ${R} .vs-link:hover { background: var(--vs-hover); color: var(--vs-text); }
 ${R} .vs-go { display: flex; align-items: center; gap: 6px; }
@@ -421,6 +422,26 @@ ${R} .hb-popover .hb-get-note.error { color: var(--vs-error); }
 ${R} .hb-add { margin-top: 8px; height: 36px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; }
 ${R} .hb-add:hover { background: rgba(255,255,255,0.14); }
 ${R} .hb-add:active { background: rgba(255,255,255,0.08); }
+
+/* Firefox Account & Sync */
+${R} .vs-sync-hero { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+${R} .vs-sync-hero-top { display: flex; align-items: center; gap: 16px; }
+${R} .vs-sync-hero-ico { width: 44px; height: 44px; border-radius: 22px; background: var(--vs-accent-soft); color: var(--vs-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+${R} .vs-sync-hero-ico .vs-ico { width: 22px; height: 22px; color: currentColor; }
+${R} .vs-sync-hero-text { display: flex; flex-direction: column; gap: 3px; }
+${R} .vs-sync-hero-title { font-size: 15px; font-weight: 600; line-height: 20px; }
+${R} .vs-sync-hero-desc { font-size: 12.5px; line-height: 18px; color: var(--vs-text2); }
+${R} .vs-sync-hero-btns { display: flex; align-items: center; gap: 10px; }
+
+${R} .vs-sync-profile { min-height: 72px; padding: 14px 18px; display: flex; align-items: center; gap: 16px; }
+${R} .vs-sync-avatar { width: 46px; height: 46px; border-radius: 23px; background: var(--vs-accent); color: var(--vs-on-accent); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; flex-shrink: 0; overflow: hidden; }
+${R} .vs-sync-avatar img { width: 100%; height: 100%; object-fit: cover; }
+${R} .vs-sync-profile-text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+${R} .vs-sync-name { font-size: 14.5px; font-weight: 600; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+${R} .vs-sync-email { font-size: 12px; color: var(--vs-text2); line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+${R} .vs-sync-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--vs-text3); margin-top: 2px; }
+${R} .vs-sync-dot { width: 7px; height: 7px; border-radius: 3.5px; background: #22c55e; flex-shrink: 0; }
+${R} .vs-sync-profile-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   ${R} :is(.vs-sheet, .hb-pop) { scale: none !important; transition: box-shadow 150ms ease !important; }

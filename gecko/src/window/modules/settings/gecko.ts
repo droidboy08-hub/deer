@@ -3,7 +3,8 @@
 //
 //   pickFile(title, filters, dir?)   the native Open dialog (nsIFilePicker, modeOpen) -> path | null
 //   pickFolder(title, dir?)          the native folder dialog (modeGetFolder)         -> path | null
-//   sanitize(items, range)           Firefox's Sanitizer with a time range
+//   sanitize(items, range)           Firefox's Sanitizer with a time range (History's pending
+//                                    delete, in any window, commits first: VitreHistory.flushAll)
 //   forgetClosedEverywhere()         empty Ctrl+Shift+T's list in every browser window
 //   builtinWallpapers()              the photos that ship with Windows (%SystemRoot%\Web\Wallpaper)
 //   exists(path)                     IOUtils.exists, never throwing
@@ -15,6 +16,8 @@
 //                                    Firefox's caret browsing pref (accessibility.browsewithcaret)
 
 import { isMac } from '../../../shared/os';
+import type { Browser } from '../../browser';
+import { sysModule } from '../../firefox';
 
 /** What the Open dialog offers. `extensions` without dots: ['jpg', 'png']. */
 export interface FileFilter {
@@ -95,6 +98,13 @@ export type SanitizeItem = 'history' | 'formdata' | 'cookies' | 'offlineApps' | 
 export async function sanitize(items: SanitizeItem[], range: [number, number] | null): Promise<void> {
   const { Sanitizer } = ChromeUtils.importESModule('resource:///modules/Sanitizer.sys.mjs');
   if (!items.length) return;
+  // A delete waiting under History's undo line, in any window, commits first (HISTORY-SPEC.md
+  // "Deleting, and undo": the commit runs when Clear browsing data runs).
+  try {
+    await sysModule('VitreHistory').flushAll();
+  } catch (e) {
+    console.error('Deer settings: History could not commit its pending delete', e);
+  }
   await Sanitizer.sanitize(items, range ? { ignoreTimespan: false, range } : { ignoreTimespan: true });
 }
 
@@ -242,4 +252,76 @@ export function onCaretBrowsingChange(fn: (on: boolean) => void): () => void {
   const observer = { observe: () => fn(caretBrowsing()) };
   Services.prefs.addObserver(CARET_PREF, observer);
   return () => Services.prefs.removeObserver(CARET_PREF, observer);
+}
+
+export function getBoolPref(key: string, def = true): boolean {
+  try {
+    return Services.prefs.getBoolPref(key, def);
+  } catch {
+    return def;
+  }
+}
+
+export function setBoolPref(key: string, val: boolean): void {
+  try {
+    Services.prefs.setBoolPref(key, val);
+  } catch (e) {
+    console.warn(`Deer settings: failed to set pref ${key}`, e);
+  }
+}
+
+export function prefSubscriber(key: string): (fn: () => void) => () => void {
+  return (fn) => {
+    const obs = () => fn();
+    try {
+      Services.prefs.addObserver(key, obs);
+    } catch {}
+    return () => {
+      try {
+        Services.prefs.removeObserver(key, obs);
+      } catch {}
+    };
+  };
+}
+
+export function savedLoginsCount(): number {
+  try {
+    return (Services as any).logins?.countLogins('', '', '') ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function openSavedLogins(b: Browser): void {
+  b.service('settings')?.close();
+  b.newTab('about:logins');
+}
+
+export function openBookmarksOrganizer(): void {
+  const w = window as any;
+  try {
+    if (w.PlacesCommandHook?.showPlacesOrganizer) {
+      w.PlacesCommandHook.showPlacesOrganizer('AllBookmarks');
+      return;
+    }
+  } catch (e) {
+    console.warn('Deer: PlacesCommandHook.showPlacesOrganizer failed', e);
+  }
+  try {
+    (window as any).openDialog?.('chrome://browser/content/places/places.xhtml', 'Places', 'chrome,toolbar=yes,dialog=no,resizable=yes', 'AllBookmarks');
+  } catch (e) {
+    console.warn('Deer: openDialog places failed', e);
+  }
+}
+
+export function bookmarkCurrentPage(): void {
+  const w = window as any;
+  try {
+    if (w.PlacesCommandHook?.bookmarkPage) {
+      w.PlacesCommandHook.bookmarkPage();
+      return;
+    }
+  } catch (e) {
+    console.warn('Deer: PlacesCommandHook.bookmarkPage failed', e);
+  }
 }

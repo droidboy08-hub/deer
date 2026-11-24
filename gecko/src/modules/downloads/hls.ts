@@ -68,6 +68,7 @@ import { audioFor, isMaster, isPlaylist, ladder, parseMaster, parseMedia, type K
 import { silentRestart, type TransferEnv } from './ranged';
 import { DURATION_SLACK, StreamTable, durHash, fingerprinted, keysOf, mapNext, matchRep, pathShape, renditionRung, repRung, repick, rungOf, segmentHash, type SegLine, type TrackHead } from './table';
 import type { FfmpegInfo, StreamRung } from './types';
+import { decompressResponse, decryptFlixManifest, getCachedPlaylist, getSavedFlixPk, isEncryptedFlixManifest } from './webdownfix';
 
 export type Container = '' | 'ts' | 'mp4' | 'aac' | 'webm';
 
@@ -179,7 +180,7 @@ const PLAYLIST_MESSAGE = 'The stream’s playlist couldn’t be read.';
 const ATTEMPTS = 3;
 const SEGMENT_MAX = 256 * 1024 * 1024;
 /** Early segments wait in memory up to this much, then on disk. */
-const SPILL_AFTER = 48 * 1024 * 1024;
+const SPILL_AFTER = 256 * 1024 * 1024;
 /** The writer may hold this much before the in-order loop waits for the disk. */
 const WRITE_BACKLOG = 32 * 1024 * 1024;
 /** A one-file DASH representation (SegmentBase) is fetched in pieces of this size. */
@@ -267,8 +268,17 @@ export class StreamTransfer {
   /** What ffmpeg reported for the merge (4.2): the output's media seconds and its error output. */
   merged = { secs: -1, said: '' };
   private inflight = 0;
-  /** Segments fetched but not yet written (they arrive out of order): bytes and media seconds. */
-  private early = { bytes: 0, secs: 0 };
+  /** Segments fetched but not yet written (they arrive out of order): bytes and media seconds per track. */
+  private earlyByTrack = new Map<StreamTrack, { bytes: number; secs: number }>();
+  get early(): { bytes: number; secs: number } {
+    let bytes = 0;
+    let secs = 0;
+    for (const v of this.earlyByTrack.values()) {
+      bytes += v.bytes;
+      secs += v.secs;
+    }
+    return { bytes, secs };
+  }
   private playlists = new Map<string, MediaPlaylist>();
   private texts = new Map<string, string>();
   private keys = new Map<string, Promise<CryptoKey>>();
@@ -720,7 +730,7 @@ export class StreamTransfer {
             s.rung ??= renditionRung(rendition);
           } else if (pick) {
             main = pick.url;
-            s.bandwidth = pick.bandwidth;
+            s.bandwidth = pick.bandwidth > 0 && pick.bandwidth < 50_000 ? pick.bandwidth * 1000 : pick.bandwidth;
             if (!s.audioOnly && rendition && !audio) audio = rendition.url;
             // RESUME-DESIGN.md 5.3: the rung picked here, so a master read again picks it again.
             s.rung ??= rungOf(pick, rendition);
@@ -991,11 +1001,21 @@ export class StreamTransfer {
   // ---- downloading ----
 
   async download(partBase: string, signal: AbortSignal): Promise<void> {
-    for (const [k, t] of this.state.tracks.entries()) {
-      this.inflight = 0;
-      await this.runTrack(t, k, trackPart(partBase, t), signal);
-    }
     this.inflight = 0;
+    const stopAll = new AbortController();
+    const onAbort = (): void => stopAll.abort();
+    signal.addEventListener('abort', onAbort);
+    try {
+      await Promise.all(
+        this.state.tracks.map((t, k) => this.runTrack(t, k, trackPart(partBase, t), stopAll.signal))
+      );
+    } catch (err) {
+      stopAll.abort();
+      throw err;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+      this.inflight = 0;
+    }
   }
 
   /**
@@ -1015,6 +1035,10 @@ export class StreamTransfer {
     const webm = main.container === 'webm' && (!audio || audio.container === 'webm');
     const needsMux = !!audio || main.container === 'ts' || main.container === 'aac';
     const ff = this.muxer.path;
+    try {
+      const line = `[${new Date().toISOString()}] hls.finish: START partBase=${partBase} needsMux=${needsMux} ff=${ff} mainPart=${mainPart} (exists=${existsSync(mainPart)}) audioPart=${audioPart} (exists=${existsSync(audioPart)})\n`;
+      IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+    } catch {}
     if (ff && needsMux) {
       const out = place(webm ? (this.state.audioOnly ? '.weba' : '.webm') : this.state.audioOnly ? '.m4a' : '.mp4');
       const tmp = `${partBase}.merge.part`;
@@ -1027,18 +1051,34 @@ export class StreamTransfer {
       if (before) await before(out);
       try {
         let secs = -1;
+        try {
+          const line = `[${new Date().toISOString()}] hls.finish: running ffmpeg out=${out} tmp=${tmp} args=${args.join(' ')}\n`;
+          IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+        } catch {}
         const said = await runFfmpeg(ff, args, signal, (x) => {
           secs = x;
           onProgress?.(x);
         });
         this.merged = { secs, said: said.trim() };
+        try {
+          const line = `[${new Date().toISOString()}] hls.finish: ffmpeg SUCCESS secs=${secs} said=${said.slice(0, 200)}\n`;
+          IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+        } catch {}
         if (this.merged.said) console.warn('Deer downloads: ffmpeg reported while joining', this.merged.said.slice(-600));
         await IOUtils.move(tmp, out);
         await IOUtils.remove(mainPart, { ignoreAbsent: true });
         if (audioPart) await IOUtils.remove(audioPart, { ignoreAbsent: true });
         this.lengthCheck(secs, Math.max(...this.state.tracks.map((t) => t.length || 0)));
+        try {
+          const line = `[${new Date().toISOString()}] hls.finish: moved to ${out} note=${this.note}\n`;
+          IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+        } catch {}
         return out;
       } catch (err) {
+        try {
+          const line = `[${new Date().toISOString()}] hls.finish: ffmpeg FAILED: ${String(err)}\n`;
+          IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+        } catch {}
         await IOUtils.remove(tmp, { ignoreAbsent: true }).catch(() => undefined);
         if (signal.aborted) throw new AbortedError();
         if (before) await before(null);
@@ -1048,10 +1088,25 @@ export class StreamTransfer {
       }
     } else if (needsMux) {
       this.note = audio ? 'ffmpeg not found: the video and its sound are saved as two files.' : 'ffmpeg not found: saved as it came (TS).';
+      try {
+        const line = `[${new Date().toISOString()}] hls.finish: ffmpeg not found! note=${this.note}\n`;
+        IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+      } catch {}
     }
     const out = place(extension(main.container, this.state.audioOnly));
+    try {
+      const line = `[${new Date().toISOString()}] hls.finish: moving fallback mainPart to ${out}\n`;
+      IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+    } catch {}
     await IOUtils.move(mainPart, out);
-    if (audio) await IOUtils.move(audioPart, place(extension(audio.container, true), ' (audio)'));
+    if (audio) {
+      const audioOut = place(extension(audio.container, true), ' (audio)');
+      try {
+        const line = `[${new Date().toISOString()}] hls.finish: moving fallback audioPart to ${audioOut}\n`;
+        IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', line, { mode: 'append' }).catch(() => {});
+      } catch {}
+      await IOUtils.move(audioPart, audioOut);
+    }
     return out;
   }
 
@@ -1149,7 +1204,6 @@ export class StreamTransfer {
     // Keyed by the index in `segs`; `head` is the index of the next segment to write.
     const ready = new Map<number, Piece>();
     const started = new Map<number, number>();
-    const hedged = new Set<number>();
     const racers = new Map<number, AbortController[]>();
     const spill = `${partPath}.d`;
     let spillMade = false;
@@ -1158,8 +1212,12 @@ export class StreamTransfer {
     let failure: unknown = null;
     let head = Math.max(0, Math.min(segs.length, this.starts.get(track) ?? track.done));
     let next = head;
-    const conns = Math.max(1, Math.min(16, this.env.connections()));
-    const ahead = Math.max(24, conns * 4);
+    const conns = track.kind === 'main'
+      ? Math.max(1, Math.min(32, Math.max(this.env.connections(), 16)))
+      : Math.max(1, Math.min(8, Math.max(Math.floor(this.env.connections() / 2), 4)));
+    const laneOffset = k * 16;
+    const trackEarly = { bytes: 0, secs: 0 };
+    this.earlyByTrack.set(track, trackEarly);
     // While the proof of what the track wrote runs beside it (lazyProof), only the next segment is fetched: a
     // stream found changed costs one segment, not a window of them (review of Phase 6).
     let proof = this.proofs.get(track);
@@ -1200,8 +1258,8 @@ export class StreamTransfer {
           held += piece.buf.length;
           ready.set(i, { buf: piece.buf, file: '', net: piece.net });
         }
-        this.early.bytes += piece.buf.length;
-        this.early.secs += segs[i].duration;
+        trackEarly.bytes += piece.buf.length;
+        trackEarly.secs += segs[i].duration;
         notify();
       } catch (err) {
         // Lost a race, stopped, or a second try whose first is still running: not a failure.
@@ -1227,18 +1285,64 @@ export class StreamTransfer {
           if ((await take(again, false, conn)) === 'retire') return;
           continue;
         }
-        if (next < segs.length && next < head + (proving ? 1 : ahead)) {
+        // If head has been running without completing, hedge it immediately
+        // so the in-order write pipeline doesn't wait on a stalled socket.
+        if (!ready.has(head)) {
+          const rHead = racers.get(head)?.length ?? 0;
+          if (rHead < 2) {
+            const since = started.get(head);
+            if (since !== undefined && Date.now() - since > Math.max(1000, avgMs * 1.5)) {
+              await take(head, true, conn);
+              continue;
+            }
+          }
+        }
+        // Pull next available segment: while proving (verifying resume), fetch only 1 segment ahead;
+        // once proving passes, workers fetch all remaining segments in parallel without lookahead throttling.
+        if (next < segs.length && (proving ? next < head + 1 : true)) {
           if ((await take(next++, false, conn)) === 'retire') return;
           continue;
         }
-        const first = head;
-        const since = started.get(first);
-        if (since !== undefined && !ready.has(first) && !hedged.has(first) && Date.now() - since > Math.max(3000, avgMs * 2)) {
-          hedged.add(first);
-          await take(first, true, conn);
+        // All segments have been dispatched (or proving is active).
+        // Find lagging or uncompleted in-flight segments and race them so workers don't sit idle!
+        let hedgeCandidate = -1;
+        // First pass: any segment taking > Math.max(600, avgMs) that has < 2 racers
+        for (let i = head; i < segs.length; i++) {
+          if (!ready.has(i)) {
+            const rCount = racers.get(i)?.length ?? 0;
+            const since = started.get(i);
+            if (rCount < 2 && since !== undefined && Date.now() - since > Math.max(600, avgMs)) {
+              hedgeCandidate = i;
+              break;
+            }
+          }
+        }
+        // Second pass: if only a few segments remain (< 5) and workers are idle, race any unready segment that has < 3 racers
+        if (hedgeCandidate === -1) {
+          let unreadyCount = 0;
+          for (let i = head; i < segs.length; i++) {
+            if (!ready.has(i)) {
+              unreadyCount++;
+              if (unreadyCount > 4) break;
+            }
+          }
+          if (unreadyCount <= 4) {
+            for (let i = head; i < segs.length; i++) {
+              if (!ready.has(i)) {
+                const rCount = racers.get(i)?.length ?? 0;
+                if (rCount < 3) {
+                  hedgeCandidate = i;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (hedgeCandidate !== -1) {
+          await take(hedgeCandidate, true, conn);
           continue;
         }
-        await wait(500);
+        await wait(50);
       }
     };
     const worker = async (lane: number): Promise<void> => {
@@ -1307,7 +1411,7 @@ export class StreamTransfer {
           this.table?.setInit(k, h);
           mark();
         }
-        const workers = Array.from({ length: conns }, (_, i) => worker(i));
+        const workers = Array.from({ length: conns }, (_, i) => worker(laneOffset + i));
         // The proof of what this track wrote, running beside the download (lazyProof; review of Phase 6): the
         // workers fetch meanwhile, nothing is written before it passes, and a failure stops the run.
         if (proof) {
@@ -1339,8 +1443,8 @@ export class StreamTransfer {
           if (!track.container) track.container = sniff(buf);
           const off = track.bytes;
           writer.writeBytes(buf);
-          this.early.bytes -= buf.length;
-          this.early.secs -= seg.duration;
+          trackEarly.bytes -= buf.length;
+          trackEarly.secs -= seg.duration;
           track.bytes += buf.length;
           track.secs += seg.duration;
           track.done++;
@@ -1361,7 +1465,7 @@ export class StreamTransfer {
         notify();
         signal.removeEventListener('abort', relay);
         ready.clear();
-        this.early = { bytes: 0, secs: 0 };
+        this.earlyByTrack.delete(track);
         if (spillMade) await IOUtils.remove(spill, { recursive: true, ignoreAbsent: true }).catch(() => undefined);
       }
     } finally {
@@ -1618,16 +1722,47 @@ export class StreamTransfer {
 
   /** A playlist or manifest, read once (or again, fresh). Not a playlist: NotTheFileError (G2: the renewal steps may find one). */
   private async text(url: string, signal: AbortSignal, fresh = false): Promise<string> {
-    const hit = this.texts.get(url);
-    if (hit && !fresh) return hit;
+    let hit = this.texts.get(url) || (!fresh ? getCachedPlaylist(url) : undefined);
+    if (hit && isEncryptedFlixManifest(hit)) {
+      const pk = getSavedFlixPk();
+      if (pk) {
+        const dec = decryptFlixManifest(hit, pk);
+        if (isPlaylist(dec) || isMpd(dec)) hit = dec;
+      }
+    }
+    if (hit && (isPlaylist(hit) || isMpd(hit)) && !fresh) {
+      try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: cache HIT for ${url} (${hit.length} chars, isPlaylist=${isPlaylist(hit)})\n`, { mode: 'append' }).catch(() => {}); } catch {}
+      return hit;
+    }
+    try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: cache MISS for ${url} (fresh=${fresh}), fetching...\n`, { mode: 'append' }).catch(() => {}); } catch {}
     for (let attempt = 1; ; attempt++) {
       try {
         const got = await this.fetchBytes(url, null, signal, { counts: false });
-        const text = new TextDecoder('utf-8').decode(got.buf);
-        if (!isPlaylist(text) && !isMpd(text)) throw new NotAPlaylistError(got.type);
+        let rawStr = '';
+        const buf = got.buf;
+        if (buf.length >= 4 && buf[0] === 0x28 && buf[1] === 0xb5 && buf[2] === 0x2f && buf[3] === 0xfd) {
+          // zstd compressed
+          for (let i = 0; i < buf.length; i++) rawStr += String.fromCharCode(buf[i]);
+          rawStr = decompressResponse(rawStr, 'zstd');
+        }
+        let text = rawStr || new TextDecoder('utf-8').decode(got.buf);
+        if (!isPlaylist(text) && !isMpd(text) && isEncryptedFlixManifest(text)) {
+          const pk = getSavedFlixPk();
+          try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: encrypted flix manifest detected, pk=${pk ? 'yes' : 'no'}\n`, { mode: 'append' }).catch(() => {}); } catch {}
+          if (pk) {
+            const dec = decryptFlixManifest(text, pk);
+            try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: decrypted (${dec.length} chars, isPlaylist=${isPlaylist(dec)}) start: ${dec.slice(0, 80).replace(/\r?\n/g, '\\n')}\n`, { mode: 'append' }).catch(() => {}); } catch {}
+            if (isPlaylist(dec)) text = dec;
+          }
+        }
+        if (!isPlaylist(text) && !isMpd(text)) {
+          try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: NOT A PLAYLIST after all processing! type=${got.type} first80: ${text.slice(0, 80).replace(/\r?\n/g, '\\n')}\n`, { mode: 'append' }).catch(() => {}); } catch {}
+          throw new NotAPlaylistError(got.type);
+        }
         this.texts.set(url, text);
         return text;
       } catch (err) {
+        try { IOUtils.writeUTF8('/Users/droid/Documents/Projects/Deer browser/gecko/deer-debug.log', `[${new Date().toISOString()}] hls.text: attempt ${attempt} FAILED for ${url}: ${String(err)} status=${(err as any)?.status}\n`, { mode: 'append' }).catch(() => {}); } catch {}
         if (signal.aborted) throw new AbortedError();
         // A refused playlist (403) is asked once more, then the renewal steps take over (G2), when they can: a
         // stream with nothing written keeps its three tries (review of Phase 6).

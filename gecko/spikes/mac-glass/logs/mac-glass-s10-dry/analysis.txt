@@ -1,0 +1,5 @@
+
+== Ink contrast on each capsule (WCAG; under 3:1 hard to read, under 4.5:1 below the text rule) ==
+tone = median sRGB grey of the capsule (inset 3 CSS px), ink = Deer's colour blended on it
+MEASURE 36 {"tag":"track-36-1","stats":{"frames":877,"secs":14.57,"dtP50":16.53,"dtP95":22.82,"dtMax":33.95,"costP50":0.3,"costP95":1.57,"costMax":15.31,"windowsMax":10},"recPath":"/Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/cd-rec-36.json"}
+MEASURE 24 {"tag":"track-24-2","stats":{"frames":873,"secs":14.43,"dtP50":16.53,"dtP95":22.62,"dtMax":27.49,"costP50":0.3,"costP95":1.61,"costMax":11.08,"windowsMax":10},"recPath":"/Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/cd-rec-24.json"}

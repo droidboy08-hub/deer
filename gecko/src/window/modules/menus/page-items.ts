@@ -11,7 +11,6 @@
 import type { Browser, OpenRequest } from '../../browser';
 import type { DownloadOptions } from '../downloads/index';
 import * as fx from '../../firefox';
-import { isMac } from '../../../shared/os';
 import type { Tab } from '../../model';
 import { isHomeUrl, looksLikeAddress, resolveInput, searchUrl } from '../../../shared/url';
 import * as gecko from './gecko';
@@ -487,8 +486,7 @@ function homeRows(env: PageEnv): MenuItem[] {
         })
       : null,
     video ? item(video.paused ? 'Play background' : 'Pause background', video.paused ? 'play' : 'pause', '', 'P', () => (video.paused ? void video.play().catch(() => undefined) : video.pause())) : null,
-    // macOS: the row never hides (reveal.ts), so there is nothing to switch.
-    isMac ? null : item('Show tab bar', '', '', 'T', () => b.sys('VitreSettings').set({ barAutoHide: !b.settings.barAutoHide }), { checked: !b.settings.barAutoHide }),
+    item('Show tab bar', '', '', 'T', () => b.sys('VitreSettings').set({ barAutoHide: !b.settings.barAutoHide }), { checked: !b.settings.barAutoHide }),
     SEP,
     settings ? item('Settings', '', actionKey(b, 'settings', 'Ctrl+,'), 'E', () => settingsService(b)?.open()) : null,
   ]);

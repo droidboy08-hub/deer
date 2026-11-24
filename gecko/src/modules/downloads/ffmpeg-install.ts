@@ -11,17 +11,29 @@
 //   4. bin\ffmpeg.exe, bin\*.dll and LICENSE.txt are unpacked into a fresh folder that then replaces
 //      %LOCALAPPDATA%\Deer\ffmpeg; the zip is deleted. The caller points vitre.ffmpegPath at the exe.
 // One install at a time per process; the state is kept here so a reopened Settings page shows it.
-// macOS: not ported. The builds above are Windows ones, so installFfmpeg refuses there and fetches
-// nothing (Settings › Video downloads shows no Download row on a Mac).
+//
+// macOS (runMac; the sources and the steps are in mac-tools.ts): the same steps from Martin Riedl's
+// macOS release build for this Mac's processor. 1. <release>ffmpeg.zip is asked for and its redirect
+// followed to the versioned file; <that address>.sha256 gives its SHA-256 and the version (9.0.2) is
+// read from the address. 2. That same address is downloaded as above. 3. The SHA-256 must match.
+// 4. ffmpeg alone is unpacked into the fresh folder, made runnable (mode 0755, no quarantine:
+// platform/tools.ts trustInstalledTree) and started once (-version; the row says Checking, Cancel
+// stops it) before it replaces ~/Library/Application Support/Deer/ffmpeg; the caller points
+// vitre.ffmpegPath at it. Deer and Deer Dev share that folder: the install holds
+// <Deer>/.ffmpeg-install-lock and its temporary names are its own (ffmpeg-download-<id>.zip,
+// ffmpeg.new-<id>; mac-tools.ts, two Deers at once).
 //
 // Deer's folders under %LOCALAPPDATA% (deerFolder, also used for yt-dlp and Deno): new downloads go
 // to %LOCALAPPDATA%\Deer. A copy downloaded while the browser was called Vitre, in
 // %LOCALAPPDATA%\Vitre (oldFolder), is still found and used (ffmpeg.ts, ytdlp.ts), never downloaded
-// again, and never written to, moved or deleted.
+// again, and never written to, moved or deleted. macOS: the data root is ~/Library/Application Support
+// (platform/dirs.ts dataRoot), so Deer's folder is ~/Library/Application Support/Deer, shared by Deer
+// and Deer Dev as %LOCALAPPDATA%\Deer is on Windows; there is no old folder (oldFolder is never read).
 //
-// For tests (prefs): vitre.ffmpeg.source = base URL of a release (ends with "/"),
-// vitre.ffmpeg.installDir = the folder that replaces %LOCALAPPDATA%\Deer\ffmpeg,
-// vitre.localAppData = a folder that stands in for %LOCALAPPDATA% (tools/run.py sets one inside each
+// For tests (prefs): vitre.ffmpeg.source = base URL of a release (ends with "/"; on a Mac it serves
+// ffmpeg.zip, which may redirect, and <final address>.sha256), vitre.ffmpeg.installDir = the folder
+// that replaces %LOCALAPPDATA%\Deer\ffmpeg, vitre.localAppData = a folder that stands in for
+// %LOCALAPPDATA% (on a Mac for ~/Library/Application Support; tools/run.py sets one inside each
 // throwaway profile, so a test never reads the person's real copies).
 //
 // Firefox internals: resource://gre/modules/Downloads.sys.mjs (createDownload, Download.start /
@@ -30,11 +42,12 @@
 import { Downloads } from 'resource://gre/modules/Downloads.sys.mjs';
 import { setTimeout } from 'resource://gre/modules/Timer.sys.mjs';
 import { isMac } from '../../shared/os';
+import { dataRoot } from '../platform/dirs';
+import { toolName, trustInstalledTree } from '../platform/tools';
+import { ffmpegMacRelease, ffmpegVersionOf, finalAddress, listedFingerprint, releaseText, sweep, takeInstallLock, tempId, tryRun, unzipOne } from './mac-tools';
 import { fileFor } from './partfile';
 
 const RELEASE = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/';
-/** macOS: why nothing is installed there (the state's error, after "Couldn’t install ffmpeg:"). */
-const MAC_NOT_YET = 'it is not available on a Mac yet';
 const BUILD = /^([0-9a-f]{64})\s+\*?(ffmpeg-n(\d+)\.(\d+)-latest-win64-lgpl-shared-([\d.]+)\.zip)$/i;
 
 export type FfmpegInstallPhase = 'idle' | 'checking' | 'downloading' | 'verifying' | 'unpacking' | 'done' | 'failed' | 'cancelled';
@@ -45,7 +58,7 @@ export interface FfmpegInstallState {
   version: string;
   received: number;
   total: number;
-  /** The installed ffmpeg.exe ('done'). */
+  /** The installed ffmpeg.exe ('done'; ffmpeg on a Mac). */
   path: string;
   /** What went wrong, in a sentence ('failed'). */
   error: string;
@@ -98,8 +111,10 @@ function pref(name: string): string {
   }
 }
 
-/** %LOCALAPPDATA%, or the folder a test put in its place (vitre.localAppData). */
+/** %LOCALAPPDATA% (~/Library/Application Support on a Mac), or the folder a test put in its place (vitre.localAppData). */
 export function localAppData(): string {
+  // macOS has no "LocalAppData" folder key (Services.dirsvc.get throws there).
+  if (isMac) return dataRoot();
   return pref('vitre.localAppData') || Services.dirsvc.get('LocalAppData', Ci.nsIFile).path;
 }
 
@@ -108,7 +123,7 @@ export function deerFolder(name: string): string {
   return PathUtils.join(localAppData(), 'Deer', name);
 }
 
-/** The same folder in %LOCALAPPDATA%\Vitre, from before the rename: only ever read. */
+/** The same folder in %LOCALAPPDATA%\Vitre, from before the rename: only ever read (never on a Mac). */
 export function oldFolder(name: string): string {
   return PathUtils.join(localAppData(), 'Vitre', name);
 }
@@ -245,16 +260,101 @@ async function run(): Promise<string> {
   }
 }
 
-/** Download, check and unpack ffmpeg; resolves with the path of ffmpeg.exe. One at a time. */
+/** macOS: run()'s steps from the macOS release build (header; mac-tools.ts). */
+async function runMac(): Promise<string> {
+  const source = pref('vitre.ffmpeg.source') || ffmpegMacRelease();
+  const home = ffmpegInstallDir();
+  const parent = PathUtils.parent(home) ?? home;
+  // This install's own names (another Deer may install into the same folder; mac-tools.ts).
+  const id = tempId();
+  const zip = PathUtils.join(parent, `ffmpeg-download-${id}.zip`);
+  const fresh = `${home}.new-${id}`;
+  const stem = PathUtils.filename(home) + '.new';
+  const leftover = (n: string): boolean => /^ffmpeg-download(-\w+)?\.zip$/.test(n) || n === stem || (n.startsWith(stem + '-') && /^\w+$/.test(n.slice(stem.length + 1)));
+  const name = toolName('ffmpeg');
+  let release: (() => Promise<void>) | null = null;
+  set({ phase: 'checking', version: '', received: 0, total: 0, path: '', error: '' });
+  try {
+    try {
+      await IOUtils.makeDirectory(parent, { createAncestors: true, ignoreExisting: true });
+    } catch {
+      throw new Error('Deer’s folder could not be created');
+    }
+    release = await takeInstallLock(PathUtils.join(parent, '.ffmpeg-install-lock'));
+    if (!release) throw new Error('another Deer is installing it right now; try again when it has finished');
+    await sweep(parent, leftover);
+    // The versioned address "latest" points at now; its fingerprint and its download are read from it.
+    const url = await finalAddress(source + 'ffmpeg.zip');
+    const want = listedFingerprint(await releaseText(url + '.sha256'), 'ffmpeg.zip');
+    if (!want) throw new Error('no macOS build was found in the release');
+    check();
+    set({ phase: 'downloading', version: ffmpegVersionOf(url) });
+
+    await IOUtils.remove(zip, { ignoreAbsent: true });
+    const download = await Downloads.createDownload({ source: { url, isPrivate: false }, target: { path: zip } });
+    active = download;
+    download.onchange = () => {
+      if (state.phase === 'downloading') set({ received: download.currentBytes || 0, total: download.totalBytes || 0 });
+    };
+    try {
+      await download.start();
+    } catch (e) {
+      check();
+      throw new Error('the download stopped' + (download.error?.message ? `: ${download.error.message}` : ''));
+    } finally {
+      active = null;
+      await download.finalize(false).catch(() => undefined);
+    }
+    check();
+
+    set({ phase: 'verifying' });
+    const actual = await sha256(zip);
+    if (actual !== want) throw new Error('the file did not match its published fingerprint, so it was not installed');
+
+    set({ phase: 'unpacking' });
+    await new Promise((r) => setTimeout(r, 0));
+    await IOUtils.remove(fresh, { recursive: true, ignoreAbsent: true });
+    await IOUtils.makeDirectory(fresh, { createAncestors: true, ignoreExisting: true });
+    const exeNew = PathUtils.join(fresh, name);
+    if (!(await unzipOne(zip, /(^|\/)ffmpeg$/, exeNew))) throw new Error('the download has no ffmpeg in it');
+    check();
+    // Runnable before its first start: 0755, and no quarantine (else macOS may hold it at its first start).
+    if (!(await trustInstalledTree(fresh, [exeNew]))) throw new Error('macOS did not let Deer mark ffmpeg as safe to run');
+    // Its first start (macOS checks new code then): the row says Checking and offers Cancel.
+    set({ phase: 'verifying' });
+    const ran = await tryRun(exeNew, ['-version'], 60000, (stop) => {
+      active = { cancel: async () => stop() };
+    });
+    active = null;
+    check();
+    if (ran.error || !/ffmpeg version/i.test(ran.out)) throw new Error(`the downloaded ffmpeg did not start on this Mac (${ran.error || 'no version'})`);
+    try {
+      await IOUtils.remove(home, { recursive: true, ignoreAbsent: true });
+    } catch {
+      throw new Error('the ffmpeg already there could not be replaced');
+    }
+    await IOUtils.move(fresh, home);
+    const exe = PathUtils.join(home, name);
+    if (!(await IOUtils.exists(exe))) throw new Error('ffmpeg is missing after unpacking');
+    set({ phase: 'done', path: exe });
+    return exe;
+  } catch (e) {
+    if (e instanceof Stop || cancelled) set({ phase: 'cancelled' });
+    else set({ phase: 'failed', error: e instanceof Error ? e.message : String(e) });
+    throw e;
+  } finally {
+    active = null;
+    await IOUtils.remove(zip, { ignoreAbsent: true }).catch(() => undefined);
+    if (state.phase !== 'done') await IOUtils.remove(fresh, { recursive: true, ignoreAbsent: true }).catch(() => undefined);
+    await release?.();
+  }
+}
+
+/** Download, check and unpack ffmpeg; resolves with the path of ffmpeg.exe (ffmpeg on a Mac). One at a time. */
 export function installFfmpeg(): Promise<string> {
   if (running) return running;
-  if (isMac) {
-    // The release holds Windows builds only (BUILD): nothing that would run on a Mac.
-    set({ phase: 'failed', version: '', received: 0, total: 0, path: '', error: MAC_NOT_YET });
-    return Promise.reject(new Error(MAC_NOT_YET));
-  }
   cancelled = false;
-  running = run().finally(() => {
+  running = (isMac ? runMac() : run()).finally(() => {
     running = null;
   });
   return running;

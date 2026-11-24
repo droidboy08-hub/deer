@@ -1,0 +1,58 @@
+
+== Ink contrast on each capsule (WCAG; under 3:1 hard to read, under 4.5:1 below the text rule) ==
+tone = median sRGB grey of the capsule (inset 3 CSS px), ink = Deer's colour blended on it
+
+== Lag, variant 36: 12 glass windows matched to capsules, 879 frames of Deer's row, 238 window-server samples ==
+(off = glass window against where Deer's row had its capsule, both relative to Deer's window; delay = the shift of the row's timeline that fits the glass best)
+bg-tab-open     1014 ms  windows: 7, max off 36 pt, mean off 1.5 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off  36.4 pt, mean  2.7 pt, best delay 24 ms, then off 0.5 pt
+      c5   tab         max off  33.1 pt, mean  2.4 pt, best delay 24 ms, then off 0.6 pt
+      c4   tab         max off  33.1 pt, mean  2.4 pt, best delay 24 ms, then off 0.4 pt
+bg-tab-close     942 ms  windows: 6, max off 33 pt, mean off 1.7 pt, best-fit delay median 20 ms (20..20)
+      c3   tab         max off  32.7 pt, mean  2.5 pt, best delay 20 ms, then off 0.7 pt
+      c5   tab         max off  30.0 pt, mean  2.3 pt, best delay 20 ms, then off 0.8 pt
+      c4   tab         max off  30.0 pt, mean  2.3 pt, best delay 20 ms, then off 0.5 pt
+fg-tab-open     1115 ms  windows: 8, max off 172 pt, mean off 3.4 pt, best-fit delay median 36 ms (20..36)
+      c1   active      max off 172.4 pt, mean  8.7 pt, best delay 36 ms, then off 1.6 pt
+      c3   tab         max off 172.4 pt, mean  8.7 pt, best delay 36 ms, then off 1.7 pt
+      c5   tab         max off  58.6 pt, mean  2.9 pt, best delay 36 ms, then off 0.9 pt
+fg-tab-close    1010 ms  windows: 7, max off 120 pt, mean off 3.4 pt, best-fit delay median 24 ms (24..24)
+      c3   tab         max off 120.4 pt, mean  7.5 pt, best delay 24 ms, then off 1.2 pt
+      c1   tab         max off 120.4 pt, mean  7.5 pt, best delay 24 ms, then off 1.1 pt
+      c5   tab         max off  41.3 pt, mean  2.6 pt, best delay 24 ms, then off 0.7 pt
+hover-in        1205 ms  windows: 3, max off 7 pt, mean off 0.3 pt, best-fit delay median 20 ms (20..20)
+      c6   tab         max off   6.5 pt, mean  0.3 pt, best delay 20 ms, then off 0.1 pt
+      c7   tab         max off   6.5 pt, mean  0.3 pt, best delay 20 ms, then off 0.1 pt
+      c2   plus        max off   6.5 pt, mean  0.3 pt, best delay 20 ms, then off 0.1 pt
+hover-out        514 ms  windows: 3, max off 7 pt, mean off 0.8 pt, best-fit delay median 16 ms (16..16)
+      c6   tab         max off   6.5 pt, mean  0.8 pt, best delay 16 ms, then off 0.2 pt
+      c7   tab         max off   6.5 pt, mean  0.8 pt, best delay 16 ms, then off 0.2 pt
+      c2   plus        max off   6.5 pt, mean  0.8 pt, best delay 16 ms, then off 0.2 pt
+typing-open      444 ms  windows: 7, max off 157 pt, mean off 8.8 pt, best-fit delay median 24 ms (20..24)
+      c1   active      max off 157.1 pt, mean 13.4 pt, best delay 20 ms, then off 3.9 pt
+      c3   tab         max off 138.5 pt, mean 14.8 pt, best delay 24 ms, then off 6.5 pt
+      c4   tab         max off  94.1 pt, mean 10.1 pt, best delay 24 ms, then off 4.5 pt
+typing-close     714 ms  windows: 7, max off 79 pt, mean off 4.4 pt, best-fit delay median 20 ms (20..20)
+      c3   tab         max off  78.8 pt, mean  7.2 pt, best delay 20 ms, then off 1.2 pt
+      c1   field       max off  78.8 pt, mean  7.2 pt, best delay 20 ms, then off 0.9 pt
+      c4   tab         max off  53.5 pt, mean  4.9 pt, best delay 20 ms, then off 0.9 pt
+resize-narrow    828 ms  windows: 8, max off 108 pt, mean off 7.5 pt, best-fit delay median 28 ms (24..28)
+      c2   plus        max off 108.4 pt, mean 12.3 pt, best delay 28 ms, then off 1.7 pt
+      c7   tab         max off  89.8 pt, mean 10.3 pt, best delay 28 ms, then off 1.9 pt
+      c6   tab         max off  70.0 pt, mean  8.3 pt, best delay 28 ms, then off 1.5 pt
+resize-wide      918 ms  windows: 8, max off 121 pt, mean off 6.3 pt, best-fit delay median 28 ms (24..28)
+      c2   plus        max off 120.7 pt, mean 10.4 pt, best delay 28 ms, then off 0.8 pt
+      c7   tab         max off  98.5 pt, mean  8.8 pt, best delay 28 ms, then off 0.9 pt
+      c6   tab         max off  74.7 pt, mean  7.1 pt, best delay 28 ms, then off 0.8 pt
+snaps (window jumped > 20 pt against Deer's window while its capsule stood): 4
+      at +9601 ms (resize-narrow): c9 window x 1032 -> 996 against Deer's window, capsule at 989
+      at +9601 ms (resize-narrow): c8 window x 988 -> 952 against Deer's window, capsule at 945
+      at +3705 ms (fg-tab-close): c3 window x 207 -> 258 against Deer's window, capsule at 304
+      at +6485 ms (typing-open): c3 window x 643 -> 665 against Deer's window, capsule at 665
+window-move: Deer's window x [(19, 240)]
+   glass c9 x [(19, 1464)]
+   glass c8 x [(19, 1420)]
+window-back: Deer's window x [(17, 40)]
+   glass c9 x [(17, 1264)]
+   glass c8 x [(17, 1220)]
+MEASURE 36 {"tag":"track-36-1","stats":{"frames":879,"secs":14.62,"dtP50":16.53,"dtP95":23.53,"dtMax":59.02,"costP50":0.2,"costP95":1.54,"costMax":17.43,"windowsMax":10},"recPath":"/Users/droid/Documents/Projects/Deer browser/gecko/tests/menus/out/cd-rec-36.json"}

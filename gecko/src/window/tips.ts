@@ -9,6 +9,8 @@
 // above it instead when there is no room below, e.g. Home's corner circles), kept 8 px inside the
 // window; it hides on mouse out, press, key or wheel. Keyboard focus does not show
 // it (the accessible name already says the same). One tip element per window, in its own layer.
+// A label with line breaks shows as lines, each in its own text direction (the History panel's
+// rows: title, address, date and time).
 import type { Browser } from './browser';
 import { el } from './dom';
 
@@ -69,6 +71,10 @@ export class Tips {
     const r = host.getBoundingClientRect();
     if (!r.width || !r.height) return;
     this.text.textContent = label;
+    const lines = label.includes('\n');
+    this.tip.classList.toggle('lines', lines);
+    if (lines) this.text.setAttribute('dir', 'auto');
+    else this.text.removeAttribute('dir');
     this.key.textContent = host.dataset.key ?? '';
     this.key.hidden = !host.dataset.key;
     this.tip.hidden = false;

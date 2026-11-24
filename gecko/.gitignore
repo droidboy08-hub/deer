@@ -37,6 +37,10 @@ node_modules/
 /installer/out/
 /installer/work/
 
+# The macOS release (tools/mac/release.py): Mozilla's downloaded engine disk image, the work folder,
+# the signed Deer.app, the .dmg and its checksums. Published only as GitHub release assets.
+/release-mac/
+
 # Python's bytecode cache
 __pycache__/
 

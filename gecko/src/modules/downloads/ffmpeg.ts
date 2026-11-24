@@ -11,14 +11,17 @@
 //      downloaded before the rename, %LOCALAPPDATA%\Vitre\ffmpeg\ffmpeg.exe (used where it is, never
 //      moved or downloaded again; ffmpeg-install.ts);
 //   4. PATH (Subprocess.pathSearch).
-// macOS: 1 and 4 only in practice. Deer downloads no copy there (ffmpeg-install.ts refuses on a Mac),
-// so 3 is skipped (its folders are under %LOCALAPPDATA%, which a Mac does not have).
+// macOS: 3 is the copy Deer downloaded for the person, ~/Library/Application Support/Deer/ffmpeg/ffmpeg
+// (ffmpeg-install.ts; there is no old folder on a Mac). 2 names Windows files and never matches there.
+// 4 is Deer's own PATH: a Deer started from a terminal finds Homebrew's ffmpeg, one started from the
+// Dock or Finder has only /usr/bin:/bin:/usr/sbin:/sbin (the person can choose the file, or download it).
 // None: the UI says "ffmpeg not found" and streams that need joining are kept as separate files.
 //
 // Firefox internals: resource://gre/modules/Subprocess.sys.mjs (call, pathSearch; stdout/stderr
 // readString; wait; kill), Services.dirsvc "XREExeF".
 import { Subprocess } from 'resource://gre/modules/Subprocess.sys.mjs';
 import { isMac } from '../../shared/os';
+import { toolName } from '../platform/tools';
 import { ffmpegInstallDir, oldFolder } from './ffmpeg-install';
 import { AbortedError } from './net';
 import { existsSync, fileFor } from './partfile';
@@ -42,7 +45,7 @@ export function forgetFfmpeg(): void {
 
 export async function findFfmpeg(settingPath: string): Promise<FfmpegInfo> {
   const setting = settingPath || '';
-  const downloads = isMac ? [] : [PathUtils.join(ffmpegInstallDir(), 'ffmpeg.exe'), PathUtils.join(oldFolder('ffmpeg'), 'ffmpeg.exe')];
+  const downloads = isMac ? [PathUtils.join(ffmpegInstallDir(), toolName('ffmpeg'))] : [PathUtils.join(ffmpegInstallDir(), 'ffmpeg.exe'), PathUtils.join(oldFolder('ffmpeg'), 'ffmpeg.exe')];
   const key = [setting, ...downloads].join('|');
   if (cache && cache.key === key && Date.now() - cache.at < 60000) return cache.info;
   let info: FfmpegInfo = { path: null, source: 'none', settingBroken: false };

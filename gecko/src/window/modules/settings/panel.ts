@@ -33,6 +33,7 @@ import { exitElementFullscreen } from './gecko';
 import { ico } from './icons';
 import { BUILTIN_SECTIONS } from './pages';
 import { CAPTURE_ESC_PRIORITY, capture, matchesKeys } from './shortcuts-page';
+import { onSyncStateChange } from './sync-page';
 
 const W = 960;
 const H = 688;
@@ -104,6 +105,15 @@ export class SettingsPanel {
         }
       }
     });
+    const unsubSync = onSyncStateChange(() => {
+      if (this.openNow) {
+        this.buildNav();
+        if (this.section === 'sync') {
+          this.renderContent();
+        }
+      }
+    });
+    b.onDestroy(unsubSync);
     b.addEscLayer(CAPTURE_ESC_PRIORITY, () => {
       if (!capture.active) return false;
       capture.active.cancel(true);
@@ -364,6 +374,9 @@ export class SettingsPanel {
 
   /** Is this element under the panel: the page, the tab bar, or a module layer below panels? */
   private isBeneath(el: HTMLElement): boolean {
+    // macOS: Deer's menus are XUL panels in #mainPopupSet (menus/panelhost.ts), outside every module
+    // layer. Assistive technology gets the open menu focused (menus/view.ts takeFocus): it keeps it.
+    if (isMac && el.closest('.vt-menus')) return false;
     const layer = el.closest<HTMLElement>('.module-layer');
     return !layer || Number(layer.style.zIndex || 0) < PANEL_Z;
   }

@@ -12,6 +12,9 @@
 //
 // A click runs the Deer action the item's key runs (b.run), or the item's verb (Zoom, Bring All to
 // Front, Deer on GitHub: items.ts runVerb). Edit's standard items run Firefox's own commands.
+// History › Show All History opens the History panel and never closes it, as History in the + menu
+// does (its service's open(); ../design/HISTORY-SPEC.md "Menus"); its key, ⌘Y, toggles the panel
+// through the router. Without the History module in the build it runs the action as the key does.
 //
 // Keys. Each item shows its action's key from the key router (b.keys.chordFor, rebinds applied, set
 // again when a rebind changes) through a <key> outside every <keyset>: to Gecko's key handling it is
@@ -109,7 +112,9 @@ export function install(b: Browser): void {
     const mods = e as Event & { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean };
     if (inKey && routerKeys.has(item.id) && (mods.metaKey || mods.ctrlKey || mods.altKey)) return;
     try {
+      const history = item.action === 'history' ? b.service('history') : undefined;
       if (item.verb) runVerb(item.verb, window);
+      else if (history) history.open();
       else if (item.action) b.run(item.action as ActionId, item.arg);
     } catch (err) {
       console.error(`Deer: menu bar item ${item.id} failed`, err);

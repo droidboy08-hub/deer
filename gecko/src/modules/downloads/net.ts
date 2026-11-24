@@ -203,7 +203,7 @@ export class Identity implements IdentityJSON {
     this.firstParty = !this.principal && o.firstParty !== false;
     this.pageRules = !this.firstParty && !!o.pageRules;
     this.referrerPolicy = asPolicy(o.referrerPolicy);
-    this.cookieJarSettings = this.principal && typeof o.cookieJarSettings === 'string' ? o.cookieJarSettings : '';
+    this.cookieJarSettings = typeof o.cookieJarSettings === 'string' ? o.cookieJarSettings : '';
   }
 
   /** From a tab's BrowsingContext (parent process). */
@@ -242,30 +242,7 @@ function revive<T>(fn: () => T): T | null {
   }
 }
 
-/** The registrable domain of a host (eTLD+1), the host itself for IPs and single labels. */
-function baseDomain(host: string): string {
-  try {
-    return Services.eTLD.getBaseDomainFromHost(host);
-  } catch {
-    return host;
-  }
-}
 
-/**
- * The page's cookie jar is partitioned for another site than `uri`'s ("(https,a.example)" against
- * b.example): a lane's jar would replace that partition, so the connection keeps the page's jar.
- */
-function partitionedAway(jar: any, uri: any): boolean {
-  let key = '';
-  try {
-    key = String(jar.partitionKey ?? '');
-  } catch {
-    key = '';
-  }
-  const m = /^\(([a-z][\w+.-]*),([^,)]+)/i.exec(key);
-  if (!m) return false;
-  return baseDomain(m[2]) !== baseDomain(uri.host);
-}
 
 export interface ChannelOptions {
   /** Own network partition (connection) number; null = share the pool like a page would. */
@@ -290,9 +267,9 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
   const pageSpec = identity.requestPage || identity.pageUrl;
   const page = pageSpec ? Services.io.newURI(pageSpec) : null;
   const ownPrincipal: any = identity.principal ? revive(() => E10SUtils.deserializePrincipal(identity.principal)) : null;
-  const pageJar: any = ownPrincipal && identity.cookieJarSettings ? revive(() => E10SUtils.deserializeCookieJarSettings(identity.cookieJarSettings)) : null;
+  const pageJar: any = identity.cookieJarSettings ? revive(() => E10SUtils.deserializeCookieJarSettings(identity.cookieJarSettings)) : null;
   let channel: any;
-  if (ownPrincipal && !ownPrincipal.isSystemPrincipal) {
+  if (!identity.requestPage && ownPrincipal && !ownPrincipal.isSystemPrincipal) {
     // The page's own principal (a link, an image the page shows): as Firefox's Save Link As.
     channel = NetUtil.newChannel({
       uri,
@@ -301,7 +278,7 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
       securityFlags: Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
       contentPolicyType: Ci.nsIContentPolicy.TYPE_SAVEAS_DOWNLOAD,
     });
-  } else if (identity.principal) {
+  } else if (!identity.requestPage && identity.principal) {
     // A page principal that no longer reads: never fall back to the system one.
     throw new DownloadError('Deer can\u2019t download this address any more. Start it again from the page.');
   } else if (page && !identity.firstParty) {
@@ -327,8 +304,8 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
   }
   if (channel instanceof Ci.nsIPrivateBrowsingChannel) channel.setPrivate(identity.isPrivate);
   channel.QueryInterface(Ci.nsIHttpChannel);
-  // The page's jar wins over a lane where the lane would trade its partition away (see the header).
-  const lane = pageJar && partitionedAway(pageJar, uri) ? null : (opts.lane ?? null);
+  // The page's jar wins when no dedicated connection lane is requested.
+  const lane = opts.lane ?? null;
   if (pageJar && lane === null) channel.loadInfo.cookieJarSettings = pageJar;
   if (lane !== null) {
     const cjs = Cc['@mozilla.org/cookieJarSettings;1'].createInstance(Ci.nsICookieJarSettings);
@@ -345,7 +322,10 @@ export function makeChannel(url: string, identity: Identity, extra: Record<strin
    */
   const dress = (ch: any): void => {
     ch.QueryInterface(Ci.nsIHttpChannel);
-    const referrer = page ? referrerFor(page, ch.URI, identity.referrerPolicy) : null;
+    // A player frame sends its whole address (these embeds use no-referrer-when-downgrade). The
+    // default policy would keep only the origin, and the CDN refuses that.
+    const policy = identity.requestPage ? 'unsafe-url' : identity.referrerPolicy;
+    const referrer = page ? referrerFor(page, ch.URI, policy) : null;
     if (referrer) {
       // The policy is applied here (referrer.ts), not by Necko: with a system triggering principal
       // Necko treats every request as cross-origin and would trim a same-origin Referer. UNSAFE_URL

@@ -21,9 +21,9 @@
 // nothing here is different. The page fills the window from y 0 as on Windows (skin/shell.css
 // section 8), in a normal window and in window full screen alike, and the row floats over it (the
 // traffic lights and glass capsules, skin/bar.css), so the list follows the row's hiding mode
-// exactly as it follows the Windows bar's. The row hides only in window full screen (reveal.ts
-// `hiding`, the Mac's F11), so every page is listed there and gets no strip; in a normal window the
-// row stays, no page is listed and every page gets the top strip (src/actors/page/inset.ts: ROW_AREA,
+// exactly as it follows the Windows bar's. The row hides in window full screen (reveal.ts `hiding`,
+// the Mac's F11) and, in a normal window, with the auto-hide setting, so every page is listed then
+// and gets no strip; while the row is always shown no page is listed and every page gets the top strip (src/actors/page/inset.ts: ROW_AREA,
 // 64 px on macOS, src/shared/geometry.ts; the PDF viewer moves down as far, src/actors/page/pdf.ts):
 // its content starts below the row at scroll top and scrolls under the capsules. (Until 2026-11-15
 // the page area started at the row's bottom edge, under a band of macOS's gray title-bar material,

@@ -1,0 +1,21 @@
+[config] security.sandbox.content.mac.testing_read_path1 = /Users/droid/Documents/Projects/Deer browser/gecko/build
+@@pid 79080
+@@capture glass-look-motion-before-rec2-sysdark 0x15645fa00 screen 40 40 1400 880
+MOTION-REC rec2-sysdark 140 190 1200 420 14
+recording rec2: started
+T+0 open v4
+OPEN A v4 d=240
+T+1022 close v4
+CLOSE A (transitionend -moz-window-transform)
+T+1975 open v5
+OPEN A v5 d=240
+T+3014 close v5
+CLOSE A (transitionend -moz-window-transform)
+T+3964 open v1 slow
+OPEN A v1 d=3000
+T+7859 close v1 slow
+CLOSE A (transitionend -moz-window-opacity)
+T+10868 end
+PASS done
+RESULT pass=1 fail=0
+@@quit

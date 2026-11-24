@@ -271,12 +271,27 @@ spike.main(async () => {
   await settle();
 
   // ------------------------------------------------------------------ 6. Ctrl+H
+  // With the History panel (../design/HISTORY-SPEC.md) Ctrl+H opens the panel; the address field's
+  // list of recent pages stays, shown when the field is clicked. Without the module (a build that
+  // leaves it out) Ctrl+H still opens the field empty with that list.
   log("--- 6. recent history");
   b.focusPage();
   await sleep(150);
   press("Ctrl+H");
+  if (b.service("history")) {
+    await waitFor(() => b.service("history").isOpen(), { timeout: 3000, what: "the History panel" });
+    await settle();
+    check("Ctrl+H opens the History panel, not the address field", b.service("history").isOpen() && !b.omni.open && b.root.classList.contains("history-open"));
+    press("Escape");
+    await waitFor(() => !b.service("history").isOpen(), { timeout: 3000, what: "History closed" });
+    await settle();
+    spike.click(document.querySelector("#vitre-bar .item.active .address"));
+    await sleep(150);
+    input.select();
+    press("Delete");
+  }
   list = await suggestions(600);
-  check("Ctrl+H opens the field empty with the History group", b.omni.open && input.value === "" && groups().join() === "History" && list.length >= 5, { value: input.value, groups: groups(), n: list.length });
+  check("the field, empty, lists recent pages under the History group", b.omni.open && input.value === "" && groups().join() === "History" && list.length >= 5, { value: input.value, groups: groups(), n: list.length });
   await spike.capture("omni-6-history");
   press("Escape");
   await settle();

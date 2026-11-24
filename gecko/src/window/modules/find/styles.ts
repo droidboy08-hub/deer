@@ -218,8 +218,8 @@ export const CSS = `
    page under it, as the Windows bar's does (skin/bar.css), so the face's text and controls do too,
    in RowSpec's colours: the light set below on #vitre-root.theme-light, the dark one on theme-dark
    and theme-clear and in a private window, never by the system's appearance. In a normal window the
-   row never hides (reveal.ts), so the face never needs its own glass there; in window full screen it
-   can, and the face's own glass is then the row's (RowSpec "Liquid Glass Regular": blur 14, saturate
+   row hides only with the auto-hide setting, and in window full screen it always can; the face's
+   own glass, when it needs one, is the row's (RowSpec "Liquid Glass Regular": blur 14, saturate
    1.9, brightness 1.04, as skin/bar.css gives the capsules), not the Windows lens map views.ts
    setLens draws.
    Across, the parts sit where board RowFind puts them in its 400 px capsule (views.ts FAV_X, FIELD_X,

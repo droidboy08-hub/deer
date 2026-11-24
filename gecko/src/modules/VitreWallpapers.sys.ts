@@ -251,13 +251,15 @@ const filePath = (id: string, kind: WallpaperKind): string => PathUtils.join(kin
 const thumbPath = (id: string, kind: WallpaperKind): string => PathUtils.join(thumbDir(kind), `${id}.jpg`);
 const oldPath = (id: string, kind: WallpaperKind): string => PathUtils.join(folder(), `${id}.${EXT[kind]}`);
 
+const norm = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '');
+
 /** The Deer file a path names: a kind's file, or one of Deer 0.1.5-0.1.8's at the folder's top (`old`). */
 function deerFile(path: string): { id: string; kind: WallpaperKind; old: boolean } | null {
   if (!path || typeof path !== 'string') return null;
-  const root = folder().toLowerCase() + '\\';
-  const p = path.replace(/\//g, '\\').toLowerCase();
+  const root = norm(folder()).toLowerCase() + '/';
+  const p = norm(path).toLowerCase();
   if (!p.startsWith(root)) return null;
-  const parts = p.slice(root.length).split('\\');
+  const parts = p.slice(root.length).split('/');
   if (parts.length === 1) {
     const m = OLD_FILE.exec(parts[0]);
     return m ? { id: m[1], kind: m[2] === 'mp4' ? 'video' : 'photo', old: true } : null;
@@ -339,16 +341,19 @@ function attributes(path: string): number | null {
  * link (a junction, a symbolic link) to somewhere else. Only then is anything written or removed in it.
  */
 function ownFolder(dir: string): boolean {
-  const root = folder();
-  const d = dir.replace(/\//g, '\\').replace(/\\+$/, '');
-  if (d.toLowerCase() !== root.toLowerCase() && !d.toLowerCase().startsWith(root.toLowerCase() + '\\')) return false;
-  let p = root;
-  for (const part of ['', ...d.slice(root.length).split('\\').filter(Boolean)]) {
+  const root = norm(folder());
+  const d = norm(dir);
+  const rLow = root.toLowerCase();
+  const dLow = d.toLowerCase();
+  if (dLow !== rLow && !dLow.startsWith(rLow + '/')) return false;
+  let p = folder();
+  const rel = d.slice(root.length).replace(/^\/+/, '');
+  for (const part of ['', ...rel.split('/').filter(Boolean)]) {
     if (part) p = PathUtils.join(p, part);
     const a = attributes(p);
     if (a === -1) return true; // not there yet, nor anything below it
     if (a === null) {
-      // No js-ctypes: nsIFile's view (a symbolic link at least).
+      // No js-ctypes (macOS / Linux): nsIFile's view (a directory and not a symlink).
       try {
         const f = localFile(p);
         if (!f.exists()) return true;
@@ -412,7 +417,10 @@ async function children(dir: string): Promise<string[]> {
 
 /** Make a folder of this one's (refused when it, or one above it, is a link elsewhere). */
 async function makeFolder(dir: string): Promise<void> {
-  if (!ownFolder(dir)) throw new Error(`${dir} is not an ordinary folder`);
+  if (await IOUtils.exists(dir)) {
+    if (!ownFolder(dir)) throw new Error(`${dir} is not an ordinary folder`);
+    return;
+  }
   await IOUtils.makeDirectory(dir, { createAncestors: true, ignoreExisting: true });
   if (!ownFolder(dir)) throw new Error(`${dir} is not an ordinary folder`);
 }
@@ -714,7 +722,7 @@ async function getStream(url: string, cap: number, accept: string, signal: Abort
   const deadline = small ? setTimeout(stop, SMALL_DEADLINE_MS) : 0;
   let reader: any = null;
   try {
-    const res = await fetch(url, { headers: { Accept: accept }, signal: ac.signal, credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
+    const res = await fetch(url, { headers: { Accept: accept }, signal: ac.signal, credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'follow' });
     if (res.status !== 200) throw new Refused(`HTTP ${res.status}`);
     const length = Number(res.headers.get('content-length') ?? NaN);
     // A compressed answer's Content-Length is not the length of the bytes read.

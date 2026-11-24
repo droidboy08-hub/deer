@@ -96,9 +96,10 @@
 // and switcherSearch do nothing until their module registers them. Page actions (back, forward,
 // reload, stop, zoom, print, save, source) act on the topmost page: a focused peek first
 // (window.vitrePeek, set by the Peek module: { browser(), close() }), else the active tab.
-// Panels (Settings, Downloads): while one is open its module puts `panel-open` and `<name>-open`
-// (settings-open, downloads-open) on b.root; find / findNext / findPrev then go to the panel as the
-// document event 'vitre:panel-find' instead of running (Ctrl+F searches the topmost surface).
+// Panels (Settings, Downloads, History): while one is open its module puts `panel-open` and
+// `<name>-open` (settings-open, downloads-open, history-open) on b.root; find / findNext /
+// findPrev then go to the panel as the document event 'vitre:panel-find' instead of running (Ctrl+F
+// searches the topmost surface).
 // The other page actions (PAGE_ACTIONS_UNDER_PANEL: back, forward, reload, zoom, print, save,
 // source, developer tools, peekLink, openAsTab, downloadVideo) do nothing while a panel is open:
 // the panel is the topmost surface and has no page (keymap.json routing rule "Topmost surface"),

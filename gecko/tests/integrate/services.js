@@ -12,8 +12,8 @@ spike.main(async () => {
   await I.load(I.page("article.html"), 600);
 
   log("modules", b.modules, "errors", b.moduleErrors);
-  const want = ["downloads", "extensions", "find", "menus", "peek", "settings", "switcher"];
-  check("all seven feature modules installed, none threw", want.every((m) => b.modules.includes(m)) && b.moduleErrors.length === 0, { modules: b.modules, errors: b.moduleErrors });
+  const want = ["downloads", "extensions", "find", "history", "menus", "peek", "settings", "switcher"];
+  check("all eight feature modules installed, none threw", want.every((m) => b.modules.includes(m)) && b.moduleErrors.length === 0, { modules: b.modules, errors: b.moduleErrors });
 
   const contract = {
     peek: { members: ["open", "isOpen", "browser", "close", "promote", "headerRect", "canReopen", "reopen"], additions: ["headerSlot", "search"] },
@@ -23,6 +23,7 @@ spike.main(async () => {
     settings: { members: ["open", "registerPage"], additions: ["isOpen", "close", "changeBackground"] },
     extensions: { members: ["openPanel", "count"], additions: [] },
     switcher: { members: ["open", "isOpen"], additions: ["close"] },
+    history: { members: ["open", "toggle", "close", "isOpen"], additions: [] },
   };
   for (const [name, c] of Object.entries(contract)) {
     const api = b.service(name);
@@ -48,11 +49,12 @@ spike.main(async () => {
     settings: b.service("settings").isOpen(),
     extensions: b.service("extensions").count(),
     switcher: b.service("switcher").isOpen(),
+    history: b.service("history").isOpen(),
   };
   log("idle answers", idle);
   check(
     "with nothing open every service says so (peek closed, no header, no slot; find, menu, panels, switcher closed; a count of extensions)",
-    !idle.peekOpen && idle.peekBrowser === null && idle.peekHeader === null && !idle.peekReopen && idle.peekSlot === null && !idle.find && !idle.menus && !idle.downloadsPanel && !idle.settings && !idle.switcher && typeof idle.extensions === "number" && idle.media && typeof idle.media.count === "number" && idle.media.protected === false,
+    !idle.peekOpen && idle.peekBrowser === null && idle.peekHeader === null && !idle.peekReopen && idle.peekSlot === null && !idle.find && !idle.menus && !idle.downloadsPanel && !idle.settings && !idle.switcher && !idle.history && typeof idle.extensions === "number" && idle.media && typeof idle.media.count === "number" && idle.media.protected === false,
     idle
   );
   // The core's own hook for the Peek module.
@@ -60,7 +62,7 @@ spike.main(async () => {
 
   // The actions each module owns are registered (the router runs them; b.builtin is the core's).
   const actions = b.actions;
-  const owned = ["find", "findNext", "findPrev", "peekLink", "openAsTab", "reopenClosed", "devtools", "downloads", "downloadVideo", "settings", "shortcutsHelp", "clearData", "nextTabMru", "prevTabMru", "switcherSearch"];
+  const owned = ["find", "findNext", "findPrev", "peekLink", "openAsTab", "reopenClosed", "devtools", "downloads", "downloadVideo", "settings", "shortcutsHelp", "clearData", "nextTabMru", "prevTabMru", "switcherSearch", "history"];
   const unregistered = owned.filter((a) => !actions?.has?.(a));
   check("every module action is registered", !unregistered.length, { unregistered });
 

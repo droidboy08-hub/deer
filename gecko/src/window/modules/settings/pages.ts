@@ -12,11 +12,12 @@ import { SEARCH_ENGINES, type SearchEngine, type Settings } from '../../../share
 import { updateStatus } from '../../../shared/update';
 import { isMac } from '../../../shared/os';
 import { backgroundPicker } from './bg-picker';
-import { button, checkRow, dropdown, h, liveDesc, localDropdown, localToggle, radioRows, row, segmented, toggle, type Option, type RowDef, type SectionDef } from './controls';
-import { engineInfo, fileURL, forgetClosedEverywhere, openFolder, pickFolder, sanitize, type SanitizeItem } from './gecko';
+import { button, checkRow, dropdown, h, liveDesc, localDropdown, localToggle, radioRows, row, segmented, toggle, type Ctx, type Option, type RowDef, type SectionDef } from './controls';
+import { bookmarkCurrentPage, engineInfo, fileURL, forgetClosedEverywhere, getBoolPref, openBookmarksOrganizer, openFolder, openSavedLogins, pickFolder, prefSubscriber, sanitize, savedLoginsCount, setBoolPref, type SanitizeItem } from './gecko';
 import { ico, icon, nav } from './icons';
 import { fillKeys } from './keymap';
 import { shortcutsSection } from './shortcuts-page';
+import { currentAccountState, onSyncStateChange, signIn, signOut, syncNow, syncSection, timeAgo } from './sync-page';
 
 /** The switcher key as this system prints it (Ctrl+Tab, or ⌃⇥ on a Mac). */
 const TAB_KEY = isMac ? '⌃⇥' : 'Ctrl+Tab';
@@ -92,6 +93,26 @@ const newTabRow = (unlisted = false): RowDef => ({
     }),
 });
 
+const showCapsulesOnHomeRow = (unlisted = false): RowDef => ({
+  title: 'Show Tab Capsules on Home tab',
+  desc: 'Always display tab capsules on Home, while auto-hiding them on pages and searches',
+  keywords: 'tabs capsules home auto-hide bar reveal',
+  unlisted,
+  build: (ctx) =>
+    row({
+      icon: ico.tabBar,
+      title: 'Show Tab Capsules on Home tab',
+      desc: 'Always display tab capsules on Home, while auto-hiding them on pages and searches',
+      control: (ids) =>
+        toggle(ctx, {
+          labelledBy: ids.title,
+          describedBy: ids.desc,
+          get: (s) => s.showCapsulesOnHome,
+          set: (v) => ctx.set({ showCapsulesOnHome: v }),
+        }),
+    }),
+});
+
 const folderRow = (unlisted = false): RowDef => ({
   title: 'Save files to',
   keywords: 'downloads folder location directory',
@@ -163,7 +184,7 @@ const general: SectionDef = {
   groups: () => [
     { title: 'Theme', rows: [modeRow(true)] },
     { title: 'Search', rows: [engineDropdownRow] },
-    { title: 'Tabs', rows: [newTabRow(true)] },
+    { title: 'Tabs', rows: [newTabRow(true), showCapsulesOnHomeRow(true)] },
     { title: 'Downloads', rows: [folderRow(true), askRow(true)] },
   ],
 };
@@ -235,13 +256,8 @@ const barAutoHideRow: RowDef = {
     }),
 };
 
-/**
- * The page inset's line. macOS: the One row is always shown in a normal window (window full screen
- * hides it and gives pages no strip, as F11 does on Windows), so the line says what the strip is for.
- */
-const INSET_DESC = isMac
-  ? 'Leaves room for the tab bar at the top of each page; it scrolls away with the page'
-  : 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page';
+/** The page inset's line (both systems: the strip is only there while the tab bar is always shown). */
+const INSET_DESC = 'While the tab bar is always shown, leaves room at the top of each page; it scrolls away with the page';
 
 const pageInsetRow: RowDef = {
   title: 'Start pages below the tab bar',
@@ -261,13 +277,13 @@ const appearance: SectionDef = {
   title: 'Appearance',
   icon: nav.appearance,
   order: 20,
-  // macOS: the Dock shows the app bundle's own icon, and the One row never hides in a normal window
-  // (reveal.ts), so App icon and "Show the tab bar" are Windows-only. "Start pages below the tab bar"
-  // applies on a Mac too: the 64 px strip under the floating row (src/actors/page/inset.ts ROW_AREA).
+  // macOS: the Dock shows the app bundle's own icon, so App icon is Windows-only. "Show the tab bar"
+  // hides the One row in a normal window as it hides the Windows bar (reveal.ts), and "Start pages
+  // below the tab bar" is the 64 px strip under the floating row (src/actors/page/inset.ts ROW_AREA).
   groups: () => [
     { title: 'Theme', rows: [modeRow()] },
     ...(isMac ? [] : [{ title: 'App icon', rows: [appIconRow] }]),
-    { title: 'Tab bar', rows: isMac ? [pageInsetRow] : [barAutoHideRow, pageInsetRow] },
+    { title: 'Tab bar', rows: [barAutoHideRow, pageInsetRow] },
   ],
 };
 
@@ -505,6 +521,7 @@ const tabs: SectionDef = {
           ],
         }),
         newTabRow(),
+        showCapsulesOnHomeRow(),
         choiceRow({
           icon: ico.selection,
           title: 'Searches from selected text',
@@ -696,12 +713,184 @@ const clearRow: RowDef = {
   },
 };
 
+function prefToggleRow(ctx: Ctx, iconMarkup: string, title: string, desc: string, prefKey: string, keywords?: string): RowDef {
+  return {
+    title,
+    desc,
+    keywords,
+    build: () =>
+      row({
+        icon: iconMarkup,
+        title,
+        desc,
+        control: (ids) =>
+          localToggle(ctx, {
+            labelledBy: ids.title,
+            describedBy: ids.desc,
+            get: () => getBoolPref(prefKey, true),
+            set: (v) => setBoolPref(prefKey, v),
+            subscribe: prefSubscriber(prefKey),
+          }),
+      }),
+  };
+}
+
 const privacy: SectionDef = {
   id: 'privacy',
   title: 'Privacy and security',
   icon: nav.privacy,
   order: 60,
-  groups: () => [{ title: 'Clear browsing data', anchor: 'clear', rows: [clearRow] }],
+  groups: (ctx) => [
+    {
+      title: 'Firefox Account and sync',
+      anchor: 'sync-data',
+      rows: [
+        {
+          title: 'Firefox Sync',
+          desc: 'Sync your bookmarks, logins and passwords, history, and open tabs across devices',
+          keywords: 'sync account firefox data login password bookmarks tabs sign in',
+          build: (c) => {
+            const el = row({
+              icon: ico.sync,
+              title: 'Firefox Sync',
+              desc: 'Connecting…',
+              control: () => h('div', { class: 'vs-row-btns' }),
+            });
+            const titleEl = el.querySelector('.vs-title') as HTMLElement | null;
+            const descEl = el.querySelector('.vs-desc') as HTMLElement | null;
+            const ctl = el.querySelector('.vs-row-btns') as HTMLElement | null;
+
+            const paint = () => {
+              if (!ctl) return;
+              const state = currentAccountState();
+              ctl.textContent = '';
+              if (state.signedIn) {
+                const name = state.displayName || state.email || 'Firefox Account';
+                if (titleEl) titleEl.textContent = name;
+                if (descEl) {
+                  const syncDesc = state.syncing ? 'Syncing now…' : `Connected · Synced ${timeAgo(state.lastSync)}`;
+                  descEl.textContent = `${state.email && state.displayName ? `${state.email} · ` : ''}${syncDesc}`;
+                }
+                const syncBtn = button(state.syncing ? 'Syncing…' : 'Sync now', () => void syncNow());
+                syncBtn.disabled = state.syncing;
+                const manageBtn = button('Manage Sync…', () => c.go('sync'));
+                const signOutBtn = button('Sign out', async () => {
+                  signOutBtn.disabled = true;
+                  signOutBtn.textContent = 'Signing out…';
+                  try {
+                    await signOut();
+                  } catch (e) {
+                    console.error('Deer signOut failed', e);
+                    signOutBtn.disabled = false;
+                    signOutBtn.textContent = 'Sign out';
+                  }
+                });
+                ctl.append(syncBtn, manageBtn, signOutBtn);
+              } else {
+                if (titleEl) titleEl.textContent = 'Firefox Sync';
+                if (descEl) descEl.textContent = 'Sign in with your Firefox Account to access your bookmarks, passwords, and open tabs across devices.';
+                const signBtn = button('Sign in to Sync', () => void signIn(c.b), { accent: true });
+                ctl.append(signBtn);
+              }
+            };
+
+            paint();
+            c.cleanup(onSyncStateChange(paint));
+            return el;
+          },
+        },
+      ],
+    },
+    {
+      title: 'Logins and passwords',
+      anchor: 'logins',
+      rows: [
+        {
+          title: 'Saved logins and passwords',
+          desc: 'View, edit, search, and manage credentials saved in Deer and synced from Firefox',
+          keywords: 'passwords logins credentials saved view edit delete about:logins lockwise autofill',
+          build: (c) => {
+            const count = savedLoginsCount();
+            const desc = count > 0 ? `${count} saved ${count === 1 ? 'login' : 'logins'} · Synced with your Firefox Account` : 'View and manage passwords saved in Deer';
+            const btn = button('Saved Logins…', () => openSavedLogins(c.b));
+            return row({
+              icon: ico.key,
+              title: 'Saved logins and passwords',
+              desc,
+              control: () => btn,
+            });
+          },
+        },
+        prefToggleRow(
+          ctx,
+          ico.key,
+          'Ask to save logins and passwords for websites',
+          'Offer to remember credentials when you sign in',
+          'signon.rememberSignons',
+          'remember save ask passwords logins'
+        ),
+        prefToggleRow(
+          ctx,
+          ico.caret,
+          'Autofill logins and passwords',
+          'Fill in saved usernames and passwords on web pages automatically',
+          'signon.autofillForms',
+          'autofill fill auto passwords logins'
+        ),
+        prefToggleRow(
+          ctx,
+          ico.key,
+          'Suggest strong passwords',
+          'Offer secure randomly generated passwords when creating new accounts',
+          'signon.generation.available',
+          'suggest strong password generator secure'
+        ),
+        prefToggleRow(
+          ctx,
+          ico.ask,
+          'Alerts for breached website passwords',
+          'Warn if a saved password has appeared in a known data breach',
+          'signon.management.page.breach-alerts.enabled',
+          'breach alerts compromised leak security'
+        ),
+      ],
+    },
+    {
+      title: 'Bookmarks',
+      anchor: 'bookmarks',
+      rows: [
+        {
+          title: 'Bookmarks library',
+          desc: 'View, search, organize, import, and manage all your bookmarks and folders',
+          keywords: 'bookmarks library organizer folders manage import export places',
+          build: () =>
+            row({
+              icon: ico.bookmark,
+              title: 'Bookmarks library',
+              desc: 'View, search, organize, import, and manage all your bookmarks and folders',
+              control: () => button('Manage Bookmarks…', () => openBookmarksOrganizer()),
+            }),
+        },
+        {
+          title: 'Bookmark current tab',
+          desc: 'Save the currently active page to your bookmarks',
+          keywords: 'bookmark current tab page star save add',
+          build: () =>
+            row({
+              icon: ico.plusRow,
+              title: 'Bookmark current tab',
+              desc: 'Save the currently active page to your bookmarks',
+              control: () => button('Bookmark Tab', () => bookmarkCurrentPage()),
+            }),
+        },
+      ],
+    },
+    {
+      title: 'Clear browsing data',
+      anchor: 'clear',
+      rows: [clearRow],
+    },
+  ],
 };
 
 // ---- Search engine ----
@@ -836,4 +1025,4 @@ const about: SectionDef = {
   ],
 };
 
-export const BUILTIN_SECTIONS: SectionDef[] = [general, appearance, home, tabs, downloads, privacy, search, shortcutsSection, about];
+export const BUILTIN_SECTIONS: SectionDef[] = [syncSection, general, appearance, home, tabs, downloads, privacy, search, shortcutsSection, about];
